@@ -506,7 +506,7 @@ bool VehicleWindowGl50DS::Storage::validateOriginalUiBank(const VehicleWindowReq
     }
 
 bool VehicleWindowGl50DS::Storage::createOriginalUi() noexcept {
-        if (!request.enableOriginalUi && !request.gcParticleTextures && !request.track.rcParticleWindow && !request.track.gbParticleWindow && !request.track.mcParticleWindow && !raceHudPreparing && !timeStatsPreparing && !positionStatsPreparing && !damagePreparing && !pauseDerivedPreparing && !speedBoostPreparing && !nativeF8BarPreparing && !nativeResultsDrawPreparing) return true;
+        if (!request.enableOriginalUi && !request.gcParticleTextures && !request.track.rcParticleWindow && !request.track.gbParticleWindow && !request.track.mcParticleWindow && !raceHudPreparing && !raceStartOverlayPreparing && !timeStatsPreparing && !positionStatsPreparing && !damagePreparing && !pauseDerivedPreparing && !speedBoostPreparing && !nativeF8BarPreparing && !nativeResultsDrawPreparing) return true;
         constexpr const char* vertexSource = R"GLSL(#version 150 core
 in vec3 rrPosition;
 in vec2 rrUv;

@@ -1,78 +1,48 @@
 #pragma once
 #include "mc_cold_sources50la.h"
 #include "native_water_runtime50jc_fixture.h"
+#include "../../src/assets/track_height_descriptor50jb.h"
 #include "../../src/game/undertrack_reset50ew.h"
 #include "audio_retained_payload50mc.h"
 
 namespace mc_water50MC {
-struct Pin {const char* name;std::size_t offset,bytes;const char* sha;};
-inline constexpr Pin pins[]{
- {"tracks\\mc.wtt",466944u,3097u,"43ce93a91873f4b32edcfea72f5f6296d178d9e3d48d2730b566f6f5177d15fb"},
- {"tracks\\Sigs\\test0000.pst",491520u,22860u,"28e2a50aa10e1376cf26ac567c4442dba3870452b97bc70d8bf815d8ade327fb"},
- {"textures\\WaterEnvironment.pst",540672u,33820u,"d4db790a0b5d70754e3d41dc64849832ecf1152d34b3516642129a5ef4fad440"},
- {"tracks\\baseDisplacement.tga",589824u,1068u,"07e69a2bfc92e646788d2ddb0e6112be2b6f52ccb8ef7b84fd64fc889fc84be9"},
- {"textures\\WaterDefault.psm",11722752u,2623u,"b46e8c236ecd7a082a6cc07b3d5f3460ffa23c9a887883d8fd27113cc637b5a1"},
-};
+// MC course source adapter over the common loader. The WaterFile comes from
+// the course SCB Environment, resolved beside the scene member (1B38DC), like
+// track_height_cold50JB; nothing here names an MC file.
 inline bool member(const mc_cold_sources50LA::Owner& source,const std::string& name,
  std::vector<std::uint8_t>& bytes,water_resources50JC::Member& identity,std::string& error){
- const Pin* pin=nullptr;for(const auto& p:pins)if(water_resources50JC::sameName(name,p.name))pin=&p;
- if(!pin){error="MC water member lacks actual source identity";return false;}
  const rr::assets::ResourceEntry48C* hit=nullptr;
  for(const auto& entry:source.archive().entries())if(water_resources50JC::sameName(entry.name,name)){
-  if(hit){error="MC duplicate water resource";return false;}hit=&entry;
+  if(hit){error="water resource has duplicate catalog identities";return false;}hit=&entry;
  }
+ if(!hit){error="water resource requires an unrepresented original catalog continuation: "+name;return false;}
  rr::assets::DecodeError48C diagnostic;
- if(!hit||hit->logical_offset!=pin->offset||!source.archive().extractMember(name,bytes,diagnostic,pin->bytes)||
-    bytes.size()!=pin->bytes||pod_materials50ed_fixture::detail::sha256(bytes)!=pin->sha){
-  error="MC original water resource identity differs: "+name;return false;
- }
- identity={hit->name,pin->sha,hit->logical_offset,bytes.size()};return true;
+ if(!source.archive().extractMember(hit->name,bytes,diagnostic)){error="water resource extraction rejected: "+diagnostic.code;return false;}
+ identity={hit->name,pod_materials50ed_fixture::detail::sha256(bytes),hit->logical_offset,bytes.size()};return true;
 }
 inline bool prepareResources(const mc_cold_sources50LA::Owner& source,
  std::shared_ptr<water_resources50JC::Owner>& output,std::string& error){
- if(!source.ready()){error="MC water requires actual retained source";return false;}
- auto staged=std::make_shared<water_resources50JC::Owner>();
- std::vector<std::uint8_t> waterBytes;
- if(!member(source,"tracks\\mc.wtt",waterBytes,staged->waterMember,error))return false;
- rr::assets::AiAuthoringDiagnostic50IU authoring;
- if(!rr::assets::readWaterAuthoring50JC(reinterpret_cast<const char*>(waterBytes.data()),waterBytes.size(),staged->authored,authoring)){
-  error="MC original water authoring rejected";return false;
- }
- const auto& general=staged->authored.general;
- if(general.poolCount!=0||general.signatureCount!=3||!general.enableBaseDisplacement){
-  error="MC actual pool/signature/noise construction differs";return false;
- }
- staged->signatures.resize(3);
- for(std::size_t i=0;i<3;++i){const auto& authored=staged->authored.signatures[i];auto& signature=staged->signatures[i];
-  if(authored.frameCount!=1||authored.channel!=static_cast<std::int32_t>(i)||std::string(authored.filename.data())!="test"){
-   error="MC actual three one-frame signature channels differ";return false;
-  }
-  signature.members.resize(1);signature.textures.resize(1);signature.frames.resize(1);
-  std::vector<std::uint8_t> bytes;
-  if(!member(source,"tracks\\Sigs\\test0000.pst",bytes,signature.members[0],error))return false;
-  rr::assets::DecodeError48C diagnostic;
-  if(!rr::assets::readWaterSignatureTexture50JC(bytes,signature.textures[0],diagnostic)){
-   error="MC actual signature texture rejected: "+diagnostic.code;return false;
-  }
-  const auto& texture=signature.textures[0];
-  signature.frames[0]={{texture.indices.data(),texture.indices.size(),true},texture.rowStride};
-  const auto cold=rr::assets::prepareWaterSignatureCold50JC(staged->authored,i,signature.frames.data(),1,
-      texture.dimension,texture.pixelStride,signature.cold);
-  if(cold.status!=rr::game::WaterHeightStatus50JC::Complete){error="MC signature cold projection rejected";return false;}
- }
- // Verify original archive candidate order, not an inferred global resource miss.
- for(const auto& e:source.archive().entries())if(water_resources50JC::sameName(e.name,"tracks\\baseDisplacement.pst")||
-     water_resources50JC::sameName(e.name,"tracks\\baseDisplacement.ipu")){
-  error="MC earlier noise candidate needs its own reader";return false;
- }
- std::vector<std::uint8_t> noise;rr::assets::DecodeError48C diagnostic;
- if(!member(source,"tracks\\baseDisplacement.tga",noise,staged->noiseMember,error))return false;
- // This MC-pinned file is independently byte-identical to GC's TGA. The
- // shared reader validates its same16x16 BGRA layout, not a GC archive alias.
- if(!rr::assets::readWaterNoiseTexture50JC(noise,staged->noise,diagnostic)){
-  error="MC original noise texture rejected: "+diagnostic.code;return false;
- }
- staged->coldResourcesBound=true;output=std::move(staged);error.clear();return true;
+ if(!source.ready()){error="water requires actual retained course source";return false;}
+ rr::assets::TrackHeightDescriptor50JB descriptor{};
+ const auto read=rr::assets::readTrackHeightDescriptor50JB(source.world().parameters,descriptor);
+ if(read!=rr::assets::TrackHeightReadStatus50JB::Complete){
+  error="original Environment WaterFile unavailable (status "+std::to_string(static_cast<unsigned>(read))+
+      ", parameter bytes "+std::to_string(source.world().parameters.original_bytes.size())+")";return false;}
+ const std::string water=descriptor.waterFile110.value.data();
+ //2745B0: exact, case-sensitive "none" bypasses water construction.
+ if(water=="none"){error="course SCB authors no water";return false;}
+ const std::string scene=mc_cold_sources50LA::sources[0].name;
+ const auto slash=scene.find_last_of("/\\");
+ if(slash==std::string::npos){error="track source directory unavailable";return false;}
+ const std::string name=scene.substr(0,slash+1)+water;
+ std::vector<std::uint8_t> wtt;water_resources50JC::Member identity;
+ if(!member(source,name,wtt,identity,error))return false;
+ return water_resources50JC::prepareAuthored(
+  [&](const std::string& n,std::vector<std::uint8_t>& bytes,water_resources50JC::Member& id,std::string& e){
+   return member(source,n,bytes,id,e);},
+  [&](const std::string& n){
+   for(const auto& entry:source.archive().entries())if(water_resources50JC::sameName(entry.name,n))return true;return false;},
+  identity.name,identity.logicalOffset,wtt,output,error);
 }
 class Owner final {
  std::shared_ptr<const mc_cold_sources50LA::Owner> source_;

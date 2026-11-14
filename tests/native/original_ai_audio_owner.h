@@ -448,18 +448,25 @@ public:
     }
     std::uint64_t materialDispatches()const noexcept{return materialDispatches_;}
     std::uint64_t materialRandomDraws()const noexcept{return materialDraws_;}
-    // Native race activation owns these source lifecycle events. Not a claim
-    // that the missing retail application event dispatcher was traversed.
+    // Native race activation (cold). The engine/binder emitters stay disabled
+    // until GO: the original enables them only from 1AEDD0 (and from the
+    // replay restart 1AEA70 while race1B0 bit4 is set), never at load.
     bool activate()noexcept {
         if(!prepared_||!speechInitialized_||activated_)return false;
-        for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){auto& r=racers_[slot];
-         for(auto operation:{rr::game::OriginalAiEmitterLifecycle::startEngine16DB80,
+        activated_=true;return true;
+    }
+    // 1AEDD0 at 1AEE2C..1AEE58 for one AI racer: D40 virtual +80 (16DB80,
+    // engine emitter on, 22C bit0) then +8C (16DC00, 504 = 1, binder on).
+    bool startAtGo1AEDD0(std::size_t slot)noexcept {
+        if(!activated_||slot<firstAiSlot_||slot>=racerCount_)return false;
+        auto& r=racers_[slot];
+        for(auto operation:{rr::game::OriginalAiEmitterLifecycle::startEngine16DB80,
             rr::game::OriginalAiEmitterLifecycle::startBinder16DC00})
             if(rr::game::applyOriginalAiEmitterLifecycle(r.engine,operation).status!=
                 rr::game::OriginalAiEmitterStatus::complete)return false;
-        }
-        activated_=true;return true;
+        return true;
     }
+    std::size_t firstAiSlot()const noexcept{return firstAiSlot_;}
     bool setListener(const rr::game::OriginalAiAudioListener& listener)noexcept {
         for(unsigned i=0;i<3;++i)if(!std::isfinite(listener.position[i])||
             !std::isfinite(listener.forward[i]))return false;

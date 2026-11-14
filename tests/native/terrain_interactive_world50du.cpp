@@ -1357,10 +1357,12 @@ SessionExit50DU Context::run() {
  };
  if(isMcTrack){
   mcWaterOwner=std::make_shared<mc_water50MC::Owner>();std::string error;
-  require50DU(actualHeight.sourceBound&&actualHeight.sourceDomain.terrain330==UndertrackHeightOwner50EW::Absent&&
+  // Evaluated before the message: argument order is unspecified (MSVC reads
+  // the message first, which hid every preparation error behind the generic one).
+  const bool mcWaterPrepared=actualHeight.sourceBound&&actualHeight.sourceDomain.terrain330==UndertrackHeightOwner50EW::Absent&&
       actualHeight.sourceDomain.water334==UndertrackHeightOwner50EW::Present&&
-      mcWaterOwner->prepare(mcColdSources,nativeWaterApplication.water,error),
-      error.empty()?"MC actual water334 source/runtime preparation rejected":error.c_str());
+      mcWaterOwner->prepare(mcColdSources,nativeWaterApplication.water,error);
+  require50DU(mcWaterPrepared,error.empty()?"MC actual water334 source/runtime preparation rejected":error.c_str());
   reserveMcAdditionalPayload(mcWaterOwner->retainedPayloadBytes(),"MC actual water runtime/resources exceed remaining payload");
  }
  // Retain the selected runtime provider domain independently of its authored

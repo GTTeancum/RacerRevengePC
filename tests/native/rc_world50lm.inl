@@ -349,7 +349,8 @@ public:
                 shared::need(psm,"Original RC world material absent: "+materialName);d.member=psm->name;
                 const auto source=next->member(*psm,d.decode);a::Material48E authored;
                 const bool decoded=a::decodeMaterial48E(source,authored,d.decode);
-                shared::need(decoded&&!authored.passes.empty()&&authored.passes.size()==(normalized=="CRYSTAL01"?2u:1u),
+                shared::need(decoded&&!authored.passes.empty()&&authored.passes.size()<=2u, // TotalShaderPasses (29B718); two-pass forms are admitted by the GS lowering
+
                     "Original RC material/program pass count");
                 const auto materialIndex=static_cast<std::uint32_t>(next->materials.size());
                 shared::need(materialIndex<expectedMaterials,"Original RC PSM count bound");
@@ -359,7 +360,9 @@ public:
                     const auto& pass=authored.passes[pi];const bool projected=false;
                     shared::need(pass.pass==pi+1&&pass.textures.size()==1&&pass.textures[0].slot==1&&
                         (detail::key(pass.microprogram)=="PRELITCOMPRESSED"||
-                         (normalized=="CRYSTAL01"&&pi==1&&pass.microprogram=="EnvironmentMapCompressed")),
+                         // Program choice is by PSM program name (150ABC..), not material name:
+                         // a later pass may be the environment map; the GS ALPHA lowering decides its blend.
+                         (pi>=1&&detail::key(pass.microprogram)=="ENVIRONMENTMAPCOMPRESSED")),
                         "Unjoined original RC pass/program/texture subset");
                     const auto& map=pass.textures[0];shared::need(shared::name(map.name),"Invalid original RC texture basename");
                     const auto pstCandidate=map.name+".pst";

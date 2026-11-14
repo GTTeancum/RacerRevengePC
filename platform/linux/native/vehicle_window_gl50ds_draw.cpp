@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include "../../../src/game/track_zone_visibility50zv.h"
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "native_fxaa_pass.h"
 #include <memory>
@@ -81,6 +82,62 @@ void VehicleWindowGl50DS::Storage::prepareTrackVisibility() noexcept {
                 (trackSpanCount ? trackSpans[draw].indexCount : static_cast<U>(trackIndexCount));
         }
         diagnostic->trackCulledIndices = trackCandidateIndexCount - retainedIndices;
+        // Original section visibility (27FEE0 + 240C00), common for every
+        // course: a draw of a zoned static is kept only if its zone is drawn
+        // this frame and its box is not outside that zone's portal-narrowed
+        // matrix. Pass pairs share geometry and zone, so they stay together.
+        // A numeric failure keeps the draw (never a cull).
+        if (!frameTrackZoneCount || !trackSpanCount) return;
+        U kept = 0, zoneCulled = 0;
+        retainedIndices = 0;
+        for (U n = 0; n < frameTrackDrawCount; ++n) {
+            const U draw = trackVisibleDrawIds[n];
+            const U spanIndex = trackChunkCount ? trackChunks[draw].sourceSpan : draw;
+            const U zone = trackSpans[spanIndex].sourceZone;
+            bool keep = true;
+            if (zone && zone <= frameTrackZoneCount) {
+                const auto& row = frameTrackZones[zone - 1u];
+                if (!row.drawn) keep = false;
+                else {
+                    bool ok = false;
+                    const auto& b = trackDrawBounds[draw].worldBounds;
+                    const bool outside = game::trackZoneBoxOutside50ZV(row.sourceClip, b.minimum, b.maximum, ok);
+                    if (ok && outside) keep = false;
+                    if (!ok) ++diagnostic->trackZoneNumericKept;
+                }
+            }
+            if (keep) {
+                trackVisibleDrawIds[kept++] = draw;
+                retainedIndices += trackChunkCount ? trackChunks[draw].indexCount : trackSpans[draw].indexCount;
+            } else ++zoneCulled;
+        }
+        frameTrackDrawCount = kept;
+        diagnostic->trackRetainedDraws = kept;
+        diagnostic->trackZoneCulledDraws = zoneCulled;
+        diagnostic->trackCulledIndices = trackCandidateIndexCount - retainedIndices;
+    }
+
+// 2805B4 inclusive top-origin source scissor to the GL bottom-origin target,
+// with the same half-open, floor/ceil, clamped conversion the RA route uses.
+void VehicleWindowGl50DS::Storage::bindTrackZoneScissor(U zone) noexcept {
+        if (zone == boundTrackZone) return;
+        boundTrackZone = zone;
+        if (!zone || zone > frameTrackZoneCount) { gl.disable(0x0C11); boundTrackZone = 0; return; }
+        const auto& row = frameTrackZones[zone - 1u];
+        const double x = row.viewport[0], y = row.viewport[1], w = row.viewport[2], h = row.viewport[3];
+        const double bounds[4] = {
+            (double(row.scissor[0]) - x) / w * width,
+            (y + h - double(row.scissor[3]) - 1.) / h * height,
+            (double(row.scissor[1]) + 1. - x) / w * width,
+            (y + h - double(row.scissor[2])) / h * height};
+        I scissor[4]{};
+        for (U axis = 0; axis < 4; ++axis) {
+            const double extent = (axis & 1u) ? height : width;
+            const double rounded = axis < 2 ? std::floor(bounds[axis]) : std::ceil(bounds[axis]);
+            scissor[axis] = static_cast<I>(std::max(0., std::min(extent, rounded)));
+        }
+        gl.scissor(scissor[0], scissor[1], std::max<I>(0, scissor[2] - scissor[0]), std::max<I>(0, scissor[3] - scissor[1]));
+        gl.enable(0x0C11);
     }
 
 bool VehicleWindowGl50DS::Storage::validateMaterialUvs(const VehicleWindowMaterialUv50DS* uvs, U count,
@@ -690,7 +747,7 @@ bool VehicleWindowGl50DS::Storage::drawGameplayBinders() noexcept {
             return fail(*diagnostic,VehicleWindowError50DS::material,"Binder shader, pixel bank or quad buffers missing");
         const U texture=bank->texture(frameGameplayBinderImage);if(!texture)return false;
         resetPodState();
-        gl.useProgram(trackProgram);gl.uniform1i(rcCrystalPassUniform,0);gl.uniform1i(rcCrystalPayloadUniform,0);
+        gl.useProgram(trackProgram);gl.uniform1i(gsAlphaPassUniform,0);gl.uniform1i(environmentMapUniform,0);gl.uniform1i(gsAlphaPayloadUniform,0);
         gl.uniformMatrix4fv(trackMatrixUniform,1,0,matrix);
         gl.uniform1f(trackColorScaleUniform,255.f/128.f);
         gl.uniform1i(trackUseTextureUniform,1);gl.uniform1i(trackImageUniform,0);
@@ -699,6 +756,7 @@ bool VehicleWindowGl50DS::Storage::drawGameplayBinders() noexcept {
         gl.uniform1i(trackEffectModeUniform,3);
         gl.uniform1f(trackAlphaScaleUniform,(255.f/128.f)*(255.f/128.f));
         gl.uniform1i(trackUnlitUniform,1); // Diffuse color70 is already source-packed on CPU.
+        gl.uniform1i(trackSourceColorAbsentUniform,0);
         gl.uniform1i(trackUseSourceNormalsUniform,0);gl.uniform1i(trackProjectionPassUniform,0);
         gl.uniform4f(trackUvTranslationUniform,0.f,0.f,0.f,0.f);
         gl.uniform1i(nativeShadowEnabledUniform,0);gl.uniform1i(nativeShadowOpponentCountUniform,0);
@@ -996,7 +1054,7 @@ void VehicleWindowGl50DS::Storage::resetPodState() noexcept {
         if (trackProgram) {
             gl.useProgram(trackProgram);
             gl.uniform1i(worldFogEnabledUniform, 0);
-            gl.uniform1i(rcCrystalPassUniform,0);gl.uniform1i(rcCrystalPayloadUniform,0);
+            gl.uniform1i(gsAlphaPassUniform,0);gl.uniform1i(environmentMapUniform,0);gl.uniform1i(gsAlphaPayloadUniform,0);
         }
         gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthMask(1); gl.depthFunc(0x0201);
         gl.useProgram(shader->program());
@@ -1056,10 +1114,11 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                 s.gl.uniform1i(s.trackEffectModeUniform, 0);
                 s.gl.uniform1f(s.trackAlphaScaleUniform, 1.f);
                 s.gl.uniform1i(s.trackUnlitUniform, 0);
+                s.gl.uniform1i(s.trackSourceColorAbsentUniform, 0);
                 s.gl.uniform1i(s.trackUseSourceNormalsUniform, s.trackNormalBuffer ? 1 : 0);
                 s.gl.uniform1i(s.trackProjectionPassUniform, 0);
-                s.gl.uniform1i(s.rcCrystalPassUniform,0);s.gl.uniform1i(s.rcCrystalPayloadUniform,0);
-                s.gl.uniform4f(s.rcCrystalAmbientUniform,s.rcCrystalAmbient[0],s.rcCrystalAmbient[1],s.rcCrystalAmbient[2],s.rcCrystalAmbient[3]);
+                s.gl.uniform1i(s.gsAlphaPassUniform,0);s.gl.uniform1i(s.environmentMapUniform,0);s.gl.uniform1i(s.gsAlphaPayloadUniform,0);
+                s.gl.uniform4f(s.environmentAmbientUniform,s.environmentAmbient[0],s.environmentAmbient[1],s.environmentAmbient[2],s.environmentAmbient[3]);
                 s.gl.uniform4f(s.trackUvTranslationUniform,0.f,0.f,0.f,0.f);
                 s.gl.uniform1i(s.nativeShadowEnabledUniform,
                     s.request.enableNativePodShadows && !transparent ? 1 : 0);
@@ -1093,7 +1152,7 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                 U boundSpan = assets::unresolvedMaterialTexture50EA;
                 // Only this uninterrupted track pass owns these material bindings.
                 // Do not infer state from pass setup, another program, or a prior frame.
-                I trackIntegerValues[8]{};
+                I trackIntegerValues[9]{};
                 U trackTextureName = 0;
                 std::uint8_t trackAlphaReference = 0;
                 unsigned char trackAlphaScaleBytes[sizeof(float)]{};
@@ -1148,7 +1207,7 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                         // Establish the final authored depth rule once, before drawing.
                         // Coplanar later passes use LEQUAL; single passes retain policy.
                         const auto& rasterPolicy = span.material.policy;
-                        const bool blendEnabled = !span.rcCrystalPass && rasterPolicy.blend != VehicleWindowBlend50DS::opaque;
+                        const bool blendEnabled = !span.gsDestinationAlphaPass && rasterPolicy.blend != VehicleWindowBlend50DS::opaque;
                         const TrackRasterState nextRasterState{
                             rasterPolicy.depthWrite, blendEnabled,
                             (span.sourcePass > 1 || rasterPolicy.depthEqual) ? U{0x0203} : U{0x0201},
@@ -1159,10 +1218,11 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                         // force this span and leave the next span unknown.
                         if (span.sourceUvAnimation) trackRasterKnown = false;
                         if (!trackRasterKnown || !trackRasterState.same(nextRasterState)){
-                            if(span.rcCrystalPass){s.gl.disable(0x0BE2);s.gl.depthMask(0);s.gl.depthFunc(0x0203);}
+                            if(span.gsDestinationAlphaPass){s.gl.disable(0x0BE2);s.gl.depthMask(0);s.gl.depthFunc(0x0203);}
                             else s.configureBlend(span.material.policy, span.sourcePass > 1);
                         }
-                        integerUniform(7,s.rcCrystalPassUniform,span.rcCrystalPass);
+                        integerUniform(7,s.gsAlphaPassUniform,span.gsDestinationAlphaPass);
+                        integerUniform(8,s.environmentMapUniform,span.sourceEnvironmentMap?1:0);
                         integerUniform(3, s.trackProjectionPassUniform, static_cast<I>(span.projectionPass));
                         float uOffset=0.f,vOffset=0.f;
                         if(span.sourceUvAnimation && (!s.frameTrackUv.service ||
@@ -1174,6 +1234,8 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                         if (!reuseMaterial)
                             s.gl.uniform4f(s.trackUvTranslationUniform,uOffset,vOffset,0.f,0.f);
                         integerUniform(4, s.trackEffectModeUniform, effectMode(span.material.policy));
+                        integerUniform(8, s.trackSourceColorAbsentUniform,
+                            span.material.policy.sourceColorStreamAbsent ? 1 : 0);
                         // Byte identity preserves signed zero without changing the value.
                         if (!reuseMaterial || std::memcmp(trackAlphaScaleBytes,
                             &span.material.policy.alphaScale, sizeof(float)) != 0)
@@ -1194,12 +1256,17 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                     // Coverage binding mutates neither depth nor blend. Keep it
                     // independent of the root-owned pass-local tuple cache.
                     s.bindTrackCoverage(span.nativeCoverage);
+                    // The zone's 2805B4 scissor (original per-zone draw clip).
+                    s.bindTrackZoneScissor(s.frameTrackZoneCount ? span.sourceZone : 0);
                     const U indexStart = s.trackChunkCount ? s.trackChunks[draw].indexStart : span.indexStart;
                     const U indexCount = s.trackChunkCount ? s.trackChunks[draw].indexCount : span.indexCount;
                     const auto offset = std::uintptr_t(indexStart) * sizeof(U);
-                    if(span.rcCrystalPass){
-                        if(!s.drawRcCrystalRange(s.activeFrameBank,indexStart,indexCount,span.rcCrystalPass,trackTextureName))return false;
+                    if(span.gsDestinationAlphaPass){
+                        if(!s.drawDestinationAlphaRange(s.activeFrameBank,indexStart,indexCount,span.gsDestinationAlphaPass,trackTextureName,span))return false;
                         // Bridge restores the exact source program/material/raster tuple.
+                        // It leaves scissor off (its exact path scissors to the
+                        // triangle only, not yet intersected with the zone rect).
+                        s.boundTrackZone = 0;
                     }else s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(indexCount),
                         0x1405, reinterpret_cast<const void*>(offset), 0);
                     if (!s.check("draw actual track surface range")) return false;
@@ -1211,6 +1278,7 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                     s.diagnostic->trackIndices += indexCount;
                 }
                 s.diagnostic->trackSpan = s.diagnostic->texture = assets::unresolvedMaterialTexture50EA;
+                s.bindTrackZoneScissor(0);
             } else {
                 s.drawGl.drawElementsBaseVertex(0x0004, s.trackIndexCount, 0x1405, nullptr, 0);
                 if (!s.check("draw world-space track before vehicle")) return false;
@@ -1226,7 +1294,7 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
         if (!dynamicWorldSpanCount) return true;
         resetNativeGcLighting();
         gl.useProgram(trackProgram);
-        gl.uniform1i(rcCrystalPassUniform,0);gl.uniform1i(rcCrystalPayloadUniform,0);
+        gl.uniform1i(gsAlphaPassUniform,0);gl.uniform1i(environmentMapUniform,0);gl.uniform1i(gsAlphaPayloadUniform,0);
         gl.uniform1i(worldFogEnabledUniform, 0);
         gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
         gl.uniform1f(trackColorScaleUniform, request.dynamicWorld.vertexColorScale);
@@ -1279,6 +1347,7 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
             gl.uniform1f(trackAlphaScaleUniform, material.policy.alphaScale);
             gl.uniform1i(trackUnlitUniform,
                 material.policy.unlit || material.policy.sourcePrelit ? 1 : 0);
+            gl.uniform1i(trackSourceColorAbsentUniform, material.policy.sourceColorStreamAbsent ? 1 : 0);
             if (!check("bind authenticated dynamic-world material")) return false;
             drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.indexCount), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
@@ -2266,6 +2335,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
         s.traceRaStage("transparent_racers",stageStart);
+        // Original water: after the opaque world and pods, before Binder and
+        // particles. PENDING emulator check W-E1 (exact render-list slot).
+        if (!s.drawWater()) return false;
         if (!s.drawGameplayBinders() || !s.drawGcParticles() || !s.drawEffects()) return false;
         s.traceRaStage("binders_particles",stageStart);
         if (s.hasSpecularPairs50LA || s.hasSingleDiffuse50LA || s.request.track.rcCrystal || s.frameGameplayBinderCount) {
@@ -2293,7 +2365,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // tail.1A8698 directly draws Results BEFORE1A86C8 visits F8 children.
         // Results admission rejects an active preceding source Pause; its
         // unrelated existing native Pause route remains unchanged otherwise.
-        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank) || !s.drawNativeResultsPackets(bank) || !s.drawNativeF8Bars(bank) || !s.drawPauseDerived(bank)) return false;
+        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawRaceStartOverlay(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank) || !s.drawNativeResultsPackets(bank) || !s.drawNativeF8Bars(bank) || !s.drawPauseDerived(bank)) return false;
         s.traceRaStage("hud_blur",stageStart);
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
@@ -2855,7 +2927,7 @@ bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
         // colour = vertex (128 = 1.0) x texel, alpha = vertex x texel on the
         // PS2 128 scale. Depth tested, not written; destination alpha kept.
         resetPodState();
-        gl.useProgram(trackProgram); gl.uniform1i(rcCrystalPassUniform, 0); gl.uniform1i(rcCrystalPayloadUniform, 0);
+        gl.useProgram(trackProgram); gl.uniform1i(gsAlphaPassUniform, 0); gl.uniform1i(environmentMapUniform, 0); gl.uniform1i(gsAlphaPayloadUniform, 0);
         gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
         gl.uniform1f(trackColorScaleUniform, 255.f / 128.f);
         gl.uniform1i(trackUseTextureUniform, 1); gl.uniform1i(trackImageUniform, 0);
@@ -2864,6 +2936,7 @@ bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
         gl.uniform1i(trackEffectModeUniform, 1);
         gl.uniform1f(trackAlphaScaleUniform, (255.f / 128.f) * (255.f / 128.f));
         gl.uniform1i(trackUnlitUniform, 1);
+        gl.uniform1i(trackSourceColorAbsentUniform, 0);
         gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
         gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
         gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
@@ -2911,6 +2984,129 @@ bool VehicleWindowGl50DS::Storage::deleteEffectNames(VehicleWindowDiagnostic50DS
         return deleteName(effectVertexArray, gl.deleteVertexArrays, d) &&
             deleteName(effectVertexBuffer, gl.deleteBuffers, d) &&
             deleteName(effectIndexBuffer, gl.deleteBuffers, d);
+    }
+
+// ---------------------------------------------------------------------------
+// Original water surface (VU1 `Water`). Two GS passes per strip, kicked
+// interleaved: A (reflection, TEX0 #1, TEST alpha > 0) then B (froth,
+// TEX0 #2, TEST alpha > AlphaReference). ALPHA 0x44 both: (Cs-Cd)*As/128+Cd.
+// PRIM 0x7C: TRISTRIP, Gouraud, textured, STQ, fog on, blend on; ZTST GEQUAL
+// (PS2) = LEQUAL here. Texture function MODULATE (track effect mode 1) and
+// the depth write are PENDING emulator check W-E1.
+// ---------------------------------------------------------------------------
+bool VehicleWindowGl50DS::Storage::hasWaterResources() const noexcept {
+        return waterVertexBuffer || waterIndexBuffer || waterVertexArray;
+    }
+
+bool VehicleWindowGl50DS::Storage::createWater(const VehicleWindowWater50DS& input) noexcept {
+        waterEnvironmentTexture = input.environmentTexture; waterFrothTexture = input.frothTexture;
+        waterMaximumStrips = 0;
+        if (!input.environmentTexture) return true;
+        if (!input.maximumStrips || input.maximumStrips > maxVehicleWindowWaterStrips50DS)
+            return fail(*diagnostic, VehicleWindowError50DS::request, "water strip capacity");
+        waterMaximumStrips = input.maximumStrips;
+        constexpr U stripVertices = vehicleWindowWaterStripVertices50DS;
+        const std::size_t bytes = std::size_t(waterMaximumStrips) * 2u * stripVertices * sizeof(assets::Vertex48B);
+        U indices[stripVertices];
+        for (U i = 0; i < stripVertices; ++i) indices[i] = i;
+        gl.genBuffers(1, &waterVertexBuffer);
+        drawGl.bindBuffer(arrayBuffer, waterVertexBuffer);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bytes), nullptr, dynamicDraw);
+        if (!check("allocate water strip vertices") || !waterVertexBuffer)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "water vertex buffer");
+        gl.genBuffers(1, &waterIndexBuffer);
+        drawGl.bindBuffer(arrayBuffer, waterIndexBuffer);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(sizeof(indices)), indices, staticDraw);
+        if (!check("upload water strip indices") || !waterIndexBuffer)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "water index buffer");
+        gl.genVertexArrays(1, &waterVertexArray);
+        drawGl.bindVertexArray(waterVertexArray);
+        drawGl.bindBuffer(arrayBuffer, waterVertexBuffer);
+        drawGl.bindBuffer(elementBuffer, waterIndexBuffer);
+        constexpr I sizes[] = {3, 2, 4};
+        constexpr std::uintptr_t offsets[] = {0, 12, 20};
+        for (U a = 0; a < 3; ++a) {
+            gl.enableVertexAttribArray(a);
+            gl.vertexAttribPointer(a, sizes[a], a == 2 ? unsignedByte : floatType,
+                a == 2 ? 1 : 0, 24, reinterpret_cast<const void*>(offsets[a]));
+        }
+        drawGl.bindVertexArray(0);
+        if (!check("create water Vertex48B layout") || !waterVertexArray)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "water vertex array");
+        std::fprintf(stderr, "native_water_renderer strips=%u environment=%u froth=%u\n",
+            static_cast<unsigned>(waterMaximumStrips), static_cast<unsigned>(waterEnvironmentTexture),
+            static_cast<unsigned>(waterFrothTexture));
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::drawWater() noexcept {
+        if (!frameWaterStrips || !frameWaterVertices || !waterVertexArray || !waterEnvironmentTexture || !trackProgram)
+            return true;
+        constexpr U stripVertices = vehicleWindowWaterStripVertices50DS;
+        resetPodState();
+        gl.useProgram(trackProgram); gl.uniform1i(gsAlphaPassUniform, 0); gl.uniform1i(environmentMapUniform, 0); gl.uniform1i(gsAlphaPayloadUniform, 0);
+        gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
+        // MODULATE on the PS2 scale (same law as the effect pass): colour =
+        // vertex/128 x texel, alpha = vertex/128 x texel/128.
+        gl.uniform1f(trackColorScaleUniform, 255.f / 128.f);
+        gl.uniform1i(trackUseTextureUniform, 1); gl.uniform1i(trackImageUniform, 0);
+        gl.uniform1i(trackDiscardZeroAlphaUniform, 2); // GS byte alpha test: discard if <= reference
+        gl.uniform1i(trackEffectModeUniform, 1);
+        gl.uniform1f(trackAlphaScaleUniform, (255.f / 128.f) * (255.f / 128.f));
+        gl.uniform1i(trackUnlitUniform, 1);
+        gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
+        gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
+        gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
+        // XYZF2 fog: linear in eye distance (Water+0x1F8/+0x1FC from the
+        // provider fog object). Drawn with the course world fog; the identity
+        // of provider->+0x30 is an open EE item (PLAN section 6).
+        const auto& fog = request.track.worldFog;
+        gl.uniform1i(worldFogEnabledUniform, fog.enabled ? 1 : 0);
+        gl.uniform4f(worldFogCameraUniform, worldFogCamera[0], worldFogCamera[1], worldFogCamera[2], 0.f);
+        gl.uniform4f(worldFogColorUniform, fog.color[0], fog.color[1], fog.color[2], 1.f);
+        gl.uniform4f(worldFogRangeUniform, fog.start, fog.end, 0.f, 0.f);
+        if (gl.bindSampler) gl.bindSampler(0, 0);
+        drawGl.bindVertexArray(waterVertexArray);
+        drawGl.bindBuffer(arrayBuffer, waterVertexBuffer);
+        drawGl.bufferSubData(arrayBuffer, 0,
+            static_cast<std::intptr_t>(std::size_t(frameWaterStrips) * 2u * stripVertices * sizeof(assets::Vertex48B)),
+            frameWaterVertices);
+        drawGl.bindBuffer(elementBuffer, waterIndexBuffer);
+        gl.enable(0x0BE2); gl.blendEquation(0x8006); gl.blendFunc(0x0302, 0x0303); // SRC_ALPHA, ONE_MINUS_SRC_ALPHA
+        gl.enable(0x0B71); gl.depthFunc(0x0203); gl.depthMask(frameWaterDepthWrite ? 1 : 0); gl.disable(0x0B44);
+        gl.colorMask(1, 1, 1, 0);
+        bool accepted = check("bind water state and upload strips");
+        std::uint64_t passes = 0;
+        // Original order: strip k pass A, strip k pass B, strip k+1 pass A ...
+        for (U k = 0; accepted && k < frameWaterStrips; ++k)
+            for (U pass = 0; pass < 2u; ++pass) {
+                const U texture = pass ? waterFrothTexture : waterEnvironmentTexture;
+                if (!texture) continue; // froth image absent: pass B skipped (see create log)
+                gl.activeTexture(textureUnit0); gl.bindTexture(texture2D, texture);
+                gl.uniform1f(trackAlphaReferenceUniform, pass ? float(frameWaterAlphaReference) : 0.f);
+                drawGl.drawElementsBaseVertex(0x0005, static_cast<I>(stripVertices), 0x1405, nullptr,
+                    static_cast<I>((k * 2u + pass) * stripVertices));
+                ++passes;
+            }
+        accepted = accepted && check("draw water strips");
+        if (accepted && (++waterDraws == 1 || waterDraws % 625 == 0))
+            std::fprintf(stderr, "native_water_draw draws=%llu strips=%u passes=%llu alpha_ref=%u depth_write=%u "
+                "blend=src_alpha depth=lequal texture_function=modulate froth_texture=%u\n",
+                static_cast<unsigned long long>(waterDraws), static_cast<unsigned>(frameWaterStrips),
+                static_cast<unsigned long long>(passes), static_cast<unsigned>(frameWaterAlphaReference),
+                frameWaterDepthWrite ? 1u : 0u, waterFrothTexture ? 1u : 0u);
+        gl.colorMask(1, 1, 1, 1); gl.depthMask(1); gl.blendFunc(0x0302, 0x0303); gl.disable(0x0BE2);
+        drawGl.bindVertexArray(0); gl.bindTexture(texture2D, 0);
+        resetPodState();
+        return accepted && check("restore state after water");
+    }
+
+bool VehicleWindowGl50DS::Storage::deleteWaterNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        frameWaterStrips = 0; frameWaterVertices = nullptr; waterEnvironmentTexture = 0; waterFrothTexture = 0;
+        waterMaximumStrips = 0;
+        return deleteName(waterVertexArray, gl.deleteVertexArrays, d) &&
+            deleteName(waterVertexBuffer, gl.deleteBuffers, d) &&
+            deleteName(waterIndexBuffer, gl.deleteBuffers, d);
     }
 
 bool VehicleWindowGl50DS::Storage::deleteDebrisNames(VehicleWindowDiagnostic50DS& d) noexcept {

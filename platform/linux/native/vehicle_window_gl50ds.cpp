@@ -386,6 +386,31 @@ bool VehicleWindowGl50DS::bindOriginalRaceHud(const game::OriginalRaceHud50KG& o
         fail(d,VehicleWindowError50DS::material,"original HUD optional cold join rejected");
     return accepted;
 }
+bool VehicleWindowGl50DS::bindOriginalRaceStartOverlay(std::shared_ptr<const game::OriginalRaceStartOverlay50HU> owner,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+    d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"original start overlay binding requires idle gameplay renderer");
+    if(s.nativeF8BarPreparationFailed||s.raceStartOverlay||s.raceStartOverlayUiCreationFailed||s.raceHudUiCreationFailed||
+       s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||
+       s.timeStatsUiCreationFailed||s.speedBoostUiCreationFailed)
+        return fail(d,VehicleWindowError50DS::request,"original start overlay already bound or late UI initialization failed");
+    s.diagnostic=&d;const bool accepted=s.prepareRaceStartOverlayResources(std::move(owner));
+    if(!accepted&&s.hasRaceStartOverlayResources()){
+        s.gl.finish();const bool drained=s.check("retire failed optional start overlay initialization");
+        VehicleWindowDiagnostic50DS cleanup;
+        if(!drained||!s.deleteRaceStartOverlayNames(cleanup))d.cleanupIncomplete=true;
+        if(cleanup.cleanupGlError&&!d.cleanupGlError)d.cleanupGlError=cleanup.cleanupGlError;
+    }
+    if(!accepted&&!s.hasRaceStartOverlayResources())s.raceStartOverlay.reset();
+    s.diagnostic=nullptr;
+    if(!accepted&&d.error==VehicleWindowError50DS::none)
+        fail(d,VehicleWindowError50DS::material,"original start overlay optional cold join rejected");
+    return accepted;
+}
 bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
     OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
@@ -732,6 +757,14 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if (frame.effectQuads)
         std::memcpy(s.frameEffectVertices.data(), frame.effectVertices,
             std::size_t(frame.effectQuads) * 4u * sizeof(assets::Vertex48B));
+    if (frame.waterStrips > s.waterMaximumStrips || (frame.waterStrips && !frame.waterVertices) ||
+        frame.waterAlphaReference > 255u)
+        return fail(d, VehicleWindowError50DS::frame, "water strip list outside capacity");
+    // Borrowed through this submit only (drawn before return).
+    s.frameWaterVertices = frame.waterStrips ? frame.waterVertices : nullptr;
+    s.frameWaterStrips = frame.waterStrips;
+    s.frameWaterAlphaReference = frame.waterAlphaReference;
+    s.frameWaterDepthWrite = frame.waterDepthWrite;
     s.framePlayerHidden = frame.playerHiddenDestroyed50PD;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
     s.frameGameplayBinderImage=frame.gameplayBinderFrame;
@@ -745,8 +778,28 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     // rejection leaves the existing native HUD and world frame unchanged.
     d.originalRaceHudRejected=!s.prepareRaceHudFrame(frame.originalRaceHud);
     if(d.originalRaceHudRejected&&s.raceHud)s.raceHud->frame=false;
+    d.originalRaceStartOverlayRejected=!s.prepareRaceStartOverlayFrame(frame.originalRaceStartOverlay);
+    if(d.originalRaceStartOverlayRejected&&s.raceStartOverlay)s.raceStartOverlay->frame=false;
     s.frameGameplayBlurEnabled=frame.gameplayBlur!=nullptr;
     s.frameGameplayBlur=frame.gameplayBlur?*frame.gameplayBlur:GameplayBlurFrame50DS{};
+    // Zone rows are copied (bounded) before any GL work; a count that is not
+    // the world's authored zone count is a caller error, not a cull.
+    if (frame.trackZones || frame.trackZoneCount) {
+        if (!frame.trackZones || frame.trackZoneCount != s.request.track.zoneCount ||
+            frame.trackZoneCount > maxVehicleWindowTrackZones50DS || !s.request.track.enableFrustumCulling)
+            return fail(d, VehicleWindowError50DS::frame, "track zone rows must match the world's authored zones");
+        for (U z = 0; z < frame.trackZoneCount; ++z) {
+            const auto& row = frame.trackZones[z];
+            for (float v : row.sourceClip) if (!std::isfinite(v))
+                return fail(d, VehicleWindowError50DS::frame, "track zone matrix not finite");
+            if (row.drawn && (row.viewport[2] <= 0 || row.viewport[3] <= 0 ||
+                row.scissor[0] > row.scissor[1] || row.scissor[2] > row.scissor[3]))
+                return fail(d, VehicleWindowError50DS::frame, "track zone scissor/viewport invalid");
+            s.frameTrackZones[z] = row;
+        }
+    }
+    s.frameTrackZoneCount = frame.trackZones ? frame.trackZoneCount : 0;
+    s.boundTrackZone = 0;
     s.frameSet = true; s.diagnostic = &d;
     s.prepareTrackVisibility();
     s.traceRaStage("validation_prepare",submissionStageStart,false);
@@ -781,8 +834,9 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             }
         }
     }
-    s.frameSet = false; s.framePlayerHidden = false; s.frameDebrisCount = 0; s.frameEffectQuads = 0; s.frameEffectBlended = 0; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameSet = false; s.framePlayerHidden = false; s.frameDebrisCount = 0; s.frameEffectQuads = 0; s.frameEffectBlended = 0; s.frameWaterStrips = 0; s.frameWaterVertices = nullptr; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     if(s.raceHud)s.raceHud->frame=false;
+    if(s.raceStartOverlay)s.raceStartOverlay->frame=false;
     if(s.timeStats)s.timeStats->frame=false;
     if(s.positionStats)s.positionStats->frame=false;
     if(s.damage)s.damage->frame=false;

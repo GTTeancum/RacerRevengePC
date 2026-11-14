@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include <cstdlib>
 #include "raster_shared_edge.h"
 #include "../../../tests/native/rc_crystal50rc.h"
 #include "../../../tests/native/rc_particle_visual50rc.h"
@@ -2026,7 +2027,7 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
 
 bool VehicleWindowGl50DS::Storage::createRcCrystalProjection(const VehicleWindowTrack50DS& track)noexcept {
         if(!track.rcCrystal||!coverageDemand)return fail(*diagnostic,VehicleWindowError50DS::request,
-            "RC crystal requires its authentic crowd AA1 coverage demand");
+            "environment-map projection requires the coverage targets of its destination-alpha pair");
         rcCrystalUvs.reset(new(std::nothrow) std::array<float,2>[rc_crystal50RC::Owner::uvCount]);
         if(!rcCrystalUvs)return fail(*diagnostic,VehicleWindowError50DS::allocation,"RC compact UV staging allocation");
         const auto bytes=track.mesh->vertices.size()*sizeof(std::array<float,2>);
@@ -2045,7 +2046,7 @@ bool VehicleWindowGl50DS::Storage::createRcCrystalProjection(const VehicleWindow
     }
 
 bool VehicleWindowGl50DS::Storage::prepareRcCrystalFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d)noexcept {
-        rcCrystalPrepared=false;
+        environmentMapPrepared=false;
         if(!request.track.rcCrystal)return true;
         if(!coverageDemand||!rcCrystalUvs||!request.track.rcCrystal->ready()||
            !frame.sourceBodyCamera50LA||!frame.sourceBodyCameraOwner50LA||!frame.sourceBodyCameraPublication50LA)
@@ -2056,14 +2057,14 @@ bool VehicleWindowGl50DS::Storage::prepareRcCrystalFrame(const VehicleWindowFram
         const game::CameraViewOutput49F camera=*frame.sourceBodyCamera50LA;
         if(!convertNativeCameraView50DX(camera,contract,converted,error)||
            std::memcmp(converted.worldViewProjection,frame.worldViewProjection,sizeof(converted.worldViewProjection))||
-           !request.track.rcCrystal->project(camera,rcCrystalUvs.get(),rc_crystal50RC::Owner::uvCount,rcCrystalAmbient))
+           !request.track.rcCrystal->project(camera,rcCrystalUvs.get(),rc_crystal50RC::Owner::uvCount,environmentAmbient))
             return fail(d,VehicleWindowError50DS::frame,"RC crystal camera/ambient/projection preflight rejected");
-        rcCrystalPrepared=true;return true;
+        environmentMapPrepared=true;return true;
     }
 
 bool VehicleWindowGl50DS::Storage::uploadRcCrystalUvs()noexcept {
         if(!request.track.rcCrystal)return true;
-        if(!rcCrystalPrepared||!trackProjectionBuffer)return fail(*diagnostic,VehicleWindowError50DS::frame,"RC projection lacks complete preflight");
+        if(!environmentMapPrepared||!trackProjectionBuffer)return fail(*diagnostic,VehicleWindowError50DS::frame,"RC projection lacks complete preflight");
         drawGl.bindBuffer(arrayBuffer,trackProjectionBuffer);std::size_t offset=0;
         for(const auto& range:request.track.rcCrystal->ranges()){
             drawGl.bufferSubData(arrayBuffer,std::intptr_t(range.vertexStart)*sizeof(std::array<float,2>),
@@ -2073,8 +2074,10 @@ bool VehicleWindowGl50DS::Storage::uploadRcCrystalUvs()noexcept {
         return offset==rc_crystal50RC::Owner::uvCount;
     }
 
-std::array<I,4> VehicleWindowGl50DS::Storage::rcTriangleRegion(U first)const noexcept {
-        const auto* mesh=request.track.rcCrystal->mesh();
+std::array<I,4> VehicleWindowGl50DS::Storage::gsTriangleRegion(U first)const noexcept {
+        // The SAME uploaded track mesh (validation requires the environment-map
+        // owner's mesh to be this mesh), so no course owner is consulted here.
+        const auto* mesh=request.track.mesh;
         if(!mesh||first>mesh->indices.size()||mesh->indices.size()-first<3)return {{0,0,width,height}};
         std::array<std::array<float,3>,3> triangle{};
         for(U c=0;c<3;++c){const U index=mesh->indices[first+c];if(index>=mesh->vertices.size())return {{0,0,width,height}};
@@ -2082,21 +2085,21 @@ std::array<I,4> VehicleWindowGl50DS::Storage::rcTriangleRegion(U first)const noe
         return nativeTriangleRasterRegion(triangle);
     }
 
-bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount)noexcept {
+bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount,bool environment)noexcept {
         diagnostic->rcCrystalTriangles+=triangleCount;
         if(region[2]<=region[0]||region[3]<=region[1]){diagnostic->rcCrystalEmptyTriangles+=triangleCount;return true;}
         if(region==std::array<I,4>{{0,0,width,height}})++diagnostic->rcCrystalFullRectangles;
-        if(!coverageDemand||!coverageLive.raster||!coverageLive.snapshot||!rcCrystalPrepared||pass<1||pass>2)
-            return fail(*diagnostic,VehicleWindowError50DS::frame,"RC crystal actual coverage resources unavailable");
+        if(!coverageDemand||!coverageLive.raster||!coverageLive.snapshot||(environment&&!environmentMapPrepared)||pass<1||pass>2)
+            return fail(*diagnostic,VehicleWindowError50DS::frame,"GS destination-alpha exact bridge resources unavailable");
         coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);gl.colorMask(1,1,1,1);
         gl.viewport(0,0,width,height);gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
         gl.bindFramebuffer(framebuffer,coverageLive.raster);gl.disable(0x0B71);gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
-        gl.useProgram(trackProgram);gl.uniform1i(rcCrystalPayloadUniform,1);
+        gl.useProgram(trackProgram);gl.uniform1i(gsAlphaPayloadUniform,1);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);drawGl.bindVertexArray(trackVertexArray);
         bool accepted=check("bind RC AA0 source byte/depth payload");
         if(accepted){drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(triangleCount*3),0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
-            accepted=check("raster actual ordered RC crystal triangle");}
+            accepted=check("raster ordered GS destination-alpha triangle");}
         if(accepted){
             if(gl.copyImageSubData)gl.copyImageSubData(coverageLive.color[bank],coverageTexture,0,
                 region[0],region[1],0,coverageLive.snapshotColor,coverageTexture,0,region[0],region[1],0,
@@ -2121,13 +2124,77 @@ bool VehicleWindowGl50DS::Storage::drawRcCrystalTriangle(U bank,U first,U pass,U
         gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
         gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.useProgram(trackProgram);
-        gl.uniform1i(rcCrystalPayloadUniform,0);drawGl.bindVertexArray(trackVertexArray);
+        gl.uniform1i(gsAlphaPayloadUniform,0);drawGl.bindVertexArray(trackVertexArray);
         coverageAa0();gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);gl.disable(0x0BE2);gl.disable(0x0C11);
-        const bool restored=check("restore RC track state after sample composition");return accepted&&restored;
+        const bool restored=check("restore track state after GS destination-alpha composition");return accepted&&restored;
     }
 
-bool VehicleWindowGl50DS::Storage::drawRcCrystalRange(U bank,U first,U count,U pass,U image)noexcept {
-        if(count%3)return fail(*diagnostic,VehicleWindowError50DS::indices,"RC crystal triangle extent");
+// Admission of the fixed GPU-blend route for one span this frame. Pass 1
+// (C=As) is byte-exact for any source colour: the shader floors Cs*As/128
+// and ONE,ONE adds with saturation, as COLCLAMP=1 does. Pass 2 (C=Ad) hands
+// Cs/128 to the DST_ALPHA factor, which a UNORM8 colour output clamps at 1,
+// so it is admitted only while Cs cannot exceed 128: with the texel taken as
+// 255 (no per-texture maximum is retained), the vertex byte must be <= 64
+// (ambient row for the environment map, load-time span maximum for prelit),
+// and with fog on the fog colour byte <= 128. Otherwise the exact bridge runs.
+bool VehicleWindowGl50DS::Storage::fixedDestinationAlphaAdmitted(const TrackSpan& span,U pass)const noexcept {
+        static const bool forceExact=[]{const char* e=std::getenv("RR_EXACT_DEST_ALPHA_BLEND");
+            return e&&e[0]=='1'&&!e[1];}();
+        if(forceExact||!gl.blendFuncSeparate||pass<1||pass>2)return false;
+        if(span.sourceEnvironmentMap&&!environmentMapPrepared)return false;
+        if(pass==1)return true;
+        const auto index=static_cast<std::size_t>(&span-trackSpans.get());
+        for(U c=0;c<3;++c){
+            const U vertexByte=span.sourceEnvironmentMap?environmentAmbient[c]:
+                (gsSpanMaxVertexByte&&index<trackSpanCount?gsSpanMaxVertexByte[index]:255u);
+            if((255u*vertexByte)/128u>128u)return false; // pass-2 byte before fog
+            if(request.track.worldFog.enabled&&span.worldFogEligible){
+                const float f=request.track.worldFog.color[c];
+                if(!std::isfinite(f)||f*255.f>128.f)return false;
+            }
+        }
+        return true;
+    }
+
+bool VehicleWindowGl50DS::Storage::drawDestinationAlphaRange(U bank,U first,U count,U pass,U image,const TrackSpan& span)noexcept {
+        if(count%3)return fail(*diagnostic,VehicleWindowError50DS::indices,"GS destination-alpha triangle extent");
+        // Fixed-function route for the GS A=Cs,B=0,C=As/Ad,D=Cd pair (any
+        // course, chosen by the material's own ALPHA fields). The GPU blends
+        // overlapping fragments in primitive order, per sample, so no scratch
+        // clear, copy, composition or disjoint-run split is needed. Same
+        // coverage rule as the bridge below: MULTISAMPLE disabled gives
+        // pixel-center (AA0) rasterization written to every covered sample,
+        // depth LEQUAL. Pass 1 is byte-exact; pass 2 rounds where the GS
+        // floors (at most one level): the same deviation as the pod map-2
+        // fixed route. RR_EXACT_DEST_ALPHA_BLEND=1 forces the exact bridge.
+        if(fixedDestinationAlphaAdmitted(span,pass)){
+            diagnostic->rcCrystalTriangles+=count/3;
+            if(coverageDemand){
+                if(!coverageLive.scene[bank])
+                    return fail(*diagnostic,VehicleWindowError50DS::frame,"GS destination-alpha scene target unavailable");
+                gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
+                coverageAa0();
+            } // Without coverage demand the bound gameplay target is already AA0.
+            gl.disable(0x8DB9);gl.colorMask(1,1,1,1);
+            gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(span.material.policy.depthWrite?1:0);
+            gl.enable(0x0BE2);gl.blendEquation(0x8006);           // FUNC_ADD
+            if(pass==1)gl.blendFuncSeparate(1,1,1,0);             // RGB: ONE,ONE;       A: ONE,ZERO
+            else gl.blendFuncSeparate(0x0304,1,1,0);              // RGB: DST_ALPHA,ONE; A: ONE,ZERO
+            gl.uniform1i(gsAlphaPayloadUniform,2);
+            bool accepted=check("bind GS destination-alpha fixed-function blend");
+            if(accepted){
+                ++diagnostic->rcCrystalCompositionsIssued; // counts fixed draws on this route
+                drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(count),0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
+                accepted=check("draw GS destination-alpha range through fixed-function blend");
+            }
+            // Same exit state as the bridge restoration.
+            gl.uniform1i(gsAlphaPayloadUniform,0);gl.disable(0x0BE2);
+            if(coverageDemand)coverageAa0();
+            gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);gl.disable(0x0C11);
+            const bool restored=check("restore track state after fixed destination-alpha draw");
+            return accepted&&restored;
+        }
         // Same rule as the pod pair bridge: a run keeps the contiguous index
         // order and holds only triangles whose conservative pixel rectangles are
         // pairwise disjoint, so no member can read another's destination or
@@ -2140,12 +2207,12 @@ bool VehicleWindowGl50DS::Storage::drawRcCrystalRange(U bank,U first,U count,U p
         const auto full=[&](const std::array<I,4>& r) noexcept {return r==std::array<I,4>{{0,0,width,height}};};
         const auto empty=[](const std::array<I,4>& r) noexcept {return r[2]<=r[0]||r[3]<=r[1];};
         while(first<end){
-            const auto initial=rcTriangleRegion(first);
-            if(empty(initial)||full(initial)){if(!drawRcCrystalTriangle(bank,first,pass,image,initial,1))return false;first+=3;continue;}
+            const auto initial=gsTriangleRegion(first);
+            if(empty(initial)||full(initial)){if(!drawDestinationAlphaTriangle(bank,first,pass,image,initial,1,span.sourceEnvironmentMap))return false;first+=3;continue;}
             std::array<std::array<I,4>,maximumRun> regions;regions[0]=initial;auto united=initial;
             std::uint64_t summed=area(initial);U run=1;
             while(run<maximumRun&&first+run*3<end){
-                const auto next=rcTriangleRegion(first+run*3);
+                const auto next=gsTriangleRegion(first+run*3);
                 if(empty(next)||full(next))break;
                 bool disjoint=true;
                 for(U i=0;i<run&&disjoint;++i){const auto& old=regions[i];
@@ -2158,7 +2225,7 @@ bool VehicleWindowGl50DS::Storage::drawRcCrystalRange(U bank,U first,U count,U p
                 if(area(candidate)>(summed+area(next))*2u)break;
                 regions[run++]=next;united=candidate;summed+=area(next);
             }
-            if(!drawRcCrystalTriangle(bank,first,pass,image,united,run))return false;
+            if(!drawDestinationAlphaTriangle(bank,first,pass,image,united,run,span.sourceEnvironmentMap))return false;
             first+=run*3;
         }
         return true;

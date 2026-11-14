@@ -25,8 +25,11 @@ struct Policy {
     bool sourcePrelit = false;
     // Exact SC lava pass 2 only: fixed GS alpha, independent of source alpha.
     bool fixedBlendAlpha = false;
-    // Exact RC crystal only: 1 prelit source-alpha, 2 Environment destination-alpha.
-    std::uint8_t rcCrystalPass = 0;
+    // Common GS destination-alpha pair, from the pass's ALPHA fields:
+    // 1 = A=Cs,B=0,C=As,D=Cd pass whose As the next pass reads, 2 = C=Ad pass.
+    std::uint8_t gsDestinationAlphaPass = 0;
+    // Pass program EnvironmentMapCompressed (projected UVs, ambient colour).
+    bool sourceEnvironmentMap = false;
 };
 namespace detail {
 struct Material {

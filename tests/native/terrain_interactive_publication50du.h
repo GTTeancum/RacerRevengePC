@@ -386,8 +386,6 @@ struct Context final {
     maOriginalWorldType& maOriginalWorld;
     using maSaAtmType = ma_sa_atm_window_fixture::Owner;
     maSaAtmType& maSaAtm;
-    using maShieldUvType = ma_shield_uv_fixture::Owner;
-    maShieldUvType& maShieldUv;
     using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
     maTriggerActionsType& maTriggerActions;
     using mainContactFramesType = std::uint64_t;
@@ -408,8 +406,6 @@ struct Context final {
     mbOriginalWorldType& mbOriginalWorld;
     using mbRaceType = race_session50HM::MbSession;
     mbRaceType& mbRace;
-    using mbShieldUvType = mb_shield_uv_fixture::Owner;
-    mbShieldUvType& mbShieldUv;
     using mcAnimationRuntimeType = std::shared_ptr<mc_animation_runtime50MC::Owner>;
     mcAnimationRuntimeType& mcAnimationRuntime;
     using mcAtmType = mc_atm_window_fixture::Owner;
@@ -447,8 +443,6 @@ struct Context final {
     using mcRaceType = race_session50HM::McSession;
     mcRaceType& mcRace;
     BorrowedCall<std::size_t()> mcRemainingPayloadBytesCall;
-    using mcShieldUvType = mc_shield_uv_fixture::Owner;
-    mcShieldUvType& mcShieldUv;
     using mcSkyOwnerType = std::unique_ptr<mc_sky50MC::Owner>;
     mcSkyOwnerType& mcSkyOwner;
     using mcSourceCameraAssetsType = std::unique_ptr<mc_camera_assets50MC::Owner>;
@@ -757,8 +751,6 @@ struct Context final {
     scColdSourcesType& scColdSources;
     using scGroundType = std::unique_ptr<sc_runtime_ground50LA::Owner>;
     scGroundType& scGround;
-    using scLavaUvType = sc_lava_uv_fixture::Owner;
-    scLavaUvType& scLavaUv;
     using scOriginalDiscType = const bool;
     scOriginalDiscType& scOriginalDisc;
     using scOriginalWorldType = std::shared_ptr<sc_original_world50LM::Owner>;
@@ -962,8 +954,6 @@ struct Context final {
     using tbRaceType = race_session50HM::TbSession;
     tbRaceType& tbRace;
     BorrowedCall<std::size_t()> tbRemainingPayloadBytesCall;
-    using tbShieldUvType = tb_shield_uv_fixture::Owner;
-    tbShieldUvType& tbShieldUv;
     using tbSourceCameraAssetsType = std::unique_ptr<original_camera_session50KX::AuthoredStorage>;
     tbSourceCameraAssetsType& tbSourceCameraAssets;
     using tbTrackParticlesType = std::unique_ptr<OriginalTrackParticleCold50LA>;
@@ -996,8 +986,6 @@ struct Context final {
     tcOriginalWorldType& tcOriginalWorld;
     using tcRaceType = race_session50HM::TcSession;
     tcRaceType& tcRace;
-    using tcShieldUvType = tc_shield_uv_fixture::Owner;
-    tcShieldUvType& tcShieldUv;
     using tcTriggerActionsType = std::shared_ptr<tc_trigger_actions50TC::Owner>;
     tcTriggerActionsType& tcTriggerActions;
     using tcWorldBorrowType = std::optional<tc_collision_world50TC::Owner::Borrow>;
@@ -1040,6 +1028,8 @@ struct Context final {
     trackSourceType& trackSource;
     using trackTextureBytesType = const std::size_t;
     trackTextureBytesType& trackTextureBytes;
+    using trackUvAnimationType = track_uv_animation50uv_fixture::Owner;
+    trackUvAnimationType& trackUvAnimation;
     BorrowedCall<void()> updateOpponentAudioCall;
     BorrowedCall<void()> updateOriginalAiPackingCall;
     using usePhysicalGameControllerType = const bool;

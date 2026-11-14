@@ -17,6 +17,7 @@
 #include "../../src/assets/original_ta_intro_authoring_candidate.h"
 #include "../../src/game/pod_speech50hg.h"
 #include "../../src/game/original_racer_diffuse_camera50la.h"
+#include "../../src/game/track_zone_visibility50zv.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
 #include "track_navigation_view50gb.h"
@@ -48,6 +49,7 @@ namespace rr::platform { struct VehicleWindowFrame50DS; }
 #include "../../src/game/control_presets49d.h"
 #include "../../src/game/frame_timing49i.h"
 #include "../../src/game/original_camera_start_native.h"
+#include "../../src/game/original_race_start_overlay50hu.h"
 #include "../../src/game/original_camera_start_prelude.h"
 #include "../../src/game/original_camera_visibility_join.h"
 #include "../../src/game/original_attached_race_frame.h"
@@ -740,6 +742,10 @@ class Session final {
     OriginalDirectRaceStartOwner directStart_;
     bool directStartPending_=false;
     OriginalRaceStartCountdown countdown_;
+    // race+D4 PodRaceStartOverlay (196F20), one per race on every course.
+    // Shared with the renderer, which may outlive this Session.
+    std::shared_ptr<OriginalRaceStartOverlay50HU> startOverlay_;
+    bool goLogged_=false,goEdgePending_=false;
     OriginalVideoBlockingFade blockingFade_;
     AsyncRetainedFade asyncFade_,endingFade_,taSkipAsyncFade_;
     OriginalVideoAsyncRequest50LA fadeInRequest_,taSkipFadeInRequest_,endingFadeRequest_;
@@ -1394,6 +1400,37 @@ public:
     bool ready()const noexcept{return coldBound_;}
     bool abandoned()const noexcept{return abandoned_;}
     bool countdownInstalled()const noexcept{return countdownInstalled_;}
+    // 1A8C40 / 197040 / 1A8C78: build, load and attach the race's start
+    // overlay. Called once from the common race load for every course.
+    bool loadStartOverlay(std::shared_ptr<const rr::assets::OriginalUiArchive50KG> appStart,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG> overlays,
+        const rr::assets::OriginalUiMaterialRuntime50KG& runtime,
+        OriginalRaceStartOverlayDiagnostic50HU& d)noexcept{
+        if(startOverlay_)return false;
+        try{auto owner=std::make_shared<OriginalRaceStartOverlay50HU>();
+            if(!owner->load197040(std::move(appStart),std::move(overlays),runtime,d))return false;
+            //1976B0 reads race+8C; the port runs one full-screen view (mode 0).
+            if(!owner->attach1976B0(0))return false;
+            startOverlay_=std::move(owner);return true;
+        }catch(...){return false;}
+    }
+    std::shared_ptr<const OriginalRaceStartOverlay50HU> startOverlay()const noexcept{return startOverlay_;}
+    // 1982C0/197C10 for the drawn view; returns the draw (with its 1A4B80
+    // sound events) or null when the overlay is absent.
+    const OriginalRaceStartOverlayDraw50HU* drawStartOverlay(std::uint32_t drawnView268)noexcept{
+        if(!startOverlay_)return nullptr;
+        OriginalRaceStartOverlayInputs50HU in{countdown_.countdown34,actual_.all8Manager.flags58,
+            raceFlags1B0_,raceEntityFlags29_,drawnView268};
+        if(!startOverlay_->draw198300(in))return nullptr;
+        return &startOverlay_->nativeDraw();
+    }
+    float countdown34()const noexcept{return countdown_.countdown34;}
+    // True once, on the step whose 1AFE30 ran. Root then performs 1AEDD0's
+    // per-racer starts and the 287B60 record start before any racer step.
+    bool takeGoEdge1AFE30()noexcept{const bool edge=goEdgePending_;goEdgePending_=false;return edge;}
+    bool goPublished()const noexcept{return goPublished_;}
+    // Actual permanent rig identity (racer+60) of a race slot; 0 if absent.
+    std::uint32_t racer60(std::size_t slot)const noexcept{return slot<actual_.racer60.size()?actual_.racer60[slot]:0u;}
     bool introExitReady()const noexcept{return controller_.mode44==7&&start_.complete240;}
     // Read-only smoke progress; this neither authorizes nor advances a cut.
     std::array<std::int32_t,4> nativeStartProgress()const noexcept {
@@ -1609,6 +1646,42 @@ public:
            actual.sceneKey!=sceneBinding_.sceneKey||actual.parentZoneKey!=sceneBinding_.parentZoneKey||
            actual.registrationKey!=sceneBinding_.registrationKey)return false;
         out=spatial_.parent38-1u;return true;
+    }
+    // Original per-frame zone (section) visibility for the track renderer,
+    // the same for every course: this camera's scene38 zone, the course's
+    // authored portals (272B3C) and that zone's ExclusionList (27632C), walked
+    // by 27F650/27FEE0 (track_zone_visibility50zv). false = not available this
+    // frame; the caller then supplies no zones (frustum-only, as before).
+    // Reads the lease's portal world and authoring only; writes nothing in it.
+    bool prepareTrackZones50ZV(rr::platform::VehicleWindowTrackZone50DS* out,std::size_t capacity,
+        std::uint32_t& count,float widescreenScaleX=1.f) noexcept {
+        count=0;std::uint32_t root=0;
+        if(!out||!readCameraPrimaryZone48(root)||!viewport_.prepared)return false;
+        lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+        if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+           !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return false;
+        const auto* world=lease.world();
+        const auto* authored=lease.authoredRenderZone(root);
+        if(!world||!authored||authored->exclusionCount>authored->exclusions.size()||
+           world->portals.zoneCount>capacity)return false;
+        rr::game::TrackZoneVisibilityInput50ZV in{};
+        in.portals=&world->portals;in.rootZone=root;
+        in.rootExclusions=authored->exclusions.data();in.rootExclusionCount=authored->exclusionCount;
+        in.camera=&view();in.widescreenScaleX=widescreenScaleX;
+        // 230450's constant quad, built locally (the Application 434940 copy is
+        // RA-owned today); nothing is written into any original structure.
+        if(!rr::game::constructPortalViewport230450_50EO(in.viewportQuad))return false;
+        in.viewportX=viewport_.x1E0;in.viewportY=viewport_.y1E4;
+        in.viewportWidth=viewport_.width1E8;in.viewportHeight=viewport_.height1EC;
+        std::array<rr::game::TrackZoneRow50ZV,rr::game::maxTrackZones50ZV> rows{};
+        if(rr::game::prepareTrackZoneVisibility50ZV(in,rows.data(),rows.size())!=
+           rr::game::TrackZoneVisibilityStatus50ZV::complete)return false;
+        for(std::size_t z=0;z<world->portals.zoneCount;++z){
+            auto& o=out[z];const auto& r=rows[z];
+            o.drawn=r.drawn;o.sourceClip=r.view.matrix60;o.scissor=r.scissor;
+            o.viewport={{in.viewportX,in.viewportY,in.viewportWidth,in.viewportHeight}};
+        }
+        count=static_cast<std::uint32_t>(world->portals.zoneCount);return true;
     }
     std::uint64_t publicationCount()const noexcept{return publicationCount_;}
     bool blockingVideoPending()const noexcept {
@@ -2342,24 +2415,49 @@ public:
     bool taSkipVideoResumePending()const noexcept{return frameStage_==FrameStage::taSkipVideo;}
 
 
-    //ONE existing host countdown. Root calls once per unpaused planned native
-    //tick instead of its former advanceCountdown call; never call both. Intro
-    //does not consume it. Its crossing-zero hold and subsequent GO edge retain
-    //the existing native schedule; no source1AFE30 event/sound parity is claimed.
+    //Original countdown clock. Root calls once per unpaused planned native
+    //tick (Application+11C paused ticks never reach it). This is the counting
+    //branch of the lap manager step 1AF9C0 (1AFA70..1AFAB4): countdown34 -= dt
+    //while flags58 bit2 and not bit1; on the first step that finds
+    //countdown34 <= 0 it runs 1AFE30 (GO). The racing branch (clock +30,
+    //1AFF50, 1B0CB0, 1B0A70) stays with the existing lap timing owner. The
+    //start overlay update 198190 follows, as race+D4 follows race+B4.
+    //The host race rows only mirror this clock; they no longer own one.
     Result advanceNativeStartGate(float actualPreparedSeconds){
         if(!actual_.followQueries.get()||!coldBound_||frameStage_==FrameStage::failed)return set(Status::owner);
         if(pendingDisplayWork())return set(Status::videoPending);
         if(!countdownInstalled_)return set(Status::startHeld);
-        if(!actual_.hostRace.advanceCountdown(static_cast<double>(actualPreparedSeconds))){
-            if(actual_.hostRace.rows().error!=race_session50HM::Error::None)return fail(Status::numeric);
-            return set(Status::startHeld);
-        }
+        auto& host=actual_.hostRace.rows();
+        bool held=true;
         if(!goPublished_){
-            actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58|2u);
-            for(std::size_t i=0;i<actual_.bank.count();++i)actual_.bank.visit(i,[&](){actual_.arena.fields.applicationByte58=actual_.all8Manager.flags58;});
-            goPublished_=true;
+            const auto step=advanceOriginalRaceCountdown1AFA84(countdown_,actual_.all8Manager,actualPreparedSeconds);
+            if(step==OriginalCountdownStep::arithmetic)return fail(Status::numeric);
+            if(step==OriginalCountdownStep::inactive)return fail(Status::sourcePath,0x1afa70);
+            if(step==OriginalCountdownStep::needs1AFE30){
+                //1AFE30. Its 1AEDD0 per-racer starts (body axis enables
+                //167A30/167A40 on racer+340, D40 +80/+8C) and the 287B60
+                //record start belong to owners outside this Session; root
+                //runs them on takeGoEdge1AFE30() in this same step, before
+                //any racer update. The flags58 copy into every racer below is
+                //the port's existing per-racer view of the manager word.
+                //2C4FA0(announcer, 7.0) is empty in retail: no call.
+                actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58|2u); //1AFF38.
+                for(std::size_t i=0;i<actual_.bank.count();++i)actual_.bank.visit(i,[&](){actual_.arena.fields.applicationByte58=actual_.all8Manager.flags58;});
+                goPublished_=true;held=false;goEdgePending_=true;
+                //Host rows follow the original GO; they keep no clock of their own.
+                host.countdownRemaining=0;host.phase=race_session50HM::Phase::Racing;host.error=race_session50HM::Error::None;
+                if(!goLogged_){std::fprintf(stderr,"race_start_clock go1AFE30 flags58=%u\n",unsigned(actual_.all8Manager.flags58));goLogged_=true;}
+            }else{
+                //Mirror only: race-audio validity and logs read these rows.
+                host.countdownRemaining=countdown_.countdown34>0?static_cast<double>(countdown_.countdown34):0.0;
+            }
+        }else held=false;
+        if(startOverlay_){
+            OriginalRaceStartOverlayInputs50HU in{countdown_.countdown34,actual_.all8Manager.flags58,
+                raceFlags1B0_,raceEntityFlags29_,0};
+            if(!startOverlay_->update198190(in,actualPreparedSeconds))return fail(Status::numeric);
         }
-        return set(Status::simulationAllowed);
+        return set(held?Status::startHeld:Status::simulationAllowed);
     }
     //Presentation cut only. Root must call after the real video frame drain
     //and registered callbacks, before accepting another simulation tick. The

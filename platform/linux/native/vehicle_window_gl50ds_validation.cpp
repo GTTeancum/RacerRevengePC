@@ -199,7 +199,7 @@ bool validateTbWorld(const VehicleWindowRequest50DS& request,VehicleWindowDiagno
         if(a.materialSelection>=selections->size()||a.vertexStart!=b.vertexStart||a.vertexCount!=b.vertexCount||
            a.indexStart!=b.indexStart||a.indexCount!=b.indexCount||a.textureIndex!=b.material.textureIndex||
            a.sourcePass!=b.sourcePass||a.sourcePassCount!=b.sourcePassCount||a.projectionPass!=b.projectionPass||
-           b.rcCrystalPass||b.material.mode!=VehicleWindowMaterialMode50DS::requiredTexture)
+           b.gsDestinationAlphaPass||b.sourceEnvironmentMap||b.material.mode!=VehicleWindowMaterialMode50DS::requiredTexture)
             return fail(d,VehicleWindowError50DS::material,"TB ordered source span association differs");
         if(pod_materials50ed_fixture::detail::normalized((*selections)[a.materialSelection].materialName)=="CROWD"){
             if(b.nativeCoverage!=NativeTrackCoverage50DS::fourSampleAa1)
@@ -335,8 +335,19 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
                 span.nativeCoverage != NativeTrackCoverage50DS::fourSampleAa1)
                 return fail(d, VehicleWindowError50DS::material, "unknown native track coverage policy");
             if (!validateMaterialPolicy(span.material, d)) return false;
-            if(span.rcCrystalPass && (!track.rcCrystal || span.rcCrystalPass>2))
-                return fail(d,VehicleWindowError50DS::material,"RC crystal pass lacks actual typed source owner");
+            // Common GS destination-alpha pair, keyed on the lowered material
+            // data only: 1 must be followed, 2 preceded, by its partner pass.
+            if(span.gsDestinationAlphaPass>2||
+               (span.gsDestinationAlphaPass==1&&(i+1>=track.spanCount||
+                   !validDestinationAlphaPair50DS(span,track.spans[i+1])))||
+               (span.gsDestinationAlphaPass==2&&(!i||
+                   !validDestinationAlphaPair50DS(track.spans[i-1],span))))
+                return fail(d,VehicleWindowError50DS::material,"GS destination-alpha pass lacks its same-surface partner");
+            if(span.sourceZone>track.zoneCount)
+                return fail(d,VehicleWindowError50DS::material,"track span zone outside the world's authored zones");
+            // Stand-in: the retained RC owner is the only environment-map UV producer.
+            if(span.sourceEnvironmentMap&&(!track.rcCrystal||span.gsDestinationAlphaPass!=2))
+                return fail(d,VehicleWindowError50DS::material,"environment-map pass lacks its projection owner");
             if (span.material.sourceDiffuseCompressed50LA)
                 return fail(d, VehicleWindowError50DS::material,
                     "track, dynamic-world and sky spans cannot select racer source diffuse");
@@ -448,8 +459,8 @@ bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWin
         if (animation.sourceSpanIndex >= request.track.spanCount)
             return fail(d, VehicleWindowError50DS::material, "animated source span outside original track table");
         const auto& span = request.track.spans[animation.sourceSpanIndex];
-        if(span.rcCrystalPass)
-            return fail(d,VehicleWindowError50DS::material,"RC crystal retains its actual static images; ATM override rejected");
+        if(span.sourceEnvironmentMap)
+            return fail(d,VehicleWindowError50DS::material,"environment-map pass retains its actual static image; ATM override rejected");
         if(span.sourceUvPolicy==NativeTrackUvPolicy50DS::scLavaTwoPass)
             return fail(d,VehicleWindowError50DS::material,"SC lava retains its static original image; ATM override rejected");
         if (span.material.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
@@ -479,7 +490,7 @@ bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindow
         return fail(d, VehicleWindowError50DS::limits,
             "dynamic world requires bounded textured topology without static culling/projection");
     const bool result = validateTrack(selected, d);
-    if(result)for(U i=0;i<world.spanCount;++i)if(world.spans[i].sourceUvAnimation||world.spans[i].rcCrystalPass)
+    if(result)for(U i=0;i<world.spanCount;++i)if(world.spans[i].sourceUvAnimation||world.spans[i].gsDestinationAlphaPass||world.spans[i].sourceEnvironmentMap)
         return fail(d,VehicleWindowError50DS::material,"dynamic UV/crystal controller requires a separate owner binding");
     d.dynamicWorldSpan = d.trackSpan;
     d.trackSpan = assets::unresolvedMaterialTexture50EA;

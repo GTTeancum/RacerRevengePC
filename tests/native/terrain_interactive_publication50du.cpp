@@ -2,6 +2,7 @@
 #include "native_last_failure50pd.h"
 #include "native_course_archive_release50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
+#include "native_water_surface50ws.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "native_common_results50pd.h"
@@ -18,7 +19,6 @@
 #include "gc_particle_materials50kg_fixture.h"
 #include "mc_camera_assets50mc.h"
 #include "mc_particle_cold50mc.h"
-#include "mc_shield_render50mc.h"
 #include "mc_query50mc.h"
 #include "rc_crystal50rc.h"
 #include "tb_door_binding50tb.h"
@@ -335,7 +335,6 @@ void Context::run() {
  auto& maOriginalDisc=this->maOriginalDisc;
  auto& maOriginalWorld=this->maOriginalWorld;
  auto& maSaAtm=this->maSaAtm;
- auto& maShieldUv=this->maShieldUv;
  auto& maTriggerActions=this->maTriggerActions;
  auto& mainContactFrames=this->mainContactFrames;
  auto& mainCrossedPortals=this->mainCrossedPortals;
@@ -346,7 +345,6 @@ void Context::run() {
  auto& mbMapView=this->mbMapView;
  auto& mbOriginalWorld=this->mbOriginalWorld;
  auto& mbRace=this->mbRace;
- auto& mbShieldUv=this->mbShieldUv;
  auto& mcAnimationRuntime=this->mcAnimationRuntime;
  auto& mcAtm=this->mcAtm;
  auto& mcColdSources=this->mcColdSources;
@@ -366,7 +364,6 @@ void Context::run() {
  auto& mcQueryBinding=this->mcQueryBinding;
  auto& mcRace=this->mcRace;
  const auto& mcRemainingPayloadBytes=this->mcRemainingPayloadBytesCall;
- auto& mcShieldUv=this->mcShieldUv;
  auto& mcSkyOwner=this->mcSkyOwner;
  auto& mcSourceCameraAssets=this->mcSourceCameraAssets;
  auto& mcTrackParticles=this->mcTrackParticles;
@@ -531,7 +528,6 @@ void Context::run() {
  auto& scAtm=this->scAtm;
  auto& scColdSources=this->scColdSources;
  auto& scGround=this->scGround;
- auto& scLavaUv=this->scLavaUv;
  auto& scOriginalDisc=this->scOriginalDisc;
  auto& scOriginalWorld=this->scOriginalWorld;
  auto& scTriggerActions=this->scTriggerActions;
@@ -637,7 +633,6 @@ void Context::run() {
  auto& tbPodSound=this->tbPodSound;
  auto& tbRace=this->tbRace;
  const auto& tbRemainingPayloadBytes=this->tbRemainingPayloadBytesCall;
- auto& tbShieldUv=this->tbShieldUv;
  auto& tbSourceCameraAssets=this->tbSourceCameraAssets;
  auto& tbTrackParticles=this->tbTrackParticles;
  auto& tbTriggerActions=this->tbTriggerActions;
@@ -654,7 +649,6 @@ void Context::run() {
  auto& tcOriginalDisc=this->tcOriginalDisc;
  auto& tcOriginalWorld=this->tcOriginalWorld;
  auto& tcRace=this->tcRace;
- auto& tcShieldUv=this->tcShieldUv;
  auto& tcTriggerActions=this->tcTriggerActions;
  auto& tcWorldBorrow=this->tcWorldBorrow;
  auto& terrainHitFrames=this->terrainHitFrames;
@@ -676,6 +670,7 @@ void Context::run() {
  auto& trackSession=this->trackSession;
  auto& trackSource=this->trackSource;
  auto& trackTextureBytes=this->trackTextureBytes;
+ auto& trackUvAnimation=this->trackUvAnimation;
  const auto& updateOpponentAudio=this->updateOpponentAudioCall;
  const auto& updateOriginalAiPacking=this->updateOriginalAiPackingCall;
  auto& usePhysicalGameController=this->usePhysicalGameController;
@@ -1034,25 +1029,12 @@ void Context::run() {
    for(bool actual:matched)require50DU(actual,"GC generator has no actual renderer spans");
    nativeFireSpanDrawn.resize(nativeFireSpanIds.size());
   }
-  if(isMaTrack){
-   ma_shield_uv_fixture::Diagnostic diagnostic;
-   const bool loaded=maOriginalWorld?maShieldUv.load(*maOriginalWorld,diagnostic):
-       maShieldUv.load(*trackMaterialOwner,diagnostic);
-   require50DU(loaded,
-       diagnostic.message.empty()?"MA actual shield UV owner rejected":diagnostic.message.c_str());
-  }
   if(isMbTrack){
-   mb_shield_uv_fixture::Diagnostic diagnostic;
-   require50DU(mbOriginalWorld&&mbShieldUv.load(*mbOriginalWorld,diagnostic),
-       diagnostic.message.empty()?"MB actual shield UV owner rejected":diagnostic.message.c_str());
    mb_atm_animation_fixture::Diagnostic animationDiagnostic;
    require50DU(mbAtm.loadSource(trackSession->archive,trackSource,*mbOriginalWorld,animationDiagnostic),
        animationDiagnostic.message.empty()?"MB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isScTrack){
-   sc_lava_uv_fixture::Diagnostic diagnostic;
-   const bool uvLoaded=scOriginalWorld&&scLavaUv.load(*scOriginalWorld,diagnostic);
-   require50DU(uvLoaded,diagnostic.message.empty()?"SC actual lava UV owner rejected":diagnostic.message.c_str());
    sc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=scAtm.loadSource(trackSession->archive,trackSource,*scOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"SC actual animated textures rejected":animationDiagnostic.message.c_str());
@@ -1130,24 +1112,16 @@ void Context::run() {
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"GB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isMcTrack){
-   mc_shield_uv_fixture::Diagnostic uvDiagnostic;
-   require50DU(mcShieldUv.load(*mcOriginalWorld,uvDiagnostic),uvDiagnostic.message.c_str());
    mc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=mcAtm.loadSource(trackSource,mcOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"MC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isTbTrack){
-   tb_shield_uv_fixture::Diagnostic diagnostic;
-   const bool uvLoaded=tbShieldUv.load(tbOriginalWorld,diagnostic);
-   require50DU(uvLoaded,diagnostic.message.empty()?"TB actual shield UV owner rejected":diagnostic.message.c_str());
    tb_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=tbAtm.loadSource(trackSource,tbOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"TB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isTcTrack){
-   tc_shield_uv_fixture::Diagnostic diagnostic;
-   const bool uvLoaded=tcOriginalWorld&&tcShieldUv.load(*tcOriginalWorld,diagnostic);
-   require50DU(uvLoaded,diagnostic.message.empty()?"TC actual shield UV owner rejected":diagnostic.message.c_str());
    tc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=tcAtm.loadSource(trackSource,*tcOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"TC actual animated textures rejected":animationDiagnostic.message.c_str());
@@ -1300,9 +1274,9 @@ void Context::run() {
     if(isSaTrack&&(!saAnimatedWorld||!saAnimatedWorld->ready()||!saDynamicWindow.loaded()||
        !saDynamicWindow.ownsResources()||!saTriggerActions||!saTriggerActions->ready()||
        !maSaAtm.loaded()||!maSaAtm.ownsResources()))return false;
-    if(isMaTrack&&(!maTriggerActions||!maTriggerActions->ready()||!maShieldUv.loaded()||!maSaAtm.loaded()||
+    if(isMaTrack&&(!maTriggerActions||!maTriggerActions->ready()||!maSaAtm.loaded()||
        !maSaAtm.ownsResources()))return false;
-    if(isMbTrack&&(!mbOriginalWorld||!mbOriginalWorld->loaded()||!mbShieldUv.loaded()||
+    if(isMbTrack&&(!mbOriginalWorld||!mbOriginalWorld->loaded()||
        !mbAtm.loaded()||!mbAtm.ownsResources()))return false;
     if(rcOriginalDisc&&(!humanOriginalHud||!rcColdSources||!rcColdSources->ready()||
        !rcCollisionWorld||!rcWorldBorrow||rcCollisionWorld->coldSource()!=rcColdSources.get()||
@@ -1353,7 +1327,7 @@ void Context::run() {
        rcParticleRuntime->coldOwner()!=rcTrackParticles.get()||!rcParticleWindow||!rcParticleWindow->ready()||
        !rcParticleRegistryFinalAccounted||!rcTrackParticles->particles()||
        rcTrackParticles->particles()->emitterStoragePayloadBytes()!=rcParticleRegistryPayloadCharged))return false;
-    if(isScTrack&&(!scOriginalWorld||!scOriginalWorld->loaded()||!scLavaUv.loaded()||
+    if(isScTrack&&(!scOriginalWorld||!scOriginalWorld->loaded()||
        !scAtm.loaded()||!scAtm.ownsResources()||!scZeroSky.ready()))return false;
     if(maOriginalDisc&&(!humanOriginalHud||!maOriginalWorld||!maOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
@@ -1498,6 +1472,7 @@ void Context::run() {
   // the same scene and physics available for comparisons.
   const char* disableCulling=std::getenv("RR_DISABLE_TRACK_CULLING");
   renderRequest.track.enableFrustumCulling=!(disableCulling&&std::string(disableCulling)=="1");
+  renderRequest.track.zoneCount=static_cast<std::uint32_t>(actualWorld.zones.size());
   renderRequest.track.maximumVertexBytes=isMaSaTrack?32u*1024u*1024u:isGaTrack?16u*1024u*1024u:
       trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
   renderRequest.track.maximumIndexBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:2u*1024u*1024u;
@@ -1526,6 +1501,17 @@ void Context::run() {
   trackTextureRequest.maximumGpuBytes=trackTextureBytes;
   require50DU(trackGpuTextures.create(trackTextureRequest,*trackBank,textureDiagnostic),
       "actual selected-track texture upload failed");
+  {
+   // One texture-scroll owner for every course, from the track's own
+   // authored pass fields (VertexAnimation=unique + uvs_animate, 29A310).
+   const auto* uvSelections=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gcOriginalWorld?gcOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
+       saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
+   require50DU(trackSpans&&uvSelections,"selected-track spans/selections missing for UV animation");
+   track_uv_animation50uv_fixture::Diagnostic uvDiagnostic;
+   require50DU(trackUvAnimation.load(*trackSpans,*uvSelections,uvDiagnostic),
+       uvDiagnostic.message.empty()?"common track UV animation owner rejected":uvDiagnostic.message.c_str());
+   trackUvAnimation.log(std::cerr);
+  }
   trackBindings.reserve(trackSpans->size());
   for(const auto& span:*trackSpans){
    platform::VehicleWindowTrackSpan50DS binding{};
@@ -1608,27 +1594,40 @@ void Context::run() {
    // These authenticated beam placements explicitly disable source lighting.
    binding.material.unlit=alpha.unlit;
    binding.material.sourcePrelit=alpha.sourcePrelit;
+   // Geometry data, not a course or material name: a surface stored without a
+   // colour stream draws with the original program's light-row bytes, not the
+   // export's diagnostic white (renderer: sourceColorStreamAbsent).
+   binding.material.sourceColorStreamAbsent=!span.hasOriginalColors;
    binding.discardZeroAlpha=alpha.discardZeroAlpha;
    binding.sourceAlphaTest=alpha.sourceAlphaTest;
    binding.sourceAlphaReference=alpha.sourceAlphaReference;
    binding.sourceFogKnown=alpha.sourceFogKnown;binding.sourceFogEnabled=alpha.sourceFogEnabled;
-   binding.sourceUvAnimation=(maShieldUv.loaded()&&maShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))||
-       (mbShieldUv.loaded()&&mbShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())));
-   if(isScTrack&&scLavaUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
-    require50DU(scLavaUv.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
-        "SC exact two-pass lava span lowering rejected");
-   if(isMcTrack&&mcShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
-    require50DU(mc_shield_render50MC::bind(mcShieldUv,*mcOriginalWorld,static_cast<std::uint32_t>(trackBindings.size()),binding),"MC actual unique shield UV span rejected");
-   if(isTbTrack&&tbShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
-    require50DU(tbShieldUv.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
-        "TB actual shield span lowering rejected");
-   if(isTcTrack&&tcShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
-    require50DU(tcShieldUv.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
-        "TC exact single-pass shield span lowering rejected");
+   // Common GS ALPHA lowering (every course): the destination-alpha pair and
+   // the environment-map program come from the pass data, not the course.
+   binding.gsDestinationAlphaPass=alpha.gsDestinationAlphaPass;
+   binding.sourceEnvironmentMap=alpha.sourceEnvironmentMap;
+   if(trackUvAnimation.animated(static_cast<std::uint32_t>(trackBindings.size())))
+    require50DU(trackUvAnimation.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
+        "track UV-animated span lowering rejected");
    require50DU(span.worldInstanceIndex<staticShadowReceiving.size(),"static shadow receiver source instance rejected");
    binding.allowPodShadow=staticShadowReceiving[span.worldInstanceIndex]!=0;
-   if(isRcTrack)require50DU(rcCrystal&&rcCrystal->bindSpan(trackBindings.size(),binding),"RC crystal exact span lowering rejected");
+   // Authored zone of the span's static model (SCB ZoneN-ModelM), every course.
+   require50DU(span.worldInstanceIndex<actualWorld.instances.size()&&
+       actualWorld.instances[span.worldInstanceIndex].zone<=actualWorld.zones.size(),
+       "static model zone outside the world's authored zones");
+   binding.sourceZone=actualWorld.instances[span.worldInstanceIndex].zone;
+   // The environment-map UV owner exists only where its data does (stand-in:
+   // created for RC, the one course with an EnvironmentMapCompressed pass).
+   require50DU(!binding.sourceEnvironmentMap||rcCrystal,"environment-map pass lacks its projection owner");
+   if(rcCrystal)require50DU(rcCrystal->verifySpan(trackBindings.size(),binding),"environment-map owner span association rejected");
    trackBindings.push_back(binding);
+  }
+  {
+   std::size_t absent=0,absentBlended=0;
+   for(const auto& b:trackBindings)if(b.material.sourceColorStreamAbsent){
+    ++absent;if(b.material.blend!=platform::VehicleWindowBlend50DS::opaque)++absentBlended;}
+   std::cerr<<"track_source_color_absent spans="<<absent<<" blended="<<absentBlended
+       <<" of="<<trackBindings.size()<<"\n";
   }
   }else{
    // The aggregate supplies its exact 44-family/49-image cold publication.
@@ -1746,6 +1745,19 @@ void Context::run() {
    require50DU(native_wreck_debris50PD::prepareGpu(textureRequest,textureDiagnostic,debrisLog),debrisLog.c_str());
    native_wreck_debris50PD::bindRequest(renderRequest);
    std::cerr<<"wreck_debris_gpu "<<debrisLog<<'\n';
+   // Original water surface: one owner for every course whose WaterFile is
+   // not none. Both course water loaders publish the same shared runtime;
+   // this selects by which runtime exists, never by course name.
+   {const native_water_runtime50JC::Owner* waterRuntime=mcWaterOwner?&mcWaterOwner->runtime():
+        nativeGcWater?&nativeGcWater->water():nullptr;
+    if(waterRuntime&&waterRuntime->resources()){
+     std::string waterLog;
+     const bool water=native_water_surface50WS::loadCold(trackSession->archive,*waterRuntime->resources(),
+         platform::hostTrackCode50IM(loadedTrack),originalAiHumanCount,waterLog)&&
+         native_water_surface50WS::prepareGpu(textureRequest,textureDiagnostic);
+     native_water_surface50WS::bindRequest(renderRequest);
+     std::cerr<<"water_surface_cold ready="<<water<<' '<<waterLog<<'\n';
+    }else if(waterRuntime)std::cerr<<"water_surface_cold ready=0 runtime_resources_unbound\n";}
   }
   if(gcAnimatedWorld){
    require50DU(gcDynamicWindow.createGpu(textureRequest,*gcAnimatedWorld,textureDiagnostic),"original GC dynamic texture upload failed");
@@ -2229,6 +2241,34 @@ void Context::run() {
         <<(hudRenderDiagnostic.operation?hudRenderDiagnostic.operation:"cold resource join rejected")<<'\n';
     require50DU(racerBank.visit(0,[&](){return lapOwner.bindOriginalHud(sourceRaceHud,0,
         originalAiHumanCount,dynamicConsumerFlags11050);}),"actual human nonnull lap HUD binding rejected");
+   }
+   // 1AED30 (race load 1A72DC, right after the racer manager 1AA510): every
+   // racer's body may only move vertically and pitch/roll until GO:
+   // 167A30(racer340, 0,1,0) translation, 167A40(racer340, 1,0,1) rotation.
+   if(sourceCameraSession){
+    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+     auto& body=x.parameters.bodies.main.body;
+     body.translationEnabled[0]=false;body.translationEnabled[1]=true;body.translationEnabled[2]=false;
+     body.rotationEnabled[0]=true;body.rotationEnabled[1]=false;body.rotationEnabled[2]=true;});
+    std::cerr<<"race_start_lock 1AED30 racers="<<racerBank.count()<<'\n';
+   }
+   // 1A8C40 / 197040 / 1A8C78: the race's PodRaceStartOverlay, every course,
+   // human and all-AI alike (1A8A40 builds it unconditionally).
+   if(sourceCameraSession){
+    OriginalRaceStartOverlayDiagnostic50HU startDiagnostic;
+    const bool startLoaded=sourceCameraSession->loadStartOverlay(
+        originalMainApplication.appStart(originalMainApplication.assetRoot),
+        original_main_entry50KG::readArchive(originalMainApplication.assetRoot,rr::assets::OriginalUiArchiveId50KG::overlays),
+        originalMainApplication.materialRuntime,startDiagnostic);
+    if(!startLoaded)std::cerr<<"race_start_overlay load_rejected error="<<static_cast<unsigned>(startDiagnostic.error)
+        <<" pc="<<std::hex<<startDiagnostic.sourcePC<<" material_pc="<<startDiagnostic.material.sourcePC<<std::dec
+        <<" texture="<<startDiagnostic.texture<<'\n';
+    require50DU(startLoaded,"original PodRaceStartOverlay 197040 load rejected");
+    platform::VehicleWindowDiagnostic50DS startRenderDiagnostic;
+    const bool startBound=renderer.bindOriginalRaceStartOverlay(sourceCameraSession->startOverlay(),startRenderDiagnostic);
+    require50DU(!startRenderDiagnostic.cleanupIncomplete,"failed start overlay GPU setup needs renderer retirement");
+    std::cerr<<"race_start_overlay gpu_bind="<<startBound<<" operation="
+        <<(startRenderDiagnostic.operation?startRenderDiagnostic.operation:"none")<<'\n';
    }
 
    if(sourceConsumedIntroActivation&&consumedRaStage.race()){
@@ -2749,6 +2789,7 @@ void Context::run() {
    .allAiEnabled=allAiEnabled,
    .originalAiOpponentCount=originalAiOpponentCount,
    .originalAiHumanCount=originalAiHumanCount,
+   .dynamicConsumerFlags11050=dynamicConsumerFlags11050,
    .humanCourseEnabled=humanCourseEnabled,
    .raceMusic=raceMusic,
    .mode1Enabled=mode1Enabled,
@@ -3017,12 +3058,7 @@ void Context::run() {
    .opponentUvs=opponentUvs,
    .raceOpponentCount=raceOpponentCount,
    .sourceApplicationClock=sourceApplicationClock,
-   .maShieldUv=maShieldUv,
-   .mbShieldUv=mbShieldUv,
-   .tbShieldUv=tbShieldUv,
-   .mcShieldUv=mcShieldUv,
-   .tcShieldUv=tcShieldUv,
-   .scLavaUv=scLavaUv,
+   .trackUvAnimation=trackUvAnimation,
    .mcParticleWindow=mcParticleWindow,
    .mcParticleRender=mcParticleRender,
    .mcParticleRenderDiagnostic=mcParticleRenderDiagnostic,

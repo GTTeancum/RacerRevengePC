@@ -103,7 +103,7 @@ bool VehicleWindowGl50DS::prepareNativeResultsDrawResources50LA(VehicleWindowDia
     if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.frameNativeF8Bars||s.nativeF8BarFrame||
        s.nativeF8BarRenderer||s.nativeResultsDrawPreparing||s.nativeResultsPreparationFailed||s.nativeF8BarPreparationFailed||
-       s.raceHudUiCreationFailed||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||
+       s.raceHudUiCreationFailed||s.raceStartOverlayUiCreationFailed||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||
        s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::frame,"Results scratch requires idle nonfailed actual renderer");
     if(s.nativeResultsDrawResourcesReady)return s.nativeResultsTarget&&s.nativeResultsColor&&s.nativeResultsDepth&&
@@ -484,7 +484,7 @@ bool VehicleWindowGl50DS::prepareNativeF8BarResources50LA(VehicleWindowDiagnosti
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.frameNativeF8Bars||
        s.nativeF8BarFrame||s.nativeF8BarRenderer)
         return fail(d,VehicleWindowError50DS::frame,"F8 resources require the idle actual gameplay renderer");
-    if(s.nativeF8BarPreparationFailed||s.raceHudUiCreationFailed||s.timeStatsUiCreationFailed||
+    if(s.nativeF8BarPreparationFailed||s.raceHudUiCreationFailed||s.raceStartOverlayUiCreationFailed||s.timeStatsUiCreationFailed||
        s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||
        s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"failed shared UI preparation remains cleanup-owned");

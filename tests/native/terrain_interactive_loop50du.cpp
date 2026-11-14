@@ -2,6 +2,7 @@
 #include "native_last_failure50pd.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
+#include "native_water_surface50ws.h"
 #include "native_common_results50pd.h"
 #include "native_race_replay50pd.h"
 #include "../../platform/linux/native/test_results_input50pd.h"
@@ -9,6 +10,7 @@
 #include <cfenv>
 #include "../../platform/linux/native/stall_watchdog50du.h"
 #include "../../platform/linux/native/window_swap_stats50au.h"
+#include "../../platform/linux/native/native_camera_view50dx.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/native_test_undertrack50ut.h"
@@ -21,6 +23,9 @@
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
 #include "original_results_native_frame50la.h"
+#include "original_results_roster_read50la.h"
+#include "../../src/game/lap_records50id.h"
+#include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../src/game/original_race_f8_50la.h"
 #include "../../src/game/original_results104_50la.h"
 #include <chrono>
@@ -35,6 +40,8 @@ namespace recovery50FI=checkpoint_recovery50fi_fixture;
 using NativeRacerFramePart=interactive_frame50DU::Part;
 namespace {
 std::uint64_t replayFrames50PD=0;bool replayCameraReported50PD=false;std::uint32_t replayRecordLogged50PD=0,replayResultsPC50PD=0xffffffffu; //Results replay log cadence.
+// Start overlay display log cadence: one line per lit change, per overlay owner.
+const void* startOverlayLogOwner50HU=nullptr;std::uint32_t startOverlayLoggedLit50HU=0xffffffffu;
 const char* replayDrawReported50PD=nullptr;bool replayDrawLogged50PD=false;unsigned replayF8Reported50PD=0;
 // Always-on hitch recorder: four clock reads per frame. A frame slower than
 // 100 ms writes one line splitting its wall time at the existing phase
@@ -1629,6 +1636,23 @@ void Context::run() {
      require50DU(gate.status==sourceCamera::Status::simulationAllowed||gate.status==sourceCamera::Status::startHeld,
          "original camera single native start gate rejected");
      cameraAllowsSimulation=gate.status==sourceCamera::Status::simulationAllowed;
+     if(sourceCameraSession->takeGoEdge1AFE30()){
+      // 1AEDD0 (from 1AFE30 at 1AFE44): for every racer of the manager list,
+      // 167A30(racer340, 1,1,1) and 167A40(racer340, 1,1,1) free all six
+      // body axes that 1AED30 locked at load, then D40 virtual +80 / +8C.
+      unsigned unlocked=0,aiStarted=0;
+      for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+       auto& body=x.parameters.bodies.main.body;
+       for(unsigned axis=0;axis<3;++axis){body.translationEnabled[axis]=true;body.rotationEnabled[axis]=true;}
+       ++unlocked;});
+      if(originalAiAudioEnabled&&originalAiAudio)
+       for(std::size_t slot=originalAiAudio->firstAiSlot();slot<racerBank.count();++slot){
+        require50DU(originalAiAudio->startAtGo1AEDD0(slot),"1AEDD0 AI D40 +80/+8C engine start rejected");++aiStarted;}
+      // Human D40 (19EBA0 type) +80 19FDB0 / +8C 19FE80 start the engine and
+      // binder emitters; the native engine cue starts on the first engine
+      // update, which is this step's first racer update.
+      std::cerr<<"race_start_go 1AEDD0 bodies_unlocked="<<unlocked<<" ai_engines="<<aiStarted<<'\n';
+     }
      if(!cameraAllowsSimulation){
       const auto frame=++sourceCameraTick;
       require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::heldBeforeStart,.016f).status==
@@ -1903,9 +1927,15 @@ void Context::run() {
              <<" why="<<(reason?reason:"")<<'\n';
          return begun;};
        }
-       if(replay.phase()==native_race_replay50PD::Owner::Phase::bound&&(originalAiSession.manager.flags58&2u)){
+       // 1AFE30 1AFE4C..1AFF08: with a VCR (race+78), Time Trial (11258==3)
+       // with a stored ghost (VCR+A0 > 0) only sets VCR+B0 bit2; otherwise
+       // 287B60 then bit1. The port's VCR is fresh for every race (whole-
+       // session restart), so +A0 is 0 at GO and the record branch is taken.
+       if(replay.phase()==native_race_replay50PD::Owner::Phase::bound&&
+          (sourceCameraSession?sourceCameraSession->goPublished():(originalAiSession.manager.flags58&2u)!=0)){
         const bool started=replay.startRecording(why);
-        std::cerr<<"race_replay record="<<started<<" why="<<(why?why:"")<<'\n';
+        std::cerr<<"race_replay record="<<started<<" at=1AFE30 subtype="<<dynamicMusicProfile.mode11258
+            <<" why="<<(why?why:"")<<'\n';
         if(!started)common.fallback=true;
        }
        if(replay.phase()==native_race_replay50PD::Owner::Phase::recording){
@@ -1935,6 +1965,26 @@ void Context::run() {
        std::uint32_t kills=0;
        racerBank.visit(attacker,[&](){++lapContinuity.timing.countCD0;kills=lapContinuity.timing.countCD0;});
        std::cerr<<"kill_credit attacker="<<attacker<<" victim="<<slot<<" kills="<<kills<<'\n';
+       // 225FB4..226008: a human attacker (58 == 0; the port's human is slot 0)
+       // gets 22BA60(attacker, victim60), then 22B570 only when 1863B0 places
+       // the new CD0 in the course's knockout records. Same race HUD owner.
+       if(attacker==0&&humanCourseEnabled&&sourceRaceHud.loaded()&&sourceCameraSession){
+        const auto profile=originalMainApplication.riderProfile;
+        const auto victim60=sourceCameraSession->racer60(slot);
+        std::int32_t nameId=-1;
+        const bool named=profile&&victim60&&
+            original_results_roster50LA::Read::hudRacerName3C(*profile,victim60,nameId);
+        const bool ko=named&&sourceRaceHud.knockout22BA60(0,originalAiHumanCount,
+            static_cast<std::uint8_t>(dynamicConsumerFlags11050),nameId);
+        rr::game::LapRecordQueryResult50ID record{rr::game::LapRecordQueryStatus50ID::Storage,0,0x1863b0u};
+        if(profile)record=original_results_roster50LA::Read::hudKnockoutRecord1863B0(*profile,kills);
+        const bool qualified=record.completed()&&record.originalV0!=0;
+        const bool popup=qualified&&sourceRaceHud.knockoutRecord22B570(0,originalAiHumanCount,
+            static_cast<std::uint8_t>(dynamicConsumerFlags11050),static_cast<std::int32_t>(kills));
+        std::cerr<<"ko_popup victim="<<slot<<" victim60="<<victim60<<" name_id="<<nameId<<" shown="<<ko
+            <<" kills="<<kills<<" record_rank="<<record.originalV0<<" record_status="<<static_cast<unsigned>(record.status)
+            <<" record_popup="<<popup<<'\n';
+       }
       }
       if(destroyed.musicSong){
        int result=-1;bool requested=false;
@@ -2692,6 +2742,15 @@ void Context::run() {
      renderFrame.effectBlendedQuads=blended;
      renderFrame.effectVertices=renderFrame.effectQuads?effectVertices50PD.data():nullptr;
     }
+    // Original water surface (all courses with water): built from the
+    // presented source camera and the completed water runtime state.
+    if(sourceCameraSession){
+     const native_water_runtime50JC::Owner* waterRuntime=mcWaterOwner?&mcWaterOwner->runtime():
+         nativeGcWater?&nativeGcWater->water():nullptr;
+     std::uint32_t waterZone48=0;
+     if(waterRuntime&&sourceCameraSession->readCameraPrimaryZone48(waterZone48))
+      native_water_surface50WS::buildFrame(*waterRuntime,sourceCameraSession->view(),waterZone48,renderFrame);
+    }
     if(playerDestroyed&&native_wreck_debris50PD::cameraViewBound(0)){
      // How squarely the presented camera looks at the player's debris.
      static std::uint64_t debrisViewFrames=0;
@@ -2754,6 +2813,22 @@ void Context::run() {
     const bool replayHud50PD=native_common_results50PD::state().replayActive;
     if(sourceRaceHudRendering&&sourceCameraSession&&sourceCameraSession->nativeHudVisible()&&!replayHud50PD)
      renderFrame.originalRaceHud=&sourceRaceHud;
+    // race+D4 PodRaceStartOverlay: 1982C0/197C10 for the drawn view (0).
+    // Its own gate (age, flags58 bit2, race+29) decides; no course term.
+    if(sourceCameraSession){
+     if(const auto* start=sourceCameraSession->drawStartOverlay(0)){
+      if(start->drawn)renderFrame.originalRaceStartOverlay=sourceCameraSession->startOverlay().get();
+      for(std::uint32_t i=0;i<start->soundCount;++i){
+       const auto event=start->sounds[i];
+       race_audio50HQ::Event played{race_audio50HQ::Kind::Go,event,race_audio50HQ::Result::Unavailable};
+       if(audioEnabled&&raceAudio&&raceAudio->prepared())played=raceAudio->requestRaceEvent1A4B80(event);
+       std::cerr<<"race_start_overlay number="<<(event==4?std::string("go"):std::to_string(event))
+           <<" sound="<<event<<" countdown34="<<sourceCameraSession->countdown34()
+           <<" age="<<sourceCameraSession->startOverlay()->age340()
+           <<" result="<<static_cast<unsigned>(played.result)<<" audio="<<(audioEnabled?1:0)<<'\n';
+      }
+     }
+    }
     if(sourceSpeedBoostRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalSpeedBoostNativeFrame50LA speedFrame;
      original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;
@@ -2871,6 +2946,28 @@ void Context::run() {
          (isScTrack?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):
              sourceSkySelection.select(cameraZone48,renderFrame.skyEnabled)),
          "actual camera primary-zone sky selection rejected");
+    }
+    {
+     // Original zone (section) visibility, every course: zones hidden behind
+     // walls are not drawn. RR_TRACK_ZONE_VISIBILITY=0 keeps frustum-only
+     // culling for A/B runs. Unavailable or mismatched rows also keep it.
+     static const bool zonesOff=[]{const char* e=std::getenv("RR_TRACK_ZONE_VISIBILITY");
+         return e&&e[0]=='0'&&!e[1];}();
+     static std::array<platform::VehicleWindowTrackZone50DS,platform::maxVehicleWindowTrackZones50DS> trackZones50ZV{};
+     static bool zoneFallbackLogged=false;
+     std::uint32_t zoneCount=0;
+     const bool zones=!zonesOff&&renderRequest.track.zoneCount&&renderRequest.track.enableFrustumCulling&&
+         sourceCameraSession&&sourceCameraSession->hasView()&&
+         sourceCameraSession->prepareTrackZones50ZV(trackZones50ZV.data(),trackZones50ZV.size(),zoneCount,
+             platform::nativeWidescreenScaleX50DX(renderFrame.width,renderFrame.height))&&
+         zoneCount==renderRequest.track.zoneCount;
+     renderFrame.trackZones=zones?trackZones50ZV.data():nullptr;
+     renderFrame.trackZoneCount=zones?zoneCount:0;
+     if(!zones&&!zonesOff&&renderRequest.track.zoneCount&&!zoneFallbackLogged){
+      zoneFallbackLogged=true;
+      std::cerr<<"track_zone_visibility fallback=frustum zones="<<renderRequest.track.zoneCount
+          <<" rows="<<zoneCount<<'\n';
+     }
     }
     renderFrame.worldFogCamera=camera.eye;
     platform::VehicleWindowOpponent50DS opponents[maxHostRaceOpponents50HT]{};
@@ -3034,113 +3131,25 @@ void Context::run() {
     // Canonical callbacks must instead re-read the live capability at each
     // original boundary, including29AD48 after a false callback return.
     const auto sourceApplicationTimestamp=sourceApplicationAnimation.current230;
-    struct MaShieldRenderService {
-     ma_shield_uv_fixture::Owner* owner;
+    // One UV service for every course: the renderer calls it for each drawn
+    // UV-animated span; prototypes shared by several spans step once a tick.
+    struct TrackUvRenderService {
+     track_uv_animation50uv_fixture::Owner* owner;
      std::uint32_t timestamp;
      bool applicationPaused;
-    } maShieldRender{&maShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS maShieldUvFrame;
-    if(maShieldUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"MA UV requires the shared application timestamp publication");
-     maShieldUvFrame.owner=&maShieldRender;
-     maShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<MaShieldRenderService*>(opaque);
+    } trackUvRender{&trackUvAnimation,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
+    platform::VehicleWindowTrackUvFrame50DS trackUvFrame;
+    if(trackUvAnimation.loaded()&&trackUvAnimation.counts().spans){
+     require50DU(sourceApplicationTimestampPublished,"track UV requires the shared application timestamp publication");
+     trackUvFrame.owner=&trackUvRender;
+     trackUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
+      auto& input=*static_cast<TrackUvRenderService*>(opaque);
       if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
       const auto* rows=input.owner->rows(span);
       if(!rows)return false;
       u=rows->rows[2][0];v=rows->rows[2][1];return true;
      };
-     renderFrame.trackUvAnimation=&maShieldUvFrame;
-    }
-    struct MbShieldRenderService {
-     mb_shield_uv_fixture::Owner* owner;
-     std::uint32_t timestamp;
-     bool applicationPaused;
-    } mbShieldRender{&mbShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS mbShieldUvFrame;
-    if(mbShieldUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"MB UV requires the shared application timestamp publication");
-     mbShieldUvFrame.owner=&mbShieldRender;
-     mbShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<MbShieldRenderService*>(opaque);
-      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
-      const auto* rows=input.owner->rows(span);
-      if(!rows)return false;
-      u=rows->rows[2][0];v=rows->rows[2][1];return true;
-     };
-     renderFrame.trackUvAnimation=&mbShieldUvFrame;
-    }
-    struct TbShieldRenderService {
-     tb_shield_uv_fixture::Owner* owner;
-     std::uint32_t timestamp;
-     bool applicationPaused;
-    } tbShieldRender{&tbShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS tbShieldUvFrame;
-    if(tbShieldUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"TB UV requires the shared application timestamp publication");
-     tbShieldUvFrame.owner=&tbShieldRender;
-     tbShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<TbShieldRenderService*>(opaque);
-      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
-      const auto* rows=input.owner->rows(span);
-      if(!rows)return false;
-      u=rows->rows[2][0];v=rows->rows[2][1];return true;
-     };
-     renderFrame.trackUvAnimation=&tbShieldUvFrame;
-    }
-    struct McShieldRenderService {
-     mc_shield_uv_fixture::Owner* owner;
-     std::uint32_t timestamp;
-     bool applicationPaused;
-    } mcShieldRender{&mcShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS mcShieldUvFrame;
-    if(mcShieldUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"MC UV requires the shared application timestamp publication");
-     mcShieldUvFrame.owner=&mcShieldRender;
-     mcShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<McShieldRenderService*>(opaque);
-      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
-      const auto* rows=input.owner->rows(span);
-      if(!rows)return false;
-      u=rows->rows[2][0];v=rows->rows[2][1];return true;
-     };
-     renderFrame.trackUvAnimation=&mcShieldUvFrame;
-    }
-    struct TcShieldRenderService {
-     tc_shield_uv_fixture::Owner* owner;
-     std::uint32_t timestamp;
-     bool applicationPaused;
-    } tcShieldRender{&tcShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS tcShieldUvFrame;
-    if(tcShieldUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"TC UV requires the shared application timestamp publication");
-     tcShieldUvFrame.owner=&tcShieldRender;
-     tcShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<TcShieldRenderService*>(opaque);
-      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
-      const auto* rows=input.owner->rows(span);
-      if(!rows)return false;
-      u=rows->rows[2][0];v=rows->rows[2][1];return true;
-     };
-     renderFrame.trackUvAnimation=&tcShieldUvFrame;
-    }
-    struct ScLavaRenderService {
-     sc_lava_uv_fixture::Owner* owner;
-     std::uint32_t timestamp;
-     bool applicationPaused;
-    } scLavaRender{&scLavaUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
-    platform::VehicleWindowTrackUvFrame50DS scLavaUvFrame;
-    if(scLavaUv.loaded()){
-     require50DU(sourceApplicationTimestampPublished,"SC UV requires the shared application timestamp publication");
-     scLavaUvFrame.owner=&scLavaRender;
-     scLavaUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
-      auto& input=*static_cast<ScLavaRenderService*>(opaque);
-      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
-      const auto* rows=input.owner->rows(span);
-      if(!rows)return false;
-      u=rows->rows[2][0];v=rows->rows[2][1];return true;
-     };
-     renderFrame.trackUvAnimation=&scLavaUvFrame;
+     renderFrame.trackUvAnimation=&trackUvFrame;
     }
     // The existing consumed-intro selector chooses this native route only.
     // Actual same Session/Application/Race/Display/Frame checks issue the
@@ -3404,6 +3413,21 @@ void Context::run() {
     if(sourceRaceHud.loaded()&&actualGameplayImageCompleted&&sourceCameraSession->nativeHudVisible())
      require50DU(sourceRaceHud.commitNativePresentation(0,sourceCameraSession->viewport()),
          "native HUD accepted-display text-state commit rejected");
+    if(actualGameplayImageCompleted&&sourceCameraSession&&sourceCameraSession->startOverlay()){
+     const auto* owner=sourceCameraSession->startOverlay().get();
+     if(owner!=startOverlayLogOwner50HU){startOverlayLogOwner50HU=owner;startOverlayLoggedLit50HU=0xffffffffu;}
+     const auto& draw=owner->nativeDraw();
+     const std::uint32_t lit=draw.drawn?draw.lit:0xfffffffeu;
+     if(lit!=startOverlayLoggedLit50HU&&(draw.drawn||startOverlayLoggedLit50HU!=0xffffffffu)){
+      std::cerr<<"race_start_overlay displayed lit="<<(draw.drawn?static_cast<int>(draw.lit):-1)
+          <<" quads="<<rendererDiagnostic.originalRaceStartOverlayQuads
+          <<" rejected="<<rendererDiagnostic.originalRaceStartOverlayRejected
+          <<" countdown34="<<sourceCameraSession->countdown34()<<" age="<<owner->age340();
+      for(std::uint32_t i=0;i<draw.count;++i){const auto& s=draw.sprites[i];
+       std::cerr<<" s"<<i<<"=tex"<<unsigned(s.texture)<<'@'<<s.x<<','<<s.y<<'/'<<s.width<<'x'<<s.height<<":a"<<unsigned(s.color[3]);}
+      std::cerr<<'\n';startOverlayLoggedLit50HU=lit;
+     }
+    }
     if(actualGameplayImageCompleted&&rendererDiagnostic.originalRaceHudQuads&&!sourceRaceHudDisplayReported){
      std::cerr<<"ORIGINAL RACE LAP HUD: actual completed display quads="<<rendererDiagnostic.originalRaceHudQuads
          <<" leaves="<<rendererDiagnostic.originalRaceHudLeaves<<'\n';sourceRaceHudDisplayReported=true;
@@ -3612,6 +3636,7 @@ void Context::run() {
              <<rendererDiagnostic.trackTexturedDraws<<'/'<<rendererDiagnostic.trackUntexturedDraws
              <<" track_cull candidates/retained/culled/fallback "<<rendererDiagnostic.trackCandidateDraws<<'/'
              <<rendererDiagnostic.trackRetainedDraws<<'/'<<rendererDiagnostic.trackCulledDraws<<'/'<<rendererDiagnostic.trackCullingFallback
+             <<" track_zone culled/numeric_kept "<<rendererDiagnostic.trackZoneCulledDraws<<'/'<<rendererDiagnostic.trackZoneNumericKept
              <<" cable_draws/vertices/indices "<<rendererDiagnostic.cableDraws<<'/'
              <<rendererDiagnostic.cableVertices<<'/'<<rendererDiagnostic.cableIndices
              <<" binder_loaded/draws "<<gameplayBinder.loaded()<<'/'<<rendererDiagnostic.gameplayBinderDraws

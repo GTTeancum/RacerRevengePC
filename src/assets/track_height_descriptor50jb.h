@@ -76,7 +76,11 @@ inline TrackHeightReadStatus50JB readString(const ParameterDocument48F& doc,
 inline TrackHeightReadStatus50JB readTrackHeightDescriptor50JB(
     const ParameterDocument48F& doc,TrackHeightDescriptor50JB& out) noexcept {
     using Status=TrackHeightReadStatus50JB;using namespace track_height50jb_detail;
-    if(doc.version!=1u||doc.preservesDuplicateLabels)return Status::InvalidProvenance;
+    // A document decoded with duplicate labels retained (MC's SCB) is admitted:
+    // the Environment block and every label read here are still checked one by
+    // one below (a duplicated Environment or WaterFile is refused as Duplicate),
+    // so a duplicate elsewhere in the document cannot change what is read.
+    if(doc.version!=1u)return Status::InvalidProvenance;
     const ParameterBlock48F* environment=nullptr;std::size_t index=0;
     for(std::size_t i=0;i<doc.blocks.size();++i)if(doc.blocks[i].name=="environment"){
         if(environment)return Status::Duplicate;environment=&doc.blocks[i];index=i;

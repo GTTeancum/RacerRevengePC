@@ -3,6 +3,7 @@
 #include "../../src/assets/water_noise_cold50jc.h"
 #include "pod_materials50ed_fixture.h"
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -55,22 +56,19 @@ inline bool member(const rr::assets::ResArchive48C& archive,const std::string& n
     identity={found->name,pod_materials50ed_fixture::detail::sha256(bytes),
         found->logical_offset,bytes.size()};return true;
 }
-// Invoke inside the existing authenticated archive's cold decode scope. The
-// archive argument must be that same decode, not a separately supplied catalog.
-// This bounded GC resource composition admits the actual WTT and all selected
-// first-priority PST signatures. Noise is the actual supplied TGA. It does not
-// assert completeness of unrelated retail mounts or activate runtime water.
-inline bool prepare(const rr::assets::ResArchive48C& archive,
-    const char* authenticatedArchiveSha256,const std::string& waterName,
-    std::uint32_t waterLogicalOffset,const std::vector<std::uint8_t>& waterBytes,
-    std::shared_ptr<Owner>& output,std::string& error) {
-    constexpr const char archiveSha[]="69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9";
-    constexpr const char waterSha[]="1ff8b0c60869ccde9bfc89b470bbe5591ce4c0eb7d747e55a9df3a3fe751524a";
-    if(!authenticatedArchiveSha256||std::string(authenticatedArchiveSha256)!=archiveSha||
-       !sameName(waterName,"tracks\\gc.wtt")||waterLogicalOffset!=442368u||
-       waterBytes.size()!=2622u||pod_materials50ed_fixture::detail::sha256(waterBytes)!=waterSha){
-        error="native water resources require the authenticated GC archive and selected WTT";return false;
-    }
+// One common water resource loader for every course whose SCB
+// Environment.WaterFile (2771D4 -> Environment+0x110) is not `none`. The WTT
+// drives everything: signature list and frames (2B9B9C/2BE2E0/24DA30), base
+// displacement (EnableBaseDisplacement, 24DA30 PST, IPU, then TGA). Archive
+// access goes through a member reader, so the plain ResArchive48C mount and the
+// retained IndexedResArchive48C course sources share this body. Callers must
+// pass members of the same authenticated mount the WTT came from.
+using MemberReader=std::function<bool(const std::string&,std::vector<std::uint8_t>&,Member&,std::string&)>;
+inline bool prepareAuthored(const MemberReader& readMember,
+    const std::function<bool(const std::string&)>& memberExists,
+    const std::string& waterName,std::uint32_t waterLogicalOffset,
+    const std::vector<std::uint8_t>& waterBytes,std::shared_ptr<Owner>& output,std::string& error) {
+    if(waterName.empty()||waterBytes.empty()){error="water resources require the course WaterFile member";return false;}
     auto staged=std::make_shared<Owner>();rr::assets::AiAuthoringDiagnostic50IU authoring;
     if(!rr::assets::readWaterAuthoring50JC(reinterpret_cast<const char*>(waterBytes.data()),
         waterBytes.size(),staged->authored,authoring)){
@@ -79,7 +77,7 @@ inline bool prepare(const rr::assets::ResArchive48C& archive,
     // Pools and channel4 have additional concrete construction owners. Keep
     // their real authored values and reject before claiming this cold subset.
     if(staged->authored.general.poolCount!=0){error="native water pool construction is unjoined";return false;}
-    staged->waterMember={waterName,waterSha,waterLogicalOffset,waterBytes.size()};
+    staged->waterMember={waterName,pod_materials50ed_fixture::detail::sha256(waterBytes),waterLogicalOffset,waterBytes.size()};
     const auto count=static_cast<std::size_t>(staged->authored.general.signatureCount);
     staged->signatures.resize(count);
     for(std::size_t i=0;i<count;++i){
@@ -100,7 +98,7 @@ inline bool prepare(const rr::assets::ResArchive48C& archive,
             char number[16]{};std::snprintf(number,sizeof(number),"%04u",static_cast<unsigned>(f));
             const auto path=std::string("tracks\\Sigs\\")+name+number+".pst";
             std::vector<std::uint8_t> bytes;
-            if(!member(archive,path,bytes,s.members[f],error))return false;
+            if(!readMember(path,bytes,s.members[f],error))return false;
             rr::assets::DecodeError48C decode;
             if(!rr::assets::readWaterSignatureTexture50JC(bytes,s.textures[f],decode)){
                 error="original signature texture admission rejected: "+decode.code;return false;
@@ -119,24 +117,41 @@ inline bool prepare(const rr::assets::ResArchive48C& archive,
         }
     }
     if(!staged->authored.general.enableBaseDisplacement){
-        error="selected GC base displacement unexpectedly disabled";return false;
+        // Water+0x49C = 0 would select an Absent noise owner, which no shipped
+        // course authors and the runtime has no admitted path for yet.
+        error="water base displacement disabled needs an Absent noise owner";return false;
     }
-    // Original24DA30 tries PST then IPU before TGA. The authenticated GC
-    // catalog has neither earlier candidate. If the supplied decoded mount
-    // disagrees, do not silently choose TGA or claim a complete retail miss.
-    for(const auto& entry:archive.entries)if(sameName(entry.name,"tracks\\baseDisplacement.pst")||
-        sameName(entry.name,"tracks\\baseDisplacement.ipu")){
-        error="GC base displacement has an earlier unjoined texture branch";return false;
+    // Original24DA30 tries PST then IPU before TGA. No shipped course has the
+    // earlier candidates; if a mount does, do not silently choose TGA.
+    if(memberExists("tracks\\baseDisplacement.pst")||memberExists("tracks\\baseDisplacement.ipu")){
+        error="water base displacement has an earlier unjoined texture branch";return false;
     }
     std::vector<std::uint8_t> noiseBytes;
-    if(!member(archive,rr::assets::gcWaterNoiseMember50JC,noiseBytes,staged->noiseMember,error))return false;
+    if(!readMember(rr::assets::gcWaterNoiseMember50JC,noiseBytes,staged->noiseMember,error))return false;
+    // The single shipped baseDisplacement.tga (GC and MC copies are byte-identical).
     if(staged->noiseMember.sha256!=rr::assets::gcWaterNoiseSha25650JC){
-        error="selected original GC noise member hash differs";return false;
+        error="original water noise member hash differs";return false;
     }
     rr::assets::DecodeError48C decode;
     if(!rr::assets::readWaterNoiseTexture50JC(noiseBytes,staged->noise,decode)){
         error="original noise texture admission rejected: "+decode.code;return false;
     }
     staged->coldResourcesBound=true;output=std::move(staged);error.clear();return true;
+}
+// Plain decoded-archive mount (authored_runtime_ground50cp): the archive bytes
+// were authenticated by the caller (request.archiveSha256).
+inline bool prepare(const rr::assets::ResArchive48C& archive,
+    const char* authenticatedArchiveSha256,const std::string& waterName,
+    std::uint32_t waterLogicalOffset,const std::vector<std::uint8_t>& waterBytes,
+    std::shared_ptr<Owner>& output,std::string& error) {
+    if(!authenticatedArchiveSha256||!*authenticatedArchiveSha256){
+        error="native water resources require an authenticated track archive";return false;
+    }
+    return prepareAuthored(
+        [&](const std::string& name,std::vector<std::uint8_t>& bytes,Member& identity,std::string& e){
+            return member(archive,name,bytes,identity,e);},
+        [&](const std::string& name){
+            for(const auto& entry:archive.entries)if(sameName(entry.name,name))return true;return false;},
+        waterName,waterLogicalOffset,waterBytes,output,error);
 }
 } // namespace water_resources50JC

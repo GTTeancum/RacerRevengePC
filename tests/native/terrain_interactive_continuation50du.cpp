@@ -6,6 +6,7 @@
 #include "native_common_race50pd.h"
 #include "native_race_replay50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
+#include "native_water_surface50ws.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "original_manager_fields.h"
 #include <functional>
@@ -1094,6 +1095,7 @@ SessionExit50DU Context::run() {
   .wrongWayDiagnostic=wrongWayDiagnostic,
   .wrongWayUpdates=wrongWayUpdates,
   .wrongWayActiveTicks=wrongWayActiveTicks,
+  .sourceRaceHud=sourceRaceHud,
   .dynamicContactEnabled=dynamicContactEnabled,
   .dynamicProfile=dynamicProfile,
   .boostParameters=boostParameters,
@@ -2817,9 +2819,17 @@ SessionExit50DU Context::run() {
      isGcTrack?&source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
  trackMaterialRequest.includeAllAuthoredPasses=trackSession->originalStaticCandidates;
  trackMaterialRequest.allowStaticAnimationFrame=true;
- const std::size_t trackTextureBytes=isMaSaTrack?64u*1024u*1024u:isGaTrack?32u*1024u*1024u:8u*1024u*1024u;
- trackMaterialRequest.textureBudgets={isMaSaTrack?256u:isGaTrack?128u:trackSession->originalStaticCandidates?64u:32u,1024,
-     trackTextureBytes,trackTextureBytes,1024};
+ // One texture budget for every course. The original sizes its material table (382B38) and
+ // texture table from the course's own data: the shared string table grows 16 rows at a time
+ // on the heap (298900, reached from the name request at 2993A8) and 29E340 loads every
+ // requested texture row; neither has a count limit. The only fixed count on this chain is the
+ // 4096-slot shader-pass registry (29C490, assert at 29C4E8), owned by the material table.
+ // The 50EA hard ceilings are therefore the single definition here; the track bank checks every
+ // texture, slot and byte against them before storing it, and the GPU upload re-checks bytes.
+ // 1024 stays the per-texture dimension: the PS2 GS cannot sample a larger texture.
+ const std::size_t trackTextureBytes=rr::assets::maxMaterialTextureRGBABytes50EA;
+ trackMaterialRequest.textureBudgets={rr::assets::maxMaterialTextureAssets50EA,rr::assets::maxMaterialTextureSlots50EA,
+     rr::assets::maxMaterialTextureSourceBytes50EA,rr::assets::maxMaterialTextureRGBABytes50EA,1024};
  trackTextures::Diagnostic trackMaterialDiagnostic{};
  //27A208/27A234 initializes each existing static-model +148 to true.
  //271A00 applies numeric TOB overrides by the actual loaded model name.
@@ -3077,20 +3087,15 @@ SessionExit50DU Context::run() {
  gc_atm_window_fixture::Owner gcAtm;
  ga_atm_window_fixture::Owner gaAtm;
  ma_sa_atm_window_fixture::Owner maSaAtm;
- ma_shield_uv_fixture::Owner maShieldUv;
+ track_uv_animation50uv_fixture::Owner trackUvAnimation; // every course (29A310/29A490 data rule)
  tb_atm_window_fixture::Owner tbAtm;
  gb_atm_window_fixture::Owner gbAtm;
  mc_atm_window_fixture::Owner mcAtm;
- mc_shield_uv_fixture::Owner mcShieldUv;
- tb_shield_uv_fixture::Owner tbShieldUv;
  rc_atm_window_fixture::Owner rcAtm;
  std::shared_ptr<rc_crystal50RC::Owner> rcCrystal;
  tc_atm_window_fixture::Owner tcAtm;
- tc_shield_uv_fixture::Owner tcShieldUv;
  sc_atm_window_fixture::Owner scAtm;
- sc_lava_uv_fixture::Owner scLavaUv;
  mb_atm_window_fixture::Owner mbAtm;
- mb_shield_uv_fixture::Owner mbShieldUv;
  gameplay_binder_window_candidate_fixture::Owner gameplayBinder;
  gc_particle_materials50kg_fixture::Owner gcParticleMaterials;
  OriginalGcParticleRenderOwner50KG gcParticleRender;
@@ -3854,6 +3859,9 @@ SessionExit50DU Context::run() {
     if(texture->ownsResources())return closeRejected("if(texture->ownsResources())");
    }
   }
+  if(!native_water_surface50WS::closeGpu(textureDiagnostic)){
+   std::cerr<<"water surface texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("water surface texture cleanup");
+  }
   if(!native_wreck_debris50PD::closeGpu(textureDiagnostic)){
    std::cerr<<"debris texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("debris texture cleanup");
   }
@@ -4367,7 +4375,6 @@ SessionExit50DU Context::run() {
    .maOriginalDisc=maOriginalDisc,
    .maOriginalWorld=maOriginalWorld,
    .maSaAtm=maSaAtm,
-   .maShieldUv=maShieldUv,
    .maTriggerActions=maTriggerActions,
    .mainContactFrames=mainContactFrames,
    .mainCrossedPortals=mainCrossedPortals,
@@ -4378,7 +4385,6 @@ SessionExit50DU Context::run() {
    .mbMapView=mbMapView,
    .mbOriginalWorld=mbOriginalWorld,
    .mbRace=mbRace,
-   .mbShieldUv=mbShieldUv,
    .mcAnimationRuntime=mcAnimationRuntime,
    .mcAtm=mcAtm,
    .mcColdSources=mcColdSources,
@@ -4398,7 +4404,6 @@ SessionExit50DU Context::run() {
    .mcQueryBinding=mcQueryBinding,
    .mcRace=mcRace,
    .mcRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{mcRemainingPayloadBytes},
-   .mcShieldUv=mcShieldUv,
    .mcSkyOwner=mcSkyOwner,
    .mcSourceCameraAssets=mcSourceCameraAssets,
    .mcTrackParticles=mcTrackParticles,
@@ -4563,7 +4568,6 @@ SessionExit50DU Context::run() {
    .scAtm=scAtm,
    .scColdSources=scColdSources,
    .scGround=scGround,
-   .scLavaUv=scLavaUv,
    .scOriginalDisc=scOriginalDisc,
    .scOriginalWorld=scOriginalWorld,
    .scTriggerActions=scTriggerActions,
@@ -4669,7 +4673,6 @@ SessionExit50DU Context::run() {
    .tbPodSound=tbPodSound,
    .tbRace=tbRace,
    .tbRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{tbRemainingPayloadBytes},
-   .tbShieldUv=tbShieldUv,
    .tbSourceCameraAssets=tbSourceCameraAssets,
    .tbTrackParticles=tbTrackParticles,
    .tbTriggerActions=tbTriggerActions,
@@ -4686,7 +4689,6 @@ SessionExit50DU Context::run() {
    .tcOriginalDisc=tcOriginalDisc,
    .tcOriginalWorld=tcOriginalWorld,
    .tcRace=tcRace,
-   .tcShieldUv=tcShieldUv,
    .tcTriggerActions=tcTriggerActions,
    .tcWorldBorrow=tcWorldBorrow,
    .terrainHitFrames=terrainHitFrames,
@@ -4708,6 +4710,7 @@ SessionExit50DU Context::run() {
    .trackSession=trackSession,
    .trackSource=trackSource,
    .trackTextureBytes=trackTextureBytes,
+   .trackUvAnimation=trackUvAnimation,
    .updateOpponentAudioCall=interactive_frame50DU::BorrowedCall<void()>{updateOpponentAudio},
    .updateOriginalAiPackingCall=interactive_frame50DU::BorrowedCall<void()>{updateOriginalAiPacking},
    .usePhysicalGameController=usePhysicalGameController,

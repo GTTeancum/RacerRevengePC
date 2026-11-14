@@ -76,7 +76,7 @@ const assets::ParameterField48F* field(const assets::ParameterBlock48F& b,const 
 bool textField(const assets::ParameterBlock48F& b,const char* key,const char* text) noexcept {
     const auto* f=field(b,key);return f&&f->value==text;
 }
-bool readGaRenderAuthoring(const assets::ParameterBlock48F& b,std::size_t zoneCount,
+bool readZoneRenderAuthoring(const assets::ParameterBlock48F& b,std::size_t zoneCount,
     AuthoredRenderZone& out) noexcept {
     AuthoredRenderZone next{};
     const assets::ParameterField48F* exclusions=nullptr;
@@ -104,7 +104,11 @@ bool readGaRenderAuthoring(const assets::ParameterBlock48F& b,std::size_t zoneCo
                 if(label>(std::numeric_limits<std::uint32_t>::max()-digit)/10u)return false;
                 label=label*10u+digit;++at;
             }
-            if(at==start||!label||label>zoneCount||next.exclusionCount>=next.exclusions.size())return false;
+            // 2763E8..276410 stores atoi(token)-1 with no range check, so a
+            // label outside the world (RC Zone5 lists 17 of 15) is kept and
+            // simply never matches a zone. Do not reject it.
+            (void)zoneCount;
+            if(at==start||next.exclusionCount>=next.exclusions.size())return false;
             next.exclusions[next.exclusionCount++]=label-1u;
             if(at==text.size())break;
             if(text[at]!=','&&text[at]!='\n')return false;
@@ -1220,14 +1224,16 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
                read.selection.visibilityDynamic114!=assets::ZoneSearchKind50CN::List||
                (scene==Scene::ra&&read.selection.visibilityStatic110!=assets::ZoneSearchKind50CN::List))
                 return fail(d,Status::unsupportedScene,0x272a58);
-            if(scene==Scene::ga||scene==Scene::ra){
+            // 27632C reads every zone's ExclusionList on every course (absent
+            // = empty list, as on TB). Not limited to GA/RA.
+            {
                 const auto index=w.zones[z].parameter_block;
                 if(index>=w.parameters.blocks.size()||
-                   !readGaRenderAuthoring(w.parameters.blocks[index],w.zones.size(),next->renderAuthoring[z]))
+                   !readZoneRenderAuthoring(w.parameters.blocks[index],w.zones.size(),next->renderAuthoring[z]))
                     return fail(d,Status::sourceFields,0x27632c);
             }
         }
-        next->renderAuthoringReady=scene==Scene::ga||scene==Scene::ra;
+        next->renderAuthoringReady=true;
         if(scene==Scene::ra){next->staticModels.resize(w.instances.size(),nullptr);
             next->staticSelection.resize(w.instances.size());}
         if(scene==Scene::mc)next->mcAnimations=std::make_unique<Storage::McAnimationState>();

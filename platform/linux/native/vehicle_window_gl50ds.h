@@ -36,7 +36,7 @@ namespace gb_particle_render50GB { class Owner; }
 namespace mc_particle_render50MC { class Owner; }
 namespace original_main_entry50KG { struct Application; class NativeVideoPacketInvocation50LA; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
-namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
+namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalRaceStartOverlay50HU; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
 namespace rr::platform {
 // Precharged common named-payload allowance for the GB binding metadata added
@@ -121,6 +121,13 @@ struct VehicleWindowMaterialBinding50DS {
     bool sourceBaseFog50LA = false, sourceSpecularFog50LA = false;
     // Optional actual map-2 GREATER/0/KEEP alpha test; base remains ATE0.
     bool sourceSpecularAlphaTest50LA = false;
+    // The source surface has no vertex-colour stream (PSG components 0x107).
+    // The original program then outputs its own light-row result, never the
+    // export's diagnostic white: RGB lanes take the GS neutral 128 (the host
+    // illumination stands in for the light rows) and the alpha lane takes the
+    // zone-ambient .w = 64 that 148B60/148F30 store for every zone. Keyed on
+    // geometry data only; identical for every course and material.
+    bool sourceColorStreamAbsent = false;
 };
 struct VehicleWindowComponentMaterials50DS {
     const VehicleWindowMaterialBinding50DS* bindings = nullptr;
@@ -184,9 +191,35 @@ struct VehicleWindowTrackSpan50DS {
     // Appended so existing positional aggregates retain their AA0 defaults.
     NativeTrackCoverage50DS nativeCoverage = NativeTrackCoverage50DS::aa0;
     NativeTrackUvPolicy50DS sourceUvPolicy = NativeTrackUvPolicy50DS::legacySinglePass;
-    // Issued only by actual RC crystal source association: 1 base,2 Environment.
-    std::uint8_t rcCrystalPass = 0;
+    // Original GS ALPHA (A-B)*C>>7+D, packed from the pass's own material
+    // fields by 247A24..247B10 (single context) for every course. Only the
+    // destination-alpha form needs its own route: A=Cs, B=0, D=Cd with
+    // C=Ad (2) reads the alpha the previous pass of the SAME surface wrote,
+    // and that previous pass (C=As, 1) must leave its source alpha in the
+    // destination (GS writes As on every draw). 0 = ordinary blend policy.
+    // Issued from the material data by the common material lowering, never
+    // by course or material name.
+    std::uint8_t gsDestinationAlphaPass = 0;
+    // Pass program EnvironmentMapCompressed: per-frame projected UVs from
+    // sidecar XY and the current ambient row as vertex colour. Today only
+    // the retained rc_crystal50RC owner produces these UVs (stand-in: the
+    // only environment-map program in course data is RC crystal01 pass 2).
+    bool sourceEnvironmentMap = false;
+    // Authored zone of this span's static model (SCB "ZoneN-ModelM", one-based
+    // World48F instance zone). 0 = not zoned: never hidden by zone visibility.
+    std::uint32_t sourceZone = 0;
 };
+// One zone of the original's per-frame section visibility (common for every
+// course; produced by game::prepareTrackZoneVisibility50ZV). Copied at submit.
+struct VehicleWindowTrackZone50DS {
+    bool drawn = false;
+    // 280720 portal-narrowed matrix60: original row-vector world-to-clip,
+    // tested with the original 2B0580 CLIPw rule (not the GL matrix).
+    std::array<float,16> sourceClip{};
+    std::array<std::uint32_t,4> scissor{}; // inclusive original Xmin,Xmax,Ymin,Ymax
+    std::array<std::int32_t,4> viewport{}; // original X,Y,width,height
+};
+constexpr std::uint32_t maxVehicleWindowTrackZones50DS = 64;
 // Pure cold validation of the only newly admitted two-pass UV presentation.
 // Authentic source provenance is supplied by sc_lava_uv_fixture::Owner; this
 // checks its lowered render values and is also used by renderer preflight.
@@ -210,25 +243,30 @@ inline bool validScLavaUvPair50DS(const VehicleWindowTrackSpan50DS& first,
         first.vertexStart==second.vertexStart && first.vertexCount==second.vertexCount &&
         first.indexCount && !(first.indexCount%3) && first.vertexCount;
 }
-// Closed RC pair policy; authentic source/image ownership is separately checked
-// against the retained rc_crystal50RC::Owner before any allocation or GL call.
-inline bool validRcCrystalPair50DS(const VehicleWindowTrackSpan50DS& first,
+// Common GS destination-alpha pair (any course): pass N writes As with
+// C=As, pass N+1 repeats the SAME surface range and blends with C=Ad. Only the
+// renderer-lowered values are checked here; which fields of the material
+// produced them is the material lowering's job. No course or name test.
+inline bool validDestinationAlphaPair50DS(const VehicleWindowTrackSpan50DS& first,
     const VehicleWindowTrackSpan50DS& second) noexcept {
-    const auto valid=[](const VehicleWindowTrackSpan50DS& s,std::uint8_t pass){
+    const auto valid=[](const VehicleWindowTrackSpan50DS& s,std::uint8_t mark){
         const auto& m=s.material;
-        return s.rcCrystalPass==pass&&s.sourcePass==pass&&s.sourcePassCount==2&&
-            !s.projectionPass&&!s.sourceUvAnimation&&!s.allowPodShadow&&
+        return s.gsDestinationAlphaPass==mark&&s.sourcePassCount>=2&&
+            !s.projectionPass&&!s.sourceUvAnimation&&
             s.sourceUvPolicy==NativeTrackUvPolicy50DS::legacySinglePass&&
             s.nativeCoverage==NativeTrackCoverage50DS::aa0&&s.sourceFogKnown&&
-            s.sourceFogEnabled==(pass==2)&&s.sourceAlphaTest==(pass==2)&&
-            !s.sourceAlphaReference&&!s.discardZeroAlpha&&
+            !s.discardZeroAlpha&&
             m.mode==VehicleWindowMaterialMode50DS::requiredTexture&&
             m.textureIndex!=assets::unresolvedMaterialTexture50EA&&
-            m.blend==VehicleWindowBlend50DS::additive&&!m.depthWrite&&m.depthEqual&&
-            m.alphaScale==1.f&&!m.fixedBlendAlpha&&m.unlit==(pass==2)&&m.sourcePrelit==(pass==1)&&
+            m.blend==VehicleWindowBlend50DS::additive&&m.depthEqual&&
+            m.alphaScale==1.f&&!m.fixedBlendAlpha&&
+            // GS byte path: texel x vertex byte/128 needs source vertex bytes
+            // (prelit) or the ambient row (environment map), never host lighting.
+            (m.sourcePrelit||s.sourceEnvironmentMap)&&
             !m.sourceDiffuseCompressed50LA&&!m.sourceSpecularPair50LA&&!m.sourceSingleDiffuseRgba50LA&&!m.sourceBaseAlphaTest50LA;
     };
-    return valid(first,1)&&valid(second,2)&&first.material.textureIndex!=second.material.textureIndex&&
+    return valid(first,1)&&valid(second,2)&&second.sourcePass==first.sourcePass+1u&&
+        first.sourcePassCount==second.sourcePassCount&&!first.sourceEnvironmentMap&&
         first.indexStart==second.indexStart&&first.indexCount==second.indexCount&&
         first.vertexStart==second.vertexStart&&first.vertexCount==second.vertexCount&&
         first.indexCount&&!(first.indexCount%3)&&first.vertexCount;
@@ -292,6 +330,9 @@ struct VehicleWindowTrack50DS {
     // are unchanged. At most 65536 total candidates, checked before allocation.
     // Chunk metadata/bounds/retained IDs allocate only during cold create().
     std::uint32_t cullingChunkTriangles = 0;
+    // Authored zone count of this world (World48F zones). Every span's
+    // sourceZone must be <= it; frames may then supply exactly this many zones.
+    std::uint32_t zoneCount = 0;
     // Optional authenticated world-space per-vertex normals, exact mesh order.
     // Cold-copy only; default preserves the older derivative-flat lighting.
     // Supplying normals opts into host directional/hemisphere illumination;
@@ -407,6 +448,19 @@ inline constexpr std::uint32_t maxVehicleWindowDebrisInstances50DS = 512;
 // back to front, then additive).
 struct VehicleWindowEffects50DS { std::uint32_t texture = 0; };
 inline constexpr std::uint32_t maxVehicleWindowEffectQuads50DS = 4096;
+// Original water surface (VU1 microprogram `Water`, work/scratch/audit-render/
+// water/PLAN.md). Cold: the two caller-bank GL texture names (environment =
+// TEX0 #1, froth = TEX0 #2 at TBP0+383530); zero environment disables water.
+// Per frame: strips of 34 world-space vertices (17 columns x 2 rows, zig-zag),
+// each strip as pass A (reflection) then pass B (froth), in original kick order.
+// Vertex RGBA is on the PS2 scale (128 = 1.0); UV is S,T after the STQ divide.
+struct VehicleWindowWater50DS {
+    std::uint32_t environmentTexture = 0, frothTexture = 0;
+    std::uint32_t maximumStrips = 0;
+};
+inline constexpr std::uint32_t vehicleWindowWaterStripVertices50DS = 34;
+// One-player MC: (256-1) rows x 4 bands = 1020 strips.
+inline constexpr std::uint32_t maxVehicleWindowWaterStrips50DS = 1024;
 struct VehicleWindowRequest50DS {
     // Actual display-sealed direct-transfer binding, retained through local HUD uploads.
     std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> originalUploadBinding;
@@ -505,6 +559,8 @@ struct VehicleWindowRequest50DS {
     VehicleWindowDebris50DS debris{};
     // Optional wreck particle atlas; zero texture draws no effects.
     VehicleWindowEffects50DS effects{};
+    // Optional original water surface; zero environment texture draws none.
+    VehicleWindowWater50DS water{};
 };
 // Dedicated frontend context. There is no vehicle/world asset slot and no
 // gameplay opt-in; construction cannot certify any race owner as prepared.
@@ -735,6 +791,8 @@ struct VehicleWindowFrame50DS {
     // below. Native gauges/countdown remain. Unsupported live states skip
     // only this layer; no empty batch counts as an original GPU submission.
     const game::OriginalRaceHud50KG* originalRaceHud = nullptr;
+    // Race+D4 PodRaceStartOverlay after its own 197C10 draw (3/2/1/GO).
+    const game::OriginalRaceStartOverlay50HU* originalRaceStartOverlay = nullptr;
     const game::OriginalTimeStats50LA* originalTimeStats = nullptr;
     const game::OriginalDamage50LA* originalDamage = nullptr;
     // Explicit derived/ordinary outer-tail batch; genuine Pause scheduling required.
@@ -778,6 +836,22 @@ struct VehicleWindowFrame50DS {
     // are alpha-blended, the rest additive. Borrowed through submit.
     const assets::Vertex48B* effectVertices = nullptr;
     std::uint32_t effectQuads = 0, effectBlendedQuads = 0;
+    // Original water: 2 * waterStrips * 34 vertices (pass A then pass B per
+    // strip). Borrowed through submit; zero strips draws no water (the camera
+    // zone does not see water, or the course has none).
+    const assets::Vertex48B* waterVertices = nullptr;
+    std::uint32_t waterStrips = 0;
+    // Pass B alpha test on the GS 128 scale (WTT [Wake Froth] AlphaReference,
+    // TEST_1 at Water+0x2A0); pass A tests alpha > 0 (TEST_1 at +0x290).
+    std::uint32_t waterAlphaReference = 0;
+    // PENDING emulator check W-E1: ZBUF ZMSK for the water draw is inherited
+    // from the context and not traced. Default: no depth write.
+    bool waterDepthWrite = false;
+    // Optional original zone (section) visibility, exactly request.track.zoneCount
+    // rows. Null keeps the previous frustum-only track culling (also the
+    // fallback when the zone walk fails). Requires enableFrustumCulling.
+    const VehicleWindowTrackZone50DS* trackZones = nullptr;
+    std::uint32_t trackZoneCount = 0;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -825,6 +899,9 @@ struct VehicleWindowDiagnostic50DS {
     // stale helper output, and reports zero culled/uncertain counts.
     std::uint32_t trackCandidateDraws = 0, trackRetainedDraws = 0, trackCulledDraws = 0;
     std::uint32_t trackUncertainRetainedDraws = 0, trackCulledIndices = 0;
+    // Draws hidden by the original zone (section) visibility this frame, and
+    // draws kept only because the zone box test failed numerically.
+    std::uint32_t trackZoneCulledDraws = 0, trackZoneNumericKept = 0;
     bool trackCullingApplied = false, trackCullingFallback = false;
     game::DrawVisibilityDiagnostic50EI trackVisibility{};
     // Same checked-command/commit distinction as track receipts. One indexed
@@ -870,6 +947,8 @@ struct VehicleWindowDiagnostic50DS {
     std::uint32_t hostHudDraws = 0, hostHudVertices = 0, hostHudIndices = 0;
     std::uint32_t originalRaceHudQuads = 0, originalRaceHudLeaves = 0;
     bool originalRaceHudRejected = false;
+    std::uint32_t originalRaceStartOverlayQuads = 0;
+    bool originalRaceStartOverlayRejected = false;
     std::uint32_t originalTimeStatsQuads=0,originalTimeStatsLeaves=0;
     bool originalTimeStatsRejected=false;
     std::uint32_t originalPositionStatsQuads=0,originalPositionStatsLeaves=0;
@@ -1246,6 +1325,10 @@ public:
     // atlases. Failure keeps native gameplay/HUD usable and retains any partial
     // GL allocations for renderer.close. A repeated bind is not a retry API.
     bool bindOriginalRaceHud(const game::OriginalRaceHud50KG&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Strong PodRaceStartOverlay owner retained through checked GPU cleanup.
+    // Eight real OVERLAYS images. A rejected frame skips only this layer.
+    bool bindOriginalRaceStartOverlay(std::shared_ptr<const game::OriginalRaceStartOverlay50HU>,
+        VehicleWindowDiagnostic50DS&) noexcept;
     // Strong canonical TimeStats owner retained through checked GPU cleanup.
     // Two real atlases; requested invalid frames reject the frame transaction.
     // Retains the typed presentation adapter through real GPU retirement.

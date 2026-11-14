@@ -146,6 +146,9 @@ struct Context final {
     originalAiOpponentCountType& originalAiOpponentCount;
     using originalAiHumanCountType = const std::uint32_t;
     originalAiHumanCountType& originalAiHumanCount;
+    // Actual config11050 (bit1 vertical split) read by 22BA60/22B570.
+    using dynamicConsumerFlags11050Type = const std::uint32_t;
+    dynamicConsumerFlags11050Type& dynamicConsumerFlags11050;
     using humanCourseEnabledType = const bool;
     humanCourseEnabledType& humanCourseEnabled;
     using raceMusicType = std::unique_ptr<race_music50IE::Owner>;
@@ -641,18 +644,8 @@ struct Context final {
     raceOpponentCountType& raceOpponentCount;
     using sourceApplicationClockType = const rr::game::OriginalApplicationAnimationClockView50KG;
     sourceApplicationClockType& sourceApplicationClock;
-    using maShieldUvType = ma_shield_uv_fixture::Owner;
-    maShieldUvType& maShieldUv;
-    using mbShieldUvType = mb_shield_uv_fixture::Owner;
-    mbShieldUvType& mbShieldUv;
-    using tbShieldUvType = tb_shield_uv_fixture::Owner;
-    tbShieldUvType& tbShieldUv;
-    using mcShieldUvType = mc_shield_uv_fixture::Owner;
-    mcShieldUvType& mcShieldUv;
-    using tcShieldUvType = tc_shield_uv_fixture::Owner;
-    tcShieldUvType& tcShieldUv;
-    using scLavaUvType = sc_lava_uv_fixture::Owner;
-    scLavaUvType& scLavaUv;
+    using trackUvAnimationType = track_uv_animation50uv_fixture::Owner;
+    trackUvAnimationType& trackUvAnimation;
     using mcParticleWindowType = std::shared_ptr<mc_particle_visual50MC::Window>;
     mcParticleWindowType& mcParticleWindow;
     using mcParticleRenderType = std::shared_ptr<mc_particle_render50MC::Owner>;

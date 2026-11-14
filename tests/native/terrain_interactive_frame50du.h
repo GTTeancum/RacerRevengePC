@@ -4,6 +4,7 @@
 #include "native_borrowed_call50du.h"
 #include <functional>
 
+namespace rr::game { class OriginalRaceHud50KG; }
 namespace interactive_frame50DU {
 struct NativeCalls;
 // Borrowed view of the original runSession stack only. All owner, scalar,
@@ -218,6 +219,9 @@ struct Context final {
     wrongWayUpdatesType& wrongWayUpdates;
     using wrongWayActiveTicksType = std::uint64_t;
     wrongWayActiveTicksType& wrongWayActiveTicks;
+    // The race's TextOverlay owner (race28C); 1A2E30 writes its 17C+4*view.
+    using sourceRaceHudType = rr::game::OriginalRaceHud50KG;
+    sourceRaceHudType& sourceRaceHud;
     using dynamicContactEnabledType = const bool;
     dynamicContactEnabledType& dynamicContactEnabled;
     using dynamicProfileType = rr::game::DynamicImpactProfile50IW;

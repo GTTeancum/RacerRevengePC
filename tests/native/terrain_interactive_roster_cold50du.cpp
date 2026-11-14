@@ -574,6 +574,18 @@ rr::game::LapRecordQueryResult50ID Read::profileRaceQuery(const rr::game::Origin
 rr::game::LapRecordQueryResult50ID Read::profileKnockoutQuery(const rr::game::OriginalRaceConstructor50LA& race,std::uint32_t course,std::uint32_t value)noexcept {
     return race.profile_->resultsKnockoutQuery1863B0(course,value);
 }
+bool Read::hudRacerName3C(const rr::platform::OriginalUiRiderProfileOwner50KG& profile,
+    std::uint32_t vehicle60,std::int32_t& id)noexcept {
+    return profile.resultsRacerName3C(vehicle60,id);
+}
+rr::game::LapRecordQueryResult50ID Read::hudKnockoutRecord1863B0(
+    const rr::platform::OriginalUiRiderProfileOwner50KG& profile,std::uint32_t countCD0)noexcept {
+    //225FDC..225FF0: a1 = profile 125F low nibble, the course 1C9C80 also reads.
+    std::uint32_t course=0;
+    if(!profile.resultsNameCourse1C9C80(course))
+        return {rr::game::LapRecordQueryStatus50ID::Storage,0,0x225fe8u};
+    return profile.resultsKnockoutQuery1863B0(course,countCD0);
+}
 }
 
 namespace original_results_roster50LA {

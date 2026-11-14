@@ -2,15 +2,17 @@
 // Included inside VehicleWindowGl50DS::Storage. Native bounded gameplay layer;
 // no guest packets, guest execution, host font or caller-created readiness.
 struct RaceHud {
-    static constexpr U maximumQuads=164,maximumPackets=8;
+    // Eleven TextOverlays x 40 glyphs + two gleams x two quads, one packet
+    // per text and per gleam material.
+    static constexpr U maximumQuads=448,maximumPackets=20;
     struct Packet {U first=0,count=0,material=0;};
     const game::OriginalRaceHud50KG* owner=nullptr;
     const game::OriginalCameraViewportFields* viewport=nullptr;
     std::uint64_t scene=0,generation=0,publication=0;
     MaterialTextureGl50EB textures;
-    std::array<MaterialTextureSampler50EB,4> samplers{};
-    std::array<assets::OriginalUiNativeMaterial50KG,7> policies{};
-    std::array<U,7> ranks{};
+    std::array<MaterialTextureSampler50EB,5> samplers{};
+    std::array<assets::OriginalUiNativeMaterial50KG,9> policies{};
+    std::array<U,9> ranks{};
     std::array<assets::Vertex48B,maximumQuads*4> vertices{};
     std::array<Packet,maximumPackets> packets{};
     game::OriginalUiTextLayout50KG glyphs{};

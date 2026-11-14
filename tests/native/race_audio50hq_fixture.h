@@ -199,7 +199,8 @@ public:
     }
     // Observe seeded grid, every unpaused countdown tick and every successful
     // commitFrame. Calling twice is inert. A rejected/partial frame is refused.
-    // Only 3/2/1 edges emit race keys1/2/3. Entering Racing emits key4 once.
+    // Countdown beeps are no longer timed here: the original start overlay
+    // draw 197C10 requests them through requestRaceEvent1A4B80 below.
     // Speech is native policy: authored-group round robin, one voice, five-second
     // place cooldown. Lap/finish preempt place speech; no queued stale messages.
     // Cold policy switch: mode1 keeps real countdown/GO here while the shared
@@ -218,13 +219,7 @@ private:
            (state_.phase!=race_session50HM::Phase::Countdown&&s.phase==race_session50HM::Phase::Countdown)||
            (state_.finished&&!r.finished))){++counters_.rejected;return result;}
         result.accepted=true;++counters_.observations;
-        if(s.phase==race_session50HM::Phase::Countdown&&number>=1&&number<=3&&
-           (!state_.seeded||number!=state_.number)){
-            const auto index=3-number;emit(result,static_cast<Kind>(index),index,false);++counters_.countdownEvents;
-        }else if(s.phase==race_session50HM::Phase::Racing&&
-            ((!state_.seeded&&s.raceSeconds==0)||(state_.seeded&&state_.phase==race_session50HM::Phase::Countdown))){
-            emit(result,Kind::Go,3,false);++counters_.countdownEvents;
-        }
+        (void)number;
         if(hostSpeechEnabled_&&state_.seeded&&s.raceSeconds>state_.seconds){
             if(r.finished&&!state_.finished){
                 ++counters_.finishEvents;
@@ -249,6 +244,18 @@ private:
         remember(s);return result;
     }
 public:
+    // 1A4B80(race music manager+15C ResponseEmitter, event): the only callers
+    // are 197DA4 (3), 197EE0 (2), 19801C (1) and 198150 (4, GO). RACE_SND.INI
+    // EventN is clip index N-1 (start01/02/03, gotone01) on its own voice
+    // 80+N-1, so the 26D070 Results stop still covers all four.
+    Event requestRaceEvent1A4B80(std::uint32_t event)noexcept {
+        Event e{Kind::Go,event,Result::Rejected};
+        if(!mixer_||event<1||event>4){++counters_.rejected;return e;}
+        Receipt r;const auto index=static_cast<std::size_t>(event-1);
+        static constexpr Kind kinds[4]={Kind::Countdown1,Kind::Countdown2,Kind::Countdown3,Kind::Go};
+        emit(r,kinds[index],index,false);++counters_.countdownEvents;
+        return r.events[0];
+    }
     // Countdown/go observation is independent of navigation backend. The
     // existing explicit hostSpeechEnabled policy still controls lap/place/
     // finish announcements; admitting an owner never enables those policies.

@@ -6,7 +6,7 @@
 namespace original_position_stats_adapter50LA { class Owner; }
 namespace original_camera_session50KX { class Session; }
 namespace rr::assets { class OriginalStandardMaterialTable50LA; }
-namespace rr::platform { struct OriginalUiMainProfile50KG; class OriginalPersistedProfileName50KG; }
+namespace rr::platform { struct OriginalUiMainProfile50KG; class OriginalPersistedProfileName50KG; class OriginalUiRiderProfileOwner50KG; }
 namespace rr::game { struct LapRecordQueryResult50ID; }
 namespace original_main_entry50KG { struct Application; }
 namespace ra_cold_roster50LA { class Operation; }
@@ -22,6 +22,15 @@ namespace original_results_roster50LA {
 class Read final {
     friend struct ::original_main_entry50KG::Application;
     friend class rr::game::OriginalResults10450LA;
+public:
+    // Kill-credit HUD reads (225FB4..226008): the live profile's 3C[victim60]
+    // Localization id for 22BA60, and 1863B0 on the profile's own 1125F course
+    // for the attacker's new CD0. Read-only; no record insertion.
+    static bool hudRacerName3C(const rr::platform::OriginalUiRiderProfileOwner50KG&,
+        std::uint32_t vehicle60,std::int32_t& localizationId)noexcept;
+    static rr::game::LapRecordQueryResult50ID hudKnockoutRecord1863B0(
+        const rr::platform::OriginalUiRiderProfileOwner50KG&,std::uint32_t countCD0)noexcept;
+private:
     struct Record {
         const native_racer50HN::Bank* bank=nullptr;
         const rr::game::OriginalApplicationEntities50LA* application=nullptr;

@@ -126,7 +126,9 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     // UIUnlock 209BF4 -> inherited page constructor1D63B0 prompts.
     unlockPromptMissingPsmFallback,
     // UIWin load2077F0 -> inherited page constructor1D63B0 prompts.
-    winPromptMissingPsmFallback
+    winPromptMissingPsmFallback,
+    // PodRaceStartOverlay load197040 -> 2DF0B0 321_* ScreenTextures.
+    raceStartOverlayMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -616,6 +618,20 @@ enum class OriginalSpeedBoostImage50LA : std::uint8_t {
 };
 bool readOriginalSpeedBoostFallbackMaterial50LA(
     const OriginalUiArchive50KG&,OriginalSpeedBoostImage50LA,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// PodRaceStartOverlay load197040: eight 2DF0B0 ScreenTextures (callers
+// 197078,19714C,197218,1972E4,1973A8,197474,197540,1975FC) from the strings
+// 3A9010..3A9048. OVERLAYS has their PSTs and no PSM; 2DF10C supplies ScreenMT
+// and 2475C0 builds the material. Only these eight names are admitted.
+enum class OriginalRaceStartOverlayImage50HU : std::uint8_t {
+    one,oneLit,two,twoLit,three,threeLit,go,goLit
+};
+const char* originalRaceStartOverlayImageName50HU(OriginalRaceStartOverlayImage50HU) noexcept;
+bool readOriginalRaceStartOverlayFallbackMaterial50HU(
+    const OriginalUiArchive50KG& overlays,OriginalRaceStartOverlayImage50HU,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;

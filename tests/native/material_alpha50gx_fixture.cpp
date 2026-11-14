@@ -412,25 +412,29 @@ bool selectRc(const track_materials50fa_fixture::Selection& selection,
         get(Field::textureFunction) != 0 || get(Field::alphaCorrectionValue) != 0 ||
         get(Field::alphaBlendingControlInUnitsOfPixels) != 0) return false;
     const auto program = detail::lower(selection.program);
-    const bool crystalName = detail::lower(selection.materialName) == "crystal01";
-    const bool crystal = crystalName && selection.materialKey ==
-        "ceaa6deb22d9183430934971e7022810eae0e0d867b9565f23de68e0d31fbd3b";
-    if (crystalName && !crystal) return false;
-    if (crystal) {
-        if (selection.passCount != 2 || selection.staticAnimationFrame ||
-            selection.clampU || selection.clampV ||
-            selection.textureIndex == track_materials50fa_fixture::unresolved ||
-            detail::lower(selection.textureName) != (selection.pass == 1 ? "crystal01" : "specmap5") ||
-            program != (selection.pass == 1 ? "prelitcompressed" : "environmentmapcompressed")) return false;
-        // All constructor/default and authored effective GS fields are exact.
-        // Blanks inherit actual DefaultMT, whose only GS override is AREF0.
-        const std::array<std::int32_t,rr::assets::originalUiGsFieldCount50KG> expected{{
-            1,0,255,255,0, 0,2,selection.pass==1?0:1,1,128,
-            0,0,0,0,0,0, 1,0,0,1,1,selection.pass==1?0:1,1,0,0,0,0,
-            selection.pass==1?0:1,6,0,0,0,1,2,1}};
-        if (gs != expected) return false;
-    } else if (selection.passCount != 1 ||
+    // Common GS ALPHA rule (247A24..247B10): the pass's own A/B/C/D/FIX fields
+    // are the ALPHA_1 register; nothing is chosen by material or course name.
+    // The destination-alpha pair is A=Cs, B=0, D=Cd with C=As on the writing
+    // pass and C=Ad on the reading pass that repeats the same surface. The
+    // renderer validation refuses a 1 without its following 2 and vice versa.
+    const bool environment = program == "environmentmapcompressed";
+    const bool additiveForm = get(Field::alphaBlendingOnOff) == 1 && get(Field::inputColorA) == 0 &&
+        get(Field::inputColorB) == 2 && get(Field::inputColorD) == 1;
+    const bool readsDestinationAlpha = additiveForm && get(Field::inputAlphaC) == 1;
+    const bool writesForReader = additiveForm && get(Field::inputAlphaC) == 0 &&
+        selection.passCount == 2 && selection.pass == 1;
+    if (selection.passCount == 2) {
+        // Only the GS destination-alpha pair is a two-pass form this lowering
+        // represents; other two-pass materials stay refused as before.
+        if (selection.pass == 1 ? !writesForReader : !readsDestinationAlpha) return false;
+        if (selection.staticAnimationFrame || selection.textureIndex == track_materials50fa_fixture::unresolved)
+            return false;
+    } else if (selection.passCount != 1 || readsDestinationAlpha) return false; // C=Ad needs a writer pass
+    // Environment map only as the reading pass (its projected UVs and ambient
+    // vertex colour come from the environment-map owner).
+    if (environment ? !readsDestinationAlpha || selection.pass == 1 :
         (program != "prelitcompressed" && program != "diffusecompressed")) return false;
+    if ((readsDestinationAlpha || writesForReader) && program == "diffusecompressed") return false; // lit: no GS byte path
     Policy next;
     next.depthWrite = get(Field::zWriteDisabled) == 0;
     next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.
@@ -445,14 +449,15 @@ bool selectRc(const track_materials50fa_fixture::Selection& selection,
         next.sourceAlphaTest = true;
         next.sourceAlphaReference = static_cast<std::uint8_t>(get(Field::alphaReferenceValue));
     }
-    if (crystal) {
-        // Both passes write source alpha independently and do not write depth.
-        // Pass1 RGB uses As, pass2 uses actual current Ad. Ordinary GL additive
-        // cannot represent this; renderer admission requires rcCrystalPass.
+    if (readsDestinationAlpha || writesForReader) {
+        // Both passes write source alpha independently (GS blends RGB only).
+        // Pass N RGB uses As, pass N+1 the current Ad. Ordinary GL additive
+        // cannot represent this; the renderer's destination-alpha route does.
         next.blend = Blend::additive;
         next.alphaScale = 1.f;
-        next.rcCrystalPass = static_cast<std::uint8_t>(selection.pass);
-        next.unlit = selection.pass == 2;
+        next.gsDestinationAlphaPass = readsDestinationAlpha ? 2 : 1;
+        next.sourceEnvironmentMap = environment;
+        next.unlit = environment; // environment-map program: ambient row, no lights
     } else if (get(Field::alphaBlendingOnOff)) {
         if (get(Field::inputColorA) != 0 || get(Field::inputAlphaC) != 0 ||
             get(Field::inputColorD) != 1 || (get(Field::inputColorB) != 1 && get(Field::inputColorB) != 2) ||

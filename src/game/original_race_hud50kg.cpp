@@ -3,6 +3,7 @@
 #include "original_ui_text_position50kg.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <utility>
@@ -13,6 +14,7 @@ using A=assets::OriginalUiArchiveId50KG;
 using E=OriginalRaceHudDiagnostic50KG::Error;
 using Text=OriginalRaceHudText50KG;
 using Gleam=OriginalRaceHudGleam50KG;
+using Burst=OriginalRaceHudKnockoutBurst50KG;
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,A id) noexcept {
     return a&&a->loaded()&&a->identity()==assets::originalUiArchiveIdentity50KG(id);
 }
@@ -59,13 +61,15 @@ struct OriginalRaceHud50KG::Storage {
     assets::OriginalUiScreenAssets50KG images;
     assets::OriginalUiEnglish50KG english;
     //0 gleam14,1 in-game16,2 gleam30,3 explosion16,4 explosion30,
-    //5 gleam bright,6 gleam clear. These are real parsed material objects.
-    std::array<assets::OriginalUiMaterial50KG,7> materials;
+    //5 gleam bright,6 gleam clear,7 K.O. bright (font_ko),8 K.O. clear
+    //(font_koclear). These are real parsed material objects.
+    std::array<assets::OriginalUiMaterial50KG,9> materials;
     struct View {
         std::array<Text,7> records12C;
         Text status17C,time164;
         std::array<Text,2> explosions16C;
         Gleam gleam184,recordGleam194;
+        Burst burst18C;
     };
     std::array<std::unique_ptr<View>,2> views;
     std::uint32_t count=0;
@@ -80,12 +84,44 @@ struct OriginalRaceHud50KG::Storage {
         if(offset==0x16c||offset==0x170)return &w.explosions16C[(offset-0x16c)/4];
         return nullptr;
     }
+    //2E15B0: the ScreenText's first-glyph height at its current scale.
+    bool height(const Text& t,std::int32_t& out) const noexcept {
+        const auto* font=images.font(t.fontIndex);const auto* texture=images.textures()->texture(t.fontIndex);
+        if(!font||!texture)return false;
+        OriginalUiTextLayout50KG layout;OriginalUiTextDiagnostic50KG d;
+        OriginalUiTextInput50KG in{font,&texture->texture,reinterpret_cast<const std::uint8_t*>(t.text.data()),t.textLength,0,0};
+        return layoutOriginalUiText50KG(in,layout,d)&&roundOriginalUiTextMetric50KG(layout.firstGlyphHeightBeforeScaleAndRounding,t.screenScale40,out);
+    }
     bool width(const Text& t,std::int32_t& out) const noexcept {
         const auto* font=images.font(t.fontIndex);const auto* texture=images.textures()->texture(t.fontIndex);
         if(!font||!texture)return false;
         OriginalUiTextLayout50KG layout;OriginalUiTextDiagnostic50KG d;
         OriginalUiTextInput50KG in{font,&texture->texture,reinterpret_cast<const std::uint8_t*>(t.text.data()),t.textLength,0,0};
         return layoutOriginalUiText50KG(in,layout,d)&&roundOriginalUiTextMetric50KG(layout.widthBeforeScaleAndRounding,t.screenScale40,out);
+    }
+    // Width reads occur after SetText but before any source draw commits the
+    // new scale. Preserve locked-setter suppression and old ScreenText scale.
+    bool measureBanner(const View& v,bool last,std::int32_t& measured) const noexcept {
+        Text prospective=last?v.time164:v.records12C[0];
+        setText(prospective,last?"FINAL LAP!":"NEW RECORD!",last?10u:11u);
+        return width(prospective,measured);
+    }
+    // 22AE70 setters on 12C (banner), shared by 22B170, 22B370 and 22B570.
+    static void recordBanner22AE70(View& v,std::int32_t x,bool one,bool vertical) noexcept {
+        Text& banner=v.records12C[0];
+        setColor(banner,0xff669bcc);setPosition(banner,x,one?346:vertical?276:146);
+        setText(banner,"NEW RECORD!",11);setupLap(banner,1.2f,1);
+    }
+    // 22AE70 / 22B760 gleam tail (194 / 184) from the measured banner width.
+    static void placeGleam(View& v,bool last,bool one,bool vertical,std::int32_t x,std::int32_t measured) noexcept {
+        auto& g=last?v.gleam184:v.recordGleam194;
+        const float half=static_cast<float>(measured/2); // signed integer /2 first.
+        const float delta=(last?1.15f:1.3f)*half;g.x104=static_cast<float>(x)-delta;
+        g.y100=last?(one?90.f:vertical?150.f:60.f):(one?316.f:vertical?246.f:116.f);
+        g.width108=30;g.height10C=last?50.f:100.f;
+        g.travel110=static_cast<float>(1.2*static_cast<double>(measured)); // source libgcc binary64 multiply.
+        g.offset114=0;g.duration120=.75f;g.angle118=.523598730564117431640625f; //3F060A91.
+        if(!g.active11C){g.active11C=1;g.elapsed124=0;} //2E6940 does not restart an active gleam.
     }
 };
 OriginalRaceHud50KG::OriginalRaceHud50KG() noexcept=default;
@@ -100,11 +136,12 @@ bool OriginalRaceHud50KG::load(std::shared_ptr<const assets::OriginalUiArchive50
         auto n=std::make_unique<Storage>();n->appStart=std::move(app);n->overlays=std::move(overlays);n->localization=std::move(loc);
         if(!n->templates.load(*n->appStart,d.material))return fail(d,E::material,0x29ca40);
         const char* names[]={"font/denmarkbold14gleam.psm",nullptr,"font/denmarkbold30gleam.psm",
-            "font/denmarkbold16explosion.psm","font/denmarkbold30explosion.psm","ui/textures/gleam.psm","ui/textures/gleamclear.psm"};
+            "font/denmarkbold16explosion.psm","font/denmarkbold30explosion.psm","ui/textures/gleam.psm","ui/textures/gleamclear.psm",
+            "ui/textures/font_ko.psm","ui/textures/font_koclear.psm"};
         for(std::size_t i=0;i<n->materials.size();++i){
             const bool okay=i==1?assets::readOriginalRaceHudFontFallbackMaterial50KG(*n->overlays,n->templates,runtime,n->materials[i],d.material):
                 assets::readOriginalUiMaterial50KG(*n->overlays,names[i],n->templates,assets::OriginalUiTemplate50KG::screenMt,runtime,n->materials[i],d.material);
-            if(!okay)return fail(d,E::material,i<5?0x29ca40:0x2e6770);
+            if(!okay)return fail(d,E::material,i<5?0x29ca40:i<7?0x2e6770:0x2e6fa0);
         }
         const char* fonts[]={"denmarkbold14ingame","denmarkbold16ingame","denmarkbold30ingame"};
         std::vector<assets::OriginalUiImageSource50KG> sources;
@@ -114,6 +151,8 @@ bool OriginalRaceHud50KG::load(std::shared_ptr<const assets::OriginalUiArchive50
         }
         // Both gleam ScreenTextures resolve the same authentic gleam atlas.
         const auto gleam=n->overlays->find("ui/textures/gleam.pst");sources.push_back({0x1a8cc403u,gleam,0,gleam.size,{}});
+        // 2E6FA0: both K.O. burst ScreenTextures resolve the font_ko atlas.
+        const auto ko=n->overlays->find("ui/textures/font_ko.pst");sources.push_back({0x1a8cc404u,ko,0,ko.size,{}});
         if(!n->images.load(sources,d.images))return fail(d,E::images,0x29ca40);
         if(!assets::readOriginalUiEnglish50KG(*n->localization,n->english,d.localization))return fail(d,E::localization,0x22b2dc);
         if(!n->english.at(463)||!n->english.at(464))return fail(d,E::localization,0x22b2dc);
@@ -152,6 +191,10 @@ bool OriginalRaceHud50KG::construct1A8CC4(std::uint8_t flags,
                 for(auto& c:g->brightColor)c={{127,127,127,63}};
                 for(auto& c:g->clearColor)c={{0,0,0,0}};
             }
+            //2E70A8..2E7144 bright lanes 7F/3F; 2E6FF0..2E704C clear lanes 0.
+            v.burst18C.viewport=views[i];
+            for(auto& c:v.burst18C.brightColor)c={{127,127,127,63}};
+            for(auto& c:v.burst18C.clearColor)c={{0,0,0,0}};
         }
         storage_->views=std::move(next);storage_->count=count;storage_->rendererWidth=width;storage_->rendererHeight=height;
         storage_->constructed=true;return true;
@@ -165,6 +208,9 @@ const OriginalRaceHudGleam50KG* OriginalRaceHud50KG::gleamAt(std::uint32_t view,
     if(offset==0x184)return &storage_->views[view]->gleam184;
     if(offset==0x194)return &storage_->views[view]->recordGleam194;
     return nullptr;
+}
+const OriginalRaceHudKnockoutBurst50KG* OriginalRaceHud50KG::knockoutBurstAt(std::uint32_t view) const noexcept {
+    return loaded()&&view<storage_->count?&storage_->views[view]->burst18C:nullptr;
 }
 LapHudFields50ID OriginalRaceHud50KG::lapFields(std::uint32_t view) const noexcept {
     if(!loaded()||view>=storage_->count)return {};
@@ -208,29 +254,116 @@ bool OriginalRaceHud50KG::applyLapCompletion(std::uint32_t view,std::uint32_t gr
         std::memcpy(label.data()+n,time.data(),8);n+=8;
     }
     Text& t=last?v.time164:v.records12C[lap?2:1];
-    Text& banner=last?t:v.records12C[0];
-    // Width reads occur after SetText but before any source draw commits the
-    // new scale. Preserve locked-setter suppression and old ScreenText scale.
-    Text prospective=banner;
-    setText(prospective,last?"FINAL LAP!":"NEW RECORD!",last?10u:11u);
-    std::int32_t measured=0;if(!storage_->width(prospective,measured))return false;
+    std::int32_t measured=0;if(!storage_->measureBanner(v,last,measured))return false;
     if(last){setColor(t,0xff7dcd6c);setPosition(t,x,one?120:vertical?180:90);
         setText(t,"FINAL LAP!",10);setupLap(t,1,1.5f);
     }else{
         setColor(t,0xff669bcc);setPosition(t,x,one?(lap?380:364):vertical?(lap?310:294):(lap?180:164));
         setText(t,label.data(),n);setupLap(t,.75f,1);
         // Unconditional22AE70 tail, including its independently locked banner.
-        setColor(banner,0xff669bcc);setPosition(banner,x,one?346:vertical?276:146);
-        setText(banner,"NEW RECORD!",11);setupLap(banner,1.2f,1);
+        Storage::recordBanner22AE70(v,x,one,vertical);
     }
-    auto& g=last?v.gleam184:v.recordGleam194;
-    const float half=static_cast<float>(measured/2); // signed integer /2 first.
-    const float delta=(last?1.15f:1.3f)*half;g.x104=static_cast<float>(x)-delta;
-    g.y100=last?(one?90.f:vertical?150.f:60.f):(one?316.f:vertical?246.f:116.f);
-    g.width108=30;g.height10C=last?50.f:100.f;
-    g.travel110=static_cast<float>(1.2*static_cast<double>(measured)); // source libgcc binary64 multiply.
-    g.offset114=0;g.duration120=.75f;g.angle118=.523598730564117431640625f; //3F060A91.
-    if(!g.active11C){g.active11C=1;g.elapsed124=0;} //2E6940 does not restart an active gleam.
+    Storage::placeGleam(v,last,one,vertical,x,measured);
+    return true;
+}
+bool OriginalRaceHud50KG::setColor29DA10(std::uint32_t view,std::uint32_t offset,std::uint32_t color) noexcept {
+    Text* t=loaded()?storage_->at(view,offset):nullptr;if(!t)return false;
+    setColor(*t,color);return true; //29DA18: a locked overlay ignores the call.
+}
+bool OriginalRaceHud50KG::setPosition29DB50(std::uint32_t view,std::uint32_t offset,
+    std::int32_t x,std::int32_t y,float duration) noexcept {
+    Text* t=loaded()?storage_->at(view,offset):nullptr;
+    if(!t||duration!=0)return false; //29DB88: only the zero-duration copy is represented.
+    setPosition(*t,x,y);return true;
+}
+bool OriginalRaceHud50KG::setText29D940(std::uint32_t view,std::uint32_t offset,const char* p,std::size_t n) noexcept {
+    Text* t=loaded()?storage_->at(view,offset):nullptr;if(!t||!p)return false;
+    setText(*t,p,n);return true; //29D990..29D99C: min(length, capacity 40).
+}
+bool OriginalRaceHud50KG::show29DA40(std::uint32_t view,std::uint32_t offset,const Show29DA40& a) noexcept {
+    Text* tp=loaded()?storage_->at(view,offset):nullptr;if(!tp)return false;
+    for(float f:{a.blinkF12,a.holdF13,a.scaleF14,a.rotationF15,a.secondDelayF16,a.secondScaleF17,
+        a.secondRotationF18,a.alphaDurationF19,a.scaleDurationStack0,a.rotationDurationStack8})
+        if(!std::isfinite(f))return false;
+    Text& t=*tp;if(t.lockedCC)return true; //29DA44: a locked overlay ignores the call.
+    t.lockedCC=a.lockA2;t.enabled70=1;t.blinkRemaining78=a.blinkF12;t.blinkPeriod7C=a.blinkF12;t.blinkOn80=1;
+    if(a.holdF13<0)t.indefinite88=1; //29DA64..29DA80: negative hold = indefinite, +84 kept.
+    else{t.hold84=a.holdF13;t.indefinite88=0;}
+    t.alphaTarget94=a.alphaA1;t.alpha174=static_cast<float>(a.alphaA1);t.alphaDirty184=true;
+    t.scaleTargetA8=a.scaleF14;t.scale178=a.scaleF14;t.scaleDirty188=true;
+    t.rotationTargetB4=a.rotationF15;t.rotation17C=a.rotationF15;t.rotationDirty18C=true;
+    t.secondDelayD0=a.secondDelayF16;
+    if(a.secondDelayF16<=-1.f){ //29DAF0: no second phase; it repeats the first.
+        t.secondAlphaD4=a.alphaA1;t.secondScaleD8=a.scaleF14;t.secondRotationDC=a.rotationF15;
+    }else{
+        t.secondAlphaD4=a.secondAlphaA3;t.alphaDurationA0=a.alphaDurationF19;t.secondScaleD8=a.secondScaleF17;
+        t.scaleDurationB0=a.scaleDurationStack0;t.secondRotationDC=a.secondRotationF18;
+        t.rotationDurationC0=a.rotationDurationStack8;t.lockedCC=1;
+    }
+    return true;
+}
+bool OriginalRaceHud50KG::hide29DB10(std::uint32_t view,std::uint32_t offset) noexcept {
+    Text* t=loaded()?storage_->at(view,offset):nullptr;if(!t)return false;
+    stop(*t);return true;
+}
+bool OriginalRaceHud50KG::knockout22BA60(std::uint32_t view,std::uint32_t group34,std::uint8_t split,
+    std::int32_t nameId) noexcept {
+    if(!loaded()||view>=storage_->count)return false;
+    // 22BB84..22BBD8 asserts on an out-of-range id (debug build); refuse it
+    // here before any setter so the table read stays bounded.
+    const auto* localized=nameId>=0?storage_->english.at(static_cast<std::uint32_t>(nameId)):nullptr;
+    if(!localized)return false;
+    const bool one=group34==1,vertical=(split&2u)!=0;
+    // 16C: colour FFE5D96C, (320,60) / (160,120) / (320,30), "%s" (3B2EF8).
+    if(!setColor29DA10(view,0x16c,0xffe5d96c)||
+       !setPosition29DB50(view,0x16c,one?320:vertical?160:320,one?60:vertical?120:30,0)||
+       !setText29D940(view,0x16c,localized->text.data(),localized->text.size()))return false;
+    Show29DA40 name;name.alphaA1=230;name.holdF13=3.f;name.scaleF14=1.1f; //3F8CCCCD.
+    name.secondDelayF16=2.f;name.secondScaleF17=1.1f;name.alphaDurationF19=1.f;
+    if(!show29DA40(view,0x16c,name))return false;
+    // 170: same colour, (320,80) / (160,140) / (320,50), "K.O.'d" (3B2F00).
+    if(!setColor29DA10(view,0x170,0xffe5d96c)||
+       !setPosition29DB50(view,0x170,one?320:vertical?160:320,one?80:vertical?140:50,0)||
+       !setText29D940(view,0x170,"K.O.'d",6))return false;
+    Show29DA40 ko;ko.alphaA1=230;ko.holdF13=3.f;ko.scaleF14=1.f;
+    ko.secondDelayF16=2.f;ko.secondScaleF17=1.f;ko.alphaDurationF19=1.f;
+    if(!show29DA40(view,0x170,ko))return false;
+    // 22BD8C..22BED4: the 18C burst. Widths/heights are the ScreenTexts'
+    // current metrics (the new text, the scale of the last committed draw).
+    auto& v=*storage_->views[view];
+    std::int32_t width16=0,height16=0,height30=0;
+    if(!storage_->width(v.explosions16C[0],width16)||!storage_->height(v.explosions16C[0],height16)||
+       !storage_->height(v.explosions16C[1],height30))return false;
+    auto& b=v.burst18C;
+    const float scale=1.2f; //3F99999A.
+    if(one){b.x104=320;b.y100=65;}else if(vertical){b.x104=160;b.y100=125;}else{b.x104=320;b.y100=35;}
+    b.width108=0;b.height10C=0;
+    b.growWidth110=scale*static_cast<float>(width16);
+    b.growHeight114=scale*static_cast<float>(height16+height30);
+    b.duration11C=.5f;
+    if(!b.active118){b.active118=1;b.elapsed120=0;} //2E7170 does not restart an active burst.
+    return true;
+}
+bool OriginalRaceHud50KG::knockoutRecord22B570(std::uint32_t view,std::uint32_t group34,std::uint8_t split,
+    std::int32_t kills) noexcept {
+    if(!loaded()||view>=storage_->count)return false;
+    auto& v=*storage_->views[view];
+    const bool one=group34==1,vertical=(split&2u)!=0;
+    const std::int32_t x=one||!vertical?320:160;
+    // Preflight the localized label, the sprintf and the banner width.
+    const auto* localized=storage_->english.at(465); //22B6CC: Localization [0x1D1].
+    if(!localized)return false;
+    std::array<char,512> label{};
+    const int written=std::snprintf(label.data(),label.size(),"%.*s %d", //3B2EE0 "%s %d".
+        static_cast<int>(localized->text.size()),localized->text.data(),static_cast<int>(kills));
+    if(written<0||static_cast<std::size_t>(written)>=label.size())return false;
+    std::int32_t measured=0;if(!storage_->measureBanner(v,false,measured))return false;
+    Text& t=v.records12C[3]; //race28C+138.
+    setColor(t,0xff669bcc);
+    if(one)setPosition(t,320,396);else if(vertical)setPosition(t,160,326);else setPosition(t,320,196);
+    setText(t,label.data(),static_cast<std::size_t>(written));setupLap(t,.75f,1);
+    Storage::recordBanner22AE70(v,x,one,vertical);
+    Storage::placeGleam(v,false,one,vertical,x,measured);
     return true;
 }
 namespace {
@@ -296,6 +429,8 @@ bool OriginalRaceHud50KG::advanceAnimations29CDA0(float dt) noexcept {
         for(auto* g:{&v.gleam184,&v.recordGleam194})if(g->active11C){
             g->elapsed124=g->elapsed124+dt;if(g->elapsed124>g->duration120)g->active11C=0; //2E6E50.
         }
+        if(v.burst18C.active118){auto& b=v.burst18C; //2E74D0.
+            b.elapsed120=b.elapsed120+dt;if(!(b.elapsed120<=b.duration11C))b.active118=0;}
     }
     return true;
 }

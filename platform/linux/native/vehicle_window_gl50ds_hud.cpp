@@ -395,14 +395,14 @@ bool HostHudGeometry::build(const VehicleWindowHostHud50DS& input, I width, I he
                 const float y=64.f-(float(height)-top)/scale;
                 rectangle(x,y,168.f,32.f,0x617589);
                 rectangle(x+1.f,y+1.f,166.f,30.f,0x0A111B);
-                char place[32]{},countdown[32]{};
+                char place[32]{};
                 std::snprintf(place,sizeof(place),"POS %u/%u",input.racePlace,input.raceRacerCount);
-                std::snprintf(countdown,sizeof(countdown),"START IN %u",input.raceCountdown);
                 text(x+6.f,y+5.f,place,0xEDF3F8);
+                // No host countdown/GO words: the original start graphics are
+                // the PodRaceStartOverlay layer (196F20).
                 const char* status=input.raceResultsReady?"RESULTS":input.raceFinished?"FINISHED":
-                    input.raceRetirementCD4?"DNF":input.raceCountdown?countdown:
-                    input.raceGo?"GO":input.wrongWay?"WRONG WAY":"RACING";
-                text(x+6.f,y+19.f,status,input.raceFinished||input.raceGo?0xA8E6B4:
+                    input.raceRetirementCD4?"DNF":input.wrongWay?"WRONG WAY":"RACING";
+                text(x+6.f,y+19.f,status,input.raceFinished?0xA8E6B4:
                     input.raceRetirementCD4?0xFFBF55:input.wrongWay?0xFF6556:0xA8C5DE);
                 standingsTop=top+36.f*scale;standingsScale=scale;
                 scale=hudScale;
@@ -411,16 +411,14 @@ bool HostHudGeometry::build(const VehicleWindowHostHud50DS& input, I width, I he
             const float y = 72.f - float(height) / scale;
             rectangle(0.f, y, 168.f, 32.f + clockHeight, 0x617589);
             rectangle(1.f, y + 1.f, 166.f, 30.f + clockHeight, 0x0A111B);
-            char laps[32]{}, place[32]{}, countdown[32]{};
+            char laps[32]{}, place[32]{};
             std::snprintf(laps, sizeof(laps), "LAP %u/%u", input.raceLap, input.raceLapTarget);
             std::snprintf(place, sizeof(place), "POS %u/%u", input.racePlace, input.raceRacerCount);
-            std::snprintf(countdown, sizeof(countdown), "START IN %u", input.raceCountdown);
             text(6.f, y + 5.f, laps, 0xEDF3F8);
             text(90.f, y + 5.f, place, 0xEDF3F8);
             const char* status = input.raceResultsReady ? "RESULTS" : input.raceFinished ? "FINISHED" :
-                input.raceRetirementCD4 ? "DNF" : input.raceCountdown ? countdown :
-                input.raceGo ? "GO" : input.wrongWay ? "WRONG WAY" : "RACING";
-            text(6.f, y + 19.f, status, input.raceFinished || input.raceGo ? 0xA8E6B4 :
+                input.raceRetirementCD4 ? "DNF" : input.wrongWay ? "WRONG WAY" : "RACING";
+            text(6.f, y + 19.f, status, input.raceFinished ? 0xA8E6B4 :
                 input.raceRetirementCD4 ? 0xFFBF55 : input.wrongWay ? 0xFF6556 : 0xA8C5DE);
             if (input.raceClocksValid) {
                 const auto clock = [&](float rowY, float seconds) noexcept {
@@ -658,26 +656,30 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudResources(const game::OriginalR
     auto& h=*raceHud;const auto* t=owner.textAt(0,0x12c);const auto* images=owner.images();
     const auto* bank=images?images->textures():nullptr;
     if(!t||!t->viewport||!t->viewport->prepared||!t->viewport->sceneKey||!t->viewport->sessionGeneration||
-        t->viewport->x1E0||t->viewport->y1E4||t->viewport->width1E8!=640||t->viewport->height1EC!=448||!bank||bank->textureCount()!=4)
-        return fail(*diagnostic,VehicleWindowError50DS::assets,"original HUD viewport and four authentic images required");
+        t->viewport->x1E0||t->viewport->y1E4||t->viewport->width1E8!=640||t->viewport->height1EC!=448||!bank||bank->textureCount()!=5)
+        return fail(*diagnostic,VehicleWindowError50DS::assets,"original HUD viewport and five authentic images required");
     h.owner=&owner;h.viewport=t->viewport;h.scene=t->viewport->sceneKey;h.generation=t->viewport->sessionGeneration;
     constexpr const char* names[]={"font/denmarkbold14gleam","font/denmarkbold16ingame","font/denmarkbold30gleam",
-        "font/denmarkbold16explosion","font/denmarkbold30explosion","ui/textures/gleam","ui/textures/gleamclear"};
+        "font/denmarkbold16explosion","font/denmarkbold30explosion","ui/textures/gleam","ui/textures/gleamclear",
+        "ui/textures/font_ko","ui/textures/font_koclear"};
     const auto table=owner.materialRegistry();
     if(!table.identity||!table.data||table.size!=70962)
         return fail(*diagnostic,VehicleWindowError50DS::assets,"original HUD material registry unavailable");
-    std::array<bool,7> found{};std::size_t cursor=0;U token=0;
+    std::array<bool,9> found{};std::size_t cursor=0;U token=0;
     const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
     while(cursor<table.size){while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;
         if(cursor==table.size)break;const auto start=cursor;
         while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
-        for(U i=0;i<7;++i)if(hudName(table.data+start,cursor-start,names[i])){
+        for(U i=0;i<9;++i)if(hudName(table.data+start,cursor-start,names[i])){
             if(found[i])return fail(*diagnostic,VehicleWindowError50DS::material,"duplicate original HUD registration");
             found[i]=true;h.ranks[i]=token;}
         ++token;
     }
     for(bool value:found)if(!value)return fail(*diagnostic,VehicleWindowError50DS::material,"missing original HUD registration");
-    if(token!=3235||!(h.ranks[6]<h.ranks[0]&&h.ranks[0]<h.ranks[2]&&h.ranks[2]<h.ranks[5]))
+    // Mat_Stbl: gleamclear 3197 < gleam14 3198 < gleam30 3200 < gleam 3201;
+    // font_koclear 3206 < explosion16 3207 < explosion30 3208 < font_ko 3209.
+    if(token!=3235||!(h.ranks[6]<h.ranks[0]&&h.ranks[0]<h.ranks[2]&&h.ranks[2]<h.ranks[5])||
+        !(h.ranks[8]<h.ranks[3]&&h.ranks[3]<h.ranks[4]&&h.ranks[4]<h.ranks[7]))
         return fail(*diagnostic,VehicleWindowError50DS::material,"original clear, glyph and gleam order differs");
     assets::OriginalUiMaterialDiagnostic50KG materialDiagnostic;
     for(U i: {0u,1u,2u}){const auto* m=owner.material(i);const auto* decoded=images->decodedTexture(i);
@@ -689,16 +691,35 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudResources(const game::OriginalR
         if(!hudName(reinterpret_cast<const std::uint8_t*>(group.data()),group.size(),i==1?"none":"gleam"))
             return fail(*diagnostic,VehicleWindowError50DS::material,"original HUD font group differs");
     }
+    // 16C/170 (22BA60): denmarkbold16/30explosion.psm are byte-identical to
+    // denmarkbold14/30gleam.psm except TextureMap_1 and ShaderPassGroup
+    // ("explosion"): one ScreenObject pass, alpha blending on, depth method 2.
+    for(U i:{3u,4u}){const auto* m=owner.material(i);const U image=i==3?1u:2u;const auto* decoded=images->decodedTexture(image);
+        if(!m||m->passes.size()!=1||!decoded||
+            !assets::prepareOriginalUiNativeMaterial50KG(m->passes[0],*decoded,h.policies[i],materialDiagnostic)||
+            h.policies[i].blend!=assets::OriginalUiMaterialBlend50KG::sourceAlpha||!hudSampler(h.policies[i],h.samplers[image]))
+            return fail(*diagnostic,VehicleWindowError50DS::material,"original HUD explosion font policy rejected");
+        const auto& group=m->passes[0].shaderPassGroup;
+        if(!hudName(reinterpret_cast<const std::uint8_t*>(group.data()),group.size(),"explosion"))
+            return fail(*diagnostic,VehicleWindowError50DS::material,"original HUD explosion font group differs");
+    }
     for(U i:{5u,6u}){const auto* m=owner.material(i);assets::OriginalRaceHudGleamMaterial50KG policy;
         if(!m||m->passes.size()!=1||!assets::prepareOriginalRaceHudGleamMaterial50KG(m->passes[0],*images,3,policy,materialDiagnostic)||
             policy.clearFramebufferOnly!=(i==6)||!hudSampler(policy.raster,h.samplers[3]))
             return fail(*diagnostic,VehicleWindowError50DS::material,"original stored-alpha gleam policy rejected");
         h.policies[i]=policy.raster;
     }
+    // 18C K.O. burst: the same gleam-type raster on the font_ko atlas (image 4).
+    for(U i:{7u,8u}){const auto* m=owner.material(i);assets::OriginalRaceHudGleamMaterial50KG policy;
+        if(!m||m->passes.size()!=1||!assets::prepareOriginalRaceHudGleamMaterial50KG(m->passes[0],*images,4,policy,materialDiagnostic)||
+            policy.clearFramebufferOnly!=(i==8)||!hudSampler(policy.raster,h.samplers[4]))
+            return fail(*diagnostic,VehicleWindowError50DS::material,"original stored-alpha K.O. burst policy rejected");
+        h.policies[i]=policy.raster;
+    }
     // The same gleam image has exactly one immutable sampler in both passes.
-    const auto& a=h.policies[5];const auto& b=h.policies[6];
+    for(U pair:{5u,7u}){const auto& a=h.policies[pair];const auto& b=h.policies[pair+1];
     if(a.minification!=b.minification||a.magnification!=b.magnification||a.u!=b.u||a.v!=b.v)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"original gleam sampler conflict");
+        return fail(*diagnostic,VehicleWindowError50DS::material,"original gleam sampler conflict");}
     // A texture-feedback path is needed only for this native private target.
     // Do not change the already compiled UI program's coherent-fetch variant.
     if(!uiSourceCoherentFramebufferFetch){
@@ -721,7 +742,7 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudResources(const game::OriginalR
         !load(gl.blitFramebuffer,"glBlitFramebuffer"))return false;
     MaterialTextureGlRequest50EB requestTextures{};requestTextures.context=request.context;
     requestTextures.originalUploadBinding=request.originalUploadBinding;
-    requestTextures.isCurrent=request.isCurrent;requestTextures.samplers=h.samplers.data();requestTextures.samplerCount=4;
+    requestTextures.isCurrent=request.isCurrent;requestTextures.samplers=h.samplers.data();requestTextures.samplerCount=5;
     requestTextures.maximumGpuBytes=16u*1024u*1024u;const char* missing=nullptr;
     MaterialTextureGlDiagnostic50EB textureDiagnostic;
     if(!loadMaterialTextureFunctions50EE(request.context,request.procAddress,requestTextures.gl,missing)||
@@ -765,11 +786,12 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudFrame(const game::OriginalRaceH
         v->sessionGeneration!=h.generation||v->x1E0||v->y1E4||v->width1E8!=640||v->height1EC!=448||
         !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
     const auto* images=owner->images();const auto* bank=images?images->textures():nullptr;if(!bank)return false;
-    // These four objects are the only joined lap emitters. Never accidentally
-    // render countdown, status, numeric-count, KO or an inactive second view.
+    // Joined writers: 22B170/22B370/22B760/22AE70 (12C,130,134,164),
+    // 22B570 (138), 22BA60 (16C,170), 1A2E30 WRONG WAY (17C). 13C..144 have no
+    // joined writer; an enabled one, or any object of another view, rejects.
     constexpr U offsets[]={0x12c,0x130,0x134,0x138,0x13c,0x140,0x144,0x164,0x16c,0x170,0x17c};
     for(U offset:offsets){const auto* t=owner->textAt(0,offset);if(!t||t->viewport!=v)return false;
-        if(t->enabled70&&offset!=0x12c&&offset!=0x130&&offset!=0x134&&offset!=0x164)return false;}
+        if(t->enabled70&&(offset==0x13c||offset==0x140||offset==0x144))return false;}
     const auto put=[&](float x,float y,float u,float vv,const std::array<std::uint8_t,4>& color,U index){
         if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(u)||!std::isfinite(vv)||color[3]>128)return false;
         auto& vertex=h.vertices[index];vertex.position[0]=x;vertex.position[1]=y;vertex.position[2]=16777214.f;
@@ -803,10 +825,33 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudFrame(const game::OriginalRaceH
                 if(!put(px,py,uv[i][0],uv[i][1],color,h.quads*4+i))return false;}
             ++h.quads;h.packets[h.packetCount++]={first,1,material};}
     }
-    for(U offset:{0x12cu,0x130u,0x134u,0x164u}){const auto& t=*owner->textAt(0,offset);
+    // 2E7190: the 18C burst, both ScreenTextures centred on (104,100) with
+    // size (108,10C) + (110,114) * elapsed/duration; no rotation or travel.
+    if(const auto* b=owner->knockoutBurstAt(0)){if(b->viewport!=v)return false;
+     if(b->active118){
+        for(float f:{b->x104,b->y100,b->width108,b->height10C,b->growWidth110,b->growHeight114,b->duration11C,b->elapsed120})
+            if(!std::isfinite(f))return false;
+        if(b->duration11C!=.5f||b->elapsed120<0||b->elapsed120>b->duration11C)return false;
+        const float ratio=hudDiv(b->elapsed120,b->duration11C);
+        const float w=hudAdd(b->width108,hudMul(b->growWidth110,ratio)),hh=hudAdd(b->height10C,hudMul(b->growHeight114,ratio));
+        const float x=hudSub(b->x104,hudMul(.5f,w)),y=hudSub(b->y100,hudMul(.5f,hh));
+        const float xs[]={x,hudAdd(x,w),hudAdd(x,w),x},ys[]={y,y,hudAdd(y,hh),hudAdd(y,hh)};
+        constexpr U sourceLane[]={0,1,3,2};constexpr float uv[4][2]={{0,0},{1,0},{1,1},{0,1}};
+        for(U material:{7u,8u}){const auto first=h.quads;
+            if(h.quads>=RaceHud::maximumQuads||h.packetCount>=RaceHud::maximumPackets)return false;
+            for(U i=0;i<4;++i){const auto& color=material==7?b->brightColor[sourceLane[i]]:b->clearColor[sourceLane[i]];
+                if(material==8&&color!=std::array<std::uint8_t,4>{{0,0,0,0}})return false;
+                if(!put(xs[i],ys[i],uv[i][0],uv[i][1],color,h.quads*4+i))return false;}
+            ++h.quads;h.packets[h.packetCount++]={first,1,material};}
+     }
+    }
+    for(U offset:{0x12cu,0x130u,0x134u,0x138u,0x164u,0x17cu,0x16cu,0x170u}){const auto& t=*owner->textAt(0,offset);
         if(!t.enabled70||!t.blinkOn80)continue;
-        const U font=offset==0x164?2u:0u;
-        if(t.fontIndex!=font||t.materialIndex!=font||t.textLength>40||t.text[t.textLength]!=0||t.justification74!=3||
+        // 1A8CC4 bindings: 12C.. font14/gleam14, 164 font30/gleam30,
+        // 17C font16/ScreenMT fallback, 16C font16/explosion16, 170 font30/explosion30.
+        const U font=offset==0x164||offset==0x170?2u:offset==0x17c||offset==0x16c?1u:0u;
+        const U material=offset==0x16c?3u:offset==0x170?4u:font;
+        if(t.fontIndex!=font||t.materialIndex!=material||t.textLength>40||t.text[t.textLength]!=0||t.justification74!=3||
             t.rotation17C!=0||!std::isfinite(t.scale178)||t.scale178<=0||!std::isfinite(t.alpha174)||t.alpha174<0||t.alpha174>255)return false;
         const auto* atlas=bank->texture(font);const auto* f=images->font(font);if(!atlas||!f)return false;
         game::OriginalUiTextInput50KG in{f,&atlas->texture,reinterpret_cast<const std::uint8_t*>(t.text.data()),t.textLength,0,0};
@@ -829,7 +874,7 @@ bool VehicleWindowGl50DS::Storage::prepareRaceHudFrame(const game::OriginalRaceH
         for(U q=0;q<h.glyphs.count;++q){for(U i=0;i<4;++i){const auto& vertex=h.glyphs.quads[q].vertices[i];
                 if(!put(hudMul(vertex.x,t.scale178),hudMul(vertex.y,t.scale178),vertex.u,vertex.v,color,h.quads*4+i))return false;}
             ++h.quads;}
-        h.packets[h.packetCount++]={first,h.quads-first,font};
+        h.packets[h.packetCount++]={first,h.quads-first,material};
     }
     // Stable insertion sort on the authenticated registry leaf rank. The three
     // font14 packets retain their actual object FIFO within that shared leaf.
@@ -871,14 +916,15 @@ bool VehicleWindowGl50DS::Storage::drawRaceHud(U bank) noexcept {
     {static thread_local std::vector<assets::Vertex48B> hudScratch;drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),h.packets.data(),std::uint32_t(h.packetCount),hudExtra,"RaceHud"));}
     drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
     bool okay=check("prepare authentic lap glyph/gleam source pass");
-    constexpr U image[]={0,1,2,1,2,3,3};
+    constexpr U image[]={0,1,2,1,2,3,3,4,4};
     for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
         // Original clear's failed alpha test keeps framebuffer writes while
         // suppressing depth writes. Its exact zero RGBA leaves RGB untouched
         // and replaces source A with zero through the ordinary source equation.
         // Adjacent packets of one leaf retain the preceding checked material state.
         if(p==0 || packet.material!=h.packets[p-1].material){
-            gl.depthMask(packet.material==6?0:1);gl.uniform1i(uiSourceBlendUniform,packet.material==5?3:1);
+            gl.depthMask(packet.material==6||packet.material==8?0:1);
+            gl.uniform1i(uiSourceBlendUniform,packet.material==5||packet.material==7?3:1);
             gl.bindTexture(texture2D,h.textures.texture(image[packet.material]));
         }
         if(uiSourceCoherentFramebufferFetch){
@@ -1575,6 +1621,185 @@ bool VehicleWindowGl50DS::Storage::deleteDamageNames(VehicleWindowDiagnostic50DS
     // Whole-renderer close or failed-bind cleanup has completed glFinish.
     // Release the strong canonical owner only after acknowledged name retirement.
     damage.reset();return true;
+}
+
+bool VehicleWindowGl50DS::Storage::hasRaceStartOverlayResources()const noexcept {
+    return raceStartOverlay&&(raceStartOverlay->target||raceStartOverlay->color||raceStartOverlay->depth||
+        raceStartOverlay->textures.ownsResources());
+}
+
+bool VehicleWindowGl50DS::Storage::prepareRaceStartOverlayResources(
+    std::shared_ptr<const game::OriginalRaceStartOverlay50HU> owner) noexcept {
+    if(raceStartOverlay||frontendOnly||active||frameSet||!owner||!owner->loaded())
+        return fail(*diagnostic,VehicleWindowError50DS::request,"fresh loaded original start overlay required");
+    raceStartOverlay.reset(new(std::nothrow) RaceStartOverlay);
+    if(!raceStartOverlay)return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate original start overlay storage");
+    auto& h=*raceStartOverlay;h.owner=std::move(owner);
+    const auto* images=h.owner->images();const auto* bank=images?images->textures():nullptr;
+    if(!bank||bank->textureCount()!=RaceStartOverlay::imageCount)
+        return fail(*diagnostic,VehicleWindowError50DS::assets,"original start overlay eight-image bank required");
+    assets::OriginalUiMaterialDiagnostic50KG md;
+    for(U i=0;i<RaceStartOverlay::imageCount;++i){
+        const auto* m=h.owner->material(i);const auto* decoded=images->decodedTexture(i);
+        // 2475C0 ScreenMT fallback: one pass, group "none", source-alpha raster.
+        if(!m||m->passes.size()!=1||!decoded||
+           !assets::prepareOriginalUiNativeMaterial50KG(m->passes[0],*decoded,h.policies[i],md)||
+           h.policies[i].blend!=assets::OriginalUiMaterialBlend50KG::sourceAlpha||
+           !hudSampler(h.policies[i],h.samplers[i]))
+            return fail(*diagnostic,VehicleWindowError50DS::material,"unsupported original start overlay raster");
+        const auto& group=m->passes[0].shaderPassGroup;
+        if(!hudName(reinterpret_cast<const std::uint8_t*>(group.data()),group.size(),"none"))
+            return fail(*diagnostic,VehicleWindowError50DS::material,"original start overlay group differs");
+    }
+    // A texture-feedback path is needed only for this native private target.
+    if(!uiSourceCoherentFramebufferFetch){
+        I major=0,minor=0,units=0,count=0;gl.getIntegerv(0x821B,&major);gl.getIntegerv(0x821C,&minor);
+        gl.getIntegerv(0x8872,&units);bool barrier=major>4||(major==4&&minor>=5);
+        if(!load(gl.getStringi,"glGetStringi")||!check("query original start overlay source-alpha capabilities"))return false;
+        gl.getIntegerv(0x821D,&count);
+        if(!check("query original start overlay extensions")||count<0||count>65536||units<2)
+            return fail(*diagnostic,VehicleWindowError50DS::context,"bounded original start overlay source-alpha support unavailable");
+        for(I i=0;i<count;++i){const auto* p=gl.getStringi(0x1F03,U(i));
+            if(!check("read original start overlay extension")||!p)return false;
+            if(!std::strcmp(reinterpret_cast<const char*>(p),"GL_ARB_texture_barrier"))barrier=true;}
+        if(!barrier||!load(gl.textureBarrier,"glTextureBarrier"))
+            return fail(*diagnostic,VehicleWindowError50DS::context,"original start overlay requires GL4.5 or ARB_texture_barrier");
+    }
+    if(!load(gl.genTextures,"glGenTextures")||!load(gl.deleteTextures,"glDeleteTextures")||
+        !load(gl.scissor,"glScissor")||!load(gl.activeTexture,"glActiveTexture")||!load(gl.bindTexture,"glBindTexture")||
+        !load(gl.texImage2D,"glTexImage2D")||!load(gl.texParameteri,"glTexParameteri")||
+        !load(gl.getTexLevelParameteriv,"glGetTexLevelParameteriv")||!load(gl.framebufferTexture2D,"glFramebufferTexture2D")||
+        !load(gl.blitFramebuffer,"glBlitFramebuffer"))return false;
+    MaterialTextureGlRequest50EB requestTextures{};requestTextures.context=request.context;
+    requestTextures.originalUploadBinding=request.originalUploadBinding;
+    requestTextures.isCurrent=request.isCurrent;requestTextures.samplers=h.samplers.data();
+    requestTextures.samplerCount=RaceStartOverlay::imageCount;
+    requestTextures.maximumGpuBytes=16u*1024u*1024u;const char* missing=nullptr;
+    MaterialTextureGlDiagnostic50EB textureDiagnostic;
+    if(!loadMaterialTextureFunctions50EE(request.context,request.procAddress,requestTextures.gl,missing)||
+        !h.textures.create(requestTextures,*bank,textureDiagnostic))
+        return fail(*diagnostic,VehicleWindowError50DS::material,"upload authentic original start overlay images");
+    h.publication=h.textures.publicationToken();
+    if(!uiProgram){
+        raceStartOverlayUiCreationFailed=true;raceStartOverlayPreparing=true;
+        const bool okay=createOriginalUi();raceStartOverlayPreparing=false;if(!okay)return false;
+        raceStartOverlayUiCreationFailed=false;
+    }
+    I limit=0;gl.getIntegerv(0x0D33,&limit);
+    if(!check("query original start overlay texture extent")||limit<maximumWidth||limit<maximumHeight)
+        return fail(*diagnostic,VehicleWindowError50DS::limits,"original start overlay private target exceeds texture limit");
+    gl.genFramebuffers(1,&h.target);gl.bindFramebuffer(framebuffer,h.target);
+    gl.genTextures(1,&h.color);gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,h.color);
+    gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+    gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+    gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);drawGl.bindBuffer(0x88EC,0);
+    gl.texImage2D(texture2D,0,rgba8,maximumWidth,maximumHeight,0,rgba,unsignedByte,nullptr);
+    if(!check("allocate native-size original start overlay source target")||!h.target||!h.color)return false;
+    I w=0,height=0,format=0;gl.getTexLevelParameteriv(texture2D,0,0x1000,&w);
+    gl.getTexLevelParameteriv(texture2D,0,0x1001,&height);gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+    if(!check("verify original start overlay source storage")||w!=maximumWidth||height!=maximumHeight||format!=I(rgba8))return false;
+    gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,h.color,0);
+    if(!createAttachment(h.depth,depth24,depthAttachment))return false;
+    gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+    const U status=gl.checkFramebufferStatus(framebuffer);gl.bindTexture(texture2D,0);gl.bindFramebuffer(framebuffer,0);
+    if(!check("complete original start overlay private target")||status!=framebufferComplete){diagnostic->framebufferStatus=status;return false;}
+    h.ready=true;return true;
+}
+
+bool VehicleWindowGl50DS::Storage::prepareRaceStartOverlayFrame(const game::OriginalRaceStartOverlay50HU* owner) noexcept {
+    if(raceStartOverlay){raceStartOverlay->frame=false;raceStartOverlay->quads=raceStartOverlay->packetCount=0;}
+    if(!owner)return true;
+    if(!raceStartOverlay||!raceStartOverlay->ready||owner!=raceStartOverlay->owner.get()||!owner->loaded())return false;
+    auto& h=*raceStartOverlay;const auto& source=owner->nativeDraw();
+    if(!source.drawn||source.count>RaceStartOverlay::maximumQuads||!source.serial||source.serial<h.serial||
+       !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
+    for(U q=0;q<source.count;++q){const auto& s=source.sprites[q];
+        if(s.texture>=RaceStartOverlay::imageCount||!std::isfinite(s.x)||!std::isfinite(s.y)||
+           !(s.width>0)||!(s.height>0)||s.width>1024||s.height>1024||
+           s.color[3]>h.policies[s.texture].maximumVertexAlpha)return false;
+        // 2DF550 ScreenTexture quad: 0 right-top, 1 left-top, 2 left-bottom, 3 right-bottom.
+        const float right=hudAdd(s.x,s.width),bottom=hudAdd(s.y,s.height);
+        const float xs[4]={right,s.x,s.x,right},ys[4]={s.y,s.y,bottom,bottom};
+        const float us[4]={1,0,0,1},vs[4]={0,0,1,1};
+        for(U i=0;i<4;++i){auto& out=h.vertices[q*4+i];
+            out.position[0]=xs[i];out.position[1]=ys[i];out.position[2]=16777214.f;
+            out.uv[0]=us[i];out.uv[1]=vs[i];for(U c=0;c<4;++c)out.color[c]=s.color[c];}
+        h.packets[q]={q,1,s.texture};
+    }
+    h.serial=source.serial;h.quads=source.count;h.packetCount=source.count;h.frame=h.quads!=0;return true;
+}
+
+bool VehicleWindowGl50DS::Storage::drawRaceStartOverlay(U bank) noexcept {
+    if(!raceStartOverlay||!raceStartOverlay->frame)return true;
+    auto& h=*raceStartOverlay;
+    if(!h.ready||!h.owner||h.owner->nativeDraw().serial!=h.serial||
+       !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
+    gl.disable(0x0C11);gl.disable(0x0BE2);gl.disable(0x8DB9);gl.disable(0x0BD0);
+    gl.bindFramebuffer(readFramebuffer,targets[bank]);gl.readBuffer(colorAttachment);
+    gl.bindFramebuffer(drawFramebuffer,h.target);gl.drawBuffer(colorAttachment);
+    gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
+    gl.bindFramebuffer(framebuffer,h.target);gl.viewport(0,0,width,height);
+    gl.depthMask(1);gl.clearDepth(0);gl.clear(depthBufferBit);
+    gl.colorMask(1,1,1,1);gl.enable(0x0B71);gl.depthFunc(0x0206);gl.depthRange(0,1);
+    resetNativeGcLighting();gl.useProgram(uiProgram);
+    const double scale=std::min(double(width)/640.0,double(height)/448.0);
+    const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
+    gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
+    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
+    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
+        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
+    gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
+    gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1f(uiAlphaUniform,1);gl.uniform1i(uiImageUniform,0);
+    if(!uiSourceCoherentFramebufferFetch){gl.uniform1i(uiSourceTargetUniform,1);gl.activeTexture(textureUnit0+1);
+        if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,h.color);}
+    gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
+    drawGl.bindVertexArray(uiVertexArray);drawGl.bindBuffer(arrayBuffer,uiVertexBuffer);
+    // The 3-2-1-GO row moves as one widget in widescreen (one anchor packet).
+    {static thread_local std::vector<assets::Vertex48B> hudScratch;const RaceStartOverlay::Packet whole{0,h.quads,0};
+     drawGl.bufferSubData(arrayBuffer,0,std::intptr_t(h.quads)*4*sizeof(assets::Vertex48B),
+        native_hud_margin50DS::anchor(hudScratch,h.vertices.data(),std::uint32_t(h.quads),&whole,1u,hudExtra,"RaceStartOverlay"));}
+    drawGl.bindBuffer(elementBuffer,uiIndexBuffer);
+    bool okay=check("prepare authentic start overlay source pass");
+    for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
+        // 2DF550 order: each ScreenTexture is its own source-alpha leaf.
+        gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
+        gl.bindTexture(texture2D,h.textures.texture(packet.image));
+        if(uiSourceCoherentFramebufferFetch){
+            drawGl.drawElementsBaseVertex(0x0004,I(packet.count*6),0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(packet.first)*6*sizeof(U)),0);
+            okay=check("draw original start overlay leaf");
+        }else{
+            for(U i=packet.first*6;okay&&i<(packet.first+packet.count)*6;i+=3){gl.textureBarrier();
+                drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(i)*sizeof(U)),0);
+                okay=check("draw original start overlay triangle");}
+        }
+    }
+    if(!uiSourceCoherentFramebufferFetch){gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);gl.activeTexture(textureUnit0);}
+    gl.bindTexture(texture2D,0);gl.disable(0x0C11);gl.disable(0x0BE2);
+    if(okay){
+        gl.bindFramebuffer(readFramebuffer,h.target);gl.readBuffer(colorAttachment);
+        gl.bindFramebuffer(drawFramebuffer,targets[bank]);gl.drawBuffer(colorAttachment);
+        gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
+        okay=check("copy original start overlay into pending gameplay image");
+    }
+    gl.bindFramebuffer(framebuffer,targets[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+    gl.colorMask(0,0,0,1);gl.clearColor(0,0,0,1);gl.clear(colorBufferBit);gl.colorMask(1,1,1,1);
+    gl.depthMask(1);gl.clearDepth(1);gl.depthFunc(0x0201);gl.useProgram(shader->program());
+    drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+    const bool restored=check("restore gameplay state after original start overlay pass");
+    if(okay&&restored)diagnostic->originalRaceStartOverlayQuads=h.quads;
+    return okay&&restored;
+}
+
+bool VehicleWindowGl50DS::Storage::deleteRaceStartOverlayNames(VehicleWindowDiagnostic50DS& d) noexcept {
+    if(!raceStartOverlay)return true;auto& h=*raceStartOverlay;h.ready=h.frame=false;
+    MaterialTextureGlDiagnostic50EB td;
+    if(!h.textures.close(td)){if(td.cleanupIncomplete){d.cleanupIncomplete=true;return false;}
+        if(!d.cleanupGlError)d.cleanupGlError=td.glError?td.glError:td.cleanupGlError;}
+    if(!deleteName(h.target,gl.deleteFramebuffers,d)||!deleteName(h.color,gl.deleteTextures,d)||
+        !deleteName(h.depth,gl.deleteRenderbuffers,d))return false;
+    raceStartOverlay.reset();return true;
 }
 
 bool VehicleWindowGl50DS::Storage::hasPauseDerivedResources()const noexcept {

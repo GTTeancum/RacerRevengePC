@@ -4,6 +4,7 @@
 // resource identity, initialization/destruction order or publication authority.
 // Only the existing small nested scope helpers and proc-loading template remain
 // inline; executable families have one definition in the sibling .cpp files.
+#include "../../../src/game/original_race_start_overlay50hu.h"
 #include "../../../src/game/original_options_mutation_interlock50kg.h"
 struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer.
 #include "vehicle_window_gl50ds.h"
@@ -307,7 +308,9 @@ struct VehicleWindowGl50DS::Storage {
         bool sourceAlphaTest = false, sourceUvAnimation = false;
         std::uint8_t sourceAlphaReference = 0;
         U sourcePass = 1, sourcePassCount = 1, projectionPass = 0;
-        std::uint8_t rcCrystalPass=0;
+        std::uint8_t gsDestinationAlphaPass=0; // see VehicleWindowTrackSpan50DS
+        bool sourceEnvironmentMap=false;
+        U sourceZone=0; // one-based authored zone, 0 = not zoned
         bool worldFogEligible = false;
         bool allowPodShadow = true;
         U animation = assets::unresolvedMaterialTexture50EA;
@@ -492,6 +495,11 @@ struct VehicleWindowGl50DS::Storage {
     std::unique_ptr<U[]> trackVisibleDrawIds;
     U trackDrawCount = 0, frameTrackDrawCount = 0;
     bool frameTrackCullingApplied = false;
+    // Copied per frame from VehicleWindowFrame50DS::trackZones.
+    std::array<VehicleWindowTrackZone50DS,maxVehicleWindowTrackZones50DS> frameTrackZones{};
+    U frameTrackZoneCount = 0;
+    // Zone of the span currently scissored (0 = scissor off) in the track loop.
+    U boundTrackZone = 0;
     VehicleWindowTrackUvFrame50DS frameTrackUv{};
     std::uint64_t trackTexturePublication = 0;
     std::uint64_t cableTexturePublication = 0;
@@ -520,6 +528,7 @@ struct VehicleWindowGl50DS::Storage {
     I trackDiscardZeroAlphaUniform = -1, trackUseSourceNormalsUniform = -1, trackProjectionPassUniform = -1;
     I trackUvTranslationUniform = -1, trackAlphaReferenceUniform = -1;
     I trackEffectModeUniform = -1, trackAlphaScaleUniform = -1, trackUnlitUniform = -1;
+    I trackSourceColorAbsentUniform = -1;
     I worldFogEnabledUniform = -1, worldFogCameraUniform = -1;
     I worldFogColorUniform = -1, worldFogRangeUniform = -1;
     float worldFogCamera[3]{};
@@ -703,6 +712,7 @@ struct VehicleWindowGl50DS::Storage {
 #include "original_gameplay_blur_storage.inl"
 #include "native_fxaa_storage.inl"
 #include "native_debris_storage.inl"
+#include "native_water_storage.inl"
 #include "native_coverage_storage.inl"
 bool uiCoverageDisjointTraced=false;
 #include "original_ui_coverage_storage.inl"
@@ -710,6 +720,7 @@ bool uiCoverageDisjointTraced=false;
 #include "original_gc_particle_gl_storage50kg.inl"
 #include "rc_crystal_gl_storage.inl"
 #include "original_race_hud_render.inl"
+#include "original_race_start_overlay_render.inl"
 #include "original_time_stats_render.inl"
 #include "original_position_stats_render.inl"
 #include "original_damage_render.inl"
@@ -736,6 +747,7 @@ bool uiCoverageDisjointTraced=false;
     bool createSkyMaterials(const VehicleWindowSky50DS& input) noexcept;
     bool createTrackVisibility(const VehicleWindowTrack50DS& input) noexcept;
     void prepareTrackVisibility() noexcept;
+    void bindTrackZoneScissor(U zone) noexcept;
     bool createMaterials(const VehicleWindowMaterials50DS& input) noexcept;
     bool validateMaterialUvs(const VehicleWindowMaterialUv50DS* uvs, U count,
         VehicleWindowDiagnostic50DS& d, U archetype = 0) const noexcept;

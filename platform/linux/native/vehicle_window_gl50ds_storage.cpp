@@ -351,7 +351,7 @@ bool VehicleWindowGl50DS::Storage::usesTextures() const noexcept {
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
             request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi ||
-            request.enableOriginalGameplayBlur || request.gcParticleTextures || request.track.rcParticleWindow || request.track.gbParticleWindow || request.track.mcParticleWindow || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources());
+            request.enableOriginalGameplayBlur || request.gcParticleTextures || request.track.rcParticleWindow || request.track.gbParticleWindow || request.track.mcParticleWindow || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources());
     }
 
 bool VehicleWindowGl50DS::Storage::usesTrackShader() const noexcept {
@@ -375,7 +375,10 @@ bool VehicleWindowGl50DS::Storage::createTrackMaterials(const VehicleWindowTrack
             target.indexCount = source.indexCount;
             target.discardZeroAlpha = source.discardZeroAlpha;
             target.nativeCoverage = source.nativeCoverage;
-            coverageDemand = coverageDemand || source.nativeCoverage == NativeTrackCoverage50DS::fourSampleAa1;
+            // The exact destination-alpha bridge (fallback and comparison route)
+            // composes per sample, so any GS C=Ad pair also needs these targets.
+            coverageDemand = coverageDemand || source.nativeCoverage == NativeTrackCoverage50DS::fourSampleAa1 ||
+                source.gsDestinationAlphaPass != 0;
             target.sourceAlphaTest = source.sourceAlphaTest;
             target.sourceAlphaReference = source.sourceAlphaReference;
             target.sourceUvAnimation = source.sourceUvAnimation;
@@ -383,7 +386,25 @@ bool VehicleWindowGl50DS::Storage::createTrackMaterials(const VehicleWindowTrack
             target.sourcePass = source.sourcePass;
             target.sourcePassCount = source.sourcePassCount;
             target.projectionPass = source.projectionPass;
-            target.rcCrystalPass = source.rcCrystalPass;
+            target.gsDestinationAlphaPass = source.gsDestinationAlphaPass;
+            target.sourceEnvironmentMap = source.sourceEnvironmentMap;
+            target.sourceZone = source.sourceZone;
+            if (source.gsDestinationAlphaPass == 2 && !source.sourceEnvironmentMap) {
+                // Cold bound for the fixed route's pass-2 admission: largest
+                // RGB vertex byte this span can feed into texel x byte / 128.
+                if (!gsSpanMaxVertexByte) {
+                    gsSpanMaxVertexByte.reset(new (std::nothrow) std::uint8_t[input.spanCount]());
+                    if (!gsSpanMaxVertexByte)
+                        return fail(*diagnostic, VehicleWindowError50DS::allocation,
+                            "allocate destination-alpha vertex byte bounds");
+                }
+                std::uint8_t maximum = 0;
+                if (!input.mesh || source.vertexStart > input.mesh->vertices.size() ||
+                    input.mesh->vertices.size() - source.vertexStart < source.vertexCount) maximum = 255;
+                else for (U v = source.vertexStart; v < source.vertexStart + source.vertexCount; ++v)
+                    for (U c = 0; c < 3; ++c) maximum = std::max(maximum, input.mesh->vertices[v].color[c]);
+                gsSpanMaxVertexByte[i] = maximum;
+            }
             // All source ranges/pass continuity were validated before creation.
             // For alpha-over pairs, fogging both colors with the same factor
             // yields fog(alpha*layer + (1-alpha)*base), without fogging alpha.
@@ -752,9 +773,9 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         for(U name:garageSamplers50KG)if(name)return true;
         if(hasRaWorldResources())return true;
         if(hasCoverageResources()||uiCoverage.owns())return true;
-        if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
+        if(hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
-        if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources()) return true;
+        if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources() || hasWaterResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
@@ -929,7 +950,7 @@ in vec4 rrColor;
 in vec3 rrWorldNormal;
 in vec4 rrProjectedUv;
 uniform int projectionPass;
-uniform int rcCrystalPass;
+uniform int environmentMap;
 uniform vec4 trackUvTranslation;
 uniform int worldFogEnabled;
 uniform vec4 worldFogCamera;
@@ -951,7 +972,7 @@ void main() {
     trackWorldNormal = rrWorldNormal;
     trackSourceColor = rrColor;
     rcSourceColor = rrColor;
-    trackSourceUv = rcCrystalPass == 2 ? rrProjectedUv.xy : projectionPass == 1 ? rrProjectedUv.xy :
+    trackSourceUv = environmentMap != 0 ? rrProjectedUv.xy : projectionPass == 1 ? rrProjectedUv.xy :
         (projectionPass == 2 ? rrProjectedUv.zw : rrUv);
     trackSourceUv += trackUvTranslation.xy;
 }
@@ -965,9 +986,10 @@ in vec3 trackWorldNormal;
 in vec4 trackSourceColor;
 noperspective in vec4 rcSourceColor;
 in vec2 trackSourceUv;
-uniform int rcCrystalPass;
-uniform int rcCrystalPayload;
-uniform vec4 rcCrystalAmbient;
+uniform int gsAlphaPass;
+uniform int gsAlphaPayload;
+uniform int environmentMap;
+uniform vec4 environmentAmbient;
 out float rcCenterDepth;
 uniform float vertexColorScale;
 uniform int useTexture;
@@ -976,19 +998,32 @@ uniform float sourceAlphaReference;
 uniform int effectMode;
 uniform float alphaScale;
 uniform int unlit;
+uniform int sourceColorAbsent;
 uniform int useSourceNormals;
 uniform sampler2D image;
 out vec4 viewerOutput;
 )GLSL" RR_NATIVE_POD_SHADOW_GLSL50HM R"GLSL(
 void main() {
-    if(rcCrystalPass!=0){
-        vec4 vertexByte=rcCrystalPass==2?rcCrystalAmbient:clamp(rcSourceColor*255.0,0.0,255.0);
+    if(gsAlphaPass!=0){
+        // GS byte source colour: texel x vertex byte / 128 (prelit vertex
+        // bytes, or the ambient row for the environment-map program).
+        vec4 vertexByte=environmentMap!=0?environmentAmbient:clamp(rcSourceColor*255.0,0.0,255.0);
         vec4 source=floor(clamp(texture(image,trackSourceUv)*255.0*vertexByte/128.0,0.0,255.0));
         if(discardZeroAlpha==2&&source.a<=sourceAlphaReference)discard;
         // Explicit existing native radial-fog presentation, not GS raster parity.
         if(worldFogEnabled!=0)source.rgb=floor(mix(source.rgb,worldFogColor.rgb*255.0,trackFogAmount));
         rcCenterDepth=gl_FragCoord.z;
-        viewerOutput=rcCrystalPayload!=0?source:vec4(0.0);
+        if(gsAlphaPayload==2){
+            // Fixed-function GS A=Cs,B=0,D=Cd (see drawDestinationAlphaRange).
+            // Pass 1 (C=As): this fragment's own floor(Cs*As/128), added by
+            // ONE,ONE. Pass 2 (C=Ad): Cs/128 times the DST_ALPHA factor. Both
+            // write source alpha independently (blend A: ONE,ZERO), as the GS does.
+            viewerOutput=gsAlphaPass==1?
+                vec4(min(floor(source.rgb*source.a/128.0),255.0)/255.0,source.a/255.0):
+                vec4(source.rgb/128.0,source.a/255.0);
+            return;
+        }
+        viewerOutput=gsAlphaPayload!=0?source:vec4(0.0);
         return;
     }
     vec3 plane = cross(dFdx(trackWorldPosition), dFdy(trackWorldPosition));
@@ -1012,8 +1047,14 @@ void main() {
         float skyAmbient = 0.32 + 0.16 * max(normal.y, 0.0);
         illumination = skyAmbient + 0.52 * max(dot(normal, lightDirection), 0.0);
     }
-    vec3 color = trackSourceColor.rgb * vertexColorScale * (unlit != 0 ? 1.0 : illumination);
-    float alpha = trackSourceColor.a;
+    // A surface without a source colour stream carries the export's diagnostic
+    // white. The original program emits light-row bytes instead: RGB at the GS
+    // neutral 128 (host illumination stands in for the rows), alpha = the
+    // zone-ambient .w 64. Same rule for every course; keyed on geometry data.
+    vec4 sourceColor = sourceColorAbsent != 0 ?
+        vec4(128.0 / 255.0, 128.0 / 255.0, 128.0 / 255.0, 64.0 / 255.0) : trackSourceColor;
+    vec3 color = sourceColor.rgb * vertexColorScale * (unlit != 0 ? 1.0 : illumination);
+    float alpha = sourceColor.a;
     if (useTexture != 0) {
         vec4 texel = texture(image, trackSourceUv);
         if (discardZeroAlpha == 1 && texel.a <= 0.0) discard;
@@ -1066,9 +1107,10 @@ void main() {
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track program link failed");
         }
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::uniforms;
-        rcCrystalPassUniform=shaderGl.getUniformLocation(trackProgram,"rcCrystalPass");
-        rcCrystalPayloadUniform=shaderGl.getUniformLocation(trackProgram,"rcCrystalPayload");
-        rcCrystalAmbientUniform=shaderGl.getUniformLocation(trackProgram,"rcCrystalAmbient");
+        gsAlphaPassUniform=shaderGl.getUniformLocation(trackProgram,"gsAlphaPass");
+        gsAlphaPayloadUniform=shaderGl.getUniformLocation(trackProgram,"gsAlphaPayload");
+        environmentMapUniform=shaderGl.getUniformLocation(trackProgram,"environmentMap");
+        environmentAmbientUniform=shaderGl.getUniformLocation(trackProgram,"environmentAmbient");
         worldFogEnabledUniform = shaderGl.getUniformLocation(trackProgram, "worldFogEnabled");
         worldFogCameraUniform = shaderGl.getUniformLocation(trackProgram, "worldFogCamera");
         worldFogColorUniform = shaderGl.getUniformLocation(trackProgram, "worldFogColor");
@@ -1081,6 +1123,7 @@ void main() {
         trackEffectModeUniform = shaderGl.getUniformLocation(trackProgram, "effectMode");
         trackAlphaScaleUniform = shaderGl.getUniformLocation(trackProgram, "alphaScale");
         trackUnlitUniform = shaderGl.getUniformLocation(trackProgram, "unlit");
+        trackSourceColorAbsentUniform = shaderGl.getUniformLocation(trackProgram, "sourceColorAbsent");
         trackUseSourceNormalsUniform = shaderGl.getUniformLocation(trackProgram, "useSourceNormals");
         trackProjectionPassUniform = shaderGl.getUniformLocation(trackProgram, "projectionPass");
         trackUvTranslationUniform = shaderGl.getUniformLocation(trackProgram, "trackUvTranslation");
@@ -1104,7 +1147,7 @@ void main() {
                 return fail(*diagnostic, VehicleWindowError50DS::shader, "native opponent shadow bounds uniform missing");
         }
         if (!check("query source-color track uniforms")) return false;
-        if (rcCrystalPassUniform<0||rcCrystalPayloadUniform<0||rcCrystalAmbientUniform<0||
+        if (gsAlphaPassUniform<0||gsAlphaPayloadUniform<0||environmentAmbientUniform<0||environmentMapUniform<0||
             worldFogEnabledUniform < 0 || worldFogCameraUniform < 0 ||
             worldFogColorUniform < 0 || worldFogRangeUniform < 0 ||
             trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
@@ -1112,6 +1155,8 @@ void main() {
             trackEffectModeUniform < 0 || trackAlphaScaleUniform < 0 || trackUnlitUniform < 0 ||
             trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || trackUvTranslationUniform < 0 || trackAlphaReferenceUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track uniform missing");
+        if (trackSourceColorAbsentUniform < 0)
+            return fail(*diagnostic, VehicleWindowError50DS::shader, "source colour-stream uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         return true;
     }
@@ -2081,7 +2126,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createCoverageProgram() || !createRaWorld()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createRaWorld()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2233,7 +2278,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
         if (hasNativeResultsResources() || hasNativeF8BarResources() || riderTextureBorrow || raWorld || raStaticFireOwner || rcParticleWindow || gbParticleWindow || mcParticleWindow || hasDisplayFadeNames() || uiCoverage.owns() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
-            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || hasFxaaResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
+            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || hasFxaaResources() || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){nativeGlFaultObserved50KG=true;if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
@@ -2252,7 +2297,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,0);
         }
         if (usesTextures() || hasDisplayFadeNames()) {
-            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -2277,10 +2322,12 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if(!deletePositionStatsNames(d))goto incomplete;
         if(!deleteTimeStatsNames(d))goto incomplete;
         if(!deleteRaceHudNames(d))goto incomplete;
+        if(!deleteRaceStartOverlayNames(d))goto incomplete;
         if(!deleteGameplayBlurNames(d))goto incomplete;
         if(!deleteFxaaNames(d))goto incomplete;
         if(!deleteDebrisNames(d))goto incomplete;
         if(!deleteEffectNames(d))goto incomplete;
+        if(!deleteWaterNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
                 d.cleanupShader.glError : d.cleanupShader.cleanupGlError;

@@ -47,6 +47,18 @@ struct OriginalRaceHudGleam50KG {
     float angle118=0,duration120=0,elapsed124=0;
     std::uint32_t active11C=0;
 };
+// Race28C+18C+4*view: the K.O. burst behind the 16C/170 texts (class vtable
+// 3D56E0, constructor 2E6E90, load 2E6FA0("font_ko","font_koclear")). Two
+// ScreenTextures +40 bright (font_ko, packet 127,127,127,63) and +A0 clear
+// (font_koclear, packet 0,0,0,0). 2E7170 starts it; 2E74D0 ages it; 2E7190
+// draws both centred on (104,100), size (108,10C) + (110,114)*elapsed/11C.
+struct OriginalRaceHudKnockoutBurst50KG {
+    const OriginalCameraViewportFields* viewport=nullptr;
+    std::array<std::array<std::uint8_t,4>,4> brightColor{},clearColor{};
+    float y100=0,x104=0,width108=0,height10C=0,growWidth110=0,growHeight114=0;
+    float duration11C=0,elapsed120=0;
+    std::uint32_t active118=0;
+};
 struct OriginalRaceHudDiagnostic50KG {
     enum class Error:std::uint8_t {none,alreadyLoaded,archive,material,images,localization,viewport,allocation} error=Error::none;
     std::uint32_t sourcePC=0;
@@ -85,6 +97,32 @@ public:
     bool applyLapCompletion(std::uint32_t view,std::uint32_t group34,
         std::uint8_t split11050,const LapCompletionRequest50GG&) noexcept;
     bool stopAll1AD230() noexcept;
+    // Exact TextOverlay setters for one of the eleven constructed objects,
+    // addressed by (view, race offset 12C..144/164/16C/170/17C). Each call is
+    // bounded: an unknown view or offset is refused before any write; text is
+    // cut to the constructor capacity 40 exactly as 29D940 does (min with +5B);
+    // a moving position (29DB50 f12 != 0) is not represented and is refused.
+    bool setColor29DA10(std::uint32_t view,std::uint32_t raceOffset,std::uint32_t color) noexcept;
+    bool setPosition29DB50(std::uint32_t view,std::uint32_t raceOffset,
+        std::int32_t x,std::int32_t y,float durationF12) noexcept;
+    bool setText29D940(std::uint32_t view,std::uint32_t raceOffset,const char* text,std::size_t bytes) noexcept;
+    struct Show29DA40 {
+        std::int32_t alphaA1=0,secondAlphaA3=0;std::uint32_t lockA2=0;
+        float blinkF12=0,holdF13=0,scaleF14=1,rotationF15=0,secondDelayF16=-1,
+            secondScaleF17=1,secondRotationF18=0,alphaDurationF19=0,
+            scaleDurationStack0=0,rotationDurationStack8=0;
+    };
+    bool show29DA40(std::uint32_t view,std::uint32_t raceOffset,const Show29DA40&) noexcept;
+    bool hide29DB10(std::uint32_t view,std::uint32_t raceOffset) noexcept;
+    // 22BA60(attacker, victim60) for a human attacker: victim name (Localization
+    // id profile+3C[victim60]) on 16C and "K.O.'d" on 170, then the 18C burst
+    // sized from the texts' 2E16F0 width / 2E15B0 heights and started (2E7170).
+    bool knockout22BA60(std::uint32_t view,std::uint32_t group34,std::uint8_t split11050,
+        std::int32_t victimNameId3C) noexcept;
+    // 22B570 after 1863B0 qualified the attacker's CD0: "<loc 465> <CD0>" on 138,
+    // then the unconditional 22AE70 NEW RECORD! banner and gleam 194.
+    bool knockoutRecord22B570(std::uint32_t view,std::uint32_t group34,std::uint8_t split11050,
+        std::int32_t killsCD0) noexcept;
     // Native world scheduling: once before this step's racer prefixes, so
     // setters made by the lap callback survive until accepted presentation.
     bool advanceAnimations29CDA0(float seconds) noexcept;
@@ -96,6 +134,7 @@ public:
         const OriginalCameraViewportFields& displayedViewport) noexcept;
     const OriginalRaceHudText50KG* textAt(std::uint32_t view,std::uint32_t raceOffset) const noexcept;
     const OriginalRaceHudGleam50KG* gleamAt(std::uint32_t view,std::uint32_t raceOffset) const noexcept;
+    const OriginalRaceHudKnockoutBurst50KG* knockoutBurstAt(std::uint32_t view) const noexcept;
     const assets::OriginalUiScreenAssets50KG* images() const noexcept;
     const assets::OriginalUiMaterial50KG* material(std::size_t) const noexcept;
     // Borrowed authentic APPSTART registration order, never a caller receipt.

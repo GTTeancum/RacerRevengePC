@@ -1,11 +1,16 @@
 // Private member declarations; definitions are in vehicle_window_gl50ds_world.cpp.
-// Private VehicleWindowGl50DS::Storage. Exact RC source bridge, no extra target
-// allocation and no change to existing material modes. AA1 crowd demand is
-// mandatory; crystal AA0 uses the actual checked per-sample composition path.
-    I rcCrystalPassUniform=-1,rcCrystalPayloadUniform=-1,rcCrystalAmbientUniform=-1;
+// Private VehicleWindowGl50DS::Storage. Common GS destination-alpha pair route
+// (any course whose material data has an A=Cs,B=0,C=Ad,D=Cd pass after a C=As
+// pass on the same surface) plus the environment-map UV owner. The fixed
+// GPU-blend route needs no extra target; the exact per-sample composition
+// bridge (fallback and comparison) still needs the AA1 coverage resources.
+    I gsAlphaPassUniform=-1,gsAlphaPayloadUniform=-1,environmentAmbientUniform=-1,environmentMapUniform=-1;
+    // Load-time max vertex byte (RGB) of each span's vertex range, used by the
+    // fixed route's admission test for prelit C=Ad passes. Index = span.
+    std::unique_ptr<std::uint8_t[]> gsSpanMaxVertexByte;
     std::unique_ptr<std::array<float,2>[]> rcCrystalUvs;
-    std::array<std::uint8_t,4> rcCrystalAmbient{};
-    bool rcCrystalPrepared=false;
+    std::array<std::uint8_t,4> environmentAmbient{};
+    bool environmentMapPrepared=false;
     U activeFrameBank=0;
     struct RcFrameObservation {
         VehicleWindowDiagnostic50DS& diagnostic;bool enabled;
@@ -26,6 +31,7 @@
     bool createRcCrystalProjection(const VehicleWindowTrack50DS& track)noexcept;
     bool prepareRcCrystalFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d)noexcept;
     bool uploadRcCrystalUvs()noexcept;
-    std::array<I,4> rcTriangleRegion(U first)const noexcept;
-    bool drawRcCrystalTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount)noexcept;
-    bool drawRcCrystalRange(U bank,U first,U count,U pass,U image)noexcept;
+    std::array<I,4> gsTriangleRegion(U first)const noexcept;
+    bool drawDestinationAlphaTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount,bool environment)noexcept;
+    bool fixedDestinationAlphaAdmitted(const TrackSpan& span,U pass)const noexcept;
+    bool drawDestinationAlphaRange(U bank,U first,U count,U pass,U image,const TrackSpan& span)noexcept;

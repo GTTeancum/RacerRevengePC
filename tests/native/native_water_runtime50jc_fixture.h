@@ -215,6 +215,11 @@ public:
             nextSigned_.capacity()+nextTexture_.capacity();
     }
     bool initialized() const noexcept{return initialized_;}
+    // Water surface draw (native_water_surface50ws.h): the same retained cold
+    // resources, and the froth-layer frame phase h = provider+0x35C
+    // (FramesPerSecond4, phase_[4]) the VU program reads from Water+0x210.
+    const std::shared_ptr<const water_resources50JC::Owner>& resources() const noexcept{return resources_;}
+    float frothPhase35C() const noexcept{return phase_[4];}
     const Update& update() const noexcept{return update_;}
     const WaterPresentationOwner50JC& presentation() const noexcept{return presentation_;}
     // These const views remain stable for this owner's entire lifetime. They

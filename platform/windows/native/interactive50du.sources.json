@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "53b0e0b30eee930ac7f91939e6325ea6e2f970ff8a0f60609e4c34f2bfeec1a9"
+    "tools/prepare_interactive_build50dv.py": "190d62f6745f89efa573b80b456b53111af2ff02397b2b5138dd963490fa94b6"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -88,6 +88,7 @@
     "src/game/original_death_camera_query.cpp",
     "src/game/original_death_camera50kg.cpp",
     "src/game/original_race_hud50kg.cpp",
+    "src/game/original_race_start_overlay50hu.cpp",
     "src/game/original_wreck_explosion50la.cpp",
     "src/game/original_wreck_splash50la.cpp",
     "src/game/original_wreck_effects50la.cpp",

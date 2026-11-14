@@ -28,6 +28,7 @@
 #include "../../src/game/controller_actions50ec.h"
 #include "../../src/game/controller_ingress50cx.h"
 #include "../../src/game/wrong_way_progress50go.h"
+#include "../../src/game/original_race_hud50kg.h"
 #include "../../src/game/player_finish50ia.h"
 #include "../../src/game/vehicle_base_finish50y.h"
 #include "../../src/game/boost_controls50fk.h"
@@ -319,9 +320,12 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  wrongWayInput.vehicleCD8=s.fields.impactFlagsCD8;
  std::memcpy(wrongWayInput.localForwardE0,
      s.nodes[static_cast<unsigned>(x.bindings.animation.bodyScene288)].localC0.v+8,12);
- // The original native HUD owner is genuinely absent; the separate HOST overlay
- // below observes state and is not substituted as a completed original UI call.
- wrongWayInput.warningOwner=nullptr;
+ // 1A2E30 reads race+8C (view mode) for the warning position; one view = 0.
+ wrongWayInput.viewportMode8C=0;
+ // The warning owner is the race's actual TextOverlay owner (race28C+17C+4*view,
+ // view = this human's 5C = 0). Without a constructed HUD (legacy route) the
+ // owner is genuinely absent and no callback is requested.
+ wrongWayInput.warningOwner=sourceRaceHud.loaded()&&sourceRaceHud.viewCount()>0?&sourceRaceHud:nullptr;
  WrongWayProgressState50GO wrongWayState{lapContinuity.state.vehicleFF8,
      lapContinuity.prefix.flags10CC};
  require50DU(isMcTrack?
@@ -340,6 +344,39 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      beginWrongWayProgress50GO(navigationMap->track,lapOwner.track,wrongWayInput,
          wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic),
      "native wrong-way progression rejected");
+ // Execute each requested TextOverlay effect on 17C in source order, then
+ // resume: SetColor 29DA10 -> SetPosition 29DB50 -> SetText 29D940 ->
+ // Show 29DA40, or Hide 29DB10. Every effect is the bounded owner setter.
+ {
+  const bool wasShown=[&]{const auto* t=sourceRaceHud.loaded()?sourceRaceHud.textAt(0,0x17c):nullptr;return t&&t->enabled70;}();
+  for(unsigned step=0;wrongWayContinuation.pending.operation!=WrongWayHudOperation50GO::None;++step){
+   const auto& r=wrongWayContinuation.pending;
+   require50DU(step<5&&r.owner==&sourceRaceHud,"original warning callback owner differs");
+   bool done=false;
+   switch(r.operation){
+   case WrongWayHudOperation50GO::SetColor:done=sourceRaceHud.setColor29DA10(0,0x17c,r.argumentA1);break;
+   case WrongWayHudOperation50GO::SetPosition:done=sourceRaceHud.setPosition29DB50(0,0x17c,
+       static_cast<std::int32_t>(r.argumentA1),static_cast<std::int32_t>(r.argumentA2),r.argumentF[0]);break;
+   case WrongWayHudOperation50GO::SetText:done=r.text&&sourceRaceHud.setText29D940(0,0x17c,r.text,std::strlen(r.text));break;
+   case WrongWayHudOperation50GO::Show:{OriginalRaceHud50KG::Show29DA40 show;
+       show.alphaA1=static_cast<std::int32_t>(r.argumentA1);show.lockA2=r.argumentA2;
+       show.secondAlphaA3=static_cast<std::int32_t>(r.argumentA3);
+       show.blinkF12=r.argumentF[0];show.holdF13=r.argumentF[1];show.scaleF14=r.argumentF[2];
+       show.rotationF15=r.argumentF[3];show.secondDelayF16=r.argumentF[4];show.secondScaleF17=r.argumentF[5];
+       show.secondRotationF18=r.argumentF[6];show.alphaDurationF19=r.argumentF[7];
+       show.scaleDurationStack0=r.stack0;show.rotationDurationStack8=r.stack8;
+       done=sourceRaceHud.show29DA40(0,0x17c,show);break;}
+   case WrongWayHudOperation50GO::Hide:done=sourceRaceHud.hide29DB10(0,0x17c);break;
+   case WrongWayHudOperation50GO::None:break;
+   }
+   require50DU(done,"original warning TextOverlay effect rejected");
+   require50DU(resumeWrongWayProgress50GO(wrongWayContinuation,wrongWayDiagnostic),
+       "original warning callback resume rejected");
+  }
+  const bool nowShown=[&]{const auto* t=sourceRaceHud.loaded()?sourceRaceHud.textAt(0,0x17c):nullptr;return t&&t->enabled70;}();
+  if(nowShown!=wasShown)std::cerr<<(nowShown?"wrong_way_show":"wrong_way_clear")<<" frame="<<completedFrames
+      <<" angle="<<wrongWayReceipt.sourceAngle<<" c88="<<navigationProgress.reset.vehicleC88<<'\n';
+ }
  require50DU(wrongWayContinuation.pending.operation==WrongWayHudOperation50GO::None,
      "unowned original warning callback pending");
  lapContinuity.state.vehicleFF8=wrongWayState.vehicleFF8;

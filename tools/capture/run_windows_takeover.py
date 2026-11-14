@@ -140,6 +140,8 @@ def main():
                         help='Open the (resizable, --window) test window maximized')
     parser.add_argument('--no-fxaa', action='store_true', help='Turn FXAA off for this run')
     parser.add_argument('--destroy', help='Destroy racers during the race: slot@seconds[,slot@seconds] (0 = player)')
+    parser.add_argument('--env', action='append', default=[],
+                        help='Test-only: pass RR_NAME=value to the game (repeatable; other RR_ variables are not inherited)')
     parser.add_argument('--undertrack', help='Test-only: drop racers below the track: slot@seconds[,slot@seconds] (0 = player)')
     parser.add_argument('--camera-cycle', action='store_true',
                         help='Tap the view key (C) 1 s after green and every 15 s (reaches the follow camera)')
@@ -248,6 +250,11 @@ def main():
         env['RR_TEST_DESTROY'] = args.destroy
     if args.undertrack:
         env['RR_TEST_UNDERTRACK'] = args.undertrack
+    for item in args.env:
+        key, sep, value = item.partition('=')
+        if not sep or not key.startswith('RR_'):
+            parser.error('--env expects RR_NAME=value')
+        env[key] = value
     if args.results_confirm:
         env['RR_TEST_RESULTS_CONFIRM'] = str(args.results_confirm)
     if args.camera_cycle:

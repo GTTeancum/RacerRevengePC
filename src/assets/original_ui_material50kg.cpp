@@ -183,6 +183,21 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
         }
         return false;
     }
+    if(p.origin==OriginalUiMaterialOrigin50KG::raceStartOverlayMissingPsmFallback){
+        // Exact provenance emitted by readOriginalRaceStartOverlayFallbackMaterial50HU.
+        constexpr auto id=OriginalUiArchiveId50KG::overlays;
+        constexpr std::uint32_t callers[]{0x197078,0x19714C,0x197218,0x1972E4,0x1973A8,0x197474,0x197540,0x1975FC};
+        if(p.archive!=originalUiArchiveIdentity50KG(id)||p.fallbackWidgetSource||p.fallbackPageSource)return false;
+        for(std::size_t i=0;i<8;++i){
+            const char* name=originalRaceStartOverlayImageName50HU(static_cast<OriginalRaceStartOverlayImage50HU>(i));
+            const std::string base=std::string("ui\\textures\\")+name;
+            const auto* texture=catalogMember(id,(base+".pst").c_str());
+            if(texture&&!catalogMember(id,(base+".psm").c_str())&&p.fallbackTexture==texture&&
+               p.sourceCallerPC==callers[i]&&p.registeredName==base&&
+               p.attemptedPsmMember==base+".psm"&&pass.textureName==name)return true;
+        }
+        return false;
+    }
     if(p.origin==OriginalUiMaterialOrigin50KG::tournamentPortraitMissingPsmFallback){
         constexpr auto id=OriginalUiArchiveId50KG::tournament;
         if(p.archive!=originalUiArchiveIdentity50KG(id)||p.fallbackWidgetSource||
@@ -1699,13 +1714,19 @@ bool prepareOriginalRaceHudGleamMaterial50KG(const OriginalUiMaterialPass50KG& p
     const OriginalUiScreenAssets50KG& images,std::uint32_t index,
     OriginalRaceHudGleamMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};try{
-    const bool bright=pass.identity==catalogMember(OriginalUiArchiveId50KG::overlays,"ui\\textures\\gleam.psm");
-    const bool clear=pass.identity==catalogMember(OriginalUiArchiveId50KG::overlays,"ui\\textures\\gleamclear.psm");
+    // 2E6770 race gleam (gleam/gleamclear) and 2E6FA0 K.O. burst
+    // (font_ko/font_koclear): the two PSM pairs differ only in TextureMap_1.
+    constexpr auto overlays=OriginalUiArchiveId50KG::overlays;
+    const bool gleamBright=pass.identity==catalogMember(overlays,"ui\\textures\\gleam.psm");
+    const bool gleamClear=pass.identity==catalogMember(overlays,"ui\\textures\\gleamclear.psm");
+    const bool koBright=pass.identity==catalogMember(overlays,"ui\\textures\\font_ko.psm");
+    const bool koClear=pass.identity==catalogMember(overlays,"ui\\textures\\font_koclear.psm");
+    const bool ko=koBright||koClear,bright=gleamBright||koBright,clear=gleamClear||koClear;
     const auto* source=images.sourceProvenance(index);const auto* texture=images.decodedTexture(index);
-    if((!bright&&!clear)||pass.pass!=1||!same(pass.textureName,"gleam")||
+    if((!bright&&!clear)||pass.pass!=1||!same(pass.textureName,ko?"font_ko":"gleam")||
         !same(pass.shaderPassGroup,"none")||
         pass.inheritedTemplate!=catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\ScreenMT.psm")||
-        !source||source->memberIdentity!=catalogMember(OriginalUiArchiveId50KG::overlays,"ui\\textures\\gleam.pst")||
+        !source||source->memberIdentity!=catalogMember(overlays,ko?"ui\\textures\\font_ko.pst":"ui\\textures\\gleam.pst")||
         source->celIdentity||source->pstOffset||source->pstBytes!=604||!texture)
         return fail(d,Error::profile,"actual race gleam/gleamclear and atlas",0x2e6770);
     OriginalRaceHudGleamMaterial50KG next;bool fog=false,alphaTest=false;
@@ -2583,6 +2604,42 @@ bool readOriginalSpeedBoostFallbackMaterial50LA(
         p.archive=overlays.identity();p.fallbackTexture=texture.identity;p.sourceCallerPC=source.caller;
         p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
         auto next=screenTextureFallback(p,source.name,*inherited,runtime);
+        output=std::move(next);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+
+const char* originalRaceStartOverlayImageName50HU(OriginalRaceStartOverlayImage50HU image) noexcept {
+    // Strings 3A9010..3A9048 in the 197040 load order.
+    constexpr const char* names[]{"321_1","321_1h","321_2","321_2h","321_3","321_3h","321_go","321_goh"};
+    const auto i=static_cast<std::size_t>(image);
+    return i<8?names[i]:nullptr;
+}
+bool readOriginalRaceStartOverlayFallbackMaterial50HU(
+    const OriginalUiArchive50KG& overlays,OriginalRaceStartOverlayImage50HU image,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        constexpr std::uint32_t callers[]{0x197078,0x19714C,0x197218,0x1972E4,0x1973A8,0x197474,0x197540,0x1975FC};
+        const auto index=static_cast<std::size_t>(image);
+        const char* name=originalRaceStartOverlayImageName50HU(image);
+        if(index>=8||!name)return fail(d,Error::fallbackSource,"bounded PodRaceStartOverlay image",0x197040);
+        if(!overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated PodRaceStartOverlay OVERLAYS",callers[index]);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"actual PodRaceStartOverlay ScreenMT/runtime",0x2DF10C);
+        const std::string base=std::string("ui\\textures\\")+name;
+        const auto texture=overlays.find(base+".pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+           overlays.find(base+".psm").identity)
+            return fail(d,Error::fallbackSource,"original PodRaceStartOverlay PST and absent PSM",callers[index]);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::raceStartOverlayMissingPsmFallback;
+        p.archive=overlays.identity();p.fallbackTexture=texture.identity;p.sourceCallerPC=callers[index];
+        p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
+        auto next=screenTextureFallback(p,name,*inherited,runtime);
         output=std::move(next);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }

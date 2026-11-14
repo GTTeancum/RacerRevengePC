@@ -51,7 +51,7 @@ public:
      ambient==std::array<float,4>({7.5f,5.f,10.f,64.f}),"RC crystal authenticated ambient row");
    std::array<material_alpha50gx_fixture::Policy,44> next{};std::size_t marked=0;
    for(std::size_t i=0;i<next.size();++i){need(world->alpha(i,templates,runtime,next[i]),"RC crystal source policy");
-     marked+=next[i].rcCrystalPass!=0;need(!world->selections()->at(i).projectedPrelit,"RC cannot share generic projection stream");}
+     marked+=next[i].gsDestinationAlphaPass!=0;need(!world->selections()->at(i).projectedPrelit,"RC cannot share generic projection stream");}
    need(marked==2&&world->crystalSources()&&world->crystalPlacements()&&
      world->crystalSources()->size()==4&&world->crystalPlacements()->size()==79,"RC crystal association counts");
    std::size_t vertices=0;std::uint32_t prior=0;
@@ -68,7 +68,8 @@ public:
       env.vertexStart==base.vertexStart&&env.vertexCount==base.vertexCount&&
       env.indexStart==base.indexStart&&env.indexCount==base.indexCount&&
       base.materialSelection<44&&env.materialSelection<44&&
-      next[base.materialSelection].rcCrystalPass==1&&next[env.materialSelection].rcCrystalPass==2,
+      next[base.materialSelection].gsDestinationAlphaPass==1&&next[env.materialSelection].gsDestinationAlphaPass==2&&
+      next[env.materialSelection].sourceEnvironmentMap,
       "RC crystal actual adjacent source spans differ");
     for(double n:range.matrix)need(std::isfinite(n)&&std::isfinite(static_cast<float>(n)),"RC crystal placement binary32 boundary");
     vertices+=range.vertexCount;
@@ -77,16 +78,16 @@ public:
    policies_=next;lightWorld_=lighting->world();world_=std::move(world);lighting_=std::move(lighting);error.clear();return true;
   }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}catch(...){return false;}
  }
- // Root calls after complete ordinary alpha lowering. Only the exact source
- // crystal spans acquire the marker; unrelated spans are verified unmarked.
- bool bindSpan(std::size_t i,p::VehicleWindowTrackSpan50DS& out)const noexcept {
+ // Root calls after the common material lowering, which already set the GS
+ // destination-alpha and environment-map fields from the pass data. This
+ // owner only verifies that its projected spans are exactly those spans.
+ bool verifySpan(std::size_t i,const p::VehicleWindowTrackSpan50DS& out)const noexcept {
   if(!ready()||i>=world_->spans()->size())return false;const auto& s=world_->spans()->at(i);
-  if(s.materialSelection>=44||out.indexStart!=s.indexStart||out.indexCount!=s.indexCount||
-    out.vertexStart!=s.vertexStart||out.vertexCount!=s.vertexCount||out.sourcePass!=s.sourcePass||
-    out.sourcePassCount!=s.sourcePassCount||out.material.textureIndex!=s.textureIndex||out.rcCrystalPass)return false;
-  const auto mark=policies_[s.materialSelection].rcCrystalPass;
-  if(mark){out.rcCrystalPass=mark;out.allowPodShadow=false;}
-  return true;
+  const auto& policy=policies_[s.materialSelection<44?s.materialSelection:0];
+  return s.materialSelection<44&&out.indexStart==s.indexStart&&out.indexCount==s.indexCount&&
+    out.vertexStart==s.vertexStart&&out.vertexCount==s.vertexCount&&out.sourcePass==s.sourcePass&&
+    out.sourcePassCount==s.sourcePassCount&&out.material.textureIndex==s.textureIndex&&
+    out.gsDestinationAlphaPass==policy.gsDestinationAlphaPass&&out.sourceEnvironmentMap==policy.sourceEnvironmentMap;
  }
  bool validate(const p::VehicleWindowTrack50DS& track)const noexcept {
   if(!ready()||track.mesh!=world_->mesh()||!track.spans||track.spanCount!=1767||!track.textures||
@@ -96,13 +97,14 @@ public:
    if(src.materialSelection>=44||dst.indexStart!=src.indexStart||dst.indexCount!=src.indexCount||
       dst.vertexStart!=src.vertexStart||dst.vertexCount!=src.vertexCount||dst.sourcePass!=src.sourcePass||
       dst.sourcePassCount!=src.sourcePassCount||dst.material.textureIndex!=src.textureIndex||
-      dst.rcCrystalPass!=policies_[src.materialSelection].rcCrystalPass)return false;
+      dst.gsDestinationAlphaPass!=policies_[src.materialSelection].gsDestinationAlphaPass||
+      dst.sourceEnvironmentMap!=policies_[src.materialSelection].sourceEnvironmentMap)return false;
    const auto& selected=world_->selections()->at(src.materialSelection);
    if(pod_materials50ed_fixture::detail::normalized(selected.materialName)=="CROWD"){
     if(dst.nativeCoverage!=p::NativeTrackCoverage50DS::fourSampleAa1)return false;crowdAa1=true;}
-   if(dst.rcCrystalPass){if(dst.rcCrystalPass==2&&!i)return false;
-    ++marked;const std::size_t first=dst.rcCrystalPass==1?i:i-1;
-    if(first+1>=track.spanCount||!p::validRcCrystalPair50DS(track.spans[first],track.spans[first+1]))return false;}
+   if(dst.gsDestinationAlphaPass){if(dst.gsDestinationAlphaPass==2&&!i)return false;
+    ++marked;const std::size_t first=dst.gsDestinationAlphaPass==1?i:i-1;
+    if(first+1>=track.spanCount||!p::validDestinationAlphaPair50DS(track.spans[first],track.spans[first+1]))return false;}
   }
   if(!track.textures->matchesSourceBank(*world_->bank(),track.textures->publicationToken())||
      track.textures->textureCount()!=44)return false;

@@ -372,6 +372,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_death_camera_query.cpp"
   "${RR_ROOT}/src/game/original_death_camera50kg.cpp"
   "${RR_ROOT}/src/game/original_race_hud50kg.cpp"
+  "${RR_ROOT}/src/game/original_race_start_overlay50hu.cpp"
   "${RR_ROOT}/src/game/original_wreck_explosion50la.cpp"
   "${RR_ROOT}/src/game/original_wreck_splash50la.cpp"
   "${RR_ROOT}/src/game/original_wreck_effects50la.cpp"
