@@ -911,9 +911,13 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
  struct Span{const void*p;std::size_t n;};const Span writes[]={{&s,sizeof s},{&tail,sizeof tail},{&globals,sizeof globals},{&flame,sizeof flame},{&scratch,sizeof scratch},{&w,sizeof w},{&d,sizeof d},{undertrack,undertrack?sizeof(*undertrack):0}};
  for(unsigned i=0;i<8;++i){for(unsigned j=0;j<i;++j)if(overlap(writes[i].p,writes[i].n,writes[j].p,writes[j].n))return false;for(const auto&read: {Span{&b,sizeof b},Span{&clock,sizeof clock},Span{&binding,sizeof binding}})if(overlap(writes[i].p,writes[i].n,read.p,read.n))return false;}
  if(!start(s,b,P::PostPackedBytes50S,w,d))return false;
+ // 228BBC calls 2255B0 for every racer; 2255B0 itself branches on +58. Player
+ // (58=0) and original AI (58=1 with its bound native owners) share this cut.
+ const bool undertrackRacer=s.fields.vehicle58==0u||
+     (s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV);
  if(resuming){
   if(!undertrack||!undertrack->pending||undertrack->frame!=&s||undertrack->bindings!=&b||
-     s.fields.vehicle58!=0u||std::memcmp(&undertrack->frameFactor,&s.bodies.main.frameFactor,4)||
+     !undertrackRacer||std::memcmp(&undertrack->frameFactor,&s.bodies.main.frameFactor,4)||
      !std::isfinite(undertrack->position[1])||!(undertrack->position[1]<0.f))
    return fail(d,E::Admission,0x228bc4);
  }else if(undertrack&&undertrack->pending)return fail(d,E::Admission,0x228bbc);
@@ -948,7 +952,7 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
   if(!std::isfinite(position.v[1]))return fail(d,E::Arithmetic,0x228bac);
   if(position.v[1]<0.f){
    if(undertrack){
-    if(s.fields.vehicle58!=0u||undertrack->serial==std::numeric_limits<std::uint64_t>::max())
+    if(!undertrackRacer||undertrack->serial==std::numeric_limits<std::uint64_t>::max())
      return fail(d,E::Admission,0x228bbc);
     if(!noiseContinuation(s,w.next,d))return false;
     ++undertrack->serial;undertrack->frame=&s;undertrack->bindings=&b;undertrack->frameFactor=s.bodies.main.frameFactor;

@@ -1700,6 +1700,14 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     v.resetNeedsGraphics=false;return true;
 }
 ResetVisibilityLease::~ResetVisibilityLease(){if(owner_)owner_->endResetVisibility(*this);}
+// The 228BBC -> 2255B0 lease ("player" lease without input; rename with the
+// next renderer-header batch). 228BBC runs for every racer after that racer's
+// own 228844 graphics call, so the post-graphics publication in
+// finishAiResetVisibility holds for the original AI exactly as for Player0.
+static bool baseUndertrackRacer228BBC(const VehicleFrameState49W& s) noexcept {
+    return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&
+        (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
+}
 bool Owner::resetLeaseCurrent(const ResetVisibilityLease& lease) const noexcept {
     if(!storage_||invalidated_||lease.owner_!=this||!lease.frame_||
        !lease.bindings_||!lease.parameters_)return false;
@@ -1713,7 +1721,8 @@ bool Owner::resetLeaseCurrent(const ResetVisibilityLease& lease) const noexcept 
         s.bodies.main.phase==MainBodyPhase49K::AwaitingWorldPreparation&&
         s.bodies.phase==CoupledBodyPhase49M::AwaitingWorldPreparation:
         lease.player_?
-        s.phase==(lease.input_?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostPackedBytes50S)&&s.fields.vehicle58==0u:
+        (lease.input_?s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u:
+            baseUndertrackRacer228BBC(s)):
         s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
     return domain&&!v.sourceTerminalRetired&&
         (lease.sourceTrigger_?(v.sourceResetBound&&sameSourceTriggerVisibilityIdentity50MB(v.sourceResetIdentity,lease.sourceIdentity_)):!v.sourceResetBound)&&
@@ -1762,7 +1771,8 @@ bool Owner::beginResetVisibility(std::uint32_t slot,const VehicleFrameState49W& 
         s.bodies.main.phase==MainBodyPhase49K::AwaitingWorldPreparation&&
         s.bodies.phase==CoupledBodyPhase49M::AwaitingWorldPreparation:
         player?
-        s.phase==(input?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostPackedBytes50S)&&s.fields.vehicle58==0u:
+        (input?s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u:
+            baseUndertrackRacer228BBC(s)):
         s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
     if(!domain||s.fields.vehicle3C)return fail(d,Status::phase,0x216a90);
     auto& v=o.vehicles[slot];auto& reset=v.resetOwner;

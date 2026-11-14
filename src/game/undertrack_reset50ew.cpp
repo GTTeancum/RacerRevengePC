@@ -89,7 +89,11 @@ bool entryDomain(const VehicleFrameState49W& s,UndertrackResetDomain50EW domain)
     if(s.fields.vehicle3C)return false;
     switch(domain){
     case UndertrackResetDomain50EW::PlayerPostPackedBytes50S:
-        return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&s.fields.vehicle58==0u;
+        // The 228BBC caller (name kept to avoid a header round; rename to
+        // BaseUndertrack228BBC with the next header batch). 228BBC runs for
+        // every racer: Player 58=0, or original AI 58=1 with bound owners.
+        return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&
+            (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
     case UndertrackResetDomain50EW::PlayerControllerReady50LC:
         return s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u;
     case UndertrackResetDomain50EW::SourceTriggerAiPostWorld:

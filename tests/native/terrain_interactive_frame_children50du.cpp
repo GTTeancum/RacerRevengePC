@@ -11,6 +11,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/native_test_undertrack50ut.h"
 #include <bit>
 #include "../../src/game/original_vehicle_damage50la.h"
 #include <cstring>
@@ -56,6 +57,53 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  // A destroyed racer (original state3/4) runs only its destroyed frame.
  if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u)
   return advanceDestroyedChildren(actualRacerSlot,preparedOuterFactor);
+ // One original-AI 2255B0 owner set, shared by both original callers (16EAA0
+ // at PostPlayer and 228BBC at the packed-byte cut). The six alternatives are
+ // the existing exact-type navigation views (port stand-in: per-course view
+ // types, to retire into one view type); no course-specific behaviour here.
+ // heightDomain/target/queries are caller-owned: Owners keep references.
+ using AiRecoveryOwners50UT=std::variant<native_original_ai_recovery::Owners,native_original_ai_recovery::Owners50MB,
+     native_original_ai_recovery::Owners50TC,native_original_ai_recovery::Owners50TB,
+     native_original_ai_recovery::Owners50GB,native_original_ai_recovery::Owners50MC>;
+ const auto aiRecoveryOwners50UT=[&](std::uint8_t& flags22C,std::uint32_t& field24C,auto& actualHeightDomain,
+     const VisualVector49R& target,const auto& queries)->AiRecoveryOwners50UT{
+  actualHeightDomain=selectedRuntimeHeightDomain;
+  // 216B78: the actual terrain330/water334 owners of this racer's world.
+  if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
+      terrainOwner.lift1F0,actualHeightDomain),"MC AI reset requires actual same-runtime water334 and live348 lift");
+  if(nativeGcWater)require50DU(nativeWaterRacers[actualRacerSlot]&&
+      nativeWaterRacers[actualRacerSlot]->bindResetDomain(selectedRuntimeHeightDomain,
+          terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
+  if(isMcTrack)require50DU(mcParticleVehicles->racer(actualRacerSlot)&&
+      mcParticleVehicles->racer(actualRacerSlot)->bindResetDomain(selectedRuntimeHeightDomain,
+          terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
+  auto& cables=racerCables[actualRacerSlot]->visibility50();
+  return isMcTrack?
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50MC{gcLightOwner,cables,
+          flags22C,field24C,mcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50GB{gcLightOwner,cables,
+          flags22C,field24C,gbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50TB{gcLightOwner,cables,
+          flags22C,field24C,tbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTcTrack?
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50TC{gcLightOwner,cables,
+          flags22C,field24C,tcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isMbTrack?
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50MB{gcLightOwner,cables,
+          flags22C,field24C,mbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
+      AiRecoveryOwners50UT{native_original_ai_recovery::Owners{gcLightOwner,cables,
+          flags22C,field24C,*navigationAI,actualHeightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
+ };
  if(actualRacerSlot<rr::game::nativeTestDestroyPending50PD.size()&&
     rr::game::nativeTestDestroyPending50PD[actualRacerSlot]){
   // Unattended test only (RR_TEST_DESTROY): the canonical B9D bit0 that
@@ -156,46 +204,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
     if(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining){
      const auto queries=recoveryQueries();
      auto actualHeightDomain=selectedRuntimeHeightDomain;
-     if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
-         terrainOwner.lift1F0,actualHeightDomain),"MC AI reset requires actual same-runtime water334 and live348 lift");
-     if(nativeGcWater)require50DU(nativeWaterRacers[actualRacerSlot]&&
-         nativeWaterRacers[actualRacerSlot]->bindResetDomain(selectedRuntimeHeightDomain,
-             terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
-     if(isMcTrack)require50DU(mcParticleVehicles->racer(actualRacerSlot)&&
-         mcParticleVehicles->racer(actualRacerSlot)->bindResetDomain(selectedRuntimeHeightDomain,
-             terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
      // Both native types represent the same four scalar target-relative
      // components. Copy explicitly; unrelated struct references cannot alias.
      const auto& relative=x.secondaryInputs.targetRelative2F0;
      const VisualVector49R recoveryTargetRelative{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-     using RecoveryOwners50MB=std::variant<native_original_ai_recovery::Owners,native_original_ai_recovery::Owners50MB,native_original_ai_recovery::Owners50TC,native_original_ai_recovery::Owners50TB,native_original_ai_recovery::Owners50GB,native_original_ai_recovery::Owners50MC>;
-     RecoveryOwners50MB owners=isMcTrack?
-         RecoveryOwners50MB{native_original_ai_recovery::Owners50MC{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,mcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
-         RecoveryOwners50MB{native_original_ai_recovery::Owners50GB{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,gbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
-         RecoveryOwners50MB{native_original_ai_recovery::Owners50TB{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,tbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         isTcTrack?
-         RecoveryOwners50MB{native_original_ai_recovery::Owners50TC{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,tcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         isMbTrack?
-         RecoveryOwners50MB{native_original_ai_recovery::Owners50MB{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,mbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         RecoveryOwners50MB{native_original_ai_recovery::Owners{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
-             *flags22C,*field24C,*navigationAI,actualHeightDomain,resetGlobals,resetLifecycle,
-             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
+     auto owners=aiRecoveryOwners50UT(*flags22C,*field24C,actualHeightDomain,recoveryTargetRelative,queries);
      aiReturned=std::visit([&](auto& actual){return native_original_ai_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
          originalAi,originalAiReceipt,originalRecovery,actual,*originalRecoveryWorkspace,originalRecoveryDiagnostic);},owners);
     }else {originalRecoveryDiagnostic.sourcePC=0x124cb0u;
@@ -679,10 +692,64 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  runNative([&]{return plainEffectsVehicleTail50Q(s,x.bindings,plainOwners,plain,x.workspace,x.diagnostic);},"plain effects");runNative([&]{return consumeEffects(plain.events,plain.count);},"consume plain effect controls");
  }
  runNative([&]{return packVehicleFrame50S(s,x.bindings,x.configurationEntryNonzero,x.workspace,x.diagnostic);},"packet");BaseTailBindings50X baseBinding{77,Probe128Binding50X::Null};
+ // 228BBC calls 2255B0 for every racer (2255B0 branches on +58). The base
+ // cursor (named humanBaseUndertrack; banked per racer) is offered to the
+ // Player and to every original AI whose recovery owners exist.
+ const bool aiUndertrackOwned=originalRecoveryEnabled&&originalAiEnabled&&s.fields.vehicle58==1u;
+ const bool humanUndertrackOwned=humanCourseEnabled&&actualRacerSlot==0u&&s.fields.vehicle58==0u;
+ // Unattended test drop (RR_TEST_UNDERTRACK) moves the racer's physics body
+ // at the start of its physics step (frame_physics), never the scene here.
  bool baseAdvanced=advanceVehicleBaseThroughEngine50X(s,x.bindings,clock,
      baseBinding,baseTail,baseGlobals,coldFlame,baseWorkspace,x.workspace,x.diagnostic,
-     humanCourseEnabled&&actualRacerSlot==0u?&humanBaseUndertrack:nullptr);
- if(!baseAdvanced&&humanCourseEnabled&&actualRacerSlot==0u&&
+     humanUndertrackOwned||aiUndertrackOwned?&humanBaseUndertrack:nullptr);
+ if(!baseAdvanced&&aiUndertrackOwned&&
+    x.diagnostic.error==VehicleFrameError49W::ExternalCut&&x.diagnostic.sourceStage==0x228BBC){
+  // Original AI: 2255B0 AI branch (C80 -> Next0 at 225640, AI spline +BC),
+  // virtual78 = 216A30 (no 1A24F0/1A0240), no camera tail (225B00 58!=0),
+  // then 228BC4 with the saved pre-reset position. Damage/progress kept.
+  addCounter50DU(nativeCalls);
+  bool physicalReturned=false;
+  std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
+  const auto anchorC80=navigationProgress.reset.vehicleC80;
+  if(originalResetGround&&racerCables[actualRacerSlot]&&sourceAiAudio&&
+     originalAiAudio->baseUndertrackResetOwners(actualRacerSlot,originalAi.racer60,s,flags22C,field24C)&&
+     refreshAnimatedCandidates()){
+   const auto drained=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,trackCounts.events);
+   if(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining){
+    const auto queries=recoveryQueries();
+    auto actualHeightDomain=selectedRuntimeHeightDomain;
+    const auto& relative=x.secondaryInputs.targetRelative2F0;
+    const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
+    auto owners=aiRecoveryOwners50UT(*flags22C,*field24C,actualHeightDomain,target,queries);
+    physicalReturned=std::visit([&](auto& actual){return native_original_ai_recovery::resumeUndertrack(s,x.bindings,
+        x.parameters,navigationProgress,originalAi,humanBaseUndertrack,originalRecovery,actual,
+        *originalRecoveryWorkspace,originalRecoveryDiagnostic);},owners);
+   }else{originalRecoveryDiagnostic.sourcePC=0x124cb0u;
+    originalRecoveryDiagnostic.message="actual AI reset world registration queue is pending";}
+  }else{originalRecoveryDiagnostic.sourcePC=0x216a80u;
+   originalRecoveryDiagnostic.message="actual AI D40/D44/cables reset ownership is unavailable at 228BBC";}
+  if(physicalReturned){
+   baseAdvanced=resumeVehicleBaseAfterUndertrack50X(s,x.bindings,clock,baseBinding,
+       baseTail,baseGlobals,coldFlame,baseWorkspace,x.workspace,x.diagnostic,humanBaseUndertrack);
+   if(!baseAdvanced){originalRecoveryDiagnostic.sourcePC=x.diagnostic.sourceStage;
+    originalRecoveryDiagnostic.message="actual228BC4 base continuation rejected after complete AI reset";}
+  }
+  const auto& p=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].localC0.v;
+  std::cerr<<"undertrack_reset slot="<<actualRacerSlot<<" kind=ai ok="<<baseAdvanced
+      <<" c80="<<anchorC80<<"->"<<navigationProgress.reset.vehicleC80
+      <<" anchor="<<originalRecovery.selection.anchorNode
+      <<" pos="<<p[12]<<','<<p[13]<<','<<p[14]
+      <<" stage="<<static_cast<unsigned>(originalRecovery.stage)
+      <<" pc="<<std::hex<<originalRecoveryDiagnostic.sourcePC<<std::dec
+      <<" msg="<<originalRecoveryDiagnostic.message<<'\n';
+  if(!baseAdvanced){
+   recoveryPaused=true;
+   std::cerr<<"ORIGINAL AI undertrack continuation: "<<originalRecoveryDiagnostic.message
+       <<"; actual completed prefixes retained, no HOST checkpoint.\n";
+   return false;
+  }
+ }
+ if(!baseAdvanced&&humanUndertrackOwned&&
     x.diagnostic.error==VehicleFrameError49W::ExternalCut&&x.diagnostic.sourceStage==0x228BBC){
   addCounter50DU(nativeCalls);
   bool physicalReturned=false;
@@ -742,6 +809,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    if(!baseAdvanced){originalHumanRecoveryDiagnostic.sourcePC=x.diagnostic.sourceStage;
     originalHumanRecoveryDiagnostic.message="actual228BC4 base continuation rejected after complete human reset";}
   }
+  {const auto& p=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].localC0.v;
+   std::cerr<<"undertrack_reset slot="<<actualRacerSlot<<" kind=human ok="<<baseAdvanced
+       <<" c88="<<navigationProgress.reset.vehicleC88<<" anchor="<<originalHumanRecovery.selection.anchorNode
+       <<" pos="<<p[12]<<','<<p[13]<<','<<p[14]
+       <<" stage="<<static_cast<unsigned>(originalHumanRecovery.stage)<<'\n';}
   if(!baseAdvanced){
    recoveryPaused=true;
    std::cerr<<"ORIGINAL HUMAN undertrack continuation: "<<originalHumanRecoveryDiagnostic.message

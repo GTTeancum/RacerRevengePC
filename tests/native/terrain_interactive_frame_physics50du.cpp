@@ -25,6 +25,7 @@
 #include "../../src/game/movement_static_query50l.h"
 #include "../../src/game/collision_normal_mode50ja.h"
 #include "../../src/game/engine_damage_audio50ia.h"
+#include "../../src/game/native_test_undertrack50ut.h"
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -49,6 +50,44 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   // Shared schedule contract: one consumed substep at this frame's factor.
   s.bodies.main.schedule.count=1;s.bodies.main.substepIndex=1;
   s.phase=VehicleFramePhase49W::Ready;return true;
+ }
+ // Unattended test only (RR_TEST_UNDERTRACK, native_test_undertrack50ut.h):
+ // drop this racer below Y=0 before its physics step, as a pod that fell
+ // through the track. 167CA0 rereads the body position from main190's world
+ // (133g: writing the body field alone is overwritten), so the pod's two
+ // parentless body scenes main190/19C (and the parentless hidden 198) move by
+ // the same vertical step through the game's own 28AF90 translation setter and
+ // 2897B0 refresh, and the bodies' scene caches are refreshed from them as the
+ // frame's own projection does. The 219120 sweep runs 7B0 -> 7C0; a sweep from
+ // above the track to below it hits the track and puts the pod back, so the
+ // prior point is cleared to the shared sentinel as 216A30 does after it
+ // places a pod (219D90 then copies the current point: zero-length sweep).
+ // Writes stay inside this racer's own frame state (s); nothing else moves.
+ if(actualRacerSlot<rr::game::nativeTestUndertrackPending50UT.size()&&
+    rr::game::nativeTestUndertrackPending50UT[actualRacerSlot]){
+  rr::game::nativeTestUndertrackPending50UT[actualRacerSlot]=false;
+  const auto& life=x.bindings.lifecycle;
+  const SceneGraph49P graph{s.nodes,s.sceneNodeCount};
+  require50DU(validVehicleSceneCount49W(s,x.bindings)&&validateSceneGraph49P(graph)&&
+      static_cast<std::uint32_t>(life.main190)<s.sceneNodeCount&&
+      static_cast<std::uint32_t>(life.physical19C)<s.sceneNodeCount&&
+      refreshSceneWorld49P(graph,life.main190),"test undertrack drop requires the racer's scene forest");
+  const float fromY=s.nodes[static_cast<std::uint32_t>(life.main190)].world100.v[13];
+  const float step=rr::game::nativeTestUndertrackY50UT-99.f-fromY;
+  std::cerr<<"test_undertrack armed slot="<<actualRacerSlot<<" frame="<<completedFrames<<" from_y="<<fromY<<'\n';
+  const SceneDisplacement49P down{{0.f,step,0.f,0.f}};
+  for(const auto node:{life.main190,life.physical19C,life.hidden198}){
+   if(node==SceneNodeIndex49P::none||static_cast<std::uint32_t>(node)>=s.sceneNodeCount||
+      s.nodes[static_cast<std::uint32_t>(node)].parent180!=SceneNodeIndex49P::none)continue;
+   require50DU(addParentlessTranslation49P(graph,node,down)&&refreshSceneWorld49P(graph,node),
+       "test undertrack drop scene setter rejected");
+  }
+  auto& bodies=s.bodies;
+  bodies.main.components.root.scene=s.nodes[static_cast<std::uint32_t>(life.main190)].world100;
+  bodies.mainSphere.sceneFlags190=(bodies.mainSphere.sceneFlags190&0xffffff00u)|s.nodes[static_cast<std::uint32_t>(life.main190)].sceneFlags190;
+  bodies.secondary.root.scene=s.nodes[static_cast<std::uint32_t>(life.physical19C)].world100;
+  bodies.secondary.sceneFlags190=(bodies.secondary.sceneFlags190&0xffffff00u)|s.nodes[static_cast<std::uint32_t>(life.physical19C)].sceneFlags190;
+  std::memcpy(bodies.main.priorPoint7B0,s.visualShared.zero434630.v,16);
  }
  runNative([&]{return scheduleVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::OtherChildrenAfter35C),liveSubstepScale,x.workspace,x.diagnostic);},"schedule");
  require50DU(s.bodies.main.schedule.count==1,"16ms diagnostic step requires one native substep");

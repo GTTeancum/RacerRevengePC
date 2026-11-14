@@ -575,6 +575,20 @@ public:
         field24C=materialD44_.resetField24C(r.materialD44,r.engine);
         if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
     }
+    // Distinct 228BBC borrow: the same session D40/D44 rows at the AI's own
+    // packed-byte cut, where 228BBC calls 2255B0 -> virtual78/216A30 for an
+    // original AI whose main190 local Y went negative. Same owners, no copy.
+    bool baseUndertrackResetOwners(std::size_t slot,std::uint32_t actualPod60,
+        const rr::game::VehicleFrameState49W& frame,std::uint8_t*& flags22C,
+        std::uint32_t*& field24C) noexcept {
+        flags22C=nullptr;field24C=nullptr;
+        if(!ownsSlot(slot)||!actualPod60||frame.phase!=rr::game::VehicleFramePhase49W::PostPackedBytes50S||
+           frame.fields.vehicle58!=1u||frame.fields.vehicle3C||!frame.fields.nativeAiOwnersBound50IV)return false;
+        auto& r=racers_[slot];
+        if(r.engine.identity.managerOrdinal!=slot||r.engine.identity.pod60!=actualPod60)return false;
+        field24C=materialD44_.resetField24C(r.materialD44,r.engine);
+        if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
+    }
     // Distinct source LostAI E8 borrow at the real PostWorld cut. Ordinary
     // AI recovery keeps physicalResetOwners' PostPlayer admission unchanged.
     // This is a short borrow of the SAME session D40/D44, never a new owner,

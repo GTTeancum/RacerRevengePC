@@ -1,8 +1,11 @@
 #pragma once
-// Concrete original-AI16EAA0 ->2255B0 ->virtual78/216A30 continuation.
+// Concrete original-AI 2255B0 ->virtual78/216A30 continuation, reached from
+// its two original callers: 16EAA0 (AI state-5 scalar reset) and 228BBC (the
+// base frame's negative main190 local Y, the same cut the Player uses).
 // No player override, camera reset, checkpoint, crash or damage-reset route.
 #include "../../src/game/ai_runtime50iv.h"
 #include "../../src/game/undertrack_reset50ew.h"
+#include "../../src/game/vehicle_base_tail50x.h"
 #include "../../src/game/pod_live_query50iz.h"
 #include "../../src/game/pod_scene_rebase50fb.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
@@ -23,9 +26,14 @@ enum class Stage : std::uint8_t {
     InitialPhysics,PreparePod,AttachVisibility,AttachCollision,BeginGround,
     Ground,GroundDiagnostic,FinishPhysics,FinishVisibility,Complete
 };
+// Which original call site owns the current 2255B0 continuation.
+enum class Caller : std::uint8_t {None,Scalar16EAA0,Base228BBC};
 struct State {
     Stage stage=Stage::Idle;
+    Caller caller=Caller::None;
     std::uint64_t scalarResetSerial=0,completed=0;
+    // 228BBC: the base cursor serial (BaseUndertrackContinuation50X::serial).
+    std::uint64_t baseSerial=0;
     std::uint32_t rosterSlot=0,racer60=0;
     // Continuation's originalC80 input survives its source225640 store. This
     // is not an alternate progress authority; all other progression is live.
@@ -431,42 +439,50 @@ inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
 // slices/cursors survive failures. No earlier AI navigation/packing/repair/
 //16E830 or completed reset slice is replayed. No allocation or guest execution.
 template<class OwnersT>
-    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>||std::is_same_v<OwnersT,Owners50GB>||std::is_same_v<OwnersT,Owners50MC>)
-inline bool resumeOrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+concept AiRecoveryOwners50UT=std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||
+    std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>||
+    std::is_same_v<OwnersT,Owners50GB>||std::is_same_v<OwnersT,Owners50MC>;
+template<AiRecoveryOwners50UT OwnersT>
+inline bool registered694Bound50UT(const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,const OwnersT& owners) noexcept {
+    return bindings.podLiveQuery50IZ&&bindings.podLiveQuery50IZ->source==&parameters.shape&&
+       bindings.podLiveQuery50IZ->live.expectedObjectRef==owners.queries.query[1].object&&
+       &bindings.podLiveQuery50IZ->live.registrationE0==owners.queries.query[1].membership&&
+       &bindings.podLiveQuery50IZ->live.lifecycle==&owners.collisionLifecycle&&
+       &bindings.podLiveQuery50IZ->live.world==&owners.collisionWorld&&
+       &bindings.podLiveQuery50IZ->live.workspace==&owners.collisionWorkspace;
+}
+// A new call site/serial starts a fresh continuation; completed count and the
+// represented 850 survive (21725C is the first 850 writer of every call).
+inline void rekey50UT(State& state,Caller caller,const AiRuntimeState50IV& ai) noexcept {
+    const auto completed=state.completed;const auto vehicle850=state.vehicle850;
+    const auto known=state.vehicle850Known;state={};state.completed=completed;
+    state.vehicle850=vehicle850;state.vehicle850Known=known;state.caller=caller;
+    state.rosterSlot=ai.managerIndexFE0;state.racer60=ai.racer60;
+}
+// The one AI 2255B0 body (225618..225640 AI branch, then virtual78=216A30 with
+// a1=0,a2=1; 225B00 skips the camera tail for 58!=0). Both original callers
+// enter here; only the caller's frame phase (and thus the 50EW domain and the
+// visibility lease flavour) differs. Admission/keying is the caller's job.
+template<AiRecoveryOwners50UT OwnersT>
+inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    diagnostic={};
-    // Validate the final source role/world before any continuation or visibility
-    // effect, including when resuming after selection/placement already ran.
-    if(!navigationReadyOrdinaryShared50MB(owners))
-        return fail(diagnostic,0x225620u,"ordinary ai reset requires its final same-world MB navigation view");
-    constexpr auto domain=UndertrackResetDomain50EW::OriginalAiPostPlayer;
-    if(!ai.initialized||!ai.physicalReset2255B0Pending||!ai.scalarResets16E830||
-       ai.state.aiStateFE8!=0u||frame.phase!=VehicleFramePhase49W::PostPlayer||
-       frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||frame.fields.vehicle3C)
-        return fail(diagnostic,0x16eaa0u,"AI physical-reset continuation is not at its real PostPlayer boundary");
-    if(!bindings.podLiveQuery50IZ||bindings.podLiveQuery50IZ->source!=&parameters.shape||
-       bindings.podLiveQuery50IZ->live.expectedObjectRef!=owners.queries.query[1].object||
-       &bindings.podLiveQuery50IZ->live.registrationE0!=owners.queries.query[1].membership||
-       &bindings.podLiveQuery50IZ->live.lifecycle!=&owners.collisionLifecycle||
-       &bindings.podLiveQuery50IZ->live.world!=&owners.collisionWorld||
-       &bindings.podLiveQuery50IZ->live.workspace!=&owners.collisionWorkspace)
-        return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
-    if(state.scalarResetSerial!=ai.scalarResets16E830){
-        if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
-            return fail(diagnostic,0x16eaa0u,"a different scalar reset cannot replace an unfinished physical reset");
-        const auto completed=state.completed;const auto vehicle850=state.vehicle850;
-        const auto known=state.vehicle850Known;state={};state.completed=completed;
-        state.vehicle850=vehicle850;state.vehicle850Known=known;
-        state.scalarResetSerial=ai.scalarResets16E830;state.rosterSlot=ai.managerIndexFE0;
-        state.racer60=ai.racer60;
-    }
-    if(state.rosterSlot!=ai.managerIndexFE0||state.racer60!=ai.racer60)
-        return fail(diagnostic,0x16eaa0u,"physical reset belongs to another racer");
+    State& state,OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    const bool base=state.caller==Caller::Base228BBC;
+    if(!base&&state.caller!=Caller::Scalar16EAA0)
+        return fail(diagnostic,0x2255b0u,"AI 2255B0 has no original caller");
+    const auto domain=base?UndertrackResetDomain50EW::PlayerPostPackedBytes50S: // 228BBC domain (see 50EW)
+        UndertrackResetDomain50EW::OriginalAiPostPlayer;
+    if(state.stage==Stage::Complete)return true;
     visibility::ResetVisibilityLease lease;
-    if(!owners.visibility.beginAiResetVisibility(state.rosterSlot,frame,bindings,parameters,
-        &owners.cables254Field50,lease,diagnostic.visibility))
+    // 228BBC follows this racer's 228844 graphics call (post-graphics lease);
+    // 16EAA0 precedes it (PostPlayer lease, publication left to 228844).
+    const bool borrowed=base?
+        owners.visibility.beginPlayerResetVisibility(state.rosterSlot,frame,bindings,parameters,
+            &owners.cables254Field50,lease,diagnostic.visibility):
+        owners.visibility.beginAiResetVisibility(state.rosterSlot,frame,bindings,parameters,
+            &owners.cables254Field50,lease,diagnostic.visibility);
+    if(!borrowed)
         return fail(diagnostic,diagnostic.visibility.sourcePC,"actual racer7F0/PodCables reset lease rejected");
     auto slice=[&](UndertrackResetResult50EW result,const char* message) noexcept {
         diagnostic.physics=result;
@@ -597,15 +613,72 @@ inline bool resumeOrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFr
             return fail(diagnostic,0x2169a4u,"actual694/690/7A4/348 reset ownership is incomplete");
         if(!owners.visibility.finishAiResetVisibility(lease,diagnostic.visibility))
             return fail(diagnostic,diagnostic.visibility.sourcePC,"actual reset visibility publication rejected");
-        state.stage=Stage::Complete;break;
+        ++state.completed;state.stage=Stage::Complete;break;
     case Stage::Complete:
-        //16EAA8 branches directly to16EAE8..16EAF8. FE8 is already0 from
-        //16E830, but this dispatch DOES NOT enter ordinary state0 driving.
-        ai.physicalReset2255B0Pending=false;++state.completed;++ai.dispatchedFrames;
-        receipt.physicalResetPending=false;receipt.dispatched=true;receipt.stateFE8=ai.state.aiStateFE8;
-        receipt.sourceBoundary=0;diagnostic.sourcePC=0;diagnostic.message="original-AI physical reset returned in the same PostPlayer frame";
-        return true;
+        diagnostic.sourcePC=0;return true;
     }
+}
+// Caller 16EAA0 (AI state-5 scalar reset at PostPlayer).
+template<AiRecoveryOwners50UT OwnersT>
+inline bool resumeOrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
+    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    diagnostic={};
+    // Validate the final source role/world before any continuation or visibility
+    // effect, including when resuming after selection/placement already ran.
+    if(!navigationReadyOrdinaryShared50MB(owners))
+        return fail(diagnostic,0x225620u,"ordinary ai reset requires its final same-world MB navigation view");
+    if(!ai.initialized||!ai.physicalReset2255B0Pending||!ai.scalarResets16E830||
+       ai.state.aiStateFE8!=0u||frame.phase!=VehicleFramePhase49W::PostPlayer||
+       frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||frame.fields.vehicle3C)
+        return fail(diagnostic,0x16eaa0u,"AI physical-reset continuation is not at its real PostPlayer boundary");
+    if(!registered694Bound50UT(bindings,parameters,owners))
+        return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
+    if(state.caller!=Caller::Scalar16EAA0||state.scalarResetSerial!=ai.scalarResets16E830){
+        if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
+            return fail(diagnostic,0x16eaa0u,"a different scalar reset cannot replace an unfinished physical reset");
+        rekey50UT(state,Caller::Scalar16EAA0,ai);state.scalarResetSerial=ai.scalarResets16E830;
+    }
+    if(state.rosterSlot!=ai.managerIndexFE0||state.racer60!=ai.racer60)
+        return fail(diagnostic,0x16eaa0u,"physical reset belongs to another racer");
+    if(!run2255B0Ai50UT(frame,bindings,parameters,progress,state,owners,workspace,diagnostic))return false;
+    //16EAA8 branches directly to16EAE8..16EAF8. FE8 is already0 from
+    //16E830, but this dispatch DOES NOT enter ordinary state0 driving.
+    ai.physicalReset2255B0Pending=false;++ai.dispatchedFrames;
+    receipt.physicalResetPending=false;receipt.dispatched=true;receipt.stateFE8=ai.state.aiStateFE8;
+    receipt.sourceBoundary=0;diagnostic.sourcePC=0;diagnostic.message="original-AI physical reset returned in the same PostPlayer frame";
+    return true;
+}
+// Caller 228BBC (base frame, main190 local Y < 0) for an original AI. Same
+// 2255B0 body; no AI dispatch/receipt change (228BBC is inside the vehicle
+// frame, after the AI controller already ran). The caller then resumes the
+// base frame at 228BC4 with its saved pre-reset position.
+template<AiRecoveryOwners50UT OwnersT>
+inline bool resumeUndertrack(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const AiRuntimeState50IV& ai,const BaseUndertrackContinuation50X& base,State& state,
+    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    diagnostic={};
+    if(!navigationReadyOrdinaryShared50MB(owners))
+        return fail(diagnostic,0x225620u,"ordinary ai reset requires its final same-world MB navigation view");
+    if(!base.pending||base.frame!=&frame||base.bindings!=&bindings||!base.serial)
+        return fail(diagnostic,0x228bbcu,"AI undertrack reset has no actual base continuation");
+    if(!ai.initialized||ai.physicalReset2255B0Pending||frame.phase!=VehicleFramePhase49W::PostPackedBytes50S||
+       frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||frame.fields.vehicle3C)
+        return fail(diagnostic,0x228bbcu,"AI undertrack continuation is not at its real packed-byte boundary");
+    if(!registered694Bound50UT(bindings,parameters,owners))
+        return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
+    if(state.caller!=Caller::Base228BBC||state.baseSerial!=base.serial){
+        if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
+            return fail(diagnostic,0x228bbcu,"a different reset cannot replace an unfinished AI 2255B0");
+        rekey50UT(state,Caller::Base228BBC,ai);state.baseSerial=base.serial;
+    }
+    if(state.rosterSlot!=ai.managerIndexFE0||state.racer60!=ai.racer60)
+        return fail(diagnostic,0x228bbcu,"undertrack reset belongs to another racer");
+    if(!run2255B0Ai50UT(frame,bindings,parameters,progress,state,owners,workspace,diagnostic))return false;
+    diagnostic.sourcePC=0;diagnostic.message="original-AI 228BBC 2255B0 returned; 228BC4 resumes";
+    return true;
 }
 inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,

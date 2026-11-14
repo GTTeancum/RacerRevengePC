@@ -11,6 +11,7 @@
 #include "../../platform/linux/native/window_swap_stats50au.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/native_test_undertrack50ut.h"
 #include "../../src/game/collision_mesh_admission50cc.h"
 #include <algorithm>
 #include <array>
@@ -556,6 +557,13 @@ void Context::run() {
       rr::game::nativeTestDestroyLimp50PD[static_cast<std::size_t>(test.slot)]=test.limp;
       if(test.slot==0&&test.limp&&test.limpReset)rr::game::nativeTestLimpResetArmed50PD=true;
       std::cerr<<"test_destroy due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
+     }
+    // Unattended test only (RR_TEST_UNDERTRACK): arm each configured racer once.
+    for(auto& test:rr::game::nativeTestUndertracks50UT)
+     if(test.slot>=0&&!test.fired&&static_cast<std::size_t>(test.slot)<racerBank.count()&&
+        race.raceSeconds>=test.seconds){
+      test.fired=true;rr::game::nativeTestUndertrackPending50UT[static_cast<std::size_t>(test.slot)]=true;
+      std::cerr<<"test_undertrack due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
    }
    if(!originalUiActive){
