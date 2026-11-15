@@ -38,9 +38,11 @@ inline bool Owner::constructRuntimeSourceCameraImpl(
     if(bool(fresh)!=bool(world))return fail(d,"constructor-only World and arena custody must be paired");
     if(terminal_||closed_||!prefix_.runtimeQueryWorldOwners||!prefix_.lighting||
        !prefix_.trackParticleManager||!runtimeQueries_||
-       (fresh?(!prefix_.staticWorld||prefix_.staticWorldImages||worldImagesAttempted_):!prefix_.staticWorldImages)||
+       // The camera (1A93B0) and the track load it starts (1A9EE0) precede the
+       // single world population and collector (1A7B14 14D440) on both routes.
+       !prefix_.staticWorld||prefix_.staticWorldImages||worldImagesAttempted_||
        runtimeQueries_->cameraAttempted_)
-        return fail(d,"RA camera requires its existing registered runtime/light/particle/image owners");
+        return fail(d,"RA camera requires its registered runtime/light/particle owners before the world population");
     auto& runtime=*runtimeQueries_;
     if(fresh&&!c::Session::constructorArenaMatches(fresh,actual.bank,actual.arena,
        actual.bindings,actual.ai,actual.poseHistory,actual.actualRigs))
@@ -67,8 +69,7 @@ inline bool Owner::constructRuntimeSourceCameraImpl(
            !domain||domain!=world_->domain_||!entities||!world_->context_||!world_->context_->live()||
            world_->context_->materialApplication()!=application.materialApplication||
            trackParticles_->material150()->table382B38()!=domain->materials382B38().get()||
-           (fresh?domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_):
-               !domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_))||
+           domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_)||
            domain->archiveProvider3E1A70()->revision()!=world_->providerRevision_||
            display.trackFog3EC||selectedOriginalCam.empty()||!actual.actualRigs[0]||actual.actualRigs[0]->phy.empty()||
            bool(actual.actualBottomRightModels)!=bool(actual.actualBottomLeftModels))

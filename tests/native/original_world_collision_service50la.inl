@@ -187,15 +187,13 @@ bool Owner::continueNativeCollisionObjects2743B0(const original_main_entry50KG::
     std::uint32_t& pc)noexcept {
     pc=0x1aa244;
     if(!nativeStandardServiceComplete_||!nativeFinishLine540_||!nativeFinishLine540_->complete||
-       !world_||!world_->modelPrefixes_||!world_->domain_||!world_->rendererPublication_||
-       !world_->imagePublication_||!runtimeQueries_||!candidates_||
+       !world_||!world_->modelPrefixes_||!world_->domain_||!runtimeQueries_||!candidates_||
        !nativeSceneInfo270900Current(app,pc))return false;
     const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,worldEntity_.sessionGeneration);
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!display||!runtimeQueries_->camera_||!runtimeQueries_->camera_->session||
-       world_->rendererPublication_!=&display->renderer_||
-       !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,rectangle,revision)||
-       world_->imagePublication_->raStaticWorldOwner()!=world_.get())return false;
+       !nativeWorldPublicationCurrent(*display)||
+       !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,rectangle,revision))return false;
     if(!beginNativeCollisionPrefix2743B0(*world_->modelPrefixes_,*candidates_,pc))return false;
     //1AA258 optional progress uses the established native policy, not a
     //fabricated original330/+30 observation or1CC900 call.

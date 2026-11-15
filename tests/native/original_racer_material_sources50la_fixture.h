@@ -41,7 +41,9 @@ inline bool texture(const Provider& provider,const std::string& requested,Textur
     // Exact source24DA30 priority. Only the full sealed native mount provider
     // may return absent; an omitted input vector entry never does so.
     Provider::MemberView view;
-    for(const char* extension:{".pst",".ipu",".tga"}){
+    // 24DADC..24DC30: .pst, .ipu (refused: no IPU decoder), .tga, then .atm.
+    // The one place that defines the order (racers, pending track rows).
+    for(const char* extension:{".pst",".ipu",".tga",".atm"}){
         const auto candidate=withExtension(requested,extension);d.member=candidate;
         const auto found=provider.lookup132820(candidate,view);
         if(found==Provider::Lookup::unknown)return fail(d,Status::unsealed,0x132820);

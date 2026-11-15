@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include "ra_static_world50la.h"
 #include "ra_source_camera_ownership50la.h"
 #include "../../src/game/original_racer_model_view50la.h"
@@ -47,13 +48,19 @@ class Binding final {
     bool prepare(std::shared_ptr<ra_static_world50LA::Owner> world,
         std::shared_ptr<ra_source_camera50LA::OwnershipBridge> camera) {
         world_=std::move(world);camera_.owner=std::move(camera);CameraObservation observation;
-        if(!camera_.owner||!camera_.owner->readStaticFogPublication(camera_.issued,observation)||
-           !current(observation))return false;
+        // Read-only refusal diagnostic (first few only).
+        const auto refused=[&](int gate,std::size_t row)noexcept{static int reported=0;
+            if(reported<4){++reported;std::fprintf(stderr,
+                "ra_fog_binding_refused gate=%d placement=%zu camera=(%g,%g,%g) start=%g\n",gate,row,
+                double(observation.position[0]),double(observation.position[1]),double(observation.position[2]),
+                double(observation.source.start34));}return false;};
+        if(!camera_.owner||!camera_.owner->readStaticFogPublication(camera_.issued,observation))return refused(1,0);
+        if(!current(observation))return refused(world_?20+world_->drawPlanRefusal():2,0);
         // A fresh unpublished binding emits exactly one row per retained placement.
         placements_.reserve(world_->placements_.size());
         for(std::size_t i=0;i<world_->placements_.size();++i){
             const auto& p=*world_->placements_[i];const auto* scene=p.payload?p.payload->scene():nullptr;
-            if(!scene||scene->nodes.size()!=1||scene->nodes[0].parent!=-1||scene->identity_matrix_palette)return false;
+            if(!scene||scene->nodes.size()!=1||scene->nodes[0].parent!=-1||scene->identity_matrix_palette)return refused(3,i);
             // Fill the reserved private row directly; failed bindings never publish.
             placements_.emplace_back();auto& next=placements_.back();
             next.placement=i;next.worldInstance=p.worldInstance;
@@ -74,9 +81,9 @@ class Binding final {
             // the proven single-node branch. No radius recomputation/AABB.
             std::array<float,4> center{{next.center140[0],next.center140[1],next.center140[2],0}};
             if(!rr::game::projectOriginalRacerDistance26F070(center,next.localTranslation,
-                observation.position,next.distanceCandidate))return false;
+                observation.position,next.distanceCandidate))return refused(4,i);
             const auto farDistance=rr::game::original_racer_model_view_detail50LA::add(next.distanceCandidate,next.radius194);
-            if(!std::isfinite(farDistance))return false;
+            if(!std::isfinite(farDistance))return refused(5,i);
             next.computeFogCandidate02=!(farDistance<observation.source.start34);
         }
         return current(observation);

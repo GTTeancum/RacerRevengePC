@@ -475,6 +475,27 @@ public:
         }
         return created_;
     }
+    // Race display up before any course or racer loads (the original renderer
+    // exists from boot): context functions only, through the canonical
+    // callbacks. create() later fills the same renderer; bring-up does not
+    // count as the creation attempt. Repeated calls keep the first bring-up.
+    bool bringUp(rr::platform::VehicleWindowOutput50DS output,
+        rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        d={};
+        if(!ownerThread()||attempted_||retiring_||!video_->host.created()||!video_->host.current()){
+            d.error=rr::platform::VehicleWindowError50DS::request;
+            d.operation="race display bring-up requires its actual current host before creation";
+            return false;
+        }
+        if(renderer_.broughtUp())return true;
+        rr::platform::VehicleWindowRequest50DS request{};
+        request.context=&video_->host;request.procAddress=&proc;request.isCurrent=&current;
+        request.output=output;
+        renderer_.sessionDisplayCreate50LA_=true;
+        const bool up=renderer_.bringUp(request,d);
+        renderer_.sessionDisplayCreate50LA_=false;
+        return up;
+    }
     bool create(const rr::platform::VehicleWindowRequest50DS& request,
         const rr::assets::VehicleDrawAssets50CR& assets,
         rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
@@ -487,8 +508,13 @@ public:
             return false;
         }
         attempted_=true;
-        sourceCurrentCamera0Known_=false;
-        invalidateGameplayCameraObservation50LA();
+        // A brought-up display is this same display: a gameplay camera the
+        // race load already selected on it (26F940, before the content
+        // exists) stays selected. Otherwise the display starts clean.
+        if(!(renderer_.broughtUp()&&selectedGameplayCamera0_)){
+            sourceCurrentCamera0Known_=false;
+            invalidateGameplayCameraObservation50LA();
+        }
         renderer_.sessionDisplayCreate50LA_=true;
         created_=renderer_.create(request,assets,d); // Real creation, same callbacks/banks.
         renderer_.sessionDisplayCreate50LA_=false;

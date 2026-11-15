@@ -522,6 +522,30 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
      rr::game::zeroGravity50ZG.stepLineOwner(actualRacerSlot),s.bodies.main.cachedSpeed34};
  rr::game::surfaceRules50ST.update(actualRacerSlot,terrainResult.terrain,
      (s.fields.impactFlagsCD8&1u)!=0u,s.bodies.main.schedule.factorPerSubstep,zeroGravitySurface);
+ // TEST ONLY: RR_TEST_SPEED_LOG=<every> logs the player's body speed, the
+ // surface speed bonus and the boost words every <every> steps, with the
+ // heading change since the last sample, so a straight can be picked from a
+ // muted logs-only run and the boost gain read on it. Reads only.
+ {
+  static const long speedLogEvery=[]{const char* v=std::getenv("RR_TEST_SPEED_LOG");
+      const long n=v?std::atol(v):0;return n>=1&&n<=100000?n:0L;}();
+  if(speedLogEvery&&actualRacerSlot==0){
+   static std::uint64_t speedLogSteps=0;static float speedLogYaw=0.f;static bool speedLogHaveYaw=false;
+   const auto main190=static_cast<std::uint32_t>(x.bindings.lifecycle.main190);
+   if(++speedLogSteps%static_cast<std::uint64_t>(speedLogEvery)==0&&main190<s.sceneNodeCount){
+    const auto& w=s.nodes[main190].world100.v;
+    const float yaw=std::atan2(w[8],w[10])*57.29578f;
+    float turn=speedLogHaveYaw?yaw-speedLogYaw:0.f;
+    if(turn>180.f)turn-=360.f;else if(turn<-180.f)turn+=360.f;
+    speedLogYaw=yaw;speedLogHaveYaw=true;
+    const auto& p=s.bodies.main.components.root.body.position.v;
+    std::fprintf(stderr,"speed_log step=%llu speed=%.2f bonus=%.2f boost64=%u ratio70=%.3f heat7C=%.3f yaw=%.1f turn=%.2f pos=%.1f,%.1f,%.1f\n",
+        static_cast<unsigned long long>(speedLogSteps),s.bodies.main.cachedSpeed34,
+        rr::game::surfaceRules50ST.speedBonus(0),boostState.vehicle64,boostState.speedRatio70,boostState.heat7C,
+        yaw,turn,p[0],p[1],p[2]);
+   }
+  }
+ }
  if(rr::game::zeroGravity50ZG.active()){
   // Ground distance for the ZOFF landing test (< 12 ft): the probe's own
   // contact point (body + basis x 1C0 offset, as 48G measures its gap) to the

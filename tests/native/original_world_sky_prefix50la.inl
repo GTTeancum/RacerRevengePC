@@ -146,7 +146,7 @@ bool Owner::continueNativeSky274AE0(const original_main_entry50KG::Application& 
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeTriggerList3D0_||!nativeTriggerList3D0_->serviceComplete||
        nativeTriggerList3D0_->serviceTerminal||!nativeSceneInfo270900Current(app,pc)||
-       !world_||!world_->domain_||!world_->imagePublication_||!runtimeQueries_||
+       !world_||!world_->domain_||!runtimeQueries_||
        !nativeTrackLoadBorrowsAdmitted()||!worldApplication_||
        worldApplication_->attachmentLock423F58()||!source_||!skyImages_||
        !skyImages_->mesh()||!skyImages_->bank()||!app.riderProfile)return false;
@@ -156,8 +156,7 @@ bool Owner::continueNativeSky274AE0(const original_main_entry50KG::Application& 
     const auto bits=profile->playerBits1125C;
     const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,worldEntity_.sessionGeneration);
     if(!display||!runtimeQueries_->camera_||!runtimeQueries_->camera_->session||
-       world_->rendererPublication_!=&display->renderer_||
-       world_->imagePublication_->raStaticWorldOwner()!=world_.get()||
+       !nativeWorldPublicationCurrent(*display)||
        !display->nativeSkyMetadataCurrent129280(*runtimeQueries_->camera_->session,
            *skyImages_->mesh(),*skyImages_->bank()))return false;
     if(!beginNativeSkyPalette274AE0(*source_,*skyImages_,app.skyDirectory36B750(),bits,

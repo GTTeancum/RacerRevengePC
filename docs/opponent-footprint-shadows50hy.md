@@ -1,5 +1,11 @@
 # Native opponent footprint shadows
 
+**RETIRED (2026-11).** The footprint shadows described here were a port
+invention and are removed. Pods now use the original projected shadows on all
+13 courses (`src/game/original_projected_shadow50ps.h`,
+`platform/linux/native/vehicle_window_gl50ds_shadow50ps.cpp`).
+
+
 Status: built and exercised during the full eight-racer race at 09:16 UTC on
 2026-10-09. No renderer rejection occurred; 46 frame-rate samples ranged from
 52.7322 to 62.5762 FPS. Separate solo equivalence, invalid-input and all-surface

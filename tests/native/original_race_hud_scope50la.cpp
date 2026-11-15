@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "original_race_hud_scope50la.h"
 #include "native_common_race50pd.h"
 #include "terrain_interactive_continuation50du.h"
@@ -80,7 +81,12 @@ void Scope::revoke()noexcept {
         if(race->music10C_)race->music10C_->revokeNativeProviders(*registration_);
     if(registration_->gameplay_&&registration_->gameplay_->speechApplication_==registration_->application_&&
        registration_->gameplay_->speechBankOwner_==registration_->bank_&&
-       registration_->gameplay_->speechGeneration_==registration_->generation_)
+       registration_->gameplay_->speechGeneration_==registration_->generation_&&
+       // A player whose speech owner was constructed at the pod load (D48,
+       // forward-bound) is retired by its racer's own release (2C10B0, in the
+       // camera close that follows this revoke); that authenticated retirement
+       // withdraws these same fields. Only an unbound borrow is revoked here.
+       !registration_->gameplay_->speechForwardBound_)
         registration_->gameplay_->revokeNativeHumanSpeech();
     if(registration_->engines_&&registration_->engines_->nativeSpeechApplication_==registration_->application_&&
        registration_->engines_->nativeSpeechBank_==registration_->bank_&&
@@ -239,10 +245,30 @@ bool Registration::readNativeListenerScene(const rr::game::OriginalRaceConstruct
     // already claimed the actual mix token before these reached camera reads.
     const bool all8=!camera_&&!published_&&application_&&race_.lock().get()==&race&&
         race.endHud_.lock().get()==this&&application_->consumedRaAll8ListenerCustodyNativeCurrent(camera);
+    {
+        // Read-only refusal diagnostic (first few only).
+        static int reported=0;
+        const bool refuse=(!human&&!all8)||!camera.coldBound_||camera.closed_||camera.abandoned_||!camera.hasView()||
+            camera.frameStage_!=original_camera_session50KX::Session::FrameStage::published||
+            !race.ownsNativeCameraAdapter34(camera)||
+            camera.publicationCount_<previousPublication||
+            (!heldSourceScene&&camera.publicationCount_==previousPublication);
+        if(refuse&&reported<4){++reported;
+            std::fprintf(stderr,"listener_scene_refused human=%d all8=%d scope_camera=%d end_state=%d bound=%d closed=%d view=%d stage=%d pending=%d owns34=%d publication=%llu previous=%llu held=%d\n",
+                int(human),int(all8),int(camera_==&camera),int(camera_==&camera&&endStateCurrent(race,camera)),
+                int(camera.coldBound_),int(camera.closed_||camera.abandoned_),int(camera.hasView()),
+                int(camera.frameStage_),int(camera.pendingDisplayWork()),int(race.ownsNativeCameraAdapter34(camera)),
+                static_cast<unsigned long long>(camera.publicationCount_),
+                static_cast<unsigned long long>(previousPublication),int(heldSourceScene));}
+    }
     if((!human&&!all8)||!camera.coldBound_||
        camera.closed_||camera.abandoned_||!camera.hasView()||
        camera.frameStage_!=original_camera_session50KX::Session::FrameStage::published||
-       camera.pendingDisplayWork()||!race.ownsNativeCameraAdapter34(camera)||
+       // The original listener update (1A4440) reads Race34's scene every
+       // frame, including while a video fade runs (the intro exit fades in
+       // over the held start scene); a pending fade does not change the
+       // published pose read here.
+       !race.ownsNativeCameraAdapter34(camera)||
        camera.publicationCount_<previousPublication||
        (!heldSourceScene&&camera.publicationCount_==previousPublication))return false;
     publication=camera.publicationCount_;

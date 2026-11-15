@@ -388,7 +388,14 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDe
     // collector slot. Later F8/other native borrowers must observe the SAME
     // issued generation, not an invalidated older cold seal. No source
     // population/history is replayed and no pin validity rule is relaxed.
-    if(!table||!table->rebuildColdCollector14D440(p.domain->coldCollector_,p.materialDiagnostic)){
+    // The original builds the collector once per race load (1A7B14 14D440);
+    // Results does not rebuild it. While the Domain's sealed collector is
+    // still current (no row gained or lost an object since), it is that same
+    // registry and every earlier receipt (the course world's among them)
+    // stays valid; only an expired seal is rebuilt here.
+    const bool collectorCurrent=table&&table->coldCollectorCurrent(p.domain->coldCollector_);
+    {static int last=-1;if(last!=int(collectorCurrent)){last=int(collectorCurrent);std::fprintf(stderr,"results_collector reused=%d\n",int(collectorCurrent));}}
+    if(!collectorCurrent&&(!table||!table->rebuildColdCollector14D440(p.domain->coldCollector_,p.materialDiagnostic))){
         std::fprintf(stderr,"results_collector_rebuild_rejected table=%d status=%u pc=%08x row=%d field=%s\n",table?1:0,
             unsigned(p.materialDiagnostic.status),p.materialDiagnostic.sourcePC,p.materialDiagnostic.row,
             p.materialDiagnostic.field?p.materialDiagnostic.field:"");

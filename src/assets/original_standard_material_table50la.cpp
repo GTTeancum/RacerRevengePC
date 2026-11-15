@@ -810,7 +810,11 @@ bool OriginalStandardMaterialTable50LA::inspectCableEmission24B9B0(
        !collectorPass(*out.representative_.material,static_cast<std::size_t>(out.representative_.pass),
            *s.construction,out.effectivePass_,d))return false;
     const auto& origin=out.originatingPass_;const auto& effective=out.effectivePass_;
-    if(!(*origin.flags21&2u)||!(*effective.flags21&2u)||!origin.parameters34)
+    // 249420 creates the pass's parameter owner only when the pass authors
+    // parameter rows; a strip material without any (the local flares' flare1)
+    // has none and nothing to read here. A pass that authors rows must own them.
+    if(!(*origin.flags21&2u)||!(*effective.flags21&2u)||
+       (!origin.parameters34&&(!origin.parameterCount28||*origin.parameterCount28)))
         return fail(d,S::source,0x24ba10u);
     // All earlier passes must be disabled at this unconsumed first-pass stop.
     // There is no externally supplied continuation token that can skip one.

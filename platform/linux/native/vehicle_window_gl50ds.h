@@ -37,7 +37,7 @@ namespace mc_particle_render50MC { class Owner; }
 namespace original_main_entry50KG { struct Application; class NativeVideoPacketInvocation50LA; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalRaceStartOverlay50HU; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
-namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
+namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; struct OriginalProjectedShadowFrame50PS; }
 namespace rr::platform {
 // Precharged common named-payload allowance for the GB binding metadata added
 // to the renderer Storage plus its retained Request, one input Request/Frame
@@ -192,8 +192,8 @@ struct VehicleWindowTrackSpan50DS {
     std::uint32_t sourcePass = 1, sourcePassCount = 1;
     // 0 retains authored mesh UV; 1/2 selects the source-derived sidecar XY/ZW.
     std::uint32_t projectionPass = 0;
-    // Source static-model +148 gate for the existing native shadow policy.
-    //Default true retains prior callers; false suppresses receiver shading only.
+    // Copied with the span but no longer read by any draw. Shadow receiving is
+    // the per-instance AllowShadowReceiving table (request.staticShadowReceiving).
     bool allowPodShadow = true;
     // Source GREATER/KEEP test after vertex/texture alpha modulation. This
     // distinct mode preserves the older texture-only cutout policy above.
@@ -225,6 +225,9 @@ struct VehicleWindowTrackSpan50DS {
     // Authored zone of this span's static model (SCB "ZoneN-ModelM", one-based
     // World48F instance zone). 0 = not zoned: never hidden by zone visibility.
     std::uint32_t sourceZone = 0;
+    // Static world instance (actualWorld order) this span was published from:
+    // the original shadow receiver key. All-ones = not a static model.
+    std::uint32_t worldInstance = 0xffffffffu;
 };
 // One zone of the original's per-frame section visibility (common for every
 // course; produced by game::prepareTrackZoneVisibility50ZV). Copied at submit.
@@ -538,9 +541,19 @@ struct VehicleWindowRequest50DS {
     const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
     const MaterialTextureGl50EB* originalUiTextures = nullptr;
     VehicleWindowSky50DS sky{};
-    // Native soft pod-footprint approximation on actual track receivers.
-    // Explicit opt-in; no original shadow-program or exact-occlusion claim.
-    bool enableNativePodShadows = false;
+    // Original projected pod shadows: per static world instance (the index in
+    // VehicleWindowTrackSpan50DS::worldInstance and the RA surface plan), the
+    // TOB AllowShadowReceiving value and the instance zone. Borrowed only
+    // during create() and copied. Zero count: no receivers, no shadows drawn.
+    const std::uint32_t* staticShadowReceiving = nullptr;
+    const std::uint32_t* staticInstanceZone = nullptr;
+    std::uint32_t staticInstanceCount = 0;
+    // The static world's portals (WorldPortal48F order): two 1-based zones and
+    // four world corners (12 floats) each, for the 2DEBC0 portal walk.
+    // Borrowed only during create() and copied; zero count = no walk.
+    const std::uint32_t* staticPortalZones = nullptr;
+    const float* staticPortalCorners = nullptr;
+    std::uint32_t staticPortalCount = 0;
     // Optional cold-only array. Entries are selected by one-based frame IDs;
     // ID zero retains the create() player assets/materials/cables. Each entry
     // owns independently sized immutable indices and two cold vertex banks.
@@ -769,8 +782,8 @@ struct VehicleWindowFrame50DS {
     // Optional zero-to-seven actual opponents in this ONE private transaction.
     // All batches are validated before drawing. All opaque racers precede track
     // and pod effects; sky, track and HUD are drawn once. Null/zero preserves
-    // the original single-racer path. Enabled native footprint shadows use each
-    // submitted racer's three primary-model opaque geometries and material bank.
+    // the original single-racer path. Original shadows (originalShadows) cast
+    // from each submitted racer's own drawn parts, in racer slot order.
     const VehicleWindowOpponent50DS* opponents = nullptr;
     std::uint32_t opponentCount = 0;
     VehicleWindowDynamicWorldFrame50DS dynamicWorld{};
@@ -843,9 +856,13 @@ struct VehicleWindowFrame50DS {
     // or live end-flow admission follows from a successful native submission.
     const ::original_main_entry50KG::NativeF8BarPrefix50LA* nativeF8BarPrefix = nullptr;
     const ::original_main_entry50KG::NativeResultsFrame50LA* nativeResults = nullptr;
-    // The player racer is destroyed (original 28C6E0 hid its models): its
-    // collapsed geometry casts no pod shadow.
+    // The player racer is destroyed (original 28C6E0 hid its models): none of
+    // its geometry is drawn, and it casts no shadow.
     bool playerHiddenDestroyed50PD = false;
+    // Original projected shadows for this frame (274CD0/1B32E0/231DF0 output,
+    // src/game/original_projected_shadow50ps.h), shadow i = racer slot i.
+    // Borrowed through submit and copied; null draws no shadows.
+    const game::OriginalProjectedShadowFrame50PS* originalShadows = nullptr;
     // Visible debris pieces this frame (borrowed through submit).
     const VehicleWindowDebrisInstance50DS* debris = nullptr;
     std::uint32_t debrisCount = 0;
@@ -1326,6 +1343,14 @@ public:
     VehicleWindowGl50DS(VehicleWindowGl50DS&&) = delete;
     VehicleWindowGl50DS& operator=(VehicleWindowGl50DS&&) = delete;
 
+    // The original has its renderer (442F70) up from boot, before any course or
+    // racer loads; the race load's camera start (1A9590 cold) drains it. Bring-up
+    // loads this context's functions and checks the context only: no GL name,
+    // no content, initialized() stays false. finishInitializedContextWork is
+    // admitted from here on; create() then fills this same renderer. close()
+    // retires a brought-up renderer that was never created.
+    bool bringUp(const VehicleWindowRequest50DS&, VehicleWindowDiagnostic50DS&) noexcept;
+    bool broughtUp() const noexcept;
     bool create(const VehicleWindowRequest50DS&, const assets::VehicleDrawAssets50CR&,
         VehicleWindowDiagnostic50DS&) noexcept;
     // Authentic original UI only. All gameplay submission/completion entry
@@ -1548,6 +1573,8 @@ public:
     // Opponent components whose per-vertex work this renderer evaluates on
     // the GPU (bit c = component c); zero for the player or exact/AA routes.
     std::uint32_t racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept;
+    // Original caster LOD count (+1B4 -> +10) of one racer part, 0 if none.
+    std::uint32_t racerShadowLodCount50PS(std::uint32_t archetype, std::uint32_t component) const noexcept;
     // Optional source/GPU-storage provenance of the retained accepted RA frame. Call at
     // capture selection, after excluding capture work from FPS measurement.
     // RR_RA_PIXEL_PROVENANCE=1 enables a bounded log and six fog buffer reads; no draws.

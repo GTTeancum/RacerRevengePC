@@ -77,6 +77,7 @@
 #include "ma_static_model_params_fixture.h"
 #include "original_position_stats_prestage50la.h"
 #include "gc_static_model_params50kg_fixture.h"
+#include "../../src/game/original_static_model_params50ps.h"
 #include "ga_trigger_actions_fixture.h"
 #include "sa_trigger_actions_fixture.h"
 #include "ma_trigger_actions_fixture.h"
@@ -807,6 +808,19 @@ SessionExit50DU Context::run() {
  original_main_entry50KG::TimeStatsColdResult50LA sourceTimeStats;
  original_main_entry50KG::DamageColdResult50LA sourceDamage;
  coldLoadDiagnostics.begin("roster_runtime");
+ // The original renderer (442F70) is up from boot, before any course or racer
+ // loads. Every course opens the same Video host and brings the race display
+ // up here; the race load's camera start (1A9590 cold) may drain it before the
+ // racers exist. Content is created later on this same renderer.
+ openNativeVideo();
+ {
+  rr::platform::VehicleWindowDiagnostic50DS upDiagnostic;
+  if(!sourceDisplayLifetime->bringUp(headlessLive?rr::platform::VehicleWindowOutput50DS::headless:
+      rr::platform::VehicleWindowOutput50DS::defaultBackBuffer,upDiagnostic)){
+   reportRenderer50DU(upDiagnostic);require50DU(false,"race display bring-up rejected");
+  }
+  std::cerr<<"race_display_bring_up course_cold=1\n";
+ }
  native_racer50HN::Bank racerBank;
  auto closeRcBankCollision=[&]() noexcept -> bool {try{
   if(rcCollisionCleanupDone)return true;
@@ -2832,165 +2846,23 @@ SessionExit50DU Context::run() {
      rr::assets::maxMaterialTextureSourceBytes50EA,rr::assets::maxMaterialTextureRGBABytes50EA,1024};
  trackTextures::Diagnostic trackMaterialDiagnostic{};
  //27A208/27A234 initializes each existing static-model +148 to true.
- //271A00 applies numeric TOB overrides by the actual loaded model name.
- //Per-instance native projections preserve repeated placements of that model;
- //unmatched source names create neither render geometry nor source actors.
- std::vector<std::uint32_t> staticShadowReceiving(actualWorld.instances.size(),1u);
- if(isMaTrack){
-  ma_static_model_params::Owner overrides;ma_static_model_params::Receipt receipt;
-  std::string error;
-  require50DU(maTriggerAuthoring&&overrides.load(maTriggerAuthoring->originalTob(),error),
-      error.empty()?"MA original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<ma_static_model_params::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"MA actual static-model property application rejected");
- }
- if(isMbTrack){
-  mb_static_model_params::Owner overrides;mb_static_model_params::Receipt receipt;
-  std::string error;
-  require50DU(mbCollisionWorld&&overrides.load(mbCollisionWorld->originalTob(),error),
-      error.empty()?"MB original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<mb_static_model_params::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"MB actual static-model property application rejected");
- }
- if(isScTrack){
-  sc_static_model_params::Owner overrides;sc_static_model_params::Receipt receipt;
-  std::string error;
-  // The course's own TOB from the cold source owner (present with or
-  // without triggers).
-  const auto* scDecoded=scColdSources?scColdSources->sourcesDecoded():nullptr;
-  const bool loaded=scDecoded&&overrides.load(scDecoded->memberBytes[3],error);
-  require50DU(loaded,error.empty()?"SC original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<sc_static_model_params::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"SC actual static-model property application rejected");
- }
- if(isTbTrack){
-  reserveTbAdditionalPayload(tb_static_model_params50TB::Owner::maximumAdditionalPayloadBytes(),"TB static property reservation exceeds remaining payload");
-  tb_static_model_params50TB::Owner overrides;tb_static_model_params50TB::Receipt receipt;
-  std::string error;
-  const bool loaded=tbColdSources&&overrides.load(tbColdSources,error);
-  require50DU(loaded,error.empty()?"TB original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<tb_static_model_params50TB::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"TB actual static-model property application rejected");
- }
- if(isGbTrack){
-  reserveGbAdditionalPayload(gb_static_model_params50GB::Owner::maximumAdditionalPayloadBytes(),"GB static property reservation exceeds remaining payload");
-  gb_static_model_params50GB::Owner overrides;gb_static_model_params50GB::Receipt receipt;
-  std::string error;
-  const bool loaded=gbColdSources&&overrides.load(gbColdSources,error);
-  require50DU(loaded,error.empty()?"GB original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<gb_static_model_params50GB::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"GB actual static-model property application rejected");
- }
- if(isMcTrack){
-  reserveMcAdditionalPayload(mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes(),"MC static property reservation exceeds remaining payload");
-  mc_static_model_params50MC::Owner overrides;mc_static_model_params50MC::Receipt receipt;
-  std::string error;
-  const bool loaded=mcColdSources&&overrides.load(mcColdSources,mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes(),error);
-  require50DU(loaded,error.empty()?"MC original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<mc_static_model_params50MC::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"MC actual static-model property application rejected");
- }
- if(isMcTrack){ // All override/name/ModelLease temporaries above are destroyed.
-  const auto released=mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes();
-  require50DU(mcAdditionalPayloadReserved>=released,"MC static property scratch release accounting");
-  mcAdditionalPayloadReserved-=released;
- }
- if(isRcTrack){
-  reserveRcAdditionalPayload(rc_static_model_params50RC::Owner::maximumAdditionalPayloadBytes(),"RC static property reservation exceeds remaining payload");
-  rc_static_model_params50RC::Owner overrides;rc_static_model_params50RC::Receipt receipt;
-  std::string error;
-  const bool loaded=rcColdSources&&overrides.load(rcColdSources,error);
-  require50DU(loaded,error.empty()?"RC original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<rc_static_model_params50RC::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"RC actual static-model property application rejected");
- }
- if(isTcTrack){
-  tc_static_model_params50TC::Owner overrides;tc_static_model_params50TC::Receipt receipt;
-  std::string error;
-  const bool loaded=tcColdSources&&overrides.decode(tcColdSources,error);
-  require50DU(loaded,error.empty()?"TC original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<tc_static_model_params50TC::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"TC actual static-model property application rejected");
- }
- if(isGcTrack){
-  gc_static_model_params50KG::Owner overrides;gc_static_model_params50KG::Receipt receipt;
-  std::string error;
-  require50DU(gcTriggerAuthoring&&overrides.load(gcTriggerAuthoring->originalTob(),error),
-      error.empty()?"GC original static-model parameters rejected":error.c_str());
-  std::vector<std::string> names(actualWorld.instances.size());
-  std::vector<gc_static_model_params50KG::ModelLease> models(actualWorld.instances.size());
-  for(std::size_t i=0;i<actualWorld.instances.size();++i){
-   const auto& member=actualWorld.instances[i].geometry_member;
-   const auto slash=member.find_last_of("/\\");
-   names[i]=member.substr(slash==std::string::npos?0:slash+1);
-   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
-   models[i]={&names[i],&staticShadowReceiving[i],1u};
-  }
-  require50DU(overrides.apply(models.data(),models.size(),receipt),"GC actual static-model property application rejected");
+ //271A00 applies the TOB staticmodelparams rows by the actual loaded model
+ //name. One reader for every course: courses differ only in the rows their
+ //own TOB carries (src/game/original_static_model_params50ps.h). Replaces
+ //the per-course MA/MB/SC/TB/GB/MC/RC/TC/GC owners for this flag (port
+ //stand-ins, retired) and applies TA/GA/SA rows that were never applied.
+ std::vector<std::uint32_t> staticShadowReceiving;
+ {
+  rr::game::StaticModelParamsReceipt50PS receipt;std::string error;
+  require50DU(rr::game::applyStaticModelParams50PS(actualWorld,staticShadowReceiving,receipt,error),
+      error.empty()?"original static-model parameters rejected":error.c_str());
+  require50DU(staticShadowReceiving.size()==actualWorld.instances.size(),"static shadow receiver table extent");
+  std::cerr<<"shadow_receivers course="<<trackSession->world->code<<" instances="<<receipt.instances
+      <<" standard="<<receipt.standardInstances<<" receiving="<<receipt.receiving
+      <<" rows="<<receipt.declaredRows<<" applied="<<receipt.rowsApplied<<" stores="<<receipt.stores
+      <<" unmatched="<<receipt.rowsUnmatched<<" missing_section="<<receipt.rowsMissingSection
+      <<" missing_fields="<<receipt.rowsMissingFields<<" unknown_value="<<receipt.rowsUnknownValue
+      <<" name_rule_differs="<<receipt.nameRuleDiffers<<'\n';
  }
  std::vector<rr::assets::WorldNormal50HK> legacyTrackNormals;
  const auto& trackNormals=mcOriginalWorld?*mcOriginalWorld->normals():gbOriginalWorld?*gbOriginalWorld->normals():tbOriginalWorld?*tbOriginalWorld->normals():rcOriginalWorld?*rcOriginalWorld->normals():tcOriginalWorld?*tcOriginalWorld->normals():scOriginalWorld?*scOriginalWorld->normals():mbOriginalWorld?*mbOriginalWorld->normals():taOriginalWorld?*taOriginalWorld->normals():gcOriginalWorld?*gcOriginalWorld->normals():gaOriginalWorld?*gaOriginalWorld->normals():

@@ -2789,6 +2789,11 @@ std::uint32_t sourceVisibility10,sourceHaziness14,sourceVtable18;
     bool continueNativeCollisionObjects2743B0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
     bool continueNativeFinishLine1B3B80(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
     bool continueNativeStandardModels274160(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
+    // The track load (1A9EE0) runs before the single population, so before
+    // the race display holds the world: either neither the world images nor
+    // the renderer are published yet (display brought up, not created), or
+    // both are published to this same display (the later state).
+    bool nativeWorldPublicationCurrent(const original_main_entry50KG::RaceDisplayLifetime50LA&)const noexcept;
     bool continueNativeInstances1AA194(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
     bool continueNativeParticleManager1B4DC0(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
     bool continueNativeFog273C30(const original_main_entry50KG::Application&,std::uint32_t&)noexcept;
@@ -4161,6 +4166,13 @@ public:
             d.failure="RA native camera borrow allocation failed";return {};
         }
     }
+    original_camera_session50KX::Result prepareRuntimeSourceCameraTrackCold(
+        std::uint64_t actualSessionGeneration,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::sourceCamera;
+        if(terminal_||closed_||!runtimeQueries_){d.failure="RA camera owner unavailable";
+            d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;return d.runtimeQueries.camera;}
+        return runtimeQueries_->prepareCameraTrackCold(actualSessionGeneration,d.runtimeQueries);
+    }
     original_camera_session50KX::Result prepareRuntimeSourceCamera(
         std::uint64_t actualSessionGeneration,Diagnostic& d)noexcept {
         d={};d.stage=Stage::sourceCamera;
@@ -4213,9 +4225,11 @@ public:
         Diagnostic& d)noexcept {
         // Retained racer rows must have their real resource/ref/source prefix
         // before the one whole-domain scan captures the combined collector.
+        // The camera precedes it: the track load (1A9EE0, run by the camera
+        // start) references the track's materials before 1A7B14 14D440.
         if(runtimeQueries_&&runtimeQueries_->rosterResources_&&
            (!rosterModelResourcesComplete_||runtimeQueries_->terminal_||runtimeQueries_->closed_||
-            runtimeQueries_->cameraAttempted_||!runtimeQueries_->cameraBankCurrent()||
+            !runtimeQueries_->cameraBankCurrent()||
             std::find(runtimeQueries_->rosterSlotComplete_.begin(),runtimeQueries_->rosterSlotComplete_.end(),false)!=
                 runtimeQueries_->rosterSlotComplete_.end())){
             d={};d.stage=Stage::staticWorldImages;

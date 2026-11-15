@@ -51,14 +51,13 @@ bool Owner::continueNativeTriggerServices274E90(const original_main_entry50KG::A
     if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||
        !nativeParticleList3D8_||nativeParticleList3D8_->sourceMode||!nativeParticleList3D8_->serviceComplete||
        nativeParticleList3D8_->serviceTerminal||!nativeSceneInfo270900Current(app,pc)||
-       !world_||!world_->modelPrefixes_||!world_->domain_||!world_->imagePublication_||
+       !world_||!world_->modelPrefixes_||!world_->domain_||
        !runtimeQueries_||!nativeTrackLoadBorrowsAdmitted()||!worldApplication_||
        worldApplication_->attachmentLock423F58())return false;
     const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,worldEntity_.sessionGeneration);
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!display||!runtimeQueries_->camera_||!runtimeQueries_->camera_->session||
-       world_->rendererPublication_!=&display->renderer_||
-       world_->imagePublication_->raStaticWorldOwner()!=world_.get()||
+       !nativeWorldPublicationCurrent(*display)||
        !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,rectangle,revision))return false;
     if(!completeNativeTriggerServices2DCB30(pc))return false;
     return continueNativeSky274AE0(app,pc); //Actual next Profile/sky prefix; no fullWorld.

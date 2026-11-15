@@ -263,10 +263,14 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
             if (!std::isfinite(value) || value < 0.f || value > 1.f)
                 return fail(d, VehicleWindowError50DS::request, "world fog color outside finite [0,1]");
     }
-    if (request.enableNativePodShadows && (!track.mesh ||
-        (track.mode != VehicleWindowMode50DS::sourceVertexColors &&
-         track.mode != VehicleWindowMode50DS::callerMaterialTextures)))
-        return fail(d, VehicleWindowError50DS::request, "native pod shadows require actual source-color/textured track");
+    // Original shadow receiver tables: both or neither, bounded.
+    if (request.staticInstanceCount ? (!request.staticShadowReceiving || !request.staticInstanceZone ||
+            request.staticInstanceCount > 100000u) :
+        (request.staticShadowReceiving || request.staticInstanceZone))
+        return fail(d, VehicleWindowError50DS::request, "original shadow receiver tables incomplete");
+    if (request.staticPortalCount ? (!request.staticPortalZones || !request.staticPortalCorners ||
+            request.staticPortalCount > 4096u) : (request.staticPortalZones || request.staticPortalCorners))
+        return fail(d, VehicleWindowError50DS::request, "original shadow portal tables incomplete");
     if (!track.mesh)
         return (!track.maximumVertexBytes && !track.maximumIndexBytes &&
             track.mode == VehicleWindowMode50DS::unspecified && track.vertexColorScale == 1.f &&
@@ -505,7 +509,8 @@ bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWin
 bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
     auto selected = request;
     selected.track = request.dynamicWorld;
-    selected.enableNativePodShadows = false;
+    selected.staticShadowReceiving = nullptr; selected.staticInstanceZone = nullptr; selected.staticInstanceCount = 0;
+    selected.staticPortalZones = nullptr; selected.staticPortalCorners = nullptr; selected.staticPortalCount = 0;
     const auto& world = selected.track;
     if (world.mesh && (world.mode != VehicleWindowMode50DS::callerMaterialTextures ||
         world.mesh->vertices.size() > maxVehicleWindowDynamicVertices50DS ||

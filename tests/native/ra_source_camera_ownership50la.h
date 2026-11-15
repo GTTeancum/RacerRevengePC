@@ -2859,6 +2859,26 @@ class OwnershipBridge final {
             return complete;
         }catch(...){d.message="RA grid cleanup exception; actual slot effects and retirement obligation retained";return false;}
     }
+    // The race load's camera start before the population (1A93B0 -> 1A9EE0):
+    // the same Session, generation, authored inputs and display as prepareCamera.
+    original_camera_session50KX::Result prepareCameraTrackCold(std::uint64_t generation,Diagnostic& d)noexcept {
+        namespace c=original_camera_session50KX;
+        d={};
+        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
+           !cameraBankCurrent()||!generation||generation!=camera_->generation||!camera_->display){
+            d.message="RA camera track load requires the same live Bank and actual manager/session generation";
+            d.camera.status=c::Status::owner;return d.camera;
+        }
+        if(!camera_->fog.current()||camera_->display->trackFog3EC!=&camera_->fog.fields_){
+            d.message="actual retained RA fog owner was replaced";
+            cameraPrepareTerminal_=true;d.camera.status=c::Status::owner;return d.camera;}
+        try {
+            d.camera=camera_->session->prepareTrackCold(generation,camera_->authored,*camera_->display);
+            if(d.camera.status!=c::Status::complete)d.message="actual SourceCamera track load remains incomplete";
+            return d.camera;
+        }catch(...){cameraPrepareTerminal_=true;d.message="actual SourceCamera track load exception; partial state retained";
+            d.camera.status=c::Status::terminal;return d.camera;}
+    }
     original_camera_session50KX::Result prepareCamera(std::uint64_t generation,Diagnostic& d)noexcept {
         namespace c=original_camera_session50KX;
         d={};

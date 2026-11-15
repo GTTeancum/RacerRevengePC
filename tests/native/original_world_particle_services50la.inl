@@ -39,8 +39,7 @@ bool Owner::continueNativeParticleServices274370(const original_main_entry50KG::
     const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,worldEntity_.sessionGeneration);
     std::array<std::int32_t,4> rectangle{};std::uint64_t selection=0;
     if(!display||!runtimeQueries_->camera_||!runtimeQueries_->camera_->session||
-       world_->rendererPublication_!=&display->renderer_||!world_->imagePublication_||
-       world_->imagePublication_->raStaticWorldOwner()!=world_.get()||
+       !nativeWorldPublicationCurrent(*display)||
        !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,rectangle,selection))return false;
     g::OriginalGcParticleManager50KG* numeric=nullptr;Entity* managerEntity=nullptr;
     if(!nativeEmitterManager274370Current(numeric,managerEntity,pc)||!numeric||!managerEntity)return false;

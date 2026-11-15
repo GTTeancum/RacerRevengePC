@@ -220,6 +220,18 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
        !session.onOwnerThread())return false;
     try {
     const auto race=sourceRace28COwner_;const auto& issued=session.nativeTaIssuance_;
+    // Read-only refusal diagnostic (one line per distinct gate).
+    const auto refused=[](int gate)noexcept{static int last=0;
+        if(gate!=last){last=gate;std::fprintf(stderr,"camera34_bind_refused gate=%d\n",gate);}return false;};
+    if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_)return refused(1);
+    if(race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session))return refused(2);
+    if(!issued||issued->issuer!=this||!race->raceCameraCourse34(issued->course)||
+       issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation)return refused(3);
+    if(session.closed_||session.abandoned_||!session.displayInputs_)return refused(4);
+    if(!session.readsBound_||!session.identitiesCurrent())return refused(5);
+    if(session.actual_.humanCount34!=1u||&session.actual_.race94!=&race->field94_)return refused(6);
+    if((race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||race->field8C_!=0u)return refused(7);
+    if(race->cameraInitStep_!=Step::nativePending&&race->cameraInitStep_!=Step::nativeReady)return refused(8);
     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
        race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session)||
        !issued||issued->issuer!=this||!race->raceCameraCourse34(issued->course)||
@@ -236,8 +248,25 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
     const auto& camera=race->camera34_;
     if(!camera||camera->issuer_!=this||camera->entities_!=entitiesOwner_||
        camera->phase_!=rr::game::OriginalFrontendCameraCold50LA::Phase::beforeViewport114A00||
-       !camera->coldRetirementPreflight(true).okay())return false;
+       !camera->coldRetirementPreflight(true).okay())return refused(9);
     const auto display=raceDisplayOwner50LA_.lock();
+    if(!display||display!=race->loadDisplay_||display->application_!=this)return refused(10);
+    // The race display's creation marks the start of gameplay camera custody
+    // (source Camera0 no longer the known frontend/loading value). When the
+    // race camera starts before the display content exists (display brought
+    // up, not created), that same transition happens here, once.
+    if(!display->created_&&!display->attempted_&&display->renderer_.broughtUp()&&
+       display->sourceCurrentCamera0Known_&&!display->sourceSelectedCamera0_){
+        display->sourceCurrentCamera0Known_=false;
+        display->invalidateGameplayCameraObservation50LA();
+        std::fprintf(stderr,"race_display_gameplay_camera_start before_create=1\n");
+    }
+    if(!display->gameplayDisplayIdentityCurrent50LA()){
+        std::fprintf(stderr,"camera34_display_identity created=%d attempted=%d up=%d known=%d selected=%d\n",
+            int(display->created_),int(display->attempted_),int(display->renderer_.broughtUp()),
+            int(display->sourceCurrentCamera0Known_),int(bool(display->sourceSelectedCamera0_)));
+        return refused(11);
+    }
     if(!display||display!=race->loadDisplay_||display->application_!=this||
        !display->gameplayDisplayIdentityCurrent50LA()||!display->video_->host.current()||
        &session.displayInputs_->renderer!=&display->renderer_||

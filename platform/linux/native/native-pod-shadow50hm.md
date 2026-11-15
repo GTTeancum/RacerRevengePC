@@ -1,5 +1,12 @@
 # Native pod footprint shadows 50HM
 
+**RETIRED (2026-11).** Replaced by the original projected shadows for every
+course: `src/game/original_projected_shadow50ps.h` and
+`platform/linux/native/vehicle_window_gl50ds_shadow50ps.cpp`
+(`work/scratch/pod-shadows/PLAN.md`). The headers and checks named below are
+deleted; this file is kept only as history.
+
+
 This is a host presentation approximation in the actual native renderer. It
 uses three soft directional elliptical footprints fitted to the current
 world-space opaque chariot / left-engine / right-engine vertices. It does not

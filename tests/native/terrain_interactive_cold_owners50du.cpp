@@ -172,6 +172,7 @@ void OwnersContext::run() {
   }
   if(isRaTrack){
    require50DU(originalMainApplication.enabled,"RA requires the actual original Application");
+   // Video and the race display are already up (every course, roster stage).
    openNativeVideo();
    originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
@@ -258,14 +259,8 @@ void OwnersContext::run() {
         <<" texture_offset="<<material.texture.byteOffset<<'\n';
     require50DU(false,raSessionDiagnostic.failure?raSessionDiagnostic.failure:"RA actual cold session construction failed");
    }
-   require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),
-       "RA TimeStats final shared material verification failed");
-   if(sourceDamage.owner)require50DU(originalMainApplication.finishDamageNativeCold50LA(sourceDamage),
-       "RA Damage final shared material verification failed");
-   require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),
-       "RA PositionStats preloaded canonical sources changed during construction");
-   require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),
-       "RA Speed/Boost final shared material verification failed");
+   // The HUD owners' final shared-material verification follows the single
+   // population, at the population point every course uses (publication).
    if(humanCourseEnabled)racerBank.visit(0,[&](){initializeOriginalHumanResetTimers50LC(playerEvents);});
    contactBindings=nativeRosterOwners->contacts;
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerNames[slot]=racerVisuals[slot]->displayName;

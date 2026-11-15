@@ -8,8 +8,12 @@
 
 namespace original_main_entry50KG {
 bool RaceDisplayLifetime50LA::gameplayDisplayIdentityCurrent50LA()const noexcept {
-    if(!ownerThread()||retiring_||!created_||frontendCreated_||!video_||!application_||
-       !video_->originalMain||!video_->host.created()||!renderer_.initialized()||
+    // The race display exists from boot in the original: brought up and not
+    // yet created (the race load before its single population) is the same
+    // display as the created one.
+    if(!ownerThread()||retiring_||frontendCreated_||!video_||!application_||
+       !(created_?renderer_.initialized():(!attempted_&&renderer_.broughtUp()))||
+       !video_->originalMain||!video_->host.created()||
        renderer_.sessionDisplayOwner50LA_!=this||video_->host.sessionDisplayRenderer50LA_!=&renderer_||
        sourceCurrentCamera0Known_||sourceSelectedCamera0_)return false;
     std::uint32_t ignoredPause=0;

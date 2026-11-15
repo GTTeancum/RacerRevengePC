@@ -15,6 +15,7 @@
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/native_test_undertrack50ut.h"
 #include "../../src/game/collision_mesh_admission50cc.h"
+#include "../../src/game/original_projected_shadow50ps.h"
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -3297,6 +3298,88 @@ void Context::run() {
          <<" operation="<<(f8.operation?f8.operation:"actual Session missing")
          <<" source_effects="<<f8.sourceEffectsCommitted<<'\n';
      
+    }
+    {
+     // Original projected pod shadows (274CD0 / 1B32E0 / 231DF0), the same
+     // path for every course and every pod. Racer slot order: player, then
+     // the submitted opponents. Host-side static storage only.
+     static rr::game::OriginalProjectedShadowFrame50PS originalShadowFrame50PS;
+     static std::array<rr::game::ShadowRacerInput50PS,rr::game::maxProjectedShadows50PS> shadowRacers50PS{};
+     static std::uint64_t shadowFailures50PS=0;
+     static std::uint64_t shadowDisplayBoxes50PS=0,shadowSourceBoxes50PS=0;
+     const std::uint32_t racerCount=1u+renderFrame.opponentCount;
+     renderFrame.originalShadows=nullptr;
+     if(racerCount<=rr::game::maxProjectedShadows50PS){
+      // Caster slot -> batch component: 1B4 chariot, 1B8 right (2), 1BC left
+      // (1), 1C0 bottom-right (4), 1C4 bottom-left (3).
+      constexpr std::uint32_t slotComponent[5]={0u,2u,1u,4u,3u};
+      // settings (race +B4) +58 = the ALL8 manager flags58: bit 2 set at the
+      // countdown (original_camera_start_effects.cpp), bit 0 at the end.
+      const std::uint8_t managerFlags58=sourceCameraSession?sourceCameraSession->shadowManagerFlags58():0u;
+      const bool raceRunning58=(managerFlags58&4u)&&!(managerFlags58&1u);
+      const std::uint32_t shadowHumans=sourceCameraSession?sourceCameraSession->shadowHumanCount34():1u;
+      for(std::uint32_t slot=0;slot<racerCount;++slot){
+       auto& in=shadowRacers50PS[slot];in={};
+       const auto* batch=slot?renderFrame.opponents[slot-1u].batch:&next;
+       if(!batch)continue;
+       in.present=true;
+       // 1B35B0..1B3604 (read only while the race runs): race +48[i] is view
+       // i's camera; attached (mode44 5) or follow (mode44 0) on follow
+       // record +64 -> +100 == 2 casts engines only. The port has one view,
+       // the human's (slot 0). r+58 is the racer class58: 0 for humans only.
+       if(slot<shadowHumans&&slot==0u&&sourceCameraSession){
+        const auto mode=sourceCameraSession->cameraMode();
+        in.engineOnlyView=mode==static_cast<std::int32_t>(rr::game::shadowAttachedCameraMode50PS)||
+            (mode==static_cast<std::int32_t>(rr::game::shadowFollowCameraMode50PS)&&
+             sourceCameraSession->shadowFollowRecord100()==rr::game::shadowCloseFollowRecord50PS);
+       }
+       in.viewRule58=slot>=shadowHumans;
+       // Player limp: the lost side's engine models are hidden (collapsed);
+       // they are not casters either.
+       const std::uint32_t hiddenComponents=slot?0u:limpHiddenDrawn;
+       for(std::uint32_t casterSlot=0;casterSlot<5u;++casterSlot){
+        const std::uint32_t c=slotComponent[casterSlot];
+        if(c>=batch->componentCount||((hiddenComponents>>c)&1u))continue;
+        bool sourceBounds=false;
+        if(!rr::game::shadowBoxFromSubmission50PS(batch->component[c],in.box[casterSlot],sourceBounds))continue;
+        // +1B4 -> +10 of this part's model (2316D0 clamps LOD 2 to it).
+        in.lodCount[casterSlot]=renderer.racerShadowLodCount50PS(slot,c);
+        if(!in.lodCount[casterSlot])in.lodCount[casterSlot]=1u; // no caster LOD stream: displayed mesh, logged
+        ++(sourceBounds?shadowSourceBoxes50PS:shadowDisplayBoxes50PS);
+       }
+       // Cable-shadow slots 1D0..1DC: filled by the cable-shadow owner
+       // (patch 05, after the pod-load work lands).
+       // Stand-in for r+1B4 world position + model +130: the chariot box centre.
+       if(in.box[0].valid){
+        for(unsigned a=0;a<3;++a)in.reference[a]=0.5f*(in.box[0].minimum[a]+in.box[0].maximum[a]);
+        in.referenceValid=true;
+       }
+      }
+      rr::game::ShadowFrameInput50PS shadowInput;
+      shadowInput.frame=submittedDrawFrames;
+      // Port races are single view (no split-screen race path exists): Race+1B0 & 3 == 1.
+      shadowInput.raceViews=1u;
+      shadowInput.racerCount=racerCount;
+      shadowInput.viewMode58=raceRunning58;
+      shadowInput.viewRacerCount=std::min(shadowHumans,racerCount);
+      shadowInput.racers=shadowRacers50PS.data();
+      for(unsigned a=0;a<3;++a)shadowInput.cameraEye[a]=camera.eye[a];
+      // readCameraPrimaryZone48 is zero-based; model +28 / instance zones are 1-based.
+      std::uint32_t shadowZone=0;
+      if(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(shadowZone))++shadowZone;
+      else shadowZone=0;
+      shadowInput.cameraZone=shadowZone;
+      rr::game::ProjectedShadowDiagnostic50PS shadowDiagnostic;
+      if(rr::game::buildProjectedShadows50PS(shadowInput,originalShadowFrame50PS,shadowDiagnostic))
+       renderFrame.originalShadows=&originalShadowFrame50PS;
+      else if(shadowFailures50PS++<5)
+       std::cerr<<"original_shadow_build_rejected racer="<<shadowDiagnostic.racer<<" reason="
+           <<(shadowDiagnostic.operation?shadowDiagnostic.operation:"")<<'\n';
+      if(submittedDrawFrames%600u==0u)
+       std::cerr<<"original_shadow_inputs frame="<<submittedDrawFrames<<" racers="<<racerCount
+           <<" source_boxes="<<shadowSourceBoxes50PS<<" display_boxes="<<shadowDisplayBoxes50PS
+           <<" camera_zone="<<shadowZone<<" flags58="<<unsigned(managerFlags58)<<" humans="<<shadowHumans<<'\n';
+     }else if(shadowFailures50PS++<5)std::cerr<<"original_shadow_build_rejected racers="<<racerCount<<'\n';
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
     bool submitted=false;

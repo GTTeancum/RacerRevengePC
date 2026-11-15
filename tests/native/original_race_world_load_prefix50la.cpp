@@ -8,16 +8,6 @@
 #include "../../src/game/original_native_collision_categories.h"
 #include <cstdlib>
 #include <cstring>
-namespace ra_source_camera50LA {
-// The one place that says whether the pod load 2129C0 runs at race load.
-// PORT STAND-IN (flagged): the route-2 test switch; retired when the pod load
-// is the one load path on every course.
-bool podLoadConstructsWreckRows()noexcept {
-    static const bool value=[]{const char* v=std::getenv("RR_RA_OWNED_PREPARATION");
-        return v&&v[0]=='1'&&!v[1];}();
-    return value;
-}
-}
 #include <cstdio>
 #include "original_source_particle_config_invocation50la.inl"
 #include <cstdio>
@@ -111,11 +101,14 @@ bool Owner::nativeTrackArchiveCurrent(const original_main_entry50KG::Application
     if(sourceTrackStep_!=SourceTrackStep::unreached||sourceTrackFile_||sourceWorldConfig_||
        nativeScbRevoked_||terminal_||closed_||!worldColdConstructed_||!worldReset270550Complete_||
        worldApplication_!=app.entities()||!source_||!source_->sourcesDecoded()||
-       !prefix_.sources||!prefix_.staticWorld||!prefix_.staticWorldImages||
+       !prefix_.sources||!prefix_.staticWorld||
        !rosterMountComplete_||rosterMountApplication_!=&app||!rosterMountDomain_||
        !rosterMountDomain_->prepared()||!world_||
        world_->source_!=source_||world_->domain_!=rosterMountDomain_||
-       rosterMountDomain_!=app.standardMaterialDomain()||!world_->coldImagesCurrent())return false;
+       rosterMountDomain_!=app.standardMaterialDomain()||
+       // 1A9EE0 runs before the single population (1A7B14): sources admitted,
+       // images not yet built; afterwards the built images must stay current.
+       !(prefix_.staticWorldImages?world_->coldImagesCurrent():world_->imageSourcesCurrent()))return false;
     const auto provider=rosterMountDomain_->archiveProvider3E1A70();
     if(!provider||!provider->sealed()||provider->revision()!=world_->providerRevision_)return false;
     std::size_t matches=0;
@@ -288,93 +281,10 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         // (1A6D98 -> 1A95B0 -> 174DF0) now runs on the Session's existing
         // never-adopted native staging, the same 174DF0/174A30 path every
         // other course uses (it already carries RA's 78/7C children). The
-        // separate source-adopted owned preparation below stays fenced: it
-        // was never completed past 2C1170 and is not entered.
-        {
-            if(!ra_source_camera50LA::podLoadConstructsWreckRows()){
-                std::fprintf(stderr,"ra_native_track_load_complete pc=1aa508 controller_load=existing_native_staging");
-                std::fputc(10,stderr);pc=0x1a6d98;return true;
-            }
-        }
-        // Source constructor30 is zero, but the complete original reachable
-        // writer history is NOT established here. Do not read field30_ as
-        // authority, skip114770, or claim1A95B0/174DF0 returned. The native
-        // root already owns ONE counted174A30 and its real cut/audio children;
-        // prepare those existing owners without allocating another controller.
-        const auto& issued=session.nativeTaIssuance_;
-        auto& controller=session.coldController_;
-        const auto& entity=controller.entity;
-        if(session.nativeRaOwnedPreparationAttempted_||session.closed_||session.abandoned_||
-           session.coldBound_||session.authoredPhase_||
-           session.frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
-           !issued||issued->issuer!=this||issued->course!=rr::game::OriginalCameraStartCourse::ra||
-           issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation||
-           session.actual_.applicationEntities!=entitiesOwner_||
-           !session.actual_.applicationAnimation.sameOwner(animationClock())||
-           !session.readsBound_||!session.identitiesCurrent()||
-           !controller.started||controller.released||controller.issuerGeneration!=issued->generation||
-           controller.nativeLoadOperandsPublished||controller.nativeLoadOperandsRevoked||
-           controller.nativeScene3COwner||controller.race88||controller.scene3C||
-           !race->camera34_||race->cameraNativeAdapter34_!=&session||
-           race->nativeTaController48_!=&entity||
-           entity.kind!=rr::game::OriginalWreckComponentKind50LA::cameraController174A30||
-           entity.reference00!=1||entity.sessionGeneration!=issued->generation||
-           entity.objectKey!=session.key(session.controller_)||entity.parent1C||entity.previous10||entity.next14||
-           !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
-           !entitiesOwner_->entityAuthority_.canRetire(entity)||
-           (race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||
-           session.actual_.humanCount34!=1u||race->field8C_!=0u||session.raceMode8C_!=0||
-           !session.taCuts_||session.taCuts_->loaded()||session.taCuts_->trackId()!="RA"||
-           session.taCuts_->cutCount()!=7u||controller.children64[4]||controller.children64[3]||
-           !session.nativeCinematographer70_||session.nativeCinematographer70Published_||
-           !session.nativeIntroBackingCurrent()||
-           !session.actual_.taIntroAuthoring||session.actual_.taIntroAuthoring->trackId()!="RA"||
-           !session.nativeIntroFirstChildCurrent())return false;
-        // Native late custody of process330 constructor/resources only. The
-        // prefix ends BEFORE114A00; it cannot satisfy1CC900 or load return.
-        if(!stageNativeLoading330Prefix(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",326,unsigned(pc));std::fputc(10,stderr);return false;}
-        session.nativeRaOwnedPreparationAttempted_=true;
-        //One-shot SAME-controller source prefix under explicit native adoption.
-        //Not proof that the still-unjoined Race30/1A95B0 caller reached here.
-        if(!session.beginSameControllerLoad174DF0(race.get(),race->camera34_.get(),race->field8C_,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",330,unsigned(pc));std::fputc(10,stderr);return false;}
-        std::uint32_t actualWorldCount=0;
-        if(!race->readSameControllerWorldCount174E48(session,actualWorldCount,pc)){
-            controller.nativeLoadPrefixPC=pc;return false;
-        }
-        if(!session.publishSameControllerWorldCount174E58(actualWorldCount,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",335,unsigned(pc));std::fputc(10,stderr);return false;}
-        //Original profile reads occur AFTER raw A8 publication. Do not eagerly
-        //require mode/App350 on subtype2/3, or App350 when mode==2.
-        std::uint32_t subtype=0,mode=0;std::int32_t process350=0;
-        pc=controller.nativeLoadPrefixPC=0x174e6c;
-        if(!riderProfile->resultsSubtype11258(subtype)||subtype!=session.actual_.launchKind11258){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",340,unsigned(pc));std::fputc(10,stderr);return false;}
-        if(subtype==1u){
-            pc=controller.nativeLoadPrefixPC=0x174e90;
-            const auto* common=riderProfile->commonProfile();
-            if(!common||!common->known||common->mode34!=session.actual_.configuration34){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",344,unsigned(pc));std::fputc(10,stderr);return false;}
-            mode=common->mode34;
-            if(mode!=2u){pc=controller.nativeLoadPrefixPC=0x174e9c;process350=session.actual_.application350;}
-        }
-        if(!session.finishSameControllerProfile174EC0(subtype,mode,process350,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",348,unsigned(pc));std::fputc(10,stderr);return false;}
-        if(!session.adoptNativeCamera6468(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",349,unsigned(pc));std::fputc(10,stderr);return false;}
-        if(!session.adoptNativeAttached6CAnd70(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",350,unsigned(pc));std::fputc(10,stderr);return false;}
-        if(!session.completeNativeControllerChildren177750(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",351,unsigned(pc));std::fputc(10,stderr);return false;}
-        //Separate explicit native adaptation of the SAME existing first
-        //racer, NOT source fallthrough or proof of1A6D98/1A95B0 reachability.
-        //No a2/a3 caller operands are invented: this prefix stops before them.
-        //Outside any Bank visit: 1750A0's adoption reads the retained slot0
-        //scalars through Bank::read, which refuses (throws) inside a visit.
-        if(!session.adoptNativeRacerCamera1750A0(pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",357,unsigned(pc));std::fputc(10,stderr);return false;}
-        //Explicit native loader adoption, after the actual same-World water
-        //return. It never turns planned cold arrays into source publications.
-        if(!session.nativeWreckOwner_||!race->stageNativeFirstWreckLoad(*this,session,*session.nativeWreckOwner_,pc)){std::fprintf(stderr,"ra_owned_preparation_stopped line=%d pc=%x",360,unsigned(pc));std::fputc(10,stderr);return false;}
-        // The actual base receiver's shared+98 now reaches a real detached
-        // D48 constructor/publication, but remains pending at2C1170. No load,
-        // attachment, Player+9C/D40 ownership or full+98 return is inferred.
-        // Native human return/resource scans are not source Player/Config
-        // history. No phase5, camera continuation or Restart readiness follows.
-        return false;
-        //The independent source corridor remains fenced at1A6D98; native
-        //backing adoption does not prove1A95B0 or174DF0 returned.
+        // route-2 source-adopted owned preparation (never completed past
+        // 2C1170) is retired with its test switch.
+        std::fprintf(stderr,"ra_native_track_load_complete pc=1aa508 controller_load=existing_native_staging");
+        std::fputc(10,stderr);pc=0x1a6d98;return true;
     }catch(...){return false;}
 }
 }
@@ -431,7 +341,7 @@ bool OwnershipBridge::stageNativeRetainedWreckCold(original_camera_session50KX::
        session.actual_.followQueries.get()!=follow_.get()||!rosterResources_||!rosterResources_->wreckBacking_||
        !session.readsBound_||!session.identitiesCurrent()||session.closed_||session.abandoned_||
        !camera_->generation||session.generation_!=camera_->generation)return false;
-    if(nativeWreckAttempted_)return nativeWreckPrepared_||(inputs_.wreck.empty()&&!podLoadConstructsWreckRows());
+    if(nativeWreckAttempted_)return nativeWreckPrepared_||inputs_.wreck.empty();
     nativeWreckAttempted_=true;
         auto& backing=*rosterResources_->wreckBacking_;
         if(backing.applicationIdentity()!=session.actual_.applicationEntities.get()||
@@ -447,7 +357,6 @@ bool OwnershipBridge::stageNativeRetainedWreckCold(original_camera_session50KX::
         // other course today): nothing to bind before Follow; the backing is
         // released unbound at retirement. Follow then runs with zero rows.
         if(inputs_.wreck.empty()){
-            if(podLoadConstructsWreckRows())return false;
             std::fprintf(stderr,"wreck_rows_reserved rows=0 pod_load=0");std::fputc(10,stderr);
             return true;
         }

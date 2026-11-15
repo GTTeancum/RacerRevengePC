@@ -31,7 +31,7 @@ struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer
 #include "../../../src/game/original_ui_text50kg.h"
 #include "../../../src/game/original_ui_text_position50kg.h"
 #include "../../../src/game/chariot_scene49u.h"
-#include "native_pod_shadow50hm.h"
+#include "../../../src/game/original_projected_shadow50ps.h"
 #include "../../../src/game/pod_cables50fd.h"
 #include "../../../src/game/original_gameplay_binder_candidate.h"
 #include <algorithm>
@@ -61,12 +61,9 @@ inline constexpr U rgba8 = 0x8058, depth24 = 0x81A6, unsignedByte = 0x1401, floa
 inline constexpr U rgba = 0x1908, pixelPackBuffer = 0x88EB;
 inline constexpr U colorBufferBit = 0x00004000, depthBufferBit = 0x00000100;
 inline constexpr U texture2D = 0x0DE1, textureUnit0 = 0x84C0;
-// Keep the CPU capacity tied to the deliberately unrolled GLSL contract.
-static_assert(maxVehicleWindowOpponents50DS == 7, "update explicit shadow caster slots when racer capacity changes");
-inline constexpr U nativeShadowRacerCount = 1 + maxVehicleWindowOpponents50DS;
-// Existing native shadow approximation retains its three primary-model casters.
-// Optional models are rendered normally; no additional shadow parity is claimed.
-inline constexpr U nativeShadowCasterCount = 3 * nativeShadowRacerCount;
+// One original projected shadow target per racer slot (player + opponents).
+static_assert(1 + maxVehicleWindowOpponents50DS <= game::maxProjectedShadows50PS,
+    "every racer slot needs its own original shadow target");
 inline constexpr U maxComponents = game::maxVehicleDrawComponents50CM;
 // Bounded body slots, one per draw component: chariot, primary left/right, then
 // actual optional lower left/right. Body slot N is component N. Admission comes
@@ -237,6 +234,12 @@ struct OwnerGl {
     void (*blitFramebuffer)(I, I, I, I, I, I, I, I, U, U) = nullptr;
     // Optional, admitted only by the actual desktop GL 4.3+ context.
     CopyImageSubData50DS copyImageSubData = nullptr;
+    // GL 1.5 occlusion queries, loaded only for the original shadow trace.
+    void (*genQueries)(I, U*) = nullptr;
+    void (*deleteQueries)(I, const U*) = nullptr;
+    void (*beginQuery)(U, U) = nullptr;
+    void (*endQuery)(U) = nullptr;
+    void (*getQueryObjectuiv)(U, U, U*) = nullptr;
 };
 } // namespace vehicle_window_gl50ds_detail
 // Private implementation header only; not part of vehicle_window_gl50ds.h.
@@ -319,6 +322,8 @@ struct VehicleWindowGl50DS::Storage {
         U sourceZone=0; // one-based authored zone, 0 = not zoned
         bool worldFogEligible = false;
         bool allowPodShadow = true;
+        // Static world instance this span was published from (shadow receiver key).
+        U worldInstance = 0xffffffffu;
         U animation = assets::unresolvedMaterialTexture50EA;
         bool submittedGameplayCandidate = false, submittedCompletedGameplay = false;
     };
@@ -468,8 +473,6 @@ struct VehicleWindowGl50DS::Storage {
     bool bindRacerSkin50LA(const game::VehicleDrawSubmission50CM& part, U slot, U component) noexcept;
     void releaseRacerSkin50LA() noexcept;
     void selectRacerSkinSpan50LA(const game::VehicleDrawSubmission50CM& part, U material) noexcept;
-    bool racerSkinShadow50LA(const game::VehicleDrawSubmission50CM& part, const RacerSkin50LA& skin,
-        NativePodShadow50HM& output) const noexcept;
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
     U trackSpanCount = 0;
@@ -546,12 +549,6 @@ struct VehicleWindowGl50DS::Storage {
     I worldFogColorUniform = -1, worldFogRangeUniform = -1;
     float worldFogCamera[3]{};
     I trackIndexCount = 0;
-    NativePodShadow50HM podShadows[nativeShadowRacerCount][3]{};
-    float podShadowOpponentBounds[maxVehicleWindowOpponents50DS][4]{};
-    I nativeShadowEnabledUniform = -1;
-    I nativeShadowOpponentCountUniform = -1;
-    I nativeShadowCenterUniforms[nativeShadowCasterCount]{}, nativeShadowShapeUniforms[nativeShadowCasterCount]{};
-    I nativeShadowOpponentBoundsUniforms[maxVehicleWindowOpponents50DS]{};
     U targets[2]{}, colors[2]{}, depths[2]{};
     // Native F8-only scratch plane: actual opaque source alpha/depth writes
     // never overwrite the unrelated gameplay world's depth attachment.
@@ -692,6 +689,8 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t published = 0;
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
     bool frontendOnly = false;
+    // Context-only bring-up (functions loaded, context checked, no GL name).
+    bool broughtUp = false;
     __GLsync* garagePollFence50KG=nullptr;
     // Completion marker of the last Garage source target (instead of a CPU
     // glFinish at completion). It is waited and released before the next
@@ -725,6 +724,7 @@ struct VehicleWindowGl50DS::Storage {
 #include "original_gameplay_blur_storage.inl"
 #include "native_fxaa_storage.inl"
 #include "native_debris_storage.inl"
+#include "native_shadow_storage50ps.inl"
 #include "native_water_storage.inl"
 #include "native_coverage_storage.inl"
 bool uiCoverageDisjointTraced=false;
@@ -887,10 +887,6 @@ bool uiCoverageDisjointTraced=false;
     bool initializeOriginalFrontend(const VehicleWindowRequest50DS& input) noexcept;
     bool initialize(const VehicleWindowRequest50DS& input,
         const assets::VehicleDrawAssets50CR& owner) noexcept;
-    // Only use a retained, preflighted batch and its own cold material bank.
-    // The live world-space payload is the same one this transaction will draw.
-    bool buildRacerPodShadows(const game::VehicleDrawBatch50CO& batch, U archetype,
-        NativePodShadow50HM (&output)[3]) noexcept;
     static bool ready(void* context, const VehicleGlResources50CV& resources, std::uint8_t bank,
         const game::VehicleDrawBatch50CO& batch, const game::VehicleDrawPlan50CS&) noexcept;
     static bool materialReady(void* context, game::VehicleDrawComponent50CM component, U material) noexcept;

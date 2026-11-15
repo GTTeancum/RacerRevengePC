@@ -315,6 +315,18 @@ public:
         }catch(...){return reject(d,"terminal world image failure; actual prefixes retained");}
     }
 public:
+    // The track load (1A9EE0) precedes the single world population: image
+    // sources admitted, population and collector not yet built.
+    bool imageSourcesCurrent()const noexcept{return imageSourcesStaged_&&!imagesAttempted_&&!closed_&&
+        context_&&context_->live()&&domain_->archiveProvider3E1A70()->sealed()&&
+        domain_->archiveProvider3E1A70()->revision()==providerRevision_;}
+    // Read-only diagnostic: which part of coldImagesCurrent() is false.
+    int coldImagesRefusal()const noexcept{
+        if(!imagesComplete_)return 1;if(closed_)return 2;if(!context_||!context_->live())return 3;
+        if(!domain_->archiveProvider3E1A70()->sealed())return 4;
+        if(domain_->archiveProvider3E1A70()->revision()!=providerRevision_)return 5;
+        if(!domain_->materials382B38()->coldCollectorCurrent(imageCollector_))return 6;
+        return 0;}
     bool coldImagesCurrent()const noexcept{return imagesComplete_&&!closed_&&context_&&context_->live()&&
         domain_->archiveProvider3E1A70()->sealed()&&domain_->archiveProvider3E1A70()->revision()==providerRevision_&&
         domain_->materials382B38()->coldCollectorCurrent(imageCollector_);}

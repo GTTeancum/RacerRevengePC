@@ -6,6 +6,8 @@ namespace interactive_cold50DU { struct OwnersContext; }
 #include "track_session_assets50ig_fixture.h"
 #include "original_pause_cold_driver50la.h"
 #include "../../src/game/original_results104_50la.h"
+#include "original_pending_material_sources50la.h"
+#include <cstdio>
 
 // Concrete synchronous composition of the existing native session owners.
 // The caller keeps Application, the execution arena and Bank alive; this class
@@ -27,7 +29,7 @@ class Join final {
     native_racer50HN::Bank& bank_;
     const std::uint64_t generation_;
     std::shared_ptr<ra_cold_roster50LA::Operation> roster_;
-    bool attempted_=false,retired_=false,cameraAttempted_=false;
+    bool attempted_=false,retired_=false,cameraAttempted_=false,trackLoaded_=false,populated_=false;
     std::array<bool,8> gridAttempted_{},freshAttempted_{};
     bool fail(Diagnostic& d,const char* why)noexcept{d.failure=why;return false;}
 public:
@@ -171,13 +173,14 @@ private:
             }
             d.operation="retained racer material resources";
             if(!aggregate_->prepareRetainedRuntimeModelResources(bank_,d.aggregate))return false;
+            // The RES-mounted world images must be resolvable when the race
+            // load's whole-table 2DF144 population runs (as in the original),
+            // and admitted before the track load (1A9EE0) that follows.
+            d.operation="RA world image sources before the race load";
+            if(!aggregate_->prepareStaticWorldImageSources(crowdImages,d.aggregate))return false;
             // HOST staging adaptation: source Pause100 then Results104 acquire
             // before the one combined image/collector plan; no second collector.
             if(pause){
-                // The RES-mounted world images must be resolvable when the race
-                // load's whole-table 2DF144 population runs (as in the original).
-                d.operation="RA world image sources before the race load";
-                if(!aggregate_->prepareStaticWorldImageSources(crowdImages,d.aggregate))return false;
                 d.operation="same counted race Pause100 then Results104 loading";
                 const bool loaded=actualHumanRacer60?
                     application_.loadHumanTournamentPauseResultsBeforeCollector50LA(
@@ -187,13 +190,34 @@ private:
                 if(!loaded)
                     return fail(d,"same counted race Pause/Results load rejected; actual partial owners retained");
             }
-            d.operation="single combined world image population";
-            if(!aggregate_->prepareStaticWorldImages(crowdImages,d.aggregate)||
-               !aggregate_->prepareStaticWorldDrawPlan(d.aggregate))return false;
-            // This is a completed cold join, not a running-race receipt. The
-            // existing frame/manager/start-gate path still owns activation.
+            // The single population and collector (1A7608 1AA5A0 -> 1A7B14
+            // 14D440) follow the camera's track load: completeWorldPopulation.
             return true;
         }catch(...){return fail(d,"RA native composition failed; actual partial owners retained for retirement");}
+    }
+    bool admitPendingMaterialSources(Diagnostic& d)noexcept {
+        const auto domain=application_.standardMaterialDomain();
+        if(!domain||!domain->prepared()||!domain->materials382B38()||!domain->archiveProvider3E1A70())
+            return fail(d,"material domain unavailable before the population");
+        original_racer_material_sources50LA::Materials materials;
+        original_racer_material_sources50LA::Textures textures;
+        original_pending_material_sources50LA::Result pending;
+        original_racer_material_sources50LA::Diagnostic collected;
+        if(!original_pending_material_sources50LA::collect(*domain->materials382B38(),
+            *domain->archiveProvider3E1A70(),materials,textures,pending,collected)){
+            std::fprintf(stderr,"pending_material_sources_refused why=sources status=%u pc=%x member=%s\n",
+                unsigned(collected.status),unsigned(collected.sourcePC),collected.member.c_str());
+            return fail(d,"pending material sources refused");
+        }
+        rr::assets::OriginalStandardMaterialDiagnostic50LA admitted;
+        if((!materials.empty()||!textures.empty())&&!domain->appendOriginalSources(materials,textures,admitted)){
+            std::fprintf(stderr,"pending_material_sources_refused why=admission status=%u pc=%x\n",
+                unsigned(admitted.status),unsigned(admitted.sourcePC));
+            return fail(d,"pending material admission refused");
+        }
+        std::fprintf(stderr,"pending_material_sources pending=%zu absent=%zu psm=%zu textures=%zu\n",
+            pending.pendingRows,pending.absentRows,pending.materials,pending.textures);
+        return true;
     }
 public:
     bool constructCamera(const ra_source_camera50LA::CameraRuntimeOwners& runtime,
@@ -204,6 +228,37 @@ public:
             return fail(d,"RA camera requires the actual retained cold roster and Bank");
         cameraAttempted_=true;
         return aggregate_->constructRetainedRuntimeSourceCamera(application_,runtime,originalCam,display,d.aggregate);
+    }
+    // 1A93B0 -> 1A9EE0: the race load's camera start and the track load it
+    // runs, before the single material population.
+    bool prepareCameraTrackCold(Diagnostic& d)noexcept {
+        d={};d.operation="actual source camera track load";
+        if(!cameraAttempted_||retired_||!aggregate_||trackLoaded_)
+            return fail(d,"RA track load requires the constructed camera, once");
+        const auto r=aggregate_->prepareRuntimeSourceCameraTrackCold(generation_,d.aggregate);
+        if(r.status!=original_camera_session50KX::Status::complete)return fail(d,"RA camera track load incomplete");
+        trackLoaded_=true;return true;
+    }
+    // 1A7608 1AA5A0 -> 1A7B14 14D440, once, after the track load: every row
+    // the track and the racers referenced is populated, then the one collector.
+    bool completeWorldPopulation(Diagnostic& d)noexcept {
+        d={};d.operation="pending material sources before the population";
+        if(!trackLoaded_||retired_||!aggregate_||!roster_||populated_)
+            return fail(d,"RA world population requires the completed track load, once");
+        populated_=true;
+        try {
+            // 14D370 constructs every row with references and no object. Rows
+            // whose sources no owner admitted (the track's flares, finish line
+            // and sun flare) are admitted by the common pending-row rule.
+            if(!admitPendingMaterialSources(d))return false;
+            static const std::array<std::vector<std::uint8_t>,6> noCrowd{}; // sources already staged
+            d.operation="single combined world image population";
+            if(!aggregate_->prepareStaticWorldImages(noCrowd,d.aggregate)||
+               !aggregate_->prepareStaticWorldDrawPlan(d.aggregate))return false;
+            // A completed cold join, not a running-race receipt. The existing
+            // frame/manager/start-gate path still owns activation.
+            return true;
+        }catch(...){return fail(d,"RA world population stopped; actual partial owners retained");}
     }
     rr::game::OriginalWreckComponent50LA* introController174A30(Diagnostic& d)noexcept {
         d={};d.operation="actual RA intro controller48";

@@ -762,7 +762,6 @@ bool VehicleWindowGl50DS::Storage::drawGameplayBinders() noexcept {
         gl.uniform1i(trackSourceColorAbsentUniform,0);
         gl.uniform1i(trackUseSourceNormalsUniform,0);gl.uniform1i(trackProjectionPassUniform,0);
         gl.uniform4f(trackUvTranslationUniform,0.f,0.f,0.f,0.f);
-        gl.uniform1i(nativeShadowEnabledUniform,0);gl.uniform1i(nativeShadowOpponentCountUniform,0);
         const auto& fog=request.track.worldFog;
         // Authored fog is on by default; retain the explicit scene-fog
         // diagnostic opt-out without dropping the actual Binder geometry.
@@ -856,32 +855,6 @@ bool VehicleWindowGl50DS::Storage::drawGameplayBinders() noexcept {
         return accepted&&restored;
     }
 
-bool VehicleWindowGl50DS::Storage::buildRacerPodShadows(const game::VehicleDrawBatch50CO& batch, U archetype,
-        NativePodShadow50HM (&output)[3]) noexcept {
-        const auto selected = racerView(archetype);
-        for (U c = 0; c < 3; ++c) {
-            const auto& part = batch.component[c];
-            std::uint64_t opaque = 0;
-            for (U span = 0; span < part.spanCount; ++span) {
-                bool casts = true;
-                if (request.mode == VehicleWindowMode50DS::callerMaterialTextures) {
-                    const auto& policy = selected.materials[selected.materialOffsets[c] +
-                        part.spans[span].material_index].policy;
-                    casts = policy.blend == VehicleWindowBlend50DS::opaque && policy.depthWrite;
-                }
-                if (casts) opaque |= std::uint64_t{1} << span;
-            }
-            const bool built = part.skin && selected.skin50LA && selected.skin50LA[c].eligible ?
-                racerSkinShadow50LA(part, selected.skin50LA[c], output[c]) :
-                buildNativePodShadow50HM(part, opaque, output[c]);
-            if (!built) {
-                diagnostic->component = c;
-                return fail(*diagnostic, VehicleWindowError50DS::assets, "native pod shadow source geometry rejected");
-            }
-        }
-        return true;
-    }
-
 bool VehicleWindowGl50DS::Storage::ready(void* context, const VehicleGlResources50CV& resources, std::uint8_t bank,
         const game::VehicleDrawBatch50CO& batch, const game::VehicleDrawPlan50CS&) noexcept {
         auto& s = *static_cast<Storage*>(context);
@@ -961,21 +934,6 @@ bool VehicleWindowGl50DS::Storage::ready(void* context, const VehicleGlResources
                 resources.indices[c].buffer != s.resources.indices[c].buffer)
                 return fail(*s.diagnostic, VehicleWindowError50DS::assets,
                     "batch is not the retained prepared mesh");
-        }
-        for (auto& racer : s.podShadows)
-            for (auto& shadow : racer) shadow = {};
-        if (s.request.enableNativePodShadows) {
-            if (!s.framePlayerHidden && !s.buildRacerPodShadows(batch, 0, s.podShadows[0])) return false;
-            for (U i = 0; i < s.frameOpponentCount; ++i) {
-                s.diagnostic->opponentIndex = i;
-                if (s.frameOpponentHidden[i]) { for (auto& v : s.podShadowOpponentBounds[i]) v = 0.f; continue; } // destroyed: no caster
-                if (!s.buildRacerPodShadows(s.frameOpponentBatches[i], s.frameOpponentArchetypes[i],
-                    s.podShadows[i + 1])) return false;
-                if (!buildNativePodShadowReceiverBounds50HM(s.podShadows[i + 1], s.podShadowOpponentBounds[i]))
-                    return fail(*s.diagnostic, VehicleWindowError50DS::assets,
-                        "native opponent shadow receiver bounds rejected");
-            }
-            s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         }
         return s.check("before vehicle preflight");
     }
@@ -1125,28 +1083,6 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                 s.gl.uniform1i(s.gsAlphaPassUniform,0);s.gl.uniform1i(s.environmentMapUniform,0);s.gl.uniform1i(s.gsAlphaPayloadUniform,0);
                 s.gl.uniform4f(s.environmentAmbientUniform,s.environmentAmbient[0],s.environmentAmbient[1],s.environmentAmbient[2],s.environmentAmbient[3]);
                 s.gl.uniform4f(s.trackUvTranslationUniform,0.f,0.f,0.f,0.f);
-                s.gl.uniform1i(s.nativeShadowEnabledUniform,
-                    s.request.enableNativePodShadows && !transparent ? 1 : 0);
-                s.gl.uniform1i(s.nativeShadowOpponentCountUniform,
-                    s.request.enableNativePodShadows && !transparent ? static_cast<I>(s.frameOpponentCount) : 0);
-                // One upload for the opaque track pass. Inactive slots are
-                // excluded by the explicit count, including after a roster
-                // shrinks; alpha/unlit/depth policy still disables all shadows.
-                if (s.request.enableNativePodShadows && !transparent) {
-                    for (U racer = 0; racer <= s.frameOpponentCount; ++racer) {
-                        for (U c = 0; c < 3; ++c) {
-                            const U caster = 3 * racer + c;
-                            const auto& center = s.podShadows[racer][c].centerAndReach;
-                            const auto& shape = s.podShadows[racer][c].shapeAndOpacity;
-                            s.gl.uniform4f(s.nativeShadowCenterUniforms[caster], center[0], center[1], center[2], center[3]);
-                            s.gl.uniform4f(s.nativeShadowShapeUniforms[caster], shape[0], shape[1], shape[2], shape[3]);
-                        }
-                    }
-                    for (U i = 0; i < s.frameOpponentCount; ++i) {
-                        const auto& bounds = s.podShadowOpponentBounds[i];
-                        s.gl.uniform4f(s.nativeShadowOpponentBoundsUniforms[i], bounds[0], bounds[1], bounds[2], bounds[3]);
-                    }
-                }
             }
             s.drawGl.bindVertexArray(s.trackVertexArray);
             s.drawGl.bindBuffer(elementBuffer, s.trackIndexBuffer);
@@ -1251,8 +1187,6 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                             s.gl.uniform1f(s.trackAlphaScaleUniform, span.material.policy.alphaScale);
                         integerUniform(5, s.trackUnlitUniform,
                             span.material.policy.unlit || span.material.policy.sourcePrelit ? 1 : 0);
-                        integerUniform(6, s.nativeShadowEnabledUniform, s.request.enableNativePodShadows &&
-                            !transparent && span.allowPodShadow && span.sourcePass == 1 && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
                         if (!s.check("bind explicit source-ordered track material")) return false;
                         trackRasterState = nextRasterState;
                         trackRasterKnown = !span.sourceUvAnimation;
@@ -1312,8 +1246,6 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
         gl.uniform1i(trackProjectionPassUniform, 0);
         gl.uniform4f(trackUvTranslationUniform,0.f,0.f,0.f,0.f);
         // Static receiver/culling bounds are deliberately not reused for moving owners.
-        gl.uniform1i(nativeShadowEnabledUniform, 0);
-        gl.uniform1i(nativeShadowOpponentCountUniform, 0);
         drawGl.bindVertexArray(dynamicWorldArrays[bank]);
         drawGl.bindBuffer(elementBuffer, dynamicWorldIndexBuffer);
         // Local to this pass: the first submitted span always establishes state,
@@ -1781,6 +1713,9 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
             // deferred flame/effect materials, not just the opaque body maps.
             if(c<sourceBodyCount50LA&&selected.specular[c].singleDiffuse&&
                !frameDiffuseSelected50LA[slot][c])continue;
+            // Material drain split (see commit): 1 = chariot translucency
+            // (pod_wndw glass), 2 = engine translucency (flames), 0 = all.
+            if((podEffectPass50PS==1&&c!=0)||(podEffectPass50PS==2&&c==0))continue;
             bool bound = false;
             for (U i = 0; i < selected.meshes[c]->spanCount; ++i) {
                 const auto& span = selected.meshes[c]->spans[i];
@@ -1929,97 +1864,6 @@ void VehicleWindowGl50DS::Storage::selectRacerSkinSpan50LA(const game::VehicleDr
 void VehicleWindowGl50DS::Storage::releaseRacerSkin50LA() noexcept {
         const auto& u = shader->uniforms();
         gl.uniform1i(u.skinMode50LA, 0); gl.uniform1i(u.skinDiffuseSelected50LA, 0);
-    }
-
-bool VehicleWindowGl50DS::Storage::racerSkinShadow50LA(const game::VehicleDrawSubmission50CM& part,
-        const RacerSkin50LA& cold, NativePodShadow50HM& output) const noexcept {
-        // Same footprint construction as buildNativePodShadow50HM, from exact
-        // per-bone moments (covariance) and transformed per-bone casting AABB
-        // corners (a superset of the extreme vertices for the min/max terms).
-        const auto& skin = *part.skin;
-        NativePodShadow50HM result{};
-        double low[3] = {INFINITY, INFINITY, INFINITY}, high[3] = {-INFINITY, -INFINITY, -INFINITY};
-        double samples = 0;
-        double sum[3] = {}, square[3][3] = {};
-        const auto corner = [&](const game::BodyMatrix48G& m, const std::array<float, 6>& b, unsigned k, double (&w)[3]) {
-            const double local[3] = {b[(k & 1) ? 3 : 0], b[(k & 2) ? 4 : 1], b[(k & 4) ? 5 : 2]};
-            for (unsigned axis = 0; axis < 3; ++axis)
-                w[axis] = local[0] * m.v[axis] + local[1] * m.v[4 + axis] + local[2] * m.v[8 + axis] + m.v[12 + axis];
-        };
-        for (U bone = 0; bone < skin.boneCount && bone < cold.boneCount; ++bone) {
-            const double n = cold.count[bone];
-            if (!n) continue;
-            const auto& m = skin.bones[bone];
-            for (unsigned k = 0; k < 8; ++k) {
-                double w[3]; corner(m, cold.bounds[bone], k, w);
-                for (unsigned axis = 0; axis < 3; ++axis) { low[axis] = std::min(low[axis], w[axis]); high[axis] = std::max(high[axis], w[axis]); }
-            }
-            // p = A x + t with A[a][k] = m[k*4 + a].
-            double A[3][3], t[3];
-            for (unsigned a = 0; a < 3; ++a) { t[a] = m.v[12 + a]; for (unsigned k = 0; k < 3; ++k) A[a][k] = m.v[k * 4 + a]; }
-            const auto& s1 = cold.sum[bone];
-            const auto& q = cold.square[bone];
-            const double S[3][3] = {{q[0], q[1], q[2]}, {q[1], q[3], q[4]}, {q[2], q[4], q[5]}};
-            double As[3] = {};
-            for (unsigned a = 0; a < 3; ++a) for (unsigned k = 0; k < 3; ++k) As[a] += A[a][k] * s1[k];
-            for (unsigned a = 0; a < 3; ++a) {
-                sum[a] += As[a] + n * t[a];
-                for (unsigned b = 0; b < 3; ++b) {
-                    double ASA = 0;
-                    for (unsigned k = 0; k < 3; ++k) for (unsigned l = 0; l < 3; ++l) ASA += A[a][k] * S[k][l] * A[b][l];
-                    square[a][b] += ASA + t[a] * As[b] + t[b] * As[a] + n * t[a] * t[b];
-                }
-            }
-            samples += n;
-        }
-        if (!samples) { output = result; return true; }
-        for (unsigned axis = 0; axis < 3; ++axis) if (!std::isfinite(low[axis]) || !std::isfinite(high[axis])) return false;
-        const double originX = (low[0] + high[0]) * .5, originY = high[1], originZ = (low[2] + high[2]) * .5;
-        // x = a.p + cx, z = b.p + cz.
-        const double a[3] = {1., -nativeShadowSlopeX50HM, 0.}, b[3] = {0., -nativeShadowSlopeZ50HM, 1.};
-        const double cx = nativeShadowSlopeX50HM * originY - originX, cz = nativeShadowSlopeZ50HM * originY - originZ;
-        const auto dot = [](const double (&u)[3], const double (&v)[3]) { return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]; };
-        const auto quad = [&](const double (&u)[3], const double (&v)[3]) {
-            double r = 0; for (unsigned i = 0; i < 3; ++i) for (unsigned j = 0; j < 3; ++j) r += u[i] * square[i][j] * v[j]; return r;
-        };
-        const double sumX = dot(a, sum) + samples * cx, sumZ = dot(b, sum) + samples * cz;
-        const double sumXX = quad(a, a) + 2. * cx * dot(a, sum) + samples * cx * cx;
-        const double sumZZ = quad(b, b) + 2. * cz * dot(b, sum) + samples * cz * cz;
-        const double sumXZ = quad(a, b) + cx * dot(b, sum) + cz * dot(a, sum) + samples * cx * cz;
-        const double covarianceXX = sumXX - sumX * sumX / samples;
-        const double covarianceXZ = sumXZ - sumX * sumZ / samples;
-        const double covarianceZZ = sumZZ - sumZ * sumZ / samples;
-        const double angle = .5 * std::atan2(2. * covarianceXZ, covarianceXX - covarianceZZ);
-        const double uX = std::cos(angle), uZ = std::sin(angle);
-        double minU = INFINITY, maxU = -INFINITY, minV = INFINITY, maxV = -INFINITY;
-        for (U bone = 0; bone < skin.boneCount && bone < cold.boneCount; ++bone) {
-            if (!cold.count[bone]) continue;
-            for (unsigned k = 0; k < 8; ++k) {
-                double w[3]; corner(skin.bones[bone], cold.bounds[bone], k, w);
-                const double x = w[0] - originX - nativeShadowSlopeX50HM * (w[1] - originY);
-                const double z = w[2] - originZ - nativeShadowSlopeZ50HM * (w[1] - originY);
-                const double u = x * uX + z * uZ, v = -x * uZ + z * uX;
-                minU = std::min(minU, u); maxU = std::max(maxU, u); minV = std::min(minV, v); maxV = std::max(maxV, v);
-            }
-        }
-        const double radiusU = (maxU - minU) * .55, radiusV = (maxV - minV) * .55;
-        if (radiusU < 1e-4 || radiusV < 1e-4) { output = result; return true; }
-        const double midU = (minU + maxU) * .5, midV = (minV + maxV) * .5;
-        const double inverseU = 1. / (radiusU * radiusU), inverseV = 1. / (radiusV * radiusV);
-        const double values[8] = {
-            originX + midU * uX - midV * uZ, originY, originZ + midU * uZ + midV * uX,
-            std::clamp(8. * std::sqrt(radiusU * radiusV), 32., 256.),
-            uX * uX * inverseU + uZ * uZ * inverseV, uX * uZ * (inverseU - inverseV),
-            uZ * uZ * inverseU + uX * uX * inverseV, .48
-        };
-        for (unsigned i = 0; i < 8; ++i) {
-            if (!std::isfinite(values[i]) || std::abs(values[i]) > std::numeric_limits<float>::max()) return false;
-            (i < 4 ? result.centerAndReach[i] : result.shapeAndOpacity[i - 4]) = static_cast<float>(values[i]);
-        }
-        const double qxx = result.shapeAndOpacity[0], qxz = result.shapeAndOpacity[1], qzz = result.shapeAndOpacity[2];
-        if (!(qxx > 0. && qzz > 0. && qxx * qzz > qxz * qxz)) return false;
-        output = result;
-        return true;
     }
 
 std::uint32_t VehicleWindowGl50DS::racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept {
@@ -2425,23 +2269,45 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         s.traceRaStage("cables",stageStart);
         if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
         s.traceRaStage("transparent_world",stageStart);
-        // The shared inactive VBOs currently hold the last opaque opponent.
-        // Restore the player's independent stream before its deferred effects.
-        if (s.frameOpponentCount && s.materials && !s.uploadRacer(bank, s.framePlayerBatch, 0, true)) return false;
-        // Source fog and camera-normal UV streams also hold the last opaque
-        // opponent; effect spans on the source routes (canopy passes) read them.
+        // Original order of the pod passes is the material drain order: 14D440
+        // rebuilds the passes in material-registry (APPSTART Mat_Stbl) order
+        // and 24A620 -> 24B9B0 -> 29C150 queue each pass FIFO (241280 per mesh,
+        // 2326F0 casters, 2DED30 receivers). Mat_Stbl: track materials
+        // 246..2314, pod bodies 2569..2649, pod_wndw glass 2650, cable_shadow /
+        // cable 2655/2656, Binder 2662.., shadowCaster1, shadowReceiver1,
+        // shadowCaster2, ... 2756..2779 (racer slot order), Flame 2783.. So:
+        // every racer's glass, then each racer's caster and receiver, then
+        // every racer's flames. The shared inactive VBOs hold the last opaque
+        // opponent: restore each racer's effect stream before its effects.
         const bool sourceEffectStreams = s.materials && (s.hasExtraPasses50PP || s.hasSingleDiffuse50LA);
-        if (sourceEffectStreams && s.frameOpponentCount && !s.uploadSpecularUvs50LA(bank, 0, 0)) return false;
-        if (!s.drawTransparentPod(bank)) return false;
-        if (s.materials) for (U i = 0; i < s.frameOpponentCount; ++i) {
-            s.diagnostic->opponentIndex = i;
-            if (s.frameOpponentHidden[i]) continue;
-            if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i], true) ||
-                (sourceEffectStreams && !s.uploadSpecularUvs50LA(bank, i + 1, s.frameOpponentArchetypes[i])) ||
-                !s.drawTransparentPod(bank, i)) return false;
-        }
-        s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
-        s.resetPodState();
+        const auto podEffects = [&](std::uint8_t pass) noexcept {
+            if (!s.materials) return true;
+            s.podEffectPass50PS = pass;
+            if (s.frameOpponentCount && !s.uploadRacer(bank, s.framePlayerBatch, 0, true)) return false;
+            if (sourceEffectStreams && s.frameOpponentCount && !s.uploadSpecularUvs50LA(bank, 0, 0)) return false;
+            if (!s.drawTransparentPod(bank)) return false;
+            for (U i = 0; i < s.frameOpponentCount; ++i) {
+                s.diagnostic->opponentIndex = i;
+                if (s.frameOpponentHidden[i]) continue;
+                if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i], true) ||
+                    (sourceEffectStreams && !s.uploadSpecularUvs50LA(bank, i + 1, s.frameOpponentArchetypes[i])) ||
+                    !s.drawTransparentPod(bank, i)) return false;
+            }
+            s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
+            s.podEffectPass50PS = 0;
+            s.resetPodState();
+            return true;
+        };
+        if (!podEffects(1)) return false; // chariot translucency = pod_wndw glass
+        s.traceRaStage("pod_glass",stageStart);
+        // Casters use their own LOD streams (a CPU fallback part re-uploads its
+        // own vertices), so they no longer depend on the shared VBOs.
+        // shadowCasterN / shadowReceiverN pairs in racer slot order (2756..2779).
+        for (U slot = 0; slot < 1u + s.frameOpponentCount; ++slot)
+            if (!s.drawShadowCasters(bank, slot) || !s.drawShadowReceivers(bank, slot)) return false;
+        s.finishShadowReceivers();
+        s.traceRaStage("original_shadows",stageStart);
+        if (!podEffects(2)) return false; // engine translucency = flames
         if(s.request.enableGameplayDisplayWallTiming&&s.hasExtraPasses50PP)
             std::fprintf(stderr,"native_pod_extra_pass draws=%llu alpha_saturated_spans=%llu\n",
                 static_cast<unsigned long long>(s.podExtraPassDraws50PP),
@@ -3051,7 +2917,6 @@ bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
         gl.uniform1i(trackSourceColorAbsentUniform, 0);
         gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
         gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
-        gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
         const auto& fog = request.track.worldFog;
         gl.uniform4f(worldFogCameraUniform, worldFogCamera[0], worldFogCamera[1], worldFogCamera[2], 0.f);
         gl.uniform4f(worldFogColorUniform, fog.color[0], fog.color[1], fog.color[2], 1.f);
@@ -3172,7 +3037,6 @@ bool VehicleWindowGl50DS::Storage::drawWater() noexcept {
         gl.uniform1i(trackSourceColorAbsentUniform, 0);
         gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
         gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
-        gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
         // XYZF2 fog: linear in eye distance (Water+0x1F8/+0x1FC from the
         // provider fog object). Drawn with the course world fog; the identity
         // of provider->+0x30 is an open EE item (PLAN section 6).

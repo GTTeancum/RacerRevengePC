@@ -55,10 +55,11 @@ route only. Build84's host Pause route (`bindHost`) does not use it.
 
 ## Not RA-original anywhere
 
-* Pod shadows: tracks other than RA use a host-invented footprint shadow
-  (`platform/linux/native/native-pod-shadow50hm.md`); RA has none
-  (`renderRequest.enableNativePodShadows=!isRaTrack`). Original shadows are not
-  recovered for any track.
+* Pod shadows: RESOLVED (2026-11). The host-invented footprint shadow and its
+  `!isRaTrack` gate are removed; every course, RA included, draws the original
+  projected shadows (`src/game/original_projected_shadow50ps.h`), with the
+  receiver flag read from each track's own TOB
+  (`src/game/original_static_model_params50ps.h`).
 
 ## Per-track loader branches (stand-ins, retire into one path)
 

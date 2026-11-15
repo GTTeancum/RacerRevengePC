@@ -909,7 +909,95 @@ void Context::run() {
    };
    else std::cerr<<"common_race_results_load loaded=0 operation=no counted race on this course\n";
   }
-  const bool trackMaterialsLoaded=isRaTrack||(mcOriginalWorld?mcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,mcRemainingPayloadBytes(),trackMaterialDiagnostic):gbOriginalWorld?
+  // Camera inputs shared by the population-point camera start (RA) and the
+  // camera preparation below (every course); each is made once.
+  auto makeSourceCameraDisplay=[&](){
+   if(sourceCameraDisplay)return;
+   sourceCameraDisplay=std::make_unique<sourceCamera::DisplayInputs>(sourceCamera::DisplayInputs{
+       sourceVideo,sourceRendererDispatch,renderer,rendererDiagnostic,2,640,448,
+       sourceFadeManagerA8,sourceFadeDuration98,0,0,
+       static_cast<std::uint8_t>(originalUiStarted?originalMainApplication.state->globalFlags228:applicationEvents.rootFlags228),
+       OriginalCameraDrainPolicy::initializedContext,
+       isRaTrack?nullptr:&sourceTrackFog,
+       consumedRaStage.race()?&originalMainApplication.applicationMode22C():nullptr});
+  };
+  auto readRaCameraCam=[&](){
+   sourceCameraAssets.cam=runtime_startup50fl::readBytes(
+       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+  };
+  auto prepareIntroAuthoring=[&](){
+   if(!taIntroAuthoring&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
+    taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
+    require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");
+    const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
+    const auto audioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
+        runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
+    std::string error;
+    require50DU(platform::prepareOriginalTaIntroPcm50LA(taIntroAuthoring,audioRoot,taIntroPcm,error),
+        error.empty()?"original selected-track intro PCM preparation rejected":error.c_str());
+   }
+  };
+  bool raCameraTrackLoaded=false;
+  // RA: the race load's camera start (1A93B0) and the track load it runs
+  // (1A9EE0), then the single population and collector (1A7608 1AA5A0 ->
+  // 1A7B14 14D440), here at the population point every course uses, while
+  // the race display is up but holds no content yet.
+  // PORT STAND-IN (flagged, load order): RA's racers were constructed in the
+  // earlier cold roster stage, so the track load follows them here; the
+  // original loads the track before the racers. Material rows are fixed from
+  // APPSTART and the population and collector run once in row order, so the
+  // populated set and the collector are the original's.
+  auto raCameraTrackLoadAndPopulation=[&]()->bool{
+   require50DU(originalCameraEnabled&&raSession&&!raCameraTrackLoaded,
+       "RA track load requires the original camera and the actual roster session");
+   if(sourceCameraAssets.cam.empty())readRaCameraCam();
+   makeSourceCameraDisplay();
+   prepareIntroAuthoring();
+    const ra_source_camera50LA::CameraRuntimeOwners runtime{racerBank,s,x.bindings,baseTail,originalAi,
+        lapContinuity.timing,originalAiSession.manager,legacyRace,sessionRandom,sourceAttachedGlobals,
+        applicationClock,controlPresets,nativeOrdinaryLaunch11258,dynamicProfile.game34,cameraStartup350,
+        sourceBlur,poseHistory,boostState,sourceCameraCycleAudio,dynamicRacer60,originalAiHumanCount,
+        humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,&native_wreck_debris50PD::cameraView().view,
+        &startMusicContext,requestStartMusic,nativeRecordActor.get(),
+        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade,
+        humanCourseEnabled?&playerEvents:nullptr};
+    const bool cameraConstructed=raSession&&raSession->constructCamera(runtime,sourceCameraAssets.cam,*sourceCameraDisplay,raSessionDiagnostic);
+    if(!cameraConstructed){
+     std::cerr<<"RA camera failure="<<(raSessionDiagnostic.aggregate.failure?raSessionDiagnostic.aggregate.failure:"")
+       <<" detail="<<(raSessionDiagnostic.aggregate.runtimeQueries.message?raSessionDiagnostic.aggregate.runtimeQueries.message:"")<<'\n';
+     require50DU(false,"same-owner RA camera construction rejected");
+    }
+    if(taIntroAuthoring){
+     auto* controller=raSession->introController174A30(raSessionDiagnostic);
+     require50DU(controller&&consumedRaStage.race()&&
+         consumedRaStage.race()->retainNativeIntroControllerSlot48(*controller),
+         "actual RA race slot48 intro controller publication rejected");
+     require50DU(raSession->constructIntroAudio177750(taIntroPcm,
+         platform::originalTaIntroFirstVoice50HD,platform::originalTaIntroVoices50HD,raSessionDiagnostic),
+         "actual RA intro audio177750 construction rejected");
+    }
+   if(!raSession->prepareCameraTrackCold(raSessionDiagnostic)){
+    const auto text=[](const char* p){return p?p:"";};
+    std::cerr<<"RA camera track load failure="<<text(raSessionDiagnostic.failure)
+        <<" aggregate="<<text(raSessionDiagnostic.aggregate.failure)
+        <<" queries="<<text(raSessionDiagnostic.aggregate.runtimeQueries.message)
+        <<" camera_status="<<static_cast<unsigned>(raSessionDiagnostic.aggregate.runtimeQueries.camera.status)
+        <<" camera_pc="<<std::hex<<raSessionDiagnostic.aggregate.runtimeQueries.camera.sourcePC<<std::dec<<'\n';
+    require50DU(false,"same-owner RA camera track load rejected");
+   }
+   raCameraTrackLoaded=true;
+   if(!raSession->completeWorldPopulation(raSessionDiagnostic)){
+    const auto text=[](const char* p){return p?p:"";};
+    std::cerr<<"RA world population failure="<<text(raSessionDiagnostic.failure)
+        <<" operation="<<text(raSessionDiagnostic.operation)
+        <<" aggregate="<<text(raSessionDiagnostic.aggregate.failure)
+        <<" world="<<text(raSessionDiagnostic.aggregate.world.failure)<<'\n';
+    require50DU(false,"RA single world population rejected");
+   }
+   std::cerr<<"ra_track_load_before_population complete=1"<<'\n';
+   return true;
+  };
+  const bool trackMaterialsLoaded=(isRaTrack&&raCameraTrackLoadAndPopulation())||(mcOriginalWorld?mcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,mcRemainingPayloadBytes(),trackMaterialDiagnostic):gbOriginalWorld?
       gbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,gbRemainingPayloadBytes(),trackMaterialDiagnostic):tbOriginalWorld?
       tbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,tbRemainingPayloadBytes(),trackMaterialDiagnostic):rcOriginalWorld?
       rcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,rcRemainingPayloadBytes(),trackMaterialDiagnostic):tcOriginalWorld?
@@ -966,6 +1054,20 @@ void Context::run() {
    require50DU(originalMainApplication.finishDamageNativeCold50LA(sourceDamage),"direct human Damage final verification rejected");
    require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),"direct human PositionStats final verification rejected");
    require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),"direct human Speed/Boost final verification rejected");
+  }
+  if(isRaTrack){
+   // Same four checks after the single population. PORT STAND-IN (flagged):
+   // RA stages these owners in its cold roster stage (also all-AI, Damage only
+   // when staged), so it keeps its own copy of this block until its staging
+   // joins the common one above.
+   require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),
+       "RA TimeStats final shared material verification failed");
+   if(sourceDamage.owner)require50DU(originalMainApplication.finishDamageNativeCold50LA(sourceDamage),
+       "RA Damage final shared material verification failed");
+   require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),
+       "RA PositionStats preloaded canonical sources changed during construction");
+   require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),
+       "RA Speed/Boost final shared material verification failed");
   }
   if(allAiEnabled&&originalCameraEnabled&&trackMaterialRequest.canonicalDomain&&!isRaTrack){
    const bool speedStaged=originalMainApplication.stageSpeedBoostNativeCold50LA(
@@ -1237,9 +1339,29 @@ void Context::run() {
   renderRequest.enableHostHud=true;
   renderRequest.enableOriginalGameplayBlur=originalCameraEnabled;
   renderRequest.enableGameplayDisplayWallTiming=phaseTiming.enabled;
-  const char* disableNativeShadows=std::getenv("RR_DISABLE_NATIVE_SHADOWS");
-  // Native analytic pod-shadow shader currently belongs to the legacy world.
-  renderRequest.enableNativePodShadows=!isRaTrack&&!(disableNativeShadows&&std::string(disableNativeShadows)=="1");
+  // Original projected pod shadows, one path for every course: the renderer
+  // copies the per-instance AllowShadowReceiving table (TOB 271A00, applied
+  // by original_static_model_params50ps.h) and the instance zones at create.
+  // Retires enableNativePodShadows, its !isRaTrack gate and
+  // RR_DISABLE_NATIVE_SHADOWS (port stand-ins).
+  std::vector<std::uint32_t> staticInstanceZones(actualWorld.instances.size(),0u);
+  for(std::size_t i=0;i<actualWorld.instances.size();++i)staticInstanceZones[i]=actualWorld.instances[i].zone;
+  require50DU(staticShadowReceiving.size()==actualWorld.instances.size()&&
+      staticShadowReceiving.size()<=std::numeric_limits<std::uint32_t>::max(),"original shadow receiver table extent");
+  renderRequest.staticShadowReceiving=staticShadowReceiving.empty()?nullptr:staticShadowReceiving.data();
+  renderRequest.staticInstanceZone=staticInstanceZones.empty()?nullptr:staticInstanceZones.data();
+  renderRequest.staticInstanceCount=static_cast<std::uint32_t>(staticShadowReceiving.size());
+  // 2DEBC0/2DE7C0 portal walk: the world's own portals (zones are 1-based).
+  std::vector<std::uint32_t> staticPortalZones;std::vector<float> staticPortalCorners;
+  require50DU(actualWorld.portals.size()<=4096u,"original shadow portal table extent");
+  staticPortalZones.reserve(actualWorld.portals.size()*2u);staticPortalCorners.reserve(actualWorld.portals.size()*12u);
+  for(const auto& portal:actualWorld.portals){
+   staticPortalZones.push_back(portal.zones[0]);staticPortalZones.push_back(portal.zones[1]);
+   for(const auto& corner:portal.vertices)for(double value:corner)staticPortalCorners.push_back(static_cast<float>(value));
+  }
+  renderRequest.staticPortalZones=staticPortalZones.empty()?nullptr:staticPortalZones.data();
+  renderRequest.staticPortalCorners=staticPortalCorners.empty()?nullptr:staticPortalCorners.data();
+  renderRequest.staticPortalCount=static_cast<std::uint32_t>(actualWorld.portals.size());
   renderRequest.output=headlessLive?platform::VehicleWindowOutput50DS::headless:platform::VehicleWindowOutput50DS::defaultBackBuffer;
   // Explicit diagnostic material policy: authored pass1/slot1, largest retained
   // mip, linear filtering and repeat. This does not reproduce original shaders.
@@ -1636,6 +1758,7 @@ void Context::run() {
         "track UV-animated span lowering rejected");
    require50DU(span.worldInstanceIndex<staticShadowReceiving.size(),"static shadow receiver source instance rejected");
    binding.allowPodShadow=staticShadowReceiving[span.worldInstanceIndex]!=0;
+   binding.worldInstance=static_cast<std::uint32_t>(span.worldInstanceIndex);
    // Authored zone of the span's static model (SCB ZoneN-ModelM), every course.
    require50DU(span.worldInstanceIndex<actualWorld.instances.size()&&
        actualWorld.instances[span.worldInstanceIndex].zone<=actualWorld.zones.size(),
@@ -1989,15 +2112,8 @@ void Context::run() {
    }
    else if(isRcTrack)sourceCameraAssets.loadRc(*trackSession,playerPodId,racerRigs[0]->phy,rcColdSources);
    else if(!isRaTrack)sourceCameraAssets.load(*trackSession,playerPodId,racerRigs[0]->phy);
-   else sourceCameraAssets.cam=runtime_startup50fl::readBytes(
-       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
-   sourceCameraDisplay=std::make_unique<sourceCamera::DisplayInputs>(sourceCamera::DisplayInputs{
-       sourceVideo,sourceRendererDispatch,renderer,rendererDiagnostic,2,640,448,
-       sourceFadeManagerA8,sourceFadeDuration98,0,0,
-       static_cast<std::uint8_t>(originalUiStarted?originalMainApplication.state->globalFlags228:applicationEvents.rootFlags228),
-       OriginalCameraDrainPolicy::initializedContext,
-       isRaTrack?nullptr:&sourceTrackFog,
-       consumedRaStage.race()?&originalMainApplication.applicationMode22C():nullptr});
+   else if(sourceCameraAssets.cam.empty())readRaCameraCam();
+   makeSourceCameraDisplay();
    if(isRaTrack||humanOriginalHud){
     const auto domain=originalMainApplication.standardMaterialDomain();
     const auto collector=domain->coldCollector14D440();
@@ -2044,40 +2160,10 @@ void Context::run() {
         originalMainApplication.materialRuntime,hudDiagnostic),"actual original race HUD resources rejected");
    }
    for(std::size_t slot=0;slot<sourceCameraCables.size();++slot)sourceCameraCables[slot]=racerCables[slot].get();
-   if(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation){
-    taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
-    require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");
-    const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
-    const auto audioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
-        runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
-    std::string error;
-    require50DU(platform::prepareOriginalTaIntroPcm50LA(taIntroAuthoring,audioRoot,taIntroPcm,error),
-        error.empty()?"original selected-track intro PCM preparation rejected":error.c_str());
-   }
+   prepareIntroAuthoring();
    if(isRaTrack){
-    const ra_source_camera50LA::CameraRuntimeOwners runtime{racerBank,s,x.bindings,baseTail,originalAi,
-        lapContinuity.timing,originalAiSession.manager,legacyRace,sessionRandom,sourceAttachedGlobals,
-        applicationClock,controlPresets,nativeOrdinaryLaunch11258,dynamicProfile.game34,cameraStartup350,
-        sourceBlur,poseHistory,boostState,sourceCameraCycleAudio,dynamicRacer60,originalAiHumanCount,
-        humanResultsCountdown,playerEnvironment.held,humanCourseEnabled?&sourceRaceHud:nullptr,&native_wreck_debris50PD::cameraView().view,
-        &startMusicContext,requestStartMusic,nativeRecordActor.get(),
-        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade,
-        humanCourseEnabled?&playerEvents:nullptr};
-    const bool cameraConstructed=raSession&&raSession->constructCamera(runtime,sourceCameraAssets.cam,*sourceCameraDisplay,raSessionDiagnostic);
-    if(!cameraConstructed){
-     std::cerr<<"RA camera failure="<<(raSessionDiagnostic.aggregate.failure?raSessionDiagnostic.aggregate.failure:"")
-       <<" detail="<<(raSessionDiagnostic.aggregate.runtimeQueries.message?raSessionDiagnostic.aggregate.runtimeQueries.message:"")<<'\n';
-     require50DU(false,"same-owner RA camera construction rejected");
-    }
-    if(taIntroAuthoring){
-     auto* controller=raSession->introController174A30(raSessionDiagnostic);
-     require50DU(controller&&consumedRaStage.race()&&
-         consumedRaStage.race()->retainNativeIntroControllerSlot48(*controller),
-         "actual RA race slot48 intro controller publication rejected");
-     require50DU(raSession->constructIntroAudio177750(taIntroPcm,
-         platform::originalTaIntroFirstVoice50HD,platform::originalTaIntroVoices50HD,raSessionDiagnostic),
-         "actual RA intro audio177750 construction rejected");
-    }
+    // Constructed with its track load at the population point (above).
+    require50DU(raCameraTrackLoaded,"RA camera and track load must precede the camera preparation");
     sourceCameraSession=raSession->prepareAndBorrowCamera(raSessionDiagnostic);
     if(!sourceCameraSession){
      const auto text=[](const char* p){return p?p:"";};
@@ -2470,7 +2556,7 @@ void Context::run() {
        {"input_counter_scope","controller dispatch calls and composed keyboard packets; zero required only for all-AI"},
        {"host_driver_calls",allAiHostDriverCalls},
        {"controller_samples",allAiControllerSamples},{"keyboard_packets",allAiKeyboardPackets},
-       {"native_pod_shadows",renderRequest.enableNativePodShadows},
+       {"original_shadows",renderRequest.staticInstanceCount!=0},
        {"world_renderer",renderRequest.raStaticWorld?"native_ra_aggregate":"legacy_track_adapter"},
        // Keep existing keys stable for receipt readers, but identify their
        // scope: RA uses its own camera fog and conservative clip rejection.

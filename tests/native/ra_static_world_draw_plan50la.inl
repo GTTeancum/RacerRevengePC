@@ -143,6 +143,9 @@ private:
         }catch(...){return failed("terminal draw inventory allocation failure; partial records retained");}
     }
 public:
+    int drawPlanRefusal()const noexcept{
+        if(!drawPlanComplete_)return 10;if(drawPlanTerminal_)return 11;if(modelServiceTerminal_)return 12;
+        return coldImagesRefusal();}
     bool drawPlanCurrent()const noexcept{return drawPlanComplete_&&!drawPlanTerminal_&&!modelServiceTerminal_&&coldImagesCurrent();}
     const std::vector<RasterInventory>* rasterInventory()const noexcept{return drawPlanCurrent()?&rasterInventory_:nullptr;}
     const std::vector<SurfaceDrawPlan>* surfaceDrawPlan()const noexcept{return drawPlanCurrent()?&surfaceDrawPlan_:nullptr;}

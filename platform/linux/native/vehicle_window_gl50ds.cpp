@@ -44,6 +44,36 @@ VehicleWindowGl50DS::~VehicleWindowGl50DS() noexcept {
     if (d.cleanupIncomplete) std::terminate();
 }
 
+bool VehicleWindowGl50DS::bringUp(const VehicleWindowRequest50DS& request,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
+    if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
+    d = {};
+    if(sessionDisplayFrontendCreate50KG_||(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_))
+        return fail(d,VehicleWindowError50DS::request,"session renderer bring-up requires its actual display owner");
+    if (storage_) return fail(d, VehicleWindowError50DS::alreadyOwned, "renderer already owns resources");
+    if (!request.procAddress || !request.isCurrent ||
+        (request.output != VehicleWindowOutput50DS::defaultBackBuffer &&
+            request.output != VehicleWindowOutput50DS::headless))
+        return fail(d, VehicleWindowError50DS::request, "bring-up requires context callbacks and a valid output");
+    std::unique_ptr<Storage> next(new (std::nothrow) Storage);
+    if (!next) return fail(d, VehicleWindowError50DS::allocation, "allocate caller-context renderer owner");
+    // Only the context callbacks and output are read; every content pointer
+    // stays null. No GL name is generated, so a failure leaves nothing owned.
+    next->request.context = request.context; next->request.procAddress = request.procAddress;
+    next->request.isCurrent = request.isCurrent; next->request.output = request.output;
+    next->diagnostic = &d;
+    const bool result = next->current(d) && next->loadFunctions() &&
+        next->check("initial GL error state at bring-up") && next->checkContext();
+    next->diagnostic = nullptr;
+    if (!result || next->hasGlResources()) return result ? fail(d, VehicleWindowError50DS::cleanup,
+        "bring-up must not own GL names") : false;
+    next->broughtUp = true;
+    storage_ = std::move(next);
+    return true;
+}
+bool VehicleWindowGl50DS::broughtUp() const noexcept { return storage_ && (storage_->broughtUp || storage_->initialized); }
+
 bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& assets, VehicleWindowDiagnostic50DS& d) noexcept {
     OriginalOptionsMutationInterlock50KG::Operation optionsMutation;
@@ -52,6 +82,13 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     d = {};
     if(sessionDisplayFrontendCreate50KG_||(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_))
         return fail(d,VehicleWindowError50DS::request,"session renderer creation requires its actual display owner");
+    // A brought-up renderer owns functions only (no GL name). Its storage is
+    // retired here; the content storage below is built on the same context.
+    if (storage_ && storage_->broughtUp && !storage_->initialized) {
+        if (storage_->hasGlResources())
+            return fail(d, VehicleWindowError50DS::alreadyOwned, "brought-up renderer owns GL names");
+        storage_.reset();
+    }
     if(request.gameplayBinderTextures){
         // Binder uses the shared cable quad buffers and the requested
         // world material shader. RA has its own authenticated world geometry,
@@ -766,6 +803,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.frameWaterAlphaReference = frame.waterAlphaReference;
     s.frameWaterDepthWrite = frame.waterDepthWrite;
     s.framePlayerHidden = frame.playerHiddenDestroyed50PD;
+    // After the matrix, racer list and hidden flags of this frame are copied.
+    if (!s.prepareOriginalShadowFrame(frame, d)) return false;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
     s.frameGameplayBinderImage=frame.gameplayBinderFrame;
     s.frameGcParticles=frame.mcParticles?frame.mcParticles->rendererDraw():frame.gbParticles?frame.gbParticles->rendererDraw():(frame.rcParticles?frame.rcParticles->rendererDraw():frame.gcParticles);
@@ -834,7 +873,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             }
         }
     }
-    s.frameSet = false; s.framePlayerHidden = false; s.frameDebrisCount = 0; s.frameEffectQuads = 0; s.frameEffectBlended = 0; s.frameWaterStrips = 0; s.frameWaterVertices = nullptr; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameSet = false; s.framePlayerHidden = false; s.frameShadowsSet = false; s.frameShadowCount = 0; s.frameDebrisCount = 0; s.frameEffectQuads = 0; s.frameEffectBlended = 0; s.frameWaterStrips = 0; s.frameWaterVertices = nullptr; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     if(s.raceHud)s.raceHud->frame=false;
     if(s.raceStartOverlay)s.raceStartOverlay->frame=false;
     if(s.timeStats)s.timeStats->frame=false;
@@ -1462,7 +1501,8 @@ bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) c
     if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
 
     d={};
-    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"race reset requires initialized renderer");
+    // A brought-up renderer (before its content) is idle by construction.
+    if(!broughtUp())return fail(d,VehicleWindowError50DS::notInitialized,"race reset requires initialized renderer");
     const auto& s=*storage_;
     if(!s.current(d))return false;
     if(s.active||s.frameSet||s.diagnostic)
@@ -1548,7 +1588,9 @@ bool VehicleWindowGl50DS::finishInitializedContextWork(VehicleWindowDiagnostic50
     if(!optionsMutation.admitted()){return fail(d,VehicleWindowError50DS::frame,"Options viewport owns native mutation until cancellation");}
 
     d = {};
-    if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
+    // A brought-up renderer (context only) drains as well: 1A9590's cold
+    // 244D60/245090 runs before the race content exists.
+    if (!broughtUp()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
     if (!s.current(d)) return false;
     if (s.contextDrainGeneration == std::numeric_limits<std::uint64_t>::max())

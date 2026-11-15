@@ -1539,6 +1539,11 @@ public:
         }
     }
     std::int32_t cameraMode()const noexcept{return controller_.mode44;}
+    // Original projected shadows (1B32E0): race +B4 settings flags +58, managerB0
+    // +34 human count, and this view camera's follow record index (+64 -> +100).
+    std::uint8_t shadowManagerFlags58()const noexcept{return actual_.all8Manager.flags58;}
+    std::uint32_t shadowHumanCount34()const noexcept{return static_cast<std::uint32_t>(actual_.humanCount34);}
+    std::uint32_t shadowFollowRecord100()const noexcept{return static_cast<std::uint32_t>(follow_.current100);}
     std::int32_t authoredSceneCutCount3E4()const noexcept{return startActions_.sourceSceneCutCount3E4();}
     std::int32_t effectiveControllerCutCountA8()const noexcept{return startPrelude_.controllerCutCountA8();}
     std::uint64_t sessionGeneration()const noexcept{return generation_;}
@@ -1766,10 +1771,103 @@ public:
     //setup tick, before native countdown/GO. The live50Y history is NOT reset.
     //authored, app and every borrowed owner/backing must outlive this Session.
     //generation is the native race lifetime key; it does not assert a guest ID.
+    // 1A93B0 Camera34 -> 1A9EE0 track load, the part of the race load that
+    // precedes the racers (1AA510): viewport, scene selection and renderer
+    // drain, Camera34, music and the track's world load. No racer may be
+    // required here; the racer-dependent camera parts run in prepare(), after
+    // the racers. prepare() runs this itself when no caller did it first.
+    Result prepareTrackCold(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
+        if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a93b0};
+        if(!actual_.followQueries.get()||constructorOnly_||nativeRaOwnedPreparationAttempted_)return set(Status::terminal,0x1a6d98);
+        if(coldBound_||closed_)return set(Status::order);
+        if(frameStage_==FrameStage::failed)return set(Status::terminal);
+        if(coldPhase_>=2)return set(Status::complete,0x1a6d98);
+        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||authored.course!=nativeTaIssuance_->course))return set(Status::owner);
+        if(!generation||!actual_.hostRace.runtimeValid())return set(Status::owner);
+        if(displayInputs_&&displayInputs_!=&app)return set(Status::owner);
+        if(generation_&&generation_!=generation)return set(Status::owner);
+        if(!coldTrackStarted_)invalidateFogPreparation();
+        coldTrackStarted_=true;
+        generation_=generation;displayInputs_=&app;
+        // PORT STAND-IN (flagged): the port's counted Camera34 binding checks
+        // the racer identity rows (readsBound_/identitiesCurrent). Where the
+        // roster already exists (RA constructs its racers before this point)
+        // they are bound here exactly as prepare() binds them; a course that
+        // runs this before its racers needs that binding check moved.
+        if(!readsBound_&&actual_.bank.count()&&actual_.bank.count()<=8){
+            reads_.bind(actual_);readsBound_=true;
+            for(std::size_t i=0;i<actual_.bank.count();++i){
+                identity_[i].managerIndex=static_cast<std::uint32_t>(i);
+                identity_[i].pod60=actual_.racer60[i];
+            }
+        }
+        return runTrackCold(app);
+    }
+private:
+    bool coldTrackStarted_=false;
+    Result runTrackCold(DisplayInputs& app){
+        if(!bindCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
+        while(coldPhase_<2){
+            switch(coldPhase_){
+            case 0:
+                if(!tick_.bound&&!bindFreshOriginalCameraSceneTick(tick_,generation_,key(scene_)))return set(Status::owner);
+                if(!viewport_.prepared){
+                    result_.start=prepareOriginalRaceViewport2361C0(viewport_,generation_,key(scene_),scene_);
+                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::numeric,result_.start.sourcePC);
+                }
+                pose_.mode=0;pose_.position={0,50,35,1};pose_.look=scene_.look;pose_.up=scene_.up;pose_.fov=scene_.fovDegrees;
+                //target is unconsumed on this mode0-only route. Its native
+                //scratch initialization does not claim a source stack write.
+                display_.sessionGeneration=generation_;display_.raceKey=key(*this);
+                display_.rendererBufferCount0C=app.rendererBufferCount0C;
+                display_.rendererDispatch=&app.rendererDispatch;display_.actualTrackFog3EC=app.trackFog3EC;
+                display_.drainPolicy=app.drainPolicy;
+                ++coldPhase_;break;
+            default:
+                //2361C0 selects26F940 before1A9240 reaches1A9590(true).
+                // Select this actual native scene BEFORE the separate cold
+                //1158A0/drain/zoom/matrix call.245918 must see its real target,
+                // not an empty current-scene slot. This is not source114A00
+                // completion or publication of the counted Camera34.
+                if(!coldCameraSelected26F940_){
+                    result_.start=selectOriginalRaceScene26F940(display_,viewport_,app.rendererWidth4,app.rendererHeight8);
+                    //26F948 precedes the dimension branch. Only the completed
+                    //equal-dimension path can publish its actual observation.
+                    observeSelectedGameplayCamera26F940();
+                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
+                    coldCameraSelected26F940_=true;
+                }
+                if(!coldViewport_.complete()){
+                    // Pending/failing work retains this same selection and
+                    // cursor. Resume its reached phases, never select again.
+                    result_.start=coldViewport_.advance(true,display_,sceneBorrow(),app.renderer,app.diagnostic);
+                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
+                }
+                // Actual renderer work and selection precede this bounded
+                // native adapter acceptance; numeric preparation alone cannot.
+                if(!completeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
+                {
+                    std::uint32_t musicPC=0;
+                    if(!completeCountedRaceMusicNative10C(musicPC))return set(Status::owner,musicPC);
+                }
+                {
+                    std::uint32_t worldPC=0;
+                    if(!completeCountedRaceWorldNativePrefix1A9EE0(worldPC))return set(Status::owner,worldPC);
+                }
+                ++coldPhase_;break;
+            }
+        }
+        return set(Status::complete,0x1a6d98);
+    }
+public:
+    //Cold after actual ALL8 roster/final-grid/7F0 setup and existing neutral
+    //setup tick, before native countdown/GO. The live50Y history is NOT reset.
+    //authored, app and every borrowed owner/backing must outlive this Session.
+    //generation is the native race lifetime key; it does not assert a guest ID.
     Result prepare(std::uint64_t generation,const AuthoredInputs& authored,DisplayInputs& app){
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a93b0};
         if(!actual_.followQueries.get()||constructorOnly_||nativeRaOwnedPreparationAttempted_)return set(Status::terminal,0x1a6d98);
-        invalidateFogPreparation();
+        if(!coldTrackStarted_)invalidateFogPreparation();
         // The consumed TA/RA constructor has one retained, generation-bound
         // real74 collection. Other unpublished constructor experiments do not
         // admit this source lifecycle, and retired owners cannot be reused.
@@ -1805,10 +1903,17 @@ public:
         }
         if(!identitiesCurrent())return set(Status::owner);
         for(std::size_t i=0;i<actual_.bank.count();++i)if(actual_.bank.read(i,reads_.phase)!=Phase::Ready)return set(Status::phase);
+        // 1A93B0 -> 1A9EE0 precede the racers (1AA510) in the original race
+        // load. A course that did not run them before its racers runs them
+        // here, before every racer-dependent camera part below.
+        if(coldPhase_<2){
+            coldTrackStarted_=true;
+            const auto track=runTrackCold(app);
+            if(track.status!=Status::complete)return track;
+        }else if(!bindCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         // At this native cold caller, genuinely construct the represented
         // racer27E130/7F8/240 prefix, then concrete7FC/model lifetime below.
         // No physics/collection or outer manager attachment is inferred.
-        if(!bindCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
         if(!constructRacerEntityPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
         // Native cold query backing follows the genuine racer identities and
         // prior QueryBridge admission, but precedes any Follow prepare.
@@ -1817,55 +1922,6 @@ public:
         if(!constructRacerModelPrefixes())return fail(Status::sourcePath,result_.entityCold.sourcePC);
         for(;;){
             switch(coldPhase_){
-            case 0:
-                if(!tick_.bound&&!bindFreshOriginalCameraSceneTick(tick_,generation_,key(scene_)))return set(Status::owner);
-                if(!viewport_.prepared){
-                    result_.start=prepareOriginalRaceViewport2361C0(viewport_,generation_,key(scene_),scene_);
-                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::numeric,result_.start.sourcePC);
-                }
-                pose_.mode=0;pose_.position={0,50,35,1};pose_.look=scene_.look;pose_.up=scene_.up;pose_.fov=scene_.fovDegrees;
-                //target is unconsumed on this mode0-only route. Its native
-                //scratch initialization does not claim a source stack write.
-                display_.sessionGeneration=generation_;display_.raceKey=key(*this);
-                display_.rendererBufferCount0C=app.rendererBufferCount0C;
-                display_.rendererDispatch=&app.rendererDispatch;display_.actualTrackFog3EC=app.trackFog3EC;
-                display_.drainPolicy=app.drainPolicy;
-                ++coldPhase_;break;
-            case 1:
-                //2361C0 selects26F940 before1A9240 reaches1A9590(true).
-                // Select this actual native scene BEFORE the separate cold
-                //1158A0/drain/zoom/matrix call.245918 must see its real target,
-                // not an empty current-scene slot. This is not source114A00
-                // completion or publication of the counted Camera34.
-                if(!coldCameraSelected26F940_){
-                    result_.start=selectOriginalRaceScene26F940(display_,viewport_,app.rendererWidth4,app.rendererHeight8);
-                    //26F948 precedes the dimension branch. Only the completed
-                    //equal-dimension path can publish its actual observation.
-                    observeSelectedGameplayCamera26F940();
-                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
-                    coldCameraSelected26F940_=true;
-                }
-                if(!coldViewport_.complete()){
-                    // Pending/failing work retains this same selection and
-                    // cursor. Resume its reached phases, never select again.
-                    result_.start=coldViewport_.advance(true,display_,sceneBorrow(),app.renderer,app.diagnostic);
-                    if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
-                }
-                // Actual renderer work and selection precede this bounded
-                // native adapter acceptance; numeric preparation alone cannot.
-                if(!completeCountedRaceCameraNative34())return set(Status::owner,0x1a93b0);
-                {
-                    std::uint32_t musicPC=0;
-                    if(!completeCountedRaceMusicNative10C(musicPC))return set(Status::owner,musicPC);
-                }
-                {
-                    std::uint32_t worldPC=0;
-                    if(!completeCountedRaceWorldNativePrefix1A9EE0(worldPC))return set(Status::owner,worldPC);
-                    // A prepared RA loader may open native OWNED preparation
-                    // below, never the original30 branch or1A95B0 return.
-                    // Its mandatory final barrier precedes coldBound below.
-                }
-                ++coldPhase_;break;
             case 2:{
                 if(!nativeRaOwnedPreparationAttempted_&&!publishNeverAdoptedNativeIntro())
                     return fail(Status::owner,0x177750);

@@ -4,7 +4,6 @@
 #include "../../../tests/native/rc_particle_visual50rc.h"
 #include "../../../tests/native/gb_particle_visual50gb.h"
 #include "../../../tests/native/mc_particle_visual50mc.h"
-#include "native_pod_shadow_glsl50hm.h"
 
 namespace rr::platform {
 
@@ -397,6 +396,7 @@ bool VehicleWindowGl50DS::Storage::createTrackMaterials(const VehicleWindowTrack
             target.sourceAlphaReference = source.sourceAlphaReference;
             target.sourceUvAnimation = source.sourceUvAnimation;
             target.allowPodShadow = source.allowPodShadow;
+            target.worldInstance = source.worldInstance;
             target.sourcePass = source.sourcePass;
             target.sourcePassCount = source.sourcePassCount;
             target.projectionPass = source.projectionPass;
@@ -800,6 +800,7 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         if(hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
         if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources() || hasWaterResources()) return true;
+        if (hasShadowResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
@@ -1026,7 +1027,6 @@ uniform int sourceColorAbsent;
 uniform int useSourceNormals;
 uniform sampler2D image;
 out vec4 viewerOutput;
-)GLSL" RR_NATIVE_POD_SHADOW_GLSL50HM R"GLSL(
 void main() {
     if(gsAlphaPass!=0){
         // GS byte source colour: texel x vertex byte / 128 (prelit vertex
@@ -1095,7 +1095,6 @@ void main() {
         viewerOutput = vec4(0.0, 0.0, 0.0, sourceAlphaByte / 255.0);
         return;
     }
-    color *= rrNativePodShadow(trackWorldPosition, normal);
     if (effectMode == 2) color *= alphaScale;
     if (worldFogEnabled != 0) color = mix(color, worldFogColor.rgb, trackFogAmount);
     viewerOutput = vec4(color, effectMode == 3 ? sourceAlphaByte / 128.0 :
@@ -1152,24 +1151,6 @@ void main() {
         trackProjectionPassUniform = shaderGl.getUniformLocation(trackProgram, "projectionPass");
         trackUvTranslationUniform = shaderGl.getUniformLocation(trackProgram, "trackUvTranslation");
         trackAlphaReferenceUniform = shaderGl.getUniformLocation(trackProgram, "sourceAlphaReference");
-        nativeShadowEnabledUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowEnabled");
-        nativeShadowOpponentCountUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowOpponentCount");
-        for (U c = 0; c < nativeShadowCasterCount; ++c) {
-            char center[40]{}, shape[40]{};
-            std::snprintf(center, sizeof(center), "nativePodShadowCenter[%u]", c);
-            std::snprintf(shape, sizeof(shape), "nativePodShadowShape[%u]", c);
-            nativeShadowCenterUniforms[c] = shaderGl.getUniformLocation(trackProgram, center);
-            nativeShadowShapeUniforms[c] = shaderGl.getUniformLocation(trackProgram, shape);
-            if (nativeShadowCenterUniforms[c] < 0 || nativeShadowShapeUniforms[c] < 0)
-                return fail(*diagnostic, VehicleWindowError50DS::shader, "native shadow caster uniform missing");
-        }
-        for (U i = 0; i < maxVehicleWindowOpponents50DS; ++i) {
-            char bounds[48]{};
-            std::snprintf(bounds, sizeof(bounds), "nativePodShadowOpponentBounds[%u]", i);
-            nativeShadowOpponentBoundsUniforms[i] = shaderGl.getUniformLocation(trackProgram, bounds);
-            if (nativeShadowOpponentBoundsUniforms[i] < 0)
-                return fail(*diagnostic, VehicleWindowError50DS::shader, "native opponent shadow bounds uniform missing");
-        }
         if (!check("query source-color track uniforms")) return false;
         if (gsAlphaPassUniform<0||gsAlphaPayloadUniform<0||environmentAmbientUniform<0||environmentMapUniform<0||
             worldFogEnabledUniform < 0 || worldFogCameraUniform < 0 ||
@@ -1177,7 +1158,7 @@ void main() {
             trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
             trackUseTextureUniform < 0 || trackImageUniform < 0 || trackDiscardZeroAlphaUniform < 0 ||
             trackEffectModeUniform < 0 || trackAlphaScaleUniform < 0 || trackUnlitUniform < 0 ||
-            trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || trackUvTranslationUniform < 0 || trackAlphaReferenceUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
+            trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || trackUvTranslationUniform < 0 || trackAlphaReferenceUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track uniform missing");
         if (trackSourceColorAbsentUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source colour-stream uniform missing");
@@ -1566,7 +1547,8 @@ bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(const game::VehicleDrawMe
                 if (!admitted) break;
             }
             if (!admitted || vertex != mesh->vertexCount) continue;
-            // Shadow-casting spans exactly as buildRacerPodShadows selects them.
+            // Per-bone opaque-span statistics (formerly the retired native
+            // footprint shadow input); retained unchanged, not read for shadows.
             for (U span = 0; span < mesh->spanCount; ++span) {
                 const auto& range = mesh->spans[span];
                 bool casts = true;
@@ -2160,7 +2142,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createRaWorld()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createRaWorld() || !createOriginalShadows()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2362,6 +2344,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if(!deleteDebrisNames(d))goto incomplete;
         if(!deleteEffectNames(d))goto incomplete;
         if(!deleteWaterNames(d))goto incomplete;
+        if(!deleteShadowNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
                 d.cleanupShader.glError : d.cleanupShader.cleanupGlError;

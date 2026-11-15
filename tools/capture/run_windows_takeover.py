@@ -114,14 +114,15 @@ def main():
     parser.add_argument('--restart-once', action='store_true',
                         help='Exercise native race teardown/rebuild after first race evidence; not Pause-menu input')
     parser.add_argument('--renderer-switch', action='append', default=[],
-                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME', 'RR_RA_OWNED_PREPARATION', 'RR_ORIGINAL_ASPECT',
+                        choices=['RR_EXACT_PS2_SPECULAR', 'RR_GPU_FINISH_EACH_FRAME', 'RR_ORIGINAL_ASPECT',
                                  'RR_TRACE_ORIGINAL_UI_STAGES', 'RR_TRACE_PHASES',
                                  'RR_GARAGE_PROOF_SHADOW', 'RR_GARAGE_KERNEL_SHADOW',
                                  'RR_GARAGE_LEGACY_INDEX', 'RR_GARAGE_LEGACY_FINISH',
                                  'RR_GARAGE_LEGACY_PARALLEL', 'RR_GARAGE_LEGACY_BLEND',
                                  'RR_GARAGE_COVERAGE_PER_TRIANGLE', 'RR_GARAGE_COVERAGE_VERIFY',
                                  'RR_CPU_POD_VERTICES', 'RR_TEST_PAIR_ROUTE_COMPARE', 'RR_COVERAGE_PAIR_EXACT', 'RR_GPU_POD_VERTEX_CHECK',
-                                'RR_COLLISION_ADMISSION_CHECK'],
+                                'RR_COLLISION_ADMISSION_CHECK',
+                                 'RR_SHADOW_TRACE'],
                         help='Set one renderer comparison switch to 1 (repeatable); recorded in execution.json')
     parser.add_argument('--track', default='TA', help='Direct-start track when --route none')
     parser.add_argument('--all-ai', action='store_true',

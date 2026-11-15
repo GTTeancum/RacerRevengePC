@@ -3587,7 +3587,7 @@ bool Owner::continueNativeStandardModels274160(const original_main_entry50KG::Ap
         if(nativeScbThread_!=std::this_thread::get_id()||nativeScbRevoked_||nativeStandardServiceTerminal_||
            !nativeGeometryDirectory1AA1DC_||!nativeEmptyInstances3DC_||!nativeEmptyInstances3DC_->complete||app.modelDirectory36B860()!=(nativeCollisionAnimationDirectory1AA2A0_?"anim\\":"geometry\\")||
            !nativeSceneInfo270900Current(app,pc)||!world_||world_->closed_||world_->source_!=source_||
-           !world_->rendererPublication_||!world_->imagePublication_||!world_->modelPrefixes_||
+           !world_->modelPrefixes_||
            !world_->domain_||!world_->context_||!world_->context_->live()||
            !nativeTrackLoadBorrowsAdmitted()||!runtimeQueries_)return false;
         g::OriginalRaceFogFields* fog=nullptr;
@@ -3595,15 +3595,10 @@ bool Owner::continueNativeStandardModels274160(const original_main_entry50KG::Ap
             worldEntity_.sessionGeneration,fog)||!nativeFogCustodyCurrent(fog))return false;
         const auto display=runtimeQueries_->nativeColdModelDisplay274160(*worldApplication_,*source_,
             worldEntity_.sessionGeneration);
-        const auto* images=world_->imagePublication_;
         std::array<std::int32_t,4> coldRectangle{};std::uint64_t coldSelectionRevision=0;
         if(!display||display->application_!=&app||!runtimeQueries_->camera_||
-           !runtimeQueries_->camera_->session||
-           world_->rendererPublication_!=&display->renderer_||
-           !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,coldRectangle,coldSelectionRevision)||
-           images->raStaticWorldOwner()!=world_.get()||!images->publicationToken()||
-           !images->validBorrow(&display->video_->host,&original_main_entry50KG::RaceDisplayLifetime50LA::current,
-               images->publicationToken()))return false;
+           !runtimeQueries_->camera_->session||!nativeWorldPublicationCurrent(*display)||
+           !display->readColdGameplayViewport115990(*runtimeQueries_->camera_->session,coldRectangle,coldSelectionRevision))return false;
         //Both pre-existing publications remain retained. Only descriptor/name/
         //sourceflags metadata changes; geometry/texture/buffer pointers do not.
         auto& owner=*world_->modelPrefixes_;const auto* data=source_->sourcesDecoded();
@@ -3685,6 +3680,21 @@ bool Owner::continueNativeStandardModels274160(const original_main_entry50KG::Ap
 }
 }
 
+namespace ra_cold_aggregate50LA {
+bool Owner::nativeWorldPublicationCurrent(
+    const original_main_entry50KG::RaceDisplayLifetime50LA& display)const noexcept {
+    if(!world_)return false;
+    if(!world_->rendererPublication_&&!world_->imagePublication_)
+        return !display.attempted_&&!display.created_&&display.renderer_.broughtUp()&&
+            !display.renderer_.initialized();
+    const auto* images=world_->imagePublication_;
+    return world_->rendererPublication_==&display.renderer_&&images&&
+        images->raStaticWorldOwner()==world_.get()&&images->publicationToken()&&
+        images->validBorrow(&display.video_->host,&original_main_entry50KG::RaceDisplayLifetime50LA::current,
+            images->publicationToken());
+}
+}
+
 namespace original_main_entry50KG {
 bool RaceDisplayLifetime50LA::readColdGameplayViewport115990(
     const original_camera_session50KX::Session& camera,
@@ -3737,6 +3747,10 @@ bool RaceDisplayLifetime50LA::nativeSkyMetadataCurrent129280(
     const rr::assets::MaterialTextureAssets50EA& bank)const noexcept {
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!readColdGameplayViewport115990(camera,rectangle,revision))return false;
+    // Before creation the display holds no sky: create() publishes this same
+    // retained sky (the aggregate's skyAssets) later. Afterwards the renderer's
+    // sky must be exactly this mesh and bank.
+    if(!created_&&!attempted_&&renderer_.broughtUp()&&!renderer_.initialized())return true;
     rr::platform::VehicleWindowDiagnostic50DS diagnostic;
     return renderer_.raSkySourceCurrent129280(mesh,bank,this,diagnostic);
 }

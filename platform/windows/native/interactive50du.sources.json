@@ -221,6 +221,8 @@
     "platform/linux/native/vehicle_window_gl50ds_world.cpp",
     "platform/linux/native/vehicle_window_gl50ds_hud.cpp",
     "platform/linux/native/vehicle_window_gl50ds_validation.cpp",
+    "platform/linux/native/vehicle_window_gl50ds_shadow50ps.cpp",
+    "src/game/original_projected_shadow50ps.cpp",
     "platform/linux/native/material_texture_gl50eb.cpp",
     "platform/linux/native/game_host50er.cpp",
     "src/assets/material_texture_assets50ea.cpp",
