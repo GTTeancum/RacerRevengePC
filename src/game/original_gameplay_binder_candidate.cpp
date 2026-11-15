@@ -28,7 +28,9 @@ Status project(const VehicleFrameState49W& s,const VehicleFrameBindings49W& fram
         return Status::phase;
     if(s.bodies.main.vehicleState40!=0||s.fields.vehicle3C!=0)return Status::unsupportedVehicle;
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
-    if(!std::isfinite(b.halfHeight25C)||b.halfHeight25C<=0)return Status::input;
+    // 215BC8 stores whatever the PHY authors (a converted pod authors 0); the
+    // original never range-checks it. Only a non-finite value is refused here.
+    if(!std::isfinite(b.halfHeight25C))return Status::input;
     for(float x:camera)if(!std::isfinite(x))return Status::input;
     if(!validVehicleSceneCount49W(s,frame))return Status::graph;
     std::memcpy(work.nodes.data(),s.nodes,s.sceneNodeCount*sizeof(SceneNode49P));

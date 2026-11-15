@@ -7,6 +7,8 @@
 #include "../../src/game/original_ui_texture_animation50kg.h"
 #include "../../src/game/original_gameplay_binder_candidate.h"
 #include <array>
+#include <cmath>
+#include <cstdlib>
 
 namespace gameplay_binder_candidate_fixture {
 namespace a=rr::assets;
@@ -105,8 +107,23 @@ public:
                     binding[pair].right238!=native_racer50HW::Index::none,"Original Binder named endpoint missing");
             const auto phy=native_racer50HW::rig_detail::ini(rig.phy);
             const auto section=phy.find("binder");
-            need(section==phy.end()||!section->second.count("bindermeshhalfheight"),
-                "Unadmitted BinderMeshHalfHeight override");
+            //215BC8..215BFC: [Binder] BinderMeshHalfHeight through Config's
+            // float read (158B80), default 2.25 (0x40100000) when absent. Every
+            // pod takes the value its own PHY authors (no stock PHY authors it).
+            float halfHeight25C=2.25f;
+            if(section!=phy.end()){
+                const auto authored=section->second.find("bindermeshhalfheight");
+                if(authored!=section->second.end()){
+                    std::string text=authored->second;
+                    while(!text.empty()&&(text.back()==' '||text.back()=='\t'||text.back()=='\r'))text.pop_back();
+                    std::size_t lead=0;while(lead<text.size()&&(text[lead]==' '||text[lead]=='\t'))++lead;
+                    text.erase(0,lead);
+                    char* end=nullptr;const float value=text.empty()?0.f:std::strtof(text.c_str(),&end);
+                    need(!text.empty()&&end&&*end=='\0'&&std::isfinite(value),
+                        "Binder BinderMeshHalfHeight requires one finite decimal");
+                    halfHeight25C=value;
+                }
+            }
             //215C08..215C98 reads this selected PHY's Binder/VertexColor,
             // default00FFFFFF. 213A40/150450 sets field40=1, then23D750
             // publishes each integer RGB channel >>1 and alpha64 at color70.
@@ -132,8 +149,7 @@ public:
                 }
             }
             const std::array<float,4> color70{{float(rgb[0]>>1),float(rgb[1]>>1),float(rgb[2]>>1),64.f}};
-            // The selected PHY must omit it;215BC8 supplies float2.25.
-            for(auto& pair:binding)pair.halfHeight25C=2.25f;
+            for(auto& pair:binding)pair.halfHeight25C=halfHeight25C;
             const auto* identity=original_player_identity50IK::find(rig.podId);
             need(identity,"Unadmitted original pod for Binder");
             const auto bytes=native_racer50HW::f::readBytes(rig.resourceFile);

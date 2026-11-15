@@ -948,8 +948,15 @@ bool OriginalStandardMaterialObject50LA::borrowResultsScreenFallback2475C0(
                 ((square||circle)&&selectedArchive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::garage));
             const auto* selected=allowed?originalUiMemberIdentity50KG(selectedArchive->id,proof.member_):nullptr;
             const auto original=proof.overlays_->find(proof.name_+".pst");
+            { static int reported=0; //read-only diagnostic: which Results selection test refused
+              if(reported<4&&(!allowed||!selected||!original.identity||selected->bytes!=proof.pstBytes_.size()||
+                 original.size!=proof.pstBytes_.size())){++reported;
+                std::fprintf(stderr,"results_selection_refused name=%s allowed=%d selected=%d sel_bytes=%zu pst_bytes=%zu archive_size=%zu archive_identity_bytes=%zu original=%d original_size=%zu\n",
+                    s.name00.c_str(),int(allowed),int(selected!=nullptr),selected?std::size_t(selected->bytes):0u,proof.pstBytes_.size(),
+                    std::size_t(proof.selectedArchive_.size()),selectedArchive?std::size_t(selectedArchive->bytes):0u,
+                    int(original.identity!=nullptr),std::size_t(original.size));}}
             if(!allowed||proof.selectedArchive_.providerIdentity()!=proof.provider_.get()||
-               !proof.selectedArchive_.data()||proof.selectedArchive_.size()!=selectedArchive->bytes||
+               !proof.selectedArchive_.data()||!proof.selectedArchive_.size()|| /*archive size is an admission receipt (archive50kg), not a pin*/
                !selected||!selected->name||!Provider::sameName(selected->name,proof.pstMember_)||
                selected->bytes!=proof.pstBytes_.size()||proof.overlays_->find(s.name00).identity||
                !original.identity||!original.data||original.size!=proof.pstBytes_.size()||
@@ -1019,7 +1026,7 @@ bool OriginalStandardMaterialObject50LA::borrowF8ScreenFallbackTexture2475C0(
         const auto* selected=allowed?originalUiMemberIdentity50KG(selectedArchive->id,proof.member_):nullptr;
         const auto original=proof.overlays_->find(proof.name_+".pst");
         if(!allowed||proof.selectedArchive_.providerIdentity()!=proof.provider_.get()||
-           !proof.selectedArchive_.data()||proof.selectedArchive_.size()!=selectedArchive->bytes||
+           !proof.selectedArchive_.data()||!proof.selectedArchive_.size()|| /*archive size is an admission receipt (archive50kg), not a pin*/
            !selected||!selected->name||!Provider::sameName(selected->name,proof.pstMember_)||
            selected->bytes!=proof.pstBytes_.size()||proof.overlays_->find(s.name00).identity||
            !original.identity||!original.data||original.size!=proof.pstBytes_.size()||

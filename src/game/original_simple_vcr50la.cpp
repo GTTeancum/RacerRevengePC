@@ -101,7 +101,7 @@ struct OriginalSimpleVCR50LA::Impl final {
     std::uint32_t source(std::uint32_t i)const noexcept {
         std::uint32_t v;std::memcpy(&v,pointers84[i],4);return v;
     }
-    // 3062C0(cursor,{-1000.0,0x80000000|70},8): trailer, cursor NOT advanced.
+    // 3062C0(cursor,{-999.0 (0xC479C000),0x80000000|70},8): trailer, cursor NOT advanced.
     void trailer()noexcept {
         const std::uint32_t t[2]={0xc479c000u,0x80000000u|word70};
         std::memcpy(cursor60,t,8);
@@ -152,7 +152,11 @@ struct OriginalSimpleVCR50LA::Impl final {
     bool readFrame()noexcept {
         if(!readable(8))return true; //Native fence: never read past the buffer.
         std::uint32_t peek[2];std::memcpy(peek,cursor64,8);
-        if(f(peek[0])==-1000.f)return true;
+        // 2883DC..2883EC: c.eq.s against 0xC479C000 (-999.0), the trailer word 287DD0/288030
+        // write. Comparing with -1000 never matched: playback read on past the trailer into
+        // whatever the buffer held (zeros on a first recording; the earlier lap after a
+        // 1A8 lap restart, the Results replay pose fault).
+        if(f(peek[0])==f(0xc479c000u))return true;
         prev3C=next54;next54=f(peek[0]);header58=peek[1];cursor64+=8;++framesRead;
         const bool key=(header58&0x80000000u)!=0;
         for(std::uint32_t i=0;i<count80;++i){
