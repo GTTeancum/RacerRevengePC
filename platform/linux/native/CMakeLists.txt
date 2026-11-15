@@ -393,6 +393,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/player_events49a.cpp"
   "${RR_ROOT}/src/game/control_presets49d.cpp"
   "${RR_ROOT}/src/game/vehicle_static_response50g.cpp"
+  "${RR_ROOT}/src/game/vehicle_pod_response50pc.cpp"
   "${RR_ROOT}/src/game/static_contact_response50e.cpp"
   "${RR_ROOT}/src/game/spring_model48k.cpp"
   "${RR_ROOT}/src/game/spring_contact48j.cpp"

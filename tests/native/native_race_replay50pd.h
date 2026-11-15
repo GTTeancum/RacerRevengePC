@@ -273,7 +273,15 @@ public:
         const auto* w=words_+slot*racerWords;const auto* p=bytes_+slot*racerBytes;
         rr::game::Quaternion48C q{};std::memcpy(q.v,w,16);
         rr::game::BodyMatrix48G world{};
-        if(!rr::game::quaternionToMatrix48G(q,world))return reject("apply quaternion");
+        if(!rr::game::quaternionToMatrix48G(q,world)){
+            static int reported=0; //read-only diagnostic: the played words that refused
+            if(reported<3){++reported;const auto st=race_->vcr78Source_->state();
+                std::fprintf(stderr,"race_replay quaternion_refused slot=%zu q=%g,%g,%g,%g pos=%g,%g,%g play=%g time30=%g keyframes=%llu deltas=%llu ended=%d\n",
+                    slot,q.v[0],q.v[1],q.v[2],q.v[3],
+                    *reinterpret_cast<const float*>(w+4),*reinterpret_cast<const float*>(w+5),*reinterpret_cast<const float*>(w+6),
+                    st.play34,st.time30,(unsigned long long)st.keyframes,(unsigned long long)st.deltas,int(st.ended));}
+            return reject("apply quaternion");
+        }
         std::memcpy(world.v+12,w+4,12);world.v[15]=1.f;
         const rr::game::SceneGraph49P graph{s.nodes,s.sceneNodeCount};
         if(!rr::game::setParentlessWorldMatrix49P(graph,b.lifecycle.main190,world))return reject("apply main190");

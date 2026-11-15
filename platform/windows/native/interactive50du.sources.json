@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "825c992513f67dd75f800483a39e62548bb0ba00f3bc3fceee2ba5879ff5a8c7"
+    "tools/prepare_interactive_build50dv.py": "4aea84cbdd7ed3f0e26af92be6f78ea31cc430d3c4f588f924142a61a4b4157c"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -104,6 +104,7 @@
     "src/game/original_ui_win_page50pd.cpp",
     "src/game/original_ui_win_scene50pd.cpp",
     "src/game/track_zone_visibility50zv.cpp",
+    "src/game/vehicle_pod_response50pc.cpp",
     "src/game/original_wreck_explosion50la.cpp",
     "src/game/original_wreck_splash50la.cpp",
     "src/game/original_wreck_effects50la.cpp",

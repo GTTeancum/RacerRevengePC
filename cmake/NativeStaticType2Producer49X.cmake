@@ -9,7 +9,7 @@ target_sources(racer_native_vehicle_frame PRIVATE
     src/game/static_contact_response50e.cpp src/game/spring_model48k.cpp
     src/game/spring_contact48j.cpp src/game/spring_impulse48k.cpp src/game/spring_force48l.cpp)
 target_sources(racer_native_vehicle_frame PRIVATE src/assets/spring_authoring50f.cpp)
-target_sources(racer_native_vehicle_frame PRIVATE src/game/vehicle_static_response50g.cpp)
+target_sources(racer_native_vehicle_frame PRIVATE src/game/vehicle_static_response50g.cpp src/game/vehicle_pod_response50pc.cpp)
 target_sources(racer_native_vehicle_frame PRIVATE src/game/query_prepare48o.cpp src/game/vehicle_static_query50h.cpp)
 add_executable(racer_static_type2_producer49x_check tests/native/static_type2_producer49x.cpp)
 add_executable(racer_type2_resource49x_check tests/type2_resource49x_test.cpp)

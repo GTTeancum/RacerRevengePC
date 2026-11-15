@@ -30,6 +30,7 @@
 
 namespace gb_animation_binding50GB { class Binding; }
 namespace native_racer_contact50HW { class SnapshotAccess; }
+namespace roster_pod_contact50PC { class SlotAccess; }
 namespace mc_animation_binding50MC { class Binding; }
 namespace mc_collision_world50MC { class Owner; }
 namespace gb_query50GB { class Binding; }
@@ -376,6 +377,9 @@ private:
     friend class ::native_racer_model50LA::Owner; //Private source handling requires exact live slot.
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class ::native_racer_contact50HW::SnapshotAccess;
+    // Step R: the one bounds-checked writer of another racer's saved slot
+    // during the visited racer's own frame (roster_pod_contact50pc.h).
+    friend class ::roster_pod_contact50PC::SlotAccess;
     std::uint32_t nativeFifoPins_=0;
     // Only the concrete RA bridge can construct/install the derived pin. No
     // public replacement or generic keepalive. Only terminal backing teardown

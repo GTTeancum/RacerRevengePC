@@ -458,6 +458,7 @@ def main():
         'src/game/original_ui_rider_widgets50kg.cpp',
         'src/game/original_ui_rider_visibility50kg.cpp',
         'src/game/track_zone_visibility50zv.cpp',
+        'src/game/vehicle_pod_response50pc.cpp',
         'platform/linux/native/original_ui_garage_kernel_shadow50kg.cpp',
         'platform/linux/native/original_ui_unlock_draw_contribution50pd.cpp',
         'platform/linux/native/original_ui_unlock_draw_resources50pd.cpp',

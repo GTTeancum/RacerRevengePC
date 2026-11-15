@@ -526,6 +526,18 @@ void Context::run() {
       if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
       hostInput.keys.down[key]=on?1:0;
      }
+     // RR_TEST_PITCH_STICK=up|down: hold Up (or Down) arrow, the left-stick Y
+     // keys, 2 s of every 4 s, so zero-g pitch senses show in logs.
+     static const int pitchStick50DU=[]{const char* v=std::getenv("RR_TEST_PITCH_STICK");
+         return !v?0:std::string(v)=="up"?1:std::string(v)=="down"?-1:0;}();
+     if(pitchStick50DU){
+      constexpr std::size_t keyUp=82,keyDown=81;
+      const std::size_t key=pitchStick50DU>0?keyUp:keyDown;
+      const bool on=((monotonicNow50DU()/1000000000ull)%4ull)<2ull;
+      if(on&&!hostInput.keys.down[key])hostInput.keys.pressed[key]=1;
+      if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
+      hostInput.keys.down[key]=on?1:0;
+     }
      // RR_TEST_REPAIR=1: hold the player's repair key (R) 2 s of every 6 s,
      // as a player keeping a scraped pod alive (the bot cannot read damage).
      static const bool repair50DU=[]{const char* v=std::getenv("RR_TEST_REPAIR");return v&&std::string(v)=="1";}();
@@ -1531,8 +1543,11 @@ void Context::run() {
         require50DU(sourceCameraSession->enterResultsReplayCamera1ACE14(),"1A8204 replay-loop TV camera request rejected");
         std::cerr<<"race_replay loop="<<replay.stats().loops<<'\n';
        }
-       require50DU(racerBank.visitAll([&](std::size_t slot){return replay.apply(slot,s,x.bindings);}),
-           replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");
+       {std::size_t poseSlot=racerBank.count();const auto rejectedBefore=replay.stats().rejected;
+        const bool posed=racerBank.visitAll([&](std::size_t slot){poseSlot=slot;return replay.apply(slot,s,x.bindings);});
+        if(!posed)std::cerr<<"race_replay pose_rejected slot="<<poseSlot<<" rejected_delta="<<(replay.stats().rejected-rejectedBefore)
+            <<" why="<<(replay.stats().lastRejection?replay.stats().lastRejection:"")<<'\n';
+        require50DU(posed,replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");}
        // 228620 with +3C != 0: +40 == 0 and a nonzero played +44 re-runs that
        // handler (228914..2289B0); a racer in 1/2 whose +44 differs takes the
        // same dispatch (228A94..228B2C); states 3/4 never re-dispatch (228764).

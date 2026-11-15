@@ -26,6 +26,8 @@
 #include "../../src/game/collision_normal_mode50ja.h"
 #include "../../src/game/engine_damage_audio50ia.h"
 #include "../../src/game/native_test_undertrack50ut.h"
+#include "../../src/game/vehicle_pod_response50pc.h"
+#include "roster_pod_contact50pc.h"
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "../../src/game/vehicle_frame_surface50st.h"
@@ -257,6 +259,19 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  require50DU(detectorPolicy&&detectorPolicy->admission(false,s,x.bindings,query,spring,settings,
      mainRowMember,mainRowNow.ref,admission),"actual registered native main detector policy unavailable");
  runNative(collectRegistered,"ordered prepared-list vehicle candidates");
+ // Step R2 (inert): type the merged 690 list the original's 358 detector walks.
+ // A pod694 entry needs the in-list-order 294BB0 dispatch inside the indexed
+ // query, which is not wired yet; until step R5 the PORT STAND-IN exclusion
+ // list keeps every pod out, so this only counts (and refuses a surprise).
+ {roster_pod_contact50PC::SelectedList selected;
+  require50DU(roster_pod_contact50PC::classify(trackStorage,racerBank.count(),candidates.data(),candidates.size(),
+      trackStorage.mergedIds.data(),registeredCount,registeredIndices,registeredCount,selected),
+      "pod contact: collected 690 list classification rejected");
+  auto& podTotals=roster_pod_contact50PC::totals();++podTotals.classified;
+  podTotals.mergedPods+=selected.pods;podTotals.mergedOtherRows+=selected.otherRows;
+  require50DU(!selected.pods&&!selected.otherRows,
+      "pod contact: roster row in the 690 list before step R5 (294BB0 in-order dispatch not wired)");
+  if(actualRacerSlot==0&&completedFrames%3600u==0u)roster_pod_contact50PC::reportSummary(std::cerr,completedFrames);}
  if(isMbTrack){
 #include "mb_main_terrain_query50mb.inc"
  }else{
@@ -378,7 +393,52 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
      produceVehicleForcesSurface50ST(s,x.bindings,x.parameters,world,x.workspace,x.diagnostic,
          surfaceForces);},"native main forces");
  ResponseStorage50K responseStorage;auto responseWorkspace=responseStorage.view(x.workspace);
+ // Step R4: a generated record naming another body (other44, from 294BB0 or
+ // 219420) runs the two-body 2964C0; the other bodies are read from and
+ // committed to their own saved slots, bounds-checked, only after the frame
+ // commit succeeded. With no other44 record this is exactly the static call.
+ bool podRecords=false;
+ for(std::size_t i=0;i<40u&&static_cast<std::int32_t>(i)<spring.records.generatedCount84;++i)
+  if(records[i].other44.value)podRecords=true;
+ if(!podRecords)
  runNative([&]{return respondMainStaticVehicle50G(s,x.bindings,x.parameters,settings,response,x.secondaryInputs,query.queryScene,1,spring,records,40,responseWorkspace,x.diagnostic)==VehicleStaticResponseStatus50G::Complete;},"actual main contact response");
+ else{
+  require50DU(dynamicRegistry.prepared()&&dynamicRegistry.count()==racerBank.count()&&actualRacerSlot<racerBank.count(),
+      "pod contact: body identity registry unavailable for a two-body response");
+  roster_pod_contact50PC::SlotAccess access(racerBank,s,x.parameters,actualRacerSlot);
+  require50DU(access.ready(),"pod contact: visited racer slot lease rejected");
+  const auto primary=dynamicRegistry.bodyIdentityForSlot(actualRacerSlot).value;
+  std::array<SpringModelBody48K,roster_pod_contact50PC::maximumOthers> others{},othersOut{};
+  std::array<std::size_t,roster_pod_contact50PC::maximumOthers> otherSlots{};std::size_t otherCount=0;
+  for(std::size_t i=0;i<40u&&static_cast<std::int32_t>(i)<spring.records.generatedCount84;++i){
+   const auto id=records[i].other44.value;if(!id)continue;
+   bool seen=false;for(std::size_t n=0;n<otherCount;++n)if(others[n].identity==id)seen=true;
+   if(seen)continue;
+   std::size_t slot=racerBank.count();
+   for(std::size_t k=0;k<racerBank.count();++k)if(dynamicRegistry.bodyIdentityForSlot(k).value==id){
+    require50DU(slot==racerBank.count(),"pod contact: duplicate body identity");slot=k;}
+   require50DU(slot<racerBank.count()&&slot!=actualRacerSlot&&otherCount<others.size(),
+       "pod contact: record names no other racer body");
+   require50DU(access.gatherBody(slot,id,others[otherCount])&&access.fitsBody(slot),
+       "pod contact: other racer body unavailable or its response would not fit");
+   otherSlots[otherCount++]=slot;
+  }
+  struct PodResponseStorage {
+   SpringGeneratedRecord48K projected[60]{};SpringRecord48N staged[60]{};std::uint8_t flags[60]{},nextFlags[60]{};
+   SpringModelBody48K scratch[podResponseBodyCapacity50PC]{},prepared[podResponseBodyCapacity50PC]{};
+  } podStorage;
+  const VehiclePodResponseWorkspace50PC podWorkspace{{podStorage.projected,60,
+      {podStorage.scratch,podResponseBodyCapacity50PC,podStorage.flags,60},
+      {podStorage.prepared,podResponseBodyCapacity50PC,podStorage.nextFlags,60}},podStorage.staged,60,&x.workspace};
+  runNative([&]{return respondMainVehicleWithPods50PC(s,x.bindings,x.parameters,settings,response,x.secondaryInputs,
+      query.queryScene,primary,others.data(),otherCount,othersOut.data(),spring,records,40,podWorkspace,x.diagnostic)==
+      VehicleStaticResponseStatus50G::Complete;},"original two-body main contact response");
+  for(std::size_t n=0;n<otherCount;++n)
+   require50DU(access.commitBody(otherSlots[n],othersOut[n]),"pod contact: other racer response write refused");
+  auto& podTotals=roster_pod_contact50PC::totals();podTotals.twoBodyResponses+=otherCount;
+  for(std::size_t n=0;n<otherCount;++n)roster_pod_contact50PC::reportPair("2964C0","main",actualRacerSlot,otherSlots[n],0,0);
+ }
+
  require50DU(s.phase==(s.bodies.vehicle838?VehicleFramePhase49W::Post368:VehicleFramePhase49W::MainIntegration),"source-selected response phase");
 
  if(s.bodies.vehicle838){
@@ -480,6 +540,17 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   }
   rr::game::zeroGravity50ZG.afterStep(actualRacerSlot,terrainResult.terrain,groundDistance,
       s.bodies.main.cachedSpeed34,rr::game::surfaceRules50ST,rr::game::zeroGravityStep50ZG);
+  // TEST ONLY (forced zero-g runs): the player's attitude in flight, so the
+  // stick/turn senses can be read from logs (nose = body Z axis, wing = X).
+  static const bool zeroGAttitudeLog=std::getenv("RR_TEST_FORCE_ZERO_G")!=nullptr;
+  static std::uint64_t zeroGAttitudeSteps=0;
+  if(zeroGAttitudeLog&&actualRacerSlot==0&&main190<s.sceneNodeCount&&
+     rr::game::zeroGravity50ZG.mode(0)==rr::game::ZeroGravityMode50ZG::Flight&&(zeroGAttitudeSteps++%15u)==0u){
+   const auto& w=s.nodes[main190].world100.v;
+   std::fprintf(stderr,"zero_g_attitude step=%llu stick=%.3f steer=%.3f wing_x=(%.3f,%.3f,%.3f) nose_z=(%.3f,%.3f,%.3f) speed=%.1f\n",
+       (unsigned long long)zeroGAttitudeSteps,s.bodies.main.components.bindings.aeroAux50,
+       s.bodies.main.controls.player.raw.values[0],w[0],w[1],w[2],w[8],w[9],w[10],s.bodies.main.cachedSpeed34);
+  }
  }
  zeroGravityScope.reset();
  addCounter50DU(completedFrames);
