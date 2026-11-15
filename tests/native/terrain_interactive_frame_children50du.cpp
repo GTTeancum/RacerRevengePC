@@ -13,6 +13,7 @@
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/packed_vehicle_tail50r.h"
 #include "../../src/game/native_test_undertrack50ut.h"
+#include "../../src/game/native_zero_gravity50zg.h"
 #include <bit>
 #include "../../src/game/original_vehicle_damage50la.h"
 #include <cstring>
@@ -213,6 +214,9 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      auto owners=aiRecoveryOwners50UT(*flags22C,*field24C,actualHeightDomain,recoveryTargetRelative,queries);
      aiReturned=std::visit([&](auto& actual){return native_original_ai_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
          originalAi,originalAiReceipt,originalRecovery,actual,*originalRecoveryWorkspace,originalRecoveryDiagnostic);},owners);
+     // PC enhancement (native_zero_gravity50zg.h): 16EAA0 -> 2255B0 is a track
+     // reset; N64 ResetToSpline clears ZOFF, keeps ZON, zeroes pitch rates.
+     if(aiReturned)rr::game::zeroGravity50ZG.onTrackReset(actualRacerSlot);
     }else {originalRecoveryDiagnostic.sourcePC=0x124cb0u;
      originalRecoveryDiagnostic.message="actual world registration queue could not publish before reset ground query";}
    }else {originalRecoveryDiagnostic.sourcePC=0x216a80u;
@@ -780,6 +784,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
       <<" stage="<<static_cast<unsigned>(originalRecovery.stage)
       <<" pc="<<std::hex<<originalRecoveryDiagnostic.sourcePC<<std::dec
       <<" msg="<<originalRecoveryDiagnostic.message<<'\n';
+  if(baseAdvanced)rr::game::zeroGravity50ZG.onTrackReset(actualRacerSlot); // 228BBC -> 2255B0 (AI)
   if(!baseAdvanced){
    recoveryPaused=true;
    std::cerr<<"ORIGINAL AI undertrack continuation: "<<originalRecoveryDiagnostic.message
@@ -852,6 +857,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
        <<" c88="<<navigationProgress.reset.vehicleC88<<" anchor="<<originalHumanRecovery.selection.anchorNode
        <<" pos="<<p[12]<<','<<p[13]<<','<<p[14]
        <<" stage="<<static_cast<unsigned>(originalHumanRecovery.stage)<<'\n';}
+  if(baseAdvanced)rr::game::zeroGravity50ZG.onTrackReset(actualRacerSlot); // 228BBC -> 2255B0 (human)
   if(!baseAdvanced){
    recoveryPaused=true;
    std::cerr<<"ORIGINAL HUMAN undertrack continuation: "<<originalHumanRecoveryDiagnostic.message

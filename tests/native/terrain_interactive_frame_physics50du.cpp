@@ -26,6 +26,12 @@
 #include "../../src/game/collision_normal_mode50ja.h"
 #include "../../src/game/engine_damage_audio50ia.h"
 #include "../../src/game/native_test_undertrack50ut.h"
+#include "../../src/game/native_surface_traction50st.h"
+#include "../../src/game/native_zero_gravity50zg.h"
+#include "../../src/game/vehicle_frame_surface50st.h"
+#include <algorithm>
+#include <limits>
+#include <optional>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -91,6 +97,25 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  }
  runNative([&]{return scheduleVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::OtherChildrenAfter35C),liveSubstepScale,x.workspace,x.diagnostic);},"schedule");
  require50DU(s.bodies.main.schedule.count==1,"16ms diagnostic step requires one native substep");
+ // PC ENHANCEMENT, NOT ORIGINAL (native_zero_gravity50zg.h): N64 zero gravity
+ // for every racer through the one step. Inactive (no ZeroGravity data, or
+ // switched off) -> no context, nothing below changes. The progress words are
+ // the ones 2255B0 itself picks by +58: player C8C->C88 on the map line, AI
+ // C84->C80 on the AI line. The context lives for this racer's step only.
+ std::optional<rr::game::ScopedZeroGravityStep50ZG> zeroGravityScope;
+ if(rr::game::zeroGravity50ZG.active()){
+  rr::game::ZeroGravityStepInput50ZG zg{};
+  zg.human=s.fields.vehicle58==0u;
+  zg.from=zg.human?navigationProgress.reset.vehicleC8C:navigationProgress.vehicleC84;
+  zg.to=zg.human?navigationProgress.reset.vehicleC88:navigationProgress.reset.vehicleC80;
+  for(unsigned i=0;i<3;++i)zg.position[i]=s.bodies.main.components.root.body.position.v[i];
+  zg.steer=s.bodies.main.controls.player.raw.values[0];        // both: the racer's own steering channel
+  zg.pitchStick=s.bodies.main.components.bindings.aeroAux50;    // stick Y as 48W binds it (human only read)
+  zg.speed=s.bodies.main.cachedSpeed34;
+  zg.finished=(s.fields.impactFlagsCD8&1u)!=0u;
+  zg.dt=s.bodies.main.schedule.factorPerSubstep;
+  zeroGravityScope.emplace(rr::game::zeroGravity50ZG.prepareStep(actualRacerSlot,zg));
+ }
 
  runNative([&]{return beginVehicleSubstep49W(s,x.bindings,x.selectors,x.workspace,x.diagnostic);},"native selector");
  // Stage S (consumers.md B4): this racer's own 690/364/348 rows come from the
@@ -328,7 +353,30 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
      "commit actual terrain surface");
  ++terrainQueries;if(terrainResult.terrain.surface.hit110||terrainResult.terrain.surface.hit114)++terrainHitFrames;
  PostWorld49W world{};world.point=s.bodies.vehicle838?WorldCut49W::First358Secondary36CAnd219420:WorldCut49W::First358And219420;world.effects=contactEffects49W(s);world.applicationGateByte58=s.fields.applicationByte58;
- runNative([&]{return produceVehicleForces49W(s,x.bindings,x.parameters,world,x.workspace,x.diagnostic);},"native main forces");
+ // PC ENHANCEMENT, NOT ORIGINAL (native_surface_traction50st.h,
+ // native_zero_gravity50zg.h): N64 surface grip, speed factor and speed bonus
+ // from the course's TerrainZone data, plus the zero-g speed floor and aero,
+ // every racer. All inputs are at their defaults on stock data and with the
+ // switches off, and the original entry point then runs unchanged.
+ rr::game::SurfaceForceInputs50ST surfaceForces{};
+ surfaceForces.lateralScale=rr::game::surfaceRules50ST.lateralScale(actualRacerSlot);
+ surfaceForces.speedFactor=rr::game::surfaceRules50ST.speedFactor(actualRacerSlot,
+     s.bodies.main.components.probe348.field104!=0u);
+ surfaceForces.speedBonus=rr::game::surfaceRules50ST.speedBonus(actualRacerSlot);
+ {
+  // N64 target speed at zero throttle: the bonus, and in zero-g at least 75
+  // (ZON bonus 75-speed, ZOFF floor). Revenge has no thrust without drive,
+  // so the floor is a drive floor while the pod is below it (NOTES.md 4.3).
+  const bool zeroG=rr::game::zeroGravityStepAny50ZG();
+  const float floor=zeroG?std::max(rr::game::zeroGravityMinimumSpeed50ST,surfaceForces.speedBonus):surfaceForces.speedBonus;
+  const bool driving=s.bodies.main.vehicleState40==0u&&!(s.fields.impactFlagsCD8&1u);
+  surfaceForces.minimumDrive=driving&&floor>0.f&&s.bodies.main.cachedSpeed34<floor?1.f:0.f;
+  surfaceForces.untiltedAero=rr::game::zeroGravityStepIs50ZG(rr::game::ZeroGravityMode50ZG::Flight);
+ }
+ runNative([&]{return surfaceForces.isOriginal()?
+     produceVehicleForces49W(s,x.bindings,x.parameters,world,x.workspace,x.diagnostic):
+     produceVehicleForcesSurface50ST(s,x.bindings,x.parameters,world,x.workspace,x.diagnostic,
+         surfaceForces);},"native main forces");
  ResponseStorage50K responseStorage;auto responseWorkspace=responseStorage.view(x.workspace);
  runNative([&]{return respondMainStaticVehicle50G(s,x.bindings,x.parameters,settings,response,x.secondaryInputs,query.queryScene,1,spring,records,40,responseWorkspace,x.diagnostic)==VehicleStaticResponseStatus50G::Complete;},"actual main contact response");
  require50DU(s.phase==(s.bodies.vehicle838?VehicleFramePhase49W::Post368:VehicleFramePhase49W::MainIntegration),"source-selected response phase");
@@ -406,6 +454,34 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   warning.sprayInputKnown=false; // Water probe118 is not represented by this client.
   require50DU(liveAudio->warnings(warning).okay(),"native warning audio projection rejected");
  }
+ // Surface enhancement: targets from this completed step's probe list, then
+ // the 0.5/s easing (inert and silent when off or on stock data).
+ // Zero-g: in Flight the surface is the floor under the racing line.
+ const rr::game::SurfaceZeroGravityStep50ST zeroGravitySurface{
+     rr::game::zeroGravityStepIs50ZG(rr::game::ZeroGravityMode50ZG::Flight),
+     rr::game::zeroGravity50ZG.stepLineOwner(actualRacerSlot),s.bodies.main.cachedSpeed34};
+ rr::game::surfaceRules50ST.update(actualRacerSlot,terrainResult.terrain,
+     (s.fields.impactFlagsCD8&1u)!=0u,s.bodies.main.schedule.factorPerSubstep,zeroGravitySurface);
+ if(rr::game::zeroGravity50ZG.active()){
+  // Ground distance for the ZOFF landing test (< 12 ft): the probe's own
+  // contact point (body + basis x 1C0 offset, as 48G measures its gap) to the
+  // committed surface point along its normal. +inf when the probe saw nothing.
+  float groundDistance=std::numeric_limits<float>::infinity();
+  const auto& surface=terrainResult.terrain.surface;
+  const auto main190=static_cast<std::uint32_t>(x.bindings.lifecycle.main190);
+  if((surface.hit110||surface.hit114)&&main190<s.sceneNodeCount){
+   const auto& w=s.nodes[main190].world100.v;const auto& o=s.terrainProbe.response.localOffset1c0.v;
+   float gap=0.f;
+   for(unsigned i=0;i<3;++i){
+    const float probe=s.bodies.main.components.root.body.position.v[i]+w[i]*o[0]+w[4+i]*o[1]+w[8+i]*o[2];
+    gap+=(probe-surface.point150.v[i])*surface.normal170.v[i];
+   }
+   if(std::isfinite(gap))groundDistance=gap;
+  }
+  rr::game::zeroGravity50ZG.afterStep(actualRacerSlot,terrainResult.terrain,groundDistance,
+      s.bodies.main.cachedSpeed34,rr::game::surfaceRules50ST,rr::game::zeroGravityStep50ZG);
+ }
+ zeroGravityScope.reset();
  addCounter50DU(completedFrames);
  if(m.components.probe348.field104)++terrainSupportedFrames;
  if(m.controls.player.flagsB9C&2u)addCounter50DU(repairActiveTicks);

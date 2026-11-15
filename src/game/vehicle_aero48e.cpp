@@ -1,4 +1,5 @@
 #include "vehicle_aero48e.h"
+#include "vehicle_aero_untilted50zg.h"
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -101,9 +102,12 @@ void calculateForce(Arithmetic& f,const AeroMotionPrefix48E& motion,
     }
  }
 }
-bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& p,
+namespace {
+// Shared body of 16CD90. allowTilt is true on the original route; only the PC
+// zero-g enhancement (vehicle_aero_untilted50zg.h) passes false.
+bool applyAerodynamicsWith50ZG(const AeroState48E& previous,const AeroParameters48E& p,
                           const AeroInput48E& in,const ReadyBodyBasis48D& basis,
-                          const BodyLoads48C& loads,float dt,AeroResult48E& out) noexcept {
+                          const BodyLoads48C& loads,float dt,bool allowTilt,AeroResult48E& out) noexcept {
     if(!std::isfinite(dt)||dt<0||!finite(in.bodyLocalVelocity)||!finite(in.angularVelocity)||
        !std::isfinite(in.bodyAngleE0)||!std::isfinite(in.driveE4)||!std::isfinite(in.driveE8)||
        !std::isfinite(in.brakeEc)||!std::isfinite(previous.timer140)||!std::isfinite(previous.timer144)||
@@ -125,7 +129,7 @@ bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& 
     const float factor=minimum(f.mul(fp(0x3ca3d70au),speed),1);
     const float signedFactor=v.v[2]<0 ? f.mul(factor,-1):factor;
     const float speed2=f.mul(speed,speed),up=basis.columns[1].v[1];
-    const bool tilted=up<=.5f;
+    const bool tilted=allowTilt&&up<=.5f;
     if(in.triggerD0){result.state.timer140=.25f;result.state.timer144=0;}
     const bool firstTimer=!(result.state.timer140<=0);
     if(firstTimer)result.state.timer140=f.sub(result.state.timer140,dt);
@@ -144,6 +148,18 @@ bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& 
         result.accumulatedLoads.torque.v[i]=f.add(loads.torque.v[i],torque.v[i]);
     }
     if(!f.valid)return false;out=result;return true;
+}
+} // namespace
+bool applyAerodynamics48E(const AeroState48E& previous,const AeroParameters48E& p,
+                          const AeroInput48E& in,const ReadyBodyBasis48D& basis,
+                          const BodyLoads48C& loads,float dt,AeroResult48E& out) noexcept {
+    return applyAerodynamicsWith50ZG(previous,p,in,basis,loads,dt,true,out);
+}
+// PC ENHANCEMENT, NOT ORIGINAL (vehicle_aero_untilted50zg.h): zero-g flight only.
+bool applyAerodynamicsUntilted50ZG(const AeroState48E& previous,const AeroParameters48E& p,
+                          const AeroInput48E& in,const ReadyBodyBasis48D& basis,
+                          const BodyLoads48C& loads,float dt,AeroResult48E& out) noexcept {
+    return applyAerodynamicsWith50ZG(previous,p,in,basis,loads,dt,false,out);
 }
 bool prepareAeroMotionPrefix48E(const AeroInput48E& in,const ReadyBodyBasis48D& basis,
     AeroMotionPrefix48E& out)noexcept {

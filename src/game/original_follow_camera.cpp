@@ -2,6 +2,7 @@
 #include "chariot_scene49u.h"
 #include "scalar_minmax48o.h"
 #include "../assets/pod_physics49n.h"
+#include "native_zero_gravity_step50zg.h"
 #include <cfenv>
 #include <climits>
 #include <cmath>
@@ -14,6 +15,12 @@ namespace {
 using V=OriginalFollowVector;using C=OriginalFollowCamera;
 using Status=OriginalFollowStatus;using Result=OriginalFollowResult;
 Result fail(Status s,std::uint32_t pc,std::size_t i=0) noexcept {return {s,pc,i};}
+// The follow camera is the player's (racer slot 0, as its only caller in the
+// race session visits slot 0). FLAG: keyed on the camera's racer, not on a
+// course or pod. True only in zero-g Flight / Recover for that racer.
+bool zeroGravityCameraFollowsAttitude50ZG() noexcept {
+    return zeroGravityPublishedMode50ZG[0]!=ZeroGravityMode50ZG::Normal;
+}
 float bits(std::uint32_t u) noexcept {float f;std::memcpy(&f,&u,4);return f;}
 bool scalar(float x) noexcept {
     std::uint32_t u;std::memcpy(&u,&x,4);const auto e=u&0x7f800000u;
@@ -141,6 +148,18 @@ Result finish(C& c,OriginalFollowPoseWork& work,const OriginalFollowCollisionRes
     //115CE8 dispatch initializes camera mode1 and calls virtual+14;17A050
     //does not write the mode. No inherited procedural mode0 may leak through.
     out.mode=1;next.historyC0=hit.position70;next.historyD0=work.collision.target80;
+    // PC ENHANCEMENT (zero-g): follow the pod's full attitude - up is the
+    // pod's up (0x80042510..5D4), with no pitch / cubic roll damping
+    // (0x800425DC, 0x8004266C skipped). Mode 0 hands look and up to
+    // 115060/composeCameraView49F as the attached camera does; mode 1 would
+    // rebuild up from world Y there. Position, target and FOV are unchanged.
+    if(zeroGravityCameraFollowsAttitude50ZG()){
+        const V look=m.normalize(V{m.sub(out.target.x,out.position.x),m.sub(out.target.y,out.position.y),
+            m.sub(out.target.z,out.position.z),1});
+        const V podUp=work.collision.upB0;const float along=m.add(m.add(m.mul(podUp.x,look.x),m.mul(podUp.y,look.y)),m.mul(podUp.z,look.z));
+        const V up=m.normalize(V{m.sub(podUp.x,m.mul(along,look.x)),m.sub(podUp.y,m.mul(along,look.y)),m.sub(podUp.z,m.mul(along,look.z)),1});
+        out.look=look;out.up=up;out.mode=0;
+    }
     if(!m.ok)return fail(Status::arithmetic,0x17bb70);
     ++next.revision;c=next;random.sharedRandomState=raw;output=out;work.pending=false;return {};
 }
@@ -254,7 +273,11 @@ Result beginOriginalFollowPose17A050(const C& c,const OriginalFollowSubject& s,f
     else if(fov<p.minFov48){next.fovOffset64=m.sub(p.minFov48,next.fov10);fov=p.minFov48;}
     if(!p.lookBack34&&!(raceFlags&0x10u))fov=m.add(next.dynamicFov15C,fov);
     V forward=s.worldForward,up=s.worldUp,position=s.worldPosition;forward.w=up.w=position.w=1;
-    V flat=forward;flat.y=0;flat=m.normalize(flat);
+    // PC ENHANCEMENT, NOT ORIGINAL (native_zero_gravity_step50zg.h): in N64
+    // zero-g (ZON|ZOFF, 0x80041FF0) the chase cam builds its offset in the
+    // pod's own plane (0x80042510..5D4) instead of levelling it to world up.
+    const bool zeroG=zeroGravityCameraFollowsAttitude50ZG();
+    V flat=forward;if(!zeroG)flat.y=0;flat=m.normalize(flat);
     const V velocity=m.filters(next.velocity130,s.bodyVelocity70,dt);
     const float ratio=m.div(fov,p.maxFov4C),clamped=m.min(m.max(-1,-m.keep(s.bodyA4)),1);
     const float swing=m.mul(ratio,m.mul(m.mul(bits(0x3e570a3du),next.cameraSwing14),clamped));

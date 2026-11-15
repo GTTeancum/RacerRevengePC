@@ -1,6 +1,9 @@
 #include "vehicle_base_finish50y.h"
 #include "vehicle_base_tail50x.h"
 #include "vehicle_frame49w.h"
+#include "vehicle_frame_surface50st.h"
+#include "native_zero_gravity_step50zg.h"
+#include "vehicle_aero_untilted50zg.h"
 #include "pod_live_query50iz.h"
 #include "chariot_scene49u.h"
 #include "movement_hit_point50m.h"
@@ -145,7 +148,10 @@ bool secondaryForces(const S&live,S&s,const VehicleFrameBindings49W&b,const Vehi
  if(!noiseContinuation(live,s,d))return false;
  auto&z=s.bodies.secondary;const auto&m=s.bodies.main;const auto&par=p.bodies.secondary;
  if(z.phase!=SecondaryPhase49M::Ready)return false;
- Math f;const float g=m.components.probe348.field104?s.fields.gravity378:s.fields.gravity37C;
+ // PC enhancement (native_zero_gravity_step50zg.h): no gravity in zero-g
+ // flight or recovery (N64 0x8006A9D4 / ApplyGravity skipped in ZOFF). The
+ // racer's own gravity fields are read-only here and stay untouched.
+ Math f;const float g=zeroGravityStepAny50ZG()?0.f:m.components.probe348.field104?s.fields.gravity378:s.fields.gravity37C;
  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218a3c);if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_FORCE_CUT(0x218a3c,s,b.lifecycle.physical19C);if(!noiseContinuation(live,s,d))return false;f.addLoad(z.root.loads.force,{{0,f.mul(f.neg(par.body.mass),g),0,1}});
  const float lo=x.effective4346D0,hi=x.effective4346D8;
  float damping=f.add(lo,f.div(f.mul(f.sub(z.cachedSpeed34,fp(0x422fffcc)),f.sub(hi,lo)),fp(0x41eaaa64)));
@@ -206,6 +212,60 @@ void installTerrainSurface50FP(S& s,const PreparedTerrainState48J& in) noexcept 
  p.field1E8=in.collectedCount;p.field12C=in.excludedOwnerIdentity;
  e.collectedIdentities=in.collectedIdentities;e.currentCandidateIdentity=in.currentCandidateIdentity;
 }
+// PC ENHANCEMENT, NOT ORIGINAL: N64 spline-follow orientation (0x8006AF48 /
+// swrRace_UpdateSplineOrientation) for a racer in zero-g Flight or Recover.
+// Written through the same parentless main190 setter 48G's own alignment
+// uses (28A090 equivalent), translation kept, so it stays inside this racer's
+// own frame state. Yaw is the pod's own (Revenge steering torque, integrated
+// at 219E80); the N64's forward blend toward the lookahead, pitch and roll are
+// applied here. Host float math (an enhancement, not an original-word path).
+bool writeZeroGravityBasis50ZG(S& s,const VehicleFrameBindings49W& bindings,const TerrainSurface48G& surface) noexcept {
+ auto& step=zeroGravityStep50ZG;
+ const auto old=node(s,bindings.lifecycle.main190).world100;
+ auto dot=[](const float a[3],const float b[3]){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];};
+ auto cross=[](const float a[3],const float b[3],float o[3]){o[0]=a[1]*b[2]-a[2]*b[1];o[1]=a[2]*b[0]-a[0]*b[2];o[2]=a[0]*b[1]-a[1]*b[0];};
+ auto unit=[&](float a[3]){const float l=std::sqrt(dot(a,a));if(!(l>1e-6f)||!std::isfinite(l))return false;for(unsigned i=0;i<3;++i)a[i]/=l;return true;};
+ // Rodrigues rotation of v about unit axis k by angle (radians).
+ auto rotate=[&](float v[3],const float k[3],float angle){float kv[3];cross(k,v,kv);const float c=std::cos(angle),sn=std::sin(angle),kd=dot(k,v);
+  for(unsigned i=0;i<3;++i)v[i]=v[i]*c+kv[i]*sn+k[i]*kd*(1.f-c);};
+ float fwd[3]{old.v[8],old.v[9],old.v[10]},up[3]{old.v[4],old.v[5],old.v[6]};
+ const float pos[3]{old.v[12],old.v[13],old.v[14]};
+ if(!unit(fwd)||!unit(up))return false;
+ // Steps 1-2: d = normalize(lookahead - pod); fwd += blend (d - fwd).
+ float to[3]{step.lookAhead[0]-pos[0],step.lookAhead[1]-pos[1],step.lookAhead[2]-pos[2]};
+ if(unit(to)&&std::isfinite(step.forwardBlend))for(unsigned i=0;i<3;++i)fwd[i]+=step.forwardBlend*(to[i]-fwd[i]);
+ if(!unit(fwd))return false;
+ // Step 3: right = up x fwd (48G's column order: x = normal x forward),
+ // up = fwd x right. The old up is kept: roll is not self-righted.
+ float right[3];cross(up,fwd,right);if(!unit(right))return false;
+ cross(fwd,right,up);if(!unit(up))return false;
+ // Roll rate: Flight from the host rate; Recover = gain x bank error to the
+ // surface (probe when it hits, else the floor under the line).
+ float roll=step.flightRollRateDegrees;
+ if(step.mode==ZeroGravityMode50ZG::Recover){
+  float n[3]{0.f,1.f,0.f};bool have=false;
+  if(surface.hit110||surface.hit114){for(unsigned i=0;i<3;++i)n[i]=surface.normal170.v[i];have=true;}
+  else if(step.haveSurfaceNormal){for(unsigned i=0;i<3;++i)n[i]=step.surfaceNormal[i];have=true;}
+  float error=0.f;
+  if(have){const float along=dot(n,fwd);for(unsigned i=0;i<3;++i)n[i]-=along*fwd[i];
+   if(unit(n)){float c[3];cross(up,n,c);error=std::atan2(dot(fwd,c),dot(up,n))*(180.f/3.14159265f);}}
+  step.bankErrorDegrees=error;roll=step.recoverRollGain*error;
+ }
+ // Step 4: pitch about right, roll about forward (degrees per second x dt).
+ const float toRadians=3.14159265f/180.f;
+ const float pitchAngle=step.pitchRateDegrees*step.dt*toRadians,rollAngle=roll*step.dt*toRadians;
+ if(!std::isfinite(pitchAngle)||!std::isfinite(rollAngle))return false;
+ if(pitchAngle!=0.f){rotate(fwd,right,pitchAngle);rotate(up,right,pitchAngle);}
+ if(rollAngle!=0.f){rotate(right,fwd,rollAngle);rotate(up,fwd,rollAngle);}
+ if(!unit(fwd))return false;cross(up,fwd,right);if(!unit(right))return false;cross(fwd,right,up);if(!unit(up))return false;
+ // Step 5: position restored (translation untouched).
+ auto oriented=node(s,bindings.lifecycle.main190).localC0;
+ const float* columns[3]={right,up,fwd};
+ for(unsigned axis=0;axis<3;++axis){for(unsigned i=0;i<3;++i)oriented.v[4*axis+i]=columns[axis][i];oriented.v[4*axis+3]=0.f;}
+ oriented.v[15]=1.f;
+ if(!setLocalMatrix49P(graph(s),bindings.lifecycle.main190,oriented))return false;
+ step.basisWritten=true;return true;
+}
 bool respondEnabledTerrain50FP(S& s,const VehicleFrameBindings49W& bindings) noexcept {
  auto& e=s.terrainProbe;auto& m=s.bodies.main;auto& c=m.components;auto& p=c.probe348;
  if(e.stage!=2u)return false;
@@ -215,8 +275,24 @@ bool respondEnabledTerrain50FP(S& s,const VehicleFrameBindings49W& bindings) noe
  input.cachedLocalVelocity80=c.root.localVelocity80;input.angleE8=m.cachedAnglesE0.v[2];input.loads=c.root.loads;
  for(unsigned axis=0;axis<3;++axis){std::memcpy(input.scene.basis.columns[axis].v,old.v+4*axis,12);input.scene.position.v[axis]=old.v[12+axis];}
  TerrainFollowResult48G result{};
- if(!applyTerrainFollowing48G(initial,e.response,surface.surface,input,result))return false;
- if(result.state.active104){
+ // PC ENHANCEMENT, NOT ORIGINAL (native_zero_gravity_step50zg.h). Inactive
+ // (every stock racer, every step) -> the original 48G call below, unchanged.
+ // Flight (N64 ZON, 0x8006A9D4): no ground response at all - no hover pull,
+ // no surface alignment, no airborne roll torque; the probe state is held and
+ // only "supported" (+104) is cleared, so the dust gate 2179D0 and gravity
+ // selection see an unsupported pod as they would in the air.
+ // Recover (N64 ZOFF): the ground contact is back (48G runs); while it does
+ // not hold the pod, its airborne roll torque is dropped and the pod keeps
+ // the spline-follow orientation.
+ const bool zeroGFlight=zeroGravityStepIs50ZG(ZeroGravityMode50ZG::Flight);
+ const bool zeroGRecover=zeroGravityStepIs50ZG(ZeroGravityMode50ZG::Recover);
+ if(zeroGFlight){result.state=initial;result.state.active104=0;result.body=input;}
+ else if(!applyTerrainFollowing48G(initial,e.response,surface.surface,input,result))return false;
+ bool zeroGChase=zeroGFlight;
+ if(zeroGRecover&&!result.state.active104){result.body.loads=input.loads;zeroGChase=true;}
+ if(zeroGChase){
+  if(!writeZeroGravityBasis50ZG(s,bindings,surface.surface))return false;
+ }else if(result.state.active104){
   //48G contains the original rounded28AF90 translation result. Apply its local
   //write/invalidation first. Parentless190 is required by frame admission.
   auto translated=node(s,bindings.lifecycle.main190).localC0;
@@ -577,7 +653,13 @@ bool commitVehicleTerrainQuery50FP(S& s,const VehicleFrameBindings49W& b,const T
  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b19b4);if(!noiseContinuation(s,w.next,d))return false;installTerrainSurface50FP(w.next,query.terrain);
  w.next.terrainProbe.stage=2;return commit(s,w,d,P::PostWorld);
 }
-bool produceVehicleForces49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PostWorld49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+namespace {
+// Shared body of the original 219810 force producers. engineParameters and
+// aeroParameters are par.engine / par.aero on the original route; only the PC
+// surface enhancement (native_surface_traction50st.h) passes scaled copies.
+bool produceVehicleForcesWith50ST(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PostWorld49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d,
+ const EngineParameters48D& engineParameters,const AeroParameters48E& aeroParameters,
+ float minimumDrive,bool untiltedAero) noexcept {
  if(!start(s,b,P::PostWorld,w,d))return false;auto&r=w.next;auto&m=r.bodies.main;
  const auto expected=m.substepIndex==0?(r.bodies.vehicle838?WorldCut49W::First358Secondary36CAnd219420:WorldCut49W::First358And219420):(m.vehicle380?WorldCut49W::LaterRequired358And219420:WorldCut49W::LaterSkipped);
  if(x.point!=expected)return fail(d,E::ExternalCut,0x219810);
@@ -587,15 +669,54 @@ bool produceVehicleForces49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  else{if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x1b1800);if(!noiseContinuation(s,w.next,d))return false;if(!prepareDisabledProbe49K(c.probe348,par.probeLocal140,node(r,b.lifecycle.main190).world100,par.effective434260,c.probe348))return fail(d,E::Arithmetic,0x1b1800);}
  EngineInput48D en{};AeroInput48E ai{};en.bodySpeed=m.cachedSpeed34;en.boost=m.selectedEngineFlags.engine34!=0;en.repair=m.selectedEngineFlags.engine38!=0;en.fullTorque=c.feedback.engine3C!=0;ai.bodyLocalVelocity=c.root.localVelocity80;ai.angularVelocity=c.root.body.angularVelocity;ai.bodyAngleE0=m.cachedAnglesE0.v[0];ai.subtractWorldFlow=x.aeroSubtractWorldFlow;ai.worldFlow40=x.aeroWorldFlow40;ai.triggerD0=c.feedback.aeroD0!=0;ai.fullSteeringE0=c.feedback.aeroE0!=0;
  if(!applyControlModelBindings48W(c.bindings,en,ai,en,ai))return fail(d,E::Input,0x219c84);
- if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2e7720);if(!noiseContinuation(s,w.next,d))return false;if(!updateEngine48D(c.engine,par.engine,en,c.engine))return fail(d,E::Arithmetic,0x2e7720);
- if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2827d0);if(!noiseContinuation(s,w.next,d))return false;if(!accumulateEngineGravity48D(c.root.loads,c.engine,basis(node(r,b.lifecycle.main190).world100),{m.selectedGravity,par.gravityForceX,par.gravityForceZ},par.body.mass,false,true,c.root.loads))return fail(d,E::Arithmetic,0x2827d0);
+ // PC enhancement only (minimumDrive 0 on the original route): N64 target
+ // speed floor at zero throttle (bonus / zero-g 75), local engine input copy.
+ if(minimumDrive>0.f)for(auto& drive:en.drive)if(drive<minimumDrive)drive=minimumDrive;
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2e7720);if(!noiseContinuation(s,w.next,d))return false;if(!updateEngine48D(c.engine,engineParameters,en,c.engine))return fail(d,E::Arithmetic,0x2e7720);
+ if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x2827d0);if(!noiseContinuation(s,w.next,d))return false;if(!accumulateEngineGravity48D(c.root.loads,c.engine,basis(node(r,b.lifecycle.main190).world100),zeroGravityStepAny50ZG()?GravityParameters48D{0.f,0.f,0.f}:GravityParameters48D{m.selectedGravity,par.gravityForceX,par.gravityForceZ},par.body.mass,false,true,c.root.loads))return fail(d,E::Arithmetic,0x2827d0);
  Math f;detail::SceneVectorContext49U scratch{0};V v{};
  if(x.applicationGateByte58&2u){for(unsigned k=0;k<2;++k){if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(k?0x2e7c98:0x2e7c3c);if(!noiseContinuation(s,w.next,d))return false;if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(c.engine.localThrust[k]),scratch,v))return fail(d,E::Arithmetic,0x2e7c10);f.addLoad(c.root.loads.force,v);}for(const auto&t:c.engine.torque)f.addLoad(c.root.loads.torque,vector(t));}
  V forward{},up{};if(ai.subtractWorldFlow){if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16ce10);if(!noiseContinuation(s,w.next,d))return false;if(!detail::inverseDirection49U(graph(r),b.lifecycle.main190,vector(ai.worldFlow40),scratch,v))return fail(d,E::Arithmetic,0x16ce10);}
  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16cf58);if(!noiseContinuation(s,w.next,d))return false;if(!axes(r,b.lifecycle.main190,forward,up))return fail(d,E::Arithmetic,0x16cf58);
- AeroResult48E result{};if(!applyAerodynamics48E(c.aero,par.aero,ai,basis(node(r,b.lifecycle.main190).world100),c.root.loads,m.schedule.factorPerSubstep,result))return fail(d,E::Arithmetic,0x16cd90);
+ AeroResult48E result{};if(!(untiltedAero?applyAerodynamicsUntilted50ZG:applyAerodynamics48E)(c.aero,aeroParameters,ai,basis(node(r,b.lifecycle.main190).world100),c.root.loads,m.schedule.factorPerSubstep,result))return fail(d,E::Arithmetic,0x16cd90);
  if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x16d7c0);if(!noiseContinuation(s,w.next,d))return false;if(!detail::direction49U(graph(r),b.lifecycle.main190,vector(result.localForce),scratch,v)||!f.valid)return fail(d,E::Arithmetic,0x16d7c0);
  c.aero=result.state;c.root.loads=result.accumulatedLoads;project(r,b);m.phase=MainBodyPhase49K::AwaitingResponse354;r.bodies.phase=CoupledBodyPhase49M::AwaitingResponse354;return commit(s,w,d,P::Post354);
+}
+} // namespace
+bool produceVehicleForces49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PostWorld49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ return produceVehicleForcesWith50ST(s,b,p,x,w,d,p.bodies.main.engine,p.bodies.main.aero,0.f,false);
+}
+// PC ENHANCEMENT, NOT ORIGINAL (native_surface_traction50st.h,
+// native_zero_gravity50zg.h). lateralScale multiplies the three sideslip
+// side-force coefficients 16CD90 selects from (+90 SideSlipSideForce, +10C
+// PowerslideSideForce, +118 InvertedSideSlipSideForce); speedFactor multiplies
+// the four speed endpoints 2E7720 builds its thrust falloff from (+54
+// RampDownSpeed, +58 TheoreticalTopSpeed, +60 BoostSpeed, +64 RepairSpeed);
+// speedBonus then shifts the whole window up (+58 only: lower = +58 - +54,
+// upper = +58, boost/repair windows hang off +58 too), the N64 "s += bonus";
+// minimumDrive floors the engine drive (N64 zero-throttle target); untilted
+// selects the zero-g aero variant. Scaled LOCAL copies only: the racer's
+// parameter owner is never written. Callers use the original entry point when
+// in.isOriginal(), so stock data never gets here.
+bool produceVehicleForcesSurface50ST(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PostWorld49W&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d,
+ const SurfaceForceInputs50ST& in) noexcept {
+ const float lateralScale=in.lateralScale,speedFactor=in.speedFactor,speedBonus=in.speedBonus;
+ if(!std::isfinite(lateralScale)||!(lateralScale>0.f)||lateralScale>1.f||
+    !std::isfinite(speedFactor)||!(speedFactor>0.f)||speedFactor>1.f||
+    !std::isfinite(speedBonus)||speedBonus<0.f||speedBonus>1000.f||
+    !(in.minimumDrive==0.f||in.minimumDrive==1.f))return fail(d,E::Input,0x219c84);
+ const auto&par=p.bodies.main;Math f;
+ AeroParameters48E aero=par.aero;EngineParameters48D engine=par.engine;
+ if(lateralScale!=1.f){aero.lateral90=f.mul(aero.lateral90,lateralScale);
+  aero.timerLateral10c=f.mul(aero.timerLateral10c,lateralScale);
+  aero.tiltedLateral118=f.mul(aero.tiltedLateral118,lateralScale);}
+ if(speedFactor!=1.f){engine.rampDownSpeed=f.mul(engine.rampDownSpeed,speedFactor);
+  engine.theoreticalTopSpeed=f.mul(engine.theoreticalTopSpeed,speedFactor);
+  engine.boostSpeed=f.mul(engine.boostSpeed,speedFactor);
+  engine.repairSpeed=f.mul(engine.repairSpeed,speedFactor);}
+ if(speedBonus!=0.f)engine.theoreticalTopSpeed=f.add(engine.theoreticalTopSpeed,speedBonus);
+ if(!f.valid)return fail(d,E::Arithmetic,0x219c84);
+ return produceVehicleForcesWith50ST(s,b,p,x,w,d,engine,aero,in.minimumDrive,in.untiltedAero);
 }
 bool respondVehicle354_49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const Post354_49W&x,const SecondaryInputs49M&secondary,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::Post354,w,d))return false;auto&r=w.next;install(r,x.effects);auto&m=r.bodies.main;auto&c=m.components;DisabledProbeResponse49K response{};const auto&par=p.bodies.main;

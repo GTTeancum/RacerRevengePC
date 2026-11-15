@@ -1,5 +1,6 @@
 #pragma once
 #include "ai_driving50iv.h"
+#include "native_zero_gravity_step50zg.h"
 #include "ai_combat_candidate50lh.h"
 #include "ai_combat_state50lh.h"
 #include "ai_attack_drive50lh.h"
@@ -555,8 +556,11 @@ inline bool driveOriginalAi50IVShared50MB(VehicleFrameState49W&frame,const Vehic
             const V velocity=normalize(f,point(m.components.root.body.velocity.v));
             const V distant=normalize(f,sub(f,target,point(position))),nearby=normalize(f,sub(f,nearTarget,point(position)));
             direction=normalize(f,dot(f,distant,velocity)<dot(f,nearby,velocity)?distant:nearby);
-            if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
-                m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving))return stop(receipt.driving.sourcePC);
+            // PC enhancement (native_zero_gravity_step50zg.h): zero-g flight steers about the pod's up.
+            rr::game::AiSteerFrame50ZG zeroG{direction.v,forward,scene.localC0.v[5],m.components.root.worldAngularVelocityA0.v[1]};
+            if(rr::game::zeroGravityFlightForSlot50ZG(ai.managerIndexFE0))zeroG.podFrame(scene.localC0.v,m.components.root.worldAngularVelocityA0.v);
+            if(!steerAi50IV(zeroG.direction,zeroG.forward,zeroG.upY,m.cachedSpeed34,ai.engineDifference5C,
+                zeroG.angularA4,ai.racer60,actions,receipt.driving))return stop(receipt.driving.sourcePC);
         }
         return f.valid||stop(0x172380u);
     };
@@ -612,8 +616,10 @@ inline bool driveOriginalAi50IVShared50MB(VehicleFrameState49W&frame,const Vehic
             position,forward,ai.lists,receipt.driving)||
            !aiDesiredPosition50IV(*aiFF4,progress,ai.navigation,routeOwners,position,200.f,target,receipt.driving))return stop(receipt.driving.sourcePC);
         direction=normalize(f,sub(f,target,point(position)));
-        if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
-            m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving)||
+        rr::game::AiSteerFrame50ZG zeroG{direction.v,forward,scene.localC0.v[5],m.components.root.worldAngularVelocityA0.v[1]};
+        if(rr::game::zeroGravityFlightForSlot50ZG(ai.managerIndexFE0))zeroG.podFrame(scene.localC0.v,m.components.root.worldAngularVelocityA0.v);
+        if(!steerAi50IV(zeroG.direction,zeroG.forward,zeroG.upY,m.cachedSpeed34,ai.engineDifference5C,
+            zeroG.angularA4,ai.racer60,actions,receipt.driving)||
            !aiStartupSpeed50IV(navigation_consumer_detail50MB::read(*aiMetadata).nodes[current],ai.profile,ai.lists,in.racers,in.racerCount,
             position,m.components.root.body.velocity.v,actions,receipt.desiredSpeed,attemptBoost,receipt.driving))return stop(receipt.driving.sourcePC);
         boostFactor=1.f;++ai.startupFrames;

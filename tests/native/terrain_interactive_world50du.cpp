@@ -1,5 +1,7 @@
 // Exact original suffix: world owners retire before the original early prefix.
 #include "native_last_failure50pd.h"
+#include "../../src/game/native_surface_traction50st.h"
+#include "../../src/game/native_zero_gravity50zg.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "terrain_interactive_world50du.h"
@@ -755,6 +757,28 @@ SessionExit50DU Context::run() {
  const auto& ground=isMcTrack?*mcCollisionWorld->ground():isGbTrack?*gbCollisionWorld->ground():isTbTrack?*tbCollisionWorld->ground():isRcTrack?*rcCollisionWorld->ground():isTcTrack?*tcCollisionWorld->ground():isScTrack?*scGround->ground():isMbTrack?mbCollisionWorld->ground():legacyGround;
  auto& preparedCandidates=isRaTrack?raRuntime->candidates:legacyCandidates;
  const auto& actualWorld=isRaTrack?raRuntime->source.world:ground.world;
+ // PC ENHANCEMENT, NOT ORIGINAL (native_surface_traction50st.h): the original
+ // 276880/272520 TerrainZone rows and piece->row mapping, read on every course
+ // from that course's own TOB. Host-side only; nothing when the switch is off.
+ // The RA/common split below is the existing owner split (PORT STAND-IN), not a
+ // rule difference: both spans are the static owners prepareSpan numbered from
+ // 0x10000000u, the firstIdentity every static candidate preparation here uses.
+ if(rr::game::surfaceRules50ST.enabled()){
+  const auto surfaceArchive=runtime_startup50fl::readBytes(trackSession->archive);
+  if(isRaTrack)rr::game::surfaceRules50ST.loadCourse(surfaceArchive,trackSession->world->worldMember,
+      actualWorld,raRuntime->source.collisions,0x10000000u);
+  else rr::game::surfaceRules50ST.loadCourse(surfaceArchive,trackSession->world->worldMember,
+      actualWorld,ground.owners,0x10000000u);
+  // PC ENHANCEMENT, NOT ORIGINAL (native_zero_gravity50zg.h): the racing-line
+  // table (floor under the line by progress) from this course's own map and
+  // AI splines and the same static owners. Built only when the course has a
+  // ZeroGravity "on" row (no stock course has one) and the switch is on;
+  // otherwise this call only clears the previous course's table.
+  if(isRaTrack)rr::game::zeroGravity50ZG.loadCourse(surfaceArchive,trackSession->mapSpline,trackSession->aiSpline,
+      raRuntime->source.collisions,rr::game::surfaceRules50ST);
+  else rr::game::zeroGravity50ZG.loadCourse(surfaceArchive,trackSession->mapSpline,trackSession->aiSpline,
+      ground.owners,rr::game::surfaceRules50ST);
+ }
  // Decode the same real TA owner before counted construction/audio loading.
  // It is later used directly for scene materials/mesh; no second world is made.
  if(taOriginalDisc){
