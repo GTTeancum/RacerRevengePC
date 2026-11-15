@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "runtime_asset_paths50lb.h"
 #include "../../src/assets/import_decode48c.h"
 #include <array>
@@ -11,7 +12,7 @@
 // before constructing native effect owners.
 namespace original_disc_effects50LB {
 inline std::array<std::vector<std::uint8_t>,6> load() {
-    const auto path=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS/POD01/POD01.RES");
+    const auto path=rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve("work/native/project/disc/PODS/POD01/POD01.RES"));
     std::ifstream file(path,std::ios::binary|std::ios::ate);
     if(!file)throw std::runtime_error("original POD01 effect archive unavailable");
     const auto size=file.tellg();

@@ -218,6 +218,25 @@ inline void applyVideoSettings(const fs::path& directory) {
         <<" maximized="<<value("RR_VIDEO_MAXIMIZED")<<" window="<<value("RR_VIDEO_WINDOW_SIZE")
         <<" widescreen="<<(value("RR_ORIGINAL_ASPECT")=="1"?0:1)<<" fxaa="<<value("RR_VIDEO_FXAA")<<'\n';
 }
+// PC enhancement (NOT ORIGINAL): DLC switches from RacerRevengePC.ini [DLC].
+// Read only when the keys are present; nothing is ever written for DLC, so a
+// file without a [DLC] section behaves exactly as before (DLC on, replacements
+// on). Enabled=0 ignores the DLC folder; Replacements=0 turns every flagged
+// replacement off at once (the master switch). Process values win.
+inline void applyDlcSettings(const fs::path& directory) {
+    const auto ini=directory/L"RacerRevengePC.ini";
+    std::error_code error;
+    if(!fs::is_regular_file(ini,error))return;
+    const auto publish=[&](const wchar_t* key,const char* name){
+        const int value=static_cast<int>(GetPrivateProfileIntW(L"DLC",key,-1,ini.c_str()));
+        if(value==-1||std::getenv(name))return;
+        if(value!=0&&value!=1){std::cerr<<"dlc_settings_invalid key="<<name<<" value="<<value<<" (ignored)\n";return;}
+        if(_putenv_s(name,value?"1":"0")!=0)throw std::runtime_error("Cannot apply DLC settings");
+        std::cerr<<"dlc_settings "<<name<<"="<<value<<'\n';
+    };
+    publish(L"Enabled","RR_DLC");
+    publish(L"Replacements","RR_DLC_REPLACEMENTS");
+}
 inline fs::path& terminateLogPath()noexcept{static fs::path path;return path;}
 // A failure that ends in std::terminate (strict retained-owner guards during
 // unwinding) reports its last recorded reason instead of closing silently.
@@ -265,6 +284,7 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
 #endif
         std::cerr<<"rider_presentation="<<std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")<<'\n';
         applyVideoSettings(assets);
+        applyDlcSettings(assets);
         // Exact wide directory only, never cwd/PATH search or fallback assets.
         // ASCII relative roots avoid the legacy narrow argv/environment seam.
         if(automatic&&!SetCurrentDirectoryW(assets.c_str()))throw std::runtime_error("Cannot open executable directory as original asset root");

@@ -1,3 +1,4 @@
+#include "../../../src/assets/dlc_files50dl.h"
 #include "original_audio_sample_cache50kg.h"
 #include "original_audio_pending_waves50kg.h"
 #include "original_ui_main_audio50kg.h"
@@ -68,6 +69,7 @@ bool OriginalAudioSampleCache50KG::acquireWingBacking(
   if(!wing_){
    auto path=audioRoot_;
    for(const auto* part:{"SFX","UI","WATWING3.VAG"}){path/=part;need(!std::filesystem::is_symlink(path),"native wing backing symlink refused");}
+   path=rr::assets::dlc50DL::host(path); // PC DLC overlay: flagged replacement or the stock path unchanged
    need(std::filesystem::is_regular_file(path),"native wing backing file missing");
    std::ifstream file(path,std::ios::binary|std::ios::ate);
    need(file.is_open()&&file.tellg()==2384,"native wing backing original extent differs");

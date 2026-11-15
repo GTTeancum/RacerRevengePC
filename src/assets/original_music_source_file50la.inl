@@ -85,7 +85,7 @@ bool OriginalMusicSourceFile50LA::begin131230(std::shared_ptr<R> resolver,const 
     const char* hash=percentages?"24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c":
         "bff85d5a51a94157669be85bb90bb4d6be8bf4d802d95d08b1d2b235e9483bf1";
     storage_->pendingInput=std::make_shared<std::vector<std::uint8_t>>(bytesExpected);
-    std::ifstream file(audioRoot_/localName,std::ios::binary);
+    std::ifstream file(dlc50DL::host(audioRoot_/localName),std::ios::binary); // PC DLC overlay
     auto& bytes=*storage_->pendingInput;
     if(!file||!file.read(reinterpret_cast<char*>(bytes.data()),bytes.size())||file.peek()!=std::char_traits<char>::eof()||file.bad()||
        !OriginalLoadingTextureSource50LA::hashMatches(bytes.data(),bytes.size(),hash))

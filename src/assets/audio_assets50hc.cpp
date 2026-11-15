@@ -1,3 +1,4 @@
+#include "dlc_files50dl.h"
 #include "../../platform/linux/native/loading_progress50du.h"
 #include "audio_assets50hc.h"
 #include "import_decode48c.h"
@@ -91,7 +92,8 @@ std::string key(std::string n) {
     need(n.size() > 4 && n.substr(n.size() - 4) == ".vag", "unsupported.audio_extension");
     return n;
 }
-Bytes read(const std::filesystem::path& p, std::size_t cap) {
+Bytes read(const std::filesystem::path& requested, std::size_t cap) {
+    const auto p = dlc50DL::host(requested); // PC DLC overlay: flagged replacement or the stock path unchanged
     need(!std::filesystem::is_symlink(p), "audio.symlink");
     std::ifstream f(p, std::ios::binary | std::ios::ate);
     need(f.is_open(), "audio.open"); const auto end = f.tellg();

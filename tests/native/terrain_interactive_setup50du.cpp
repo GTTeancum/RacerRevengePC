@@ -1,3 +1,4 @@
+#include "../../src/assets/dlc_files50dl.h"
 #include "native_last_failure50pd.h"
 #include <cfenv>
 #include "../../platform/linux/native/loading_progress_step113a.h"
@@ -2348,7 +2349,7 @@ SessionExit50DU Context::run() {
   return true;
  };
  rr::assets::PodFlameOwners50W coldFlame{};
- {using namespace rr::assets;std::ifstream input(runtime_asset_paths50LB::resolve("work/native/project/disc/PODS/POD01/POD01.RES"),std::ios::binary);std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(input)),{}),member;ResArchive48C res;DecodeError48C error;Scene48D left,right;Material48E shared,fl,fr;
+ {using namespace rr::assets;std::ifstream input(rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve("work/native/project/disc/PODS/POD01/POD01.RES")),std::ios::binary);std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(input)),{}),member;ResArchive48C res;DecodeError48C error;Scene48D left,right;Material48E shared,fl,fr;
  require50DU(decodeResource48C(raw,res,error),"decode actual Pod01");
  auto scene=[&](const char*name,Scene48D&out){return extractResMember48C(res,name,member,error)&&decodeScene48D(member,out,error);};
  auto material=[&](const char*name,Material48E&out){return extractResMember48C(res,name,member,error)&&decodeMaterial48E(member,out,error);};

@@ -1,4 +1,5 @@
 // Exact existing non-template bodies, outlined without owner or layout changes.
+#include "../../src/assets/dlc_files50dl.h"
 #include "runtime_startup50fl_fixture.h"
 
 namespace runtime_startup50fl {
@@ -11,7 +12,7 @@ Assets::Assets(const std::filesystem::path& root,AssetInput input){
         if(input==AssetInput::OriginalDisc){
             originalArchivePath=runtime_asset_paths50LB::resolve(root/"work/native/project/disc/PODS/POD01/POD01.RES");
             const auto* pin=original_player_identity50IK::find(1u);
-            require(pin&&std::filesystem::file_size(originalArchivePath)==pin->archiveBytes,
+            require(pin&&std::filesystem::file_size(rr::assets::dlc50DL::host(originalArchivePath))==pin->archiveBytes,
                 "original POD01 bootstrap archive extent differs");
             originalArchive=readBytes(originalArchivePath);
             require(originalArchive.size()==pin->archiveBytes&&

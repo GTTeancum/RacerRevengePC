@@ -1,3 +1,4 @@
+#include "../../../src/assets/dlc_files50dl.h"
 #include "original_ui_main_audio50kg.h"
 #include "original_ui_garage_watto_sound_group50kg.h"
 #include "original_ui_garage_pod_scene50kg.h"
@@ -266,6 +267,7 @@ Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
         path /= part;
         need(!std::filesystem::is_symlink(path), "Main audio symlink refused");
     }
+    path = rr::assets::dlc50DL::host(path); // PC DLC overlay: flagged replacement or the stock path unchanged
     need(std::filesystem::is_regular_file(path), "Original Main audio file missing");
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     need(file.is_open() && file.tellg() == static_cast<std::streamoff>(expectedSize), "Main audio original extent differs");

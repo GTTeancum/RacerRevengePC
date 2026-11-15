@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../src/assets/original_loading_texture_source50la.h"
 #include "../../src/assets/import_texture48e.h"
@@ -54,7 +55,7 @@ class PlayerLoadingPresenter50DU final {
         U (*error)()=nullptr;
     } gl_;
     static std::vector<unsigned char> read(const std::filesystem::path& path,std::size_t cap) {
-        std::ifstream f(path,std::ios::binary|std::ios::ate);
+        std::ifstream f(rr::assets::dlc50DL::host(path),std::ios::binary|std::ios::ate);
         if(!f||f.tellg()<=0||static_cast<std::uint64_t>(f.tellg())>cap)throw std::runtime_error("Original loading asset missing or oversized");
         std::vector<unsigned char> b(static_cast<std::size_t>(f.tellg()));f.seekg(0);
         if(!f.read(reinterpret_cast<char*>(b.data()),b.size()))throw std::runtime_error("Original loading asset read failed");return b;

@@ -1,4 +1,5 @@
 #pragma once
+#include "dlc_files50dl.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -84,7 +85,7 @@ private:
         const std::filesystem::path& actualApplicationRoot)noexcept {
         try {
             auto p=std::shared_ptr<OriginalLoadingTextureSource50LA>(new OriginalLoadingTextureSource50LA);
-            std::ifstream input(actualApplicationRoot/"UI"/"TEXTURES"/"LD_RA.PST",std::ios::binary);
+            std::ifstream input(dlc50DL::host(actualApplicationRoot/"UI"/"TEXTURES"/"LD_RA.PST"),std::ios::binary);
             if(!input)return {};
             p->bytes_.resize(287772u);
             if(!input.read(reinterpret_cast<char*>(p->bytes_.data()),p->bytes_.size())||

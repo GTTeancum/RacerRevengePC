@@ -1,4 +1,5 @@
 // Native source-backed Sound objects and finite PCM instances, not IOP emulation.
+#include "../../../src/assets/dlc_files50dl.h"
 #include "original_ui_garage_watto_audio50kg.h"
 #include "original_sound_mode50kg.h"
 #include "original_ui_garage_droid_audio50gn.h"
@@ -70,6 +71,7 @@ Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
         path /= part;
         need(!std::filesystem::is_symlink(path), "Watto audio symlink refused");
     }
+    path = rr::assets::dlc50DL::host(path); // PC DLC overlay: flagged replacement or the stock path unchanged
     need(std::filesystem::is_regular_file(path), "Original Watto audio file missing");
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     need(file.is_open() && file.tellg() == static_cast<std::streamoff>(expectedSize), "Watto audio original extent differs");

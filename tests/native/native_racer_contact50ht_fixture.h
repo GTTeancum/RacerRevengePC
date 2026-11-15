@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "runtime_asset_paths50lb.h"
 #include "native_racer_contact_status50du.h"
 // UNVERIFIED reconstruction from worker conversation after workspace rollback.
@@ -84,7 +85,7 @@ public:
     bool prepare(const Type2ResourceView49X& mainResource,std::string& error,
                  const char* archivePath="work/native/project/disc/PODS/POD01/POD01.RES") {
         if(ready_)return fail(error,"contact owner already prepared");
-        std::ifstream file(runtime_asset_paths50LB::resolve(archivePath),std::ios::binary);
+        std::ifstream file(rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve(archivePath)),std::ios::binary);
         if(!file)return fail(error,"actual Pod01 archive missing");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM,podF,cache;
         rr::assets::ResArchive48C archive;rr::assets::DecodeError48C why;

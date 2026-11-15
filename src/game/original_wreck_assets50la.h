@@ -1,4 +1,5 @@
 #pragma once
+#include "../assets/dlc_files50dl.h"
 #include "original_wreck_constructor_vectors50la.h"
 // Cold native geometry/query assets for one actual authored piece. Legacy
 // prepare selects the unique one-piece chariot; the full inventory friend loads
@@ -540,7 +541,7 @@ private:
     }
     static bool load(const OriginalWreckAssetBinding50LA& binding,
         const OriginalWreckEndpointPolicy50LA& endpoint,Storage& out,std::string& error) {
-        std::ifstream file(binding.archivePath,std::ios::binary|std::ios::ate);
+        std::ifstream file(rr::assets::dlc50DL::host(binding.archivePath),std::ios::binary|std::ios::ate);
         if(!file)return fail(error,"original wreck RES unavailable");
         const auto extent=static_cast<std::streamoff>(file.tellg());
         if(extent<=0||extent>static_cast<std::streamoff>(rr::assets::DecodeLimits48C{}.resource_file_bytes))

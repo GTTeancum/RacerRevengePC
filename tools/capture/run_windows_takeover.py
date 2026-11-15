@@ -17,6 +17,10 @@ import time
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
+# A git worktree under <repo>\.claude\worktrees\<name> runs against the main
+# repository's build, evidence and scratch folders (one shared tree of outputs).
+if ROOT.parent.name == 'worktrees' and ROOT.parent.parent.name == '.claude':
+    ROOT = ROOT.parents[2]
 
 # The 23 original racer ids (no pods 5, 6, 13).
 ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
