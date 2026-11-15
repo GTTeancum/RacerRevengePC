@@ -774,7 +774,13 @@ bool OriginalStandardMaterialTable50LA::selectRacerMaterial29BFF0(std::int32_t i
     if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x298e60u);
     auto* material=s.rows[static_cast<std::size_t>(index)].object04.get();
     // Unlike a texture-null skip,229B40 calls material29BFF0 unconditionally.
-    if(!material)return fail(d,S::missingMaterialObject,0x229b40u);
+    if(!material){
+        static int reported=0; //read-only diagnostic
+        if(reported<4){++reported;const auto& r=s.rows[static_cast<std::size_t>(index)];
+            std::fprintf(stderr,"material_select_missing_object row=%d references=%d name=%s\n",int(index),int(r.references08),
+                r.name00.c_str());}
+        return fail(d,S::missingMaterialObject,0x229b40u);
+    }
     s.demandActive=true;
     const bool completed=material->select29BFF0(d);s.demandActive=false;
     if(!completed&&d.sourceEffectsCommitted){s.demandTerminal=true;s.demandTerminalDiagnostic=d;}

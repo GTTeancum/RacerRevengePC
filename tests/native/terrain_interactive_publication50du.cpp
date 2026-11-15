@@ -49,6 +49,7 @@
 #include "sa_trigger_actions_fixture.h"
 #include "ma_trigger_actions_fixture.h"
 #include "sc_trigger_actions_fixture.h"
+#include "../../src/game/original_track_fog50cr.h"
 #include <fstream>
 #include <iomanip>
 
@@ -1420,6 +1421,19 @@ void Context::run() {
   }
   renderRequest.mode=platform::VehicleWindowMode50DS::callerMaterialTextures;
   std::vector<platform::VehicleWindowTrackSpan50DS> trackBindings;
+  // The loaded course's own Fog fractions (278570; defaults Visibility 1,
+  // Haziness 0.5), read the same way for every course.
+  rr::game::OriginalTrackFogRuntime50CR trackFog;
+  rr::game::OriginalTrackFogDiagnostic50CR trackFogDiagnostic;
+  rr::game::OriginalRaceFogFields loadedTrackFog{};
+  if(!trackFog.prepare(actualWorld,trackFogDiagnostic)||!trackFog.loadFields(loadedTrackFog,trackFogDiagnostic)){
+   std::cerr<<"track_fog_rejected status="<<rr::game::originalTrackFogStatusName50CR(trackFogDiagnostic.status)
+       <<" pc=0x"<<std::hex<<trackFogDiagnostic.sourcePC<<std::dec<<" offset="<<trackFogDiagnostic.sourceOffset
+       <<" zone="<<trackFogDiagnostic.zone<<'\n';
+   require50DU(false,"track Fog authoring rejected");
+  }
+  std::cerr<<"track_fog_fractions course="<<trackSession->world->code<<" visibility="<<loadedTrackFog.authoredFraction3C
+      <<" haziness="<<loadedTrackFog.authoredFraction40<<'\n';
   if(!isRaTrack){
   renderRequest.track.mesh=isMcTrack?mcOriginalWorld->mesh():isGbTrack?gbOriginalWorld->mesh():isTbTrack?tbOriginalWorld->mesh():isRcTrack?rcOriginalWorld->mesh():&trackMesh;
   renderRequest.track.rcCrystal=rcCrystal;
@@ -1438,19 +1452,19 @@ void Context::run() {
   require50DU(!(isGbTrack||isMcTrack)||!authoredFogSetting||std::string(authoredFogSetting)=="1",
       "GB actual particle/camera rendering requires authored world fog");
   if(!authoredFogSetting||std::string(authoredFogSetting)=="1"){
-   require50DU(isTaTrack||isGcTrack||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack,"unsupported reconstructed fog track");
+
    auto& fog=renderRequest.track.worldFog;
    const float* color=scZeroSky.ready()?scZeroSky.clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
    require50DU(color,"authenticated world fog RGB missing");
    for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
    constexpr float minimum=1333.300048828125f,maximum=4000.f;
-   // TC omitted Visibility/Haziness resolve to source defaults1/0.5.
-   // MB and SC own authenticated global Fog fractions are 1/1.
-   // SC zone RGB varies; this existing global native policy does not
-   // claim camera-zone color/interpolation parity.
-   const float haziness=(isGbTrack||isMcTrack)?sourceTrackFog.authoredFraction40:(isTbTrack||isRcTrack||isTcTrack)?.5f:(isScTrack||isMbTrack)?1.f:isMaSaTrack?1.f:.5f;
-   // GA source Fog.Visibility0.4 is authenticated with its own SCB.
-   const float visibility=(isGbTrack||isMcTrack)?sourceTrackFog.authoredFraction3C:(isTbTrack||isRcTrack||isTcTrack)?1.f:(isScTrack||isMbTrack)?1.f:(isTaTrack||isMaSaTrack)?1.f:isGaTrack?.4f:.5f;
+   // Fog Visibility and Haziness from this course's own [Fog] block (278570),
+   // defaults 1 / 0.5 when absent: one reader for every course
+   // (original_track_fog50cr.h, shared with the per-zone fog step). SC zone
+   // RGB varies; this global native policy does not claim camera-zone
+   // colour/interpolation parity (per-zone fog lands with that step).
+   const float haziness=loadedTrackFog.authoredFraction40;
+   const float visibility=loadedTrackFog.authoredFraction3C;
    fog.end=minimum+visibility*(maximum-minimum);
    fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
    std::cerr<<"Authored native world fog: start "<<fog.start
@@ -1461,8 +1475,8 @@ void Context::run() {
    require50DU(color,"actual source camera fog RGB missing");
    const auto channel=[&](unsigned axis){return static_cast<std::uint32_t>(std::lround(color[axis]*255.f));};
    sourceTrackFog.color30=0xff000000u|(channel(0)<<16)|(channel(1)<<8)|channel(2);
-   sourceTrackFog.authoredFraction3C=(isTbTrack||isRcTrack||isTcTrack)?1.f:(isScTrack||isMbTrack)?1.f:(isTaTrack||isMaSaTrack)?1.f:isGaTrack?.4f:.5f;
-   sourceTrackFog.authoredFraction40=(isTbTrack||isRcTrack||isTcTrack)?.5f:(isScTrack||isMbTrack)?1.f:isMaSaTrack?1.f:.5f;
+   sourceTrackFog.authoredFraction3C=loadedTrackFog.authoredFraction3C;
+   sourceTrackFog.authoredFraction40=loadedTrackFog.authoredFraction40;
   }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());

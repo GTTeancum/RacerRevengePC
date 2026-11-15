@@ -18,6 +18,7 @@
 #include <cstring>
 #include <thread>
 
+int nativeLocalFlareFailLine50LA=0;std::size_t nativeLocalFlareFailIndex50LA=0; //read-only diagnostic: last refusing line
 namespace {
 using Document=rr::assets::ParameterDocument48F;
 using Block=rr::assets::ParameterBlock48F;
@@ -1933,6 +1934,10 @@ bool Owner::continueNativeZoneServices2729E0(const original_main_entry50KG::Appl
            !continueNativeLocalFlareObserver(index,pc)||!completeNativeLocalPoint(index,pc))return zbad(18);
         ++nativePointNext_; //Only after actual source row attachment273B98.
     }
+    // RA STOP (2026-11-15): the local flares (flare1) and sun flare (flarezretrieve)
+    // retain their rows here, after the racers loaded; their PSM sources are not
+    // admitted to the material domain (RA has no common world-material admission
+    // yet), so the first frame refuses the flare draw. See work\scratch\racam\NOTES.md.
     while(nativeRemainderNext_<nativeRemainder_.size()){
         if(!continueNativeRemainingLight(nativeRemainderNext_,*this,*source_,*nativeRaLightZones_,pc))return zbad(19);
         ++nativeRemainderNext_; //Source order includes Ambient173..175.
@@ -2864,13 +2869,13 @@ bool Owner::retireNativeLocalPrimary(std::size_t index,const ::ra_cold_aggregate
 
 namespace ra_pod_scene50LA {
 bool Owner::nativeLocalFlareCurrentAt(std::size_t index)const noexcept {
-    if(index>=nativePoints_.size())return false;
+    if(index>=nativePoints_.size()){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     const auto& point=nativePoints_[index];auto& nativeLocalLight_=point.light;auto& nativeLocalFlare_=point.flare;
     auto& nativeLocalInputs_=point.inputs;auto& retiredLocalFlareIdentity_=point.retiredFlareIdentity;
     if(!nativeLocalFlare_)return true;
-    if(!sceneApplication_||!nativeLocalLight_||!nativeLocalLight_->registered||!nativeLocalInputs_)return false;
+    if(!sceneApplication_||!nativeLocalLight_||!nativeLocalLight_->registered||!nativeLocalInputs_){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     const auto& f=*nativeLocalFlare_;const auto& e=f.entity;
-    if(f.stripAttached&&!f.strip90)return false;
+    if(f.stripAttached&&!f.strip90){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     if(!f.entityConstructed||!f.table||!f.table->prepared()||e.kind!=g::OriginalWreckComponentKind50LA::lightFlare14AA10||
        e.objectKey!=key(&e)||e.sessionGeneration!=sceneGeneration_||e.reference00!=1u||e.category28!=0xffu||
        (e.flags29&15u)!=3u||e.nativeFlags29||e.parent1C!=(f.lightAttached?&nativeLocalLight_->entity:nullptr)||
@@ -2879,44 +2884,46 @@ bool Owner::nativeLocalFlareCurrentAt(std::size_t index)const noexcept {
        !sceneApplication_->entityAuthority_.canRetire(e)||f.query30||f.knownFlags33!=7u||
        f.flags33!=(f.typed?3u:0u)||(f.typed&&f.query32==0xffu)||f.constructed!=f.typed||
        f.packedColor!=0xffffffffu||f.turning9C!=1u||(f.inputsWritten&&!f.constructed)||
-       bool(f.size98)!=f.inputsWritten||(f.size98&&*f.size98!=30.f))return false;
+       bool(f.size98)!=f.inputsWritten||(f.size98&&*f.size98!=30.f)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     const auto bits=[](float value){std::uint32_t word;std::memcpy(&word,&value,4);return word;};
     for(std::size_t i=0;i<5u;++i)for(std::size_t k=0;k<4u;++k){
         const auto expected=i==0u&&f.inputsWritten?bits(nativeLocalInputs_->positionA0[k]):(k==3u?0x3f800000u:0u);
         if(i&&f.cornersWritten){float value;std::memcpy(&value,&f.vectors40To80[i][k],4);
-            if(!std::isfinite(value))return false;
-        }else if(f.vectors40To80[i][k]!=expected)return false;
+            if(!std::isfinite(value)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+        }else if(f.vectors40To80[i][k]!=expected){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     }
-    if(f.lightAttached&&(!f.lightPublished||!f.observerOwner||!f.observerOwner->portalLoopComplete))return false;
+    if(f.lightAttached&&(!f.lightPublished||!f.observerOwner||!f.observerOwner->portalLoopComplete)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     if(f.visibilityIdentity){
         const auto* o=f.observerOwner.get();
         if(!lighting_->raFlareIdentityCurrent(this,f.entity,f.visibilityIdentity,
-            o&&o->primaryRegistered?o->method08:nullptr,o&&o->primaryRegistered?o->slot14:0u))return false;
-    }else if(f.observerOwner||f.observer94)return false;
+            o&&o->primaryRegistered?o->method08:nullptr,o&&o->primaryRegistered?o->slot14:0u)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+    }else if(f.observerOwner||f.observer94){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     if(f.observerOwner){const auto& o=*f.observerOwner;
         if(o.next00||o.field0C||o.field10||o.unknown18To1C[0]||o.unknown18To1C[1]||
            (o.sharedConstructed&&!sceneApplication_->garageObserverShared_.owns(&o))||
            f.observer94!=(o.sharedConstructed?&o:nullptr)||
-           (o.portalLoopComplete&&(!o.portalLoopStarted||o.portalCursor)))return false;
+           (o.portalLoopComplete&&(!o.portalLoopStarted||o.portalCursor))){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
         if(o.primaryRegistered){if(!o.sharedConstructed||o.child04!=&visibility4C0_[index<5u?1u:7u].entity||
-            o.method08!=visibility4C0_[index<5u?1u:7u].nativeList34||!o.slot14||o.center20!=f.vectors40To80[0])return false;
-        }else if(o.child04||o.method08||o.slot14||o.portalLoopStarted||o.portalCursor)return false;
-    }else if(f.observer94)return false;
+            o.method08!=visibility4C0_[index<5u?1u:7u].nativeList34||!o.slot14||o.center20!=f.vectors40To80[0]){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+        }else if(o.child04||o.method08||o.slot14||o.portalLoopStarted||o.portalCursor){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+    }else if(f.observer94){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     if((f.stripPublished&&!f.stripConstructed)||(f.stripAttached&&!f.stripPublished)||
-       (f.setupComplete&&(!f.setupStarted||!f.stripAttached))||(f.setupStarted&&!f.stripPublished))return false;
+       (f.setupComplete&&(!f.setupStarted||!f.stripAttached))||(f.setupStarted&&!f.stripPublished)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     if(f.strip90){const auto& strip=*f.strip90;const auto& s=strip.entity_;
         if(!f.stripConstructed||s.kind!=g::OriginalWreckComponentKind50LA::strip23BCA0||s.objectKey!=key(&s)||
            s.sessionGeneration!=sceneGeneration_||s.reference00!=1u||s.category28!=0xffu||(s.flags29&15u)!=3u||
            s.nativeFlags29||s.firstChild18||s.previous10||s.next14||s.descendants24||
            s.parent1C!=(f.stripAttached?&f.entity:nullptr)||s.mask20!=(f.stripAttached?8u:0u)||
-           !sceneApplication_->entityAuthority_.canRetire(s))return false;
-        if(strip.primitive30_&&!strip.primitive30_->reference.canRelease299AC0())return false;
+           !sceneApplication_->entityAuthority_.canRetire(s)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+        // A completed live flare draws through its material every frame, so the
+        // table may hold it in use; release readiness is checked at retirement.
+        if(strip.primitive30_&&!f.setupComplete&&!strip.primitive30_->reference.canRelease299AC0()){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
         if(f.setupComplete&&(!strip.primitive30_||!strip.primitive30_->reference.retained()||
            strip.format3C_!=7u||strip.count34_!=1u||strip.field40_!=1u||!strip.groups38_||strip.groups38_[0]!=4u||
            strip.color44_!=0xffffffffu||strip.color70_!=std::array<float,4>{{127.f,127.f,127.f,64.f}}||
            strip.primitive30_->byte0C!=7u||strip.primitive30_->attributes10!=&strip.attributes_||
-           strip.primitive30_->vertices20!=4u||strip.primitive30_->groups22!=1u))return false;
-    }else if(f.stripConstructed||f.stripPublished||f.stripAttached||f.setupStarted)return false;
+           strip.primitive30_->vertices20!=4u||strip.primitive30_->groups22!=1u)){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
+    }else if(f.stripConstructed||f.stripPublished||f.stripAttached||f.setupStarted){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
     return true;
 }
 bool Owner::continueNativeLocalFlare(std::size_t index,const std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA>& table,
@@ -2968,6 +2975,7 @@ bool Owner::retireNativeLocalFlare(std::size_t index)noexcept {
     if(!nativeLocalFlare_)return true;
     if(!nativeLocalFlareCurrent()||sceneApplication_->attachmentLock423F58())return false;
     auto& f=*nativeLocalFlare_;auto& authority=sceneApplication_->entityAuthority_;
+    if(f.strip90&&f.strip90->primitive30_&&!f.strip90->primitive30_->reference.canRelease299AC0())return false; //release readiness (not part of live currency)
     //Actual142590 child-first semantics for the admitted subtree. A failed
     //unattached strip remains native abort custody, not a retail null-safe call.
     if(f.strip90){auto& strip=*f.strip90;auto& e=strip.entity_;

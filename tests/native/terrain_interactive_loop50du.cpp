@@ -3244,11 +3244,13 @@ void Context::run() {
     std::unique_ptr<original_main_entry50KG::NativeF8BarPrefix50LA> nativeF8Frame;
     std::unique_ptr<original_main_entry50KG::NativeResultsFrame50LA> nativeResultsFrame;
     const bool commonResultsDraw=native_common_results50PD::state().replayActive;
-    if(((sourceConsumedIntroActivation&&isRaTrack)||commonResultsDraw)&&sourceCameraSession){
+    // One rule on every course (the RA-only per-frame Results/F8 preparation is retired):
+    // these frames are prepared while the Results replay draws.
+    if(commonResultsDraw&&sourceCameraSession){
      rr::game::OriginalResults104Diagnostic50LA results;
      const bool preparedResults=originalMainApplication.prepareNativeResultsFrame50LA(*sourceCameraSession,
          renderFrame,nativeResultsFrame,results);
-     if(!preparedResults&&!(sourceConsumedIntroActivation&&isRaTrack)){
+     if(!preparedResults){
       if(results.operation!=replayDrawReported50PD){replayDrawReported50PD=results.operation;
        std::cerr<<"race_replay results_frame_rejected pc="<<std::hex<<results.sourcePC<<std::dec
            <<" operation="<<(results.operation?results.operation:"")<<'\n';}
@@ -3259,14 +3261,13 @@ void Context::run() {
      if(commonResultsDraw&&nativeResultsFrame&&!replayDrawLogged50PD){replayDrawLogged50PD=true;
       std::cerr<<"race_replay results_frame prepared=1\n";}
     }
-    if((sourceConsumedIntroActivation&&isRaTrack)||commonResultsDraw){
+    if(commonResultsDraw){
      OriginalRaceF8Diagnostic50LA f8;
      const bool prepared=sourceCameraSession&&sourceCameraSession->prepareNativeF8Frame50LA(renderFrame,nativeF8Frame,f8);
-     if(!prepared&&(isRaTrack||!replayF8Reported50PD++))std::cerr<<"F8_NATIVE_FRAME_REJECT source_pc="<<f8.sourcePC
+     if(!prepared&&!replayF8Reported50PD++)std::cerr<<"F8_NATIVE_FRAME_REJECT source_pc="<<f8.sourcePC
          <<" operation="<<(f8.operation?f8.operation:"actual Session missing")
          <<" source_effects="<<f8.sourceEffectsCommitted<<'\n';
-     if(!prepared&&!(sourceConsumedIntroActivation&&isRaTrack)){}
-     else require50DU(prepared,"actual RA native F8 Frame preparation rejected");
+     
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
     bool submitted=false;

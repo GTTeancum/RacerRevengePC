@@ -1,5 +1,6 @@
 #include "../../src/game/original_source_portal_overlap231150.h"
 #pragma once
+#include <cstdio>
 #include "ra_source_camera_ownership50la.h"
 #include "../../src/game/original_world_trigger_instance50la.h"
 #include "original_world_physics_index50la.h"
@@ -2184,8 +2185,19 @@ bool releaseSourceSearchNodeNative(SourceSearchNode27F120&)noexcept;
            !nativeLocalFlareCurrent()||!nativeLocalLight_||!nativeLocalLight_->attached||
            !nativeLocalFlare_->lightAttached||!nativeLocalFlare_->setupComplete||nativeLocalFlare_->consumerTerminal||
            record.kind!=g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA::Kind::lightFlare||
-           record.flareIdentity!=&nativeLocalFlare_->entity||!zone||record.zone!=*zone)
-            return fail(Status::input,0x14b2c0);
+           record.flareIdentity!=&nativeLocalFlare_->entity||!zone||record.zone!=*zone){
+            static int reported=0; //read-only diagnostic: first refusals name their gate
+            if(reported<4){++reported;std::fprintf(stderr,"ra_local_flare_strip_refused app=%d flare=%d current=%d light=%d"
+                " light_attached=%d flare_light=%d setup=%d terminal=%d kind=%d identity=%d zone=%d record_zone=%u\n",
+                int(sceneApplication_&&!sceneApplication_->released_),int(bool(nativeLocalFlare_)),int(nativeLocalFlareCurrent()),
+                int(bool(nativeLocalLight_)),int(nativeLocalLight_&&nativeLocalLight_->attached),
+                int(nativeLocalFlare_&&nativeLocalFlare_->lightAttached),int(nativeLocalFlare_&&nativeLocalFlare_->setupComplete),
+                int(nativeLocalFlare_&&nativeLocalFlare_->consumerTerminal),
+                int(record.kind==g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA::Kind::lightFlare),
+                int(nativeLocalFlare_&&record.flareIdentity==&nativeLocalFlare_->entity),zone?int(*zone):-1,unsigned(record.zone));
+                if(!nativeLocalFlareCurrent()){extern int nativeLocalFlareFailLine50LA;extern std::size_t nativeLocalFlareFailIndex50LA;
+                    std::fprintf(stderr,"ra_local_flare_current_refused index=%zu line=%d\n",nativeLocalFlareFailIndex50LA,nativeLocalFlareFailLine50LA);}}
+            return fail(Status::input,0x14b2c0);}
         auto& f=*nativeLocalFlare_;auto& strip=*f.strip90;
         if(!strip.primitive30_||!f.size98)return fail(Status::source,0x14b87c);
         std::array<float,4> position;for(std::size_t k=0;k<4;++k)

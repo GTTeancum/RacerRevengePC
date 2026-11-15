@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include <cstdio>
 #include <cstdlib>
 #include "raster_shared_edge.h"
 #include "../../../tests/native/rc_crystal50rc.h"
@@ -1214,7 +1215,11 @@ bool VehicleWindowGl50DS::Storage::prepareRaWorldFrame(const VehicleWindowFrame5
                         if(result==LocalFlareEmission::Outcome::childrenOnly)next.operands.reset();
                         return true;
                     },material);
-                if(!visited)return fail(d,VehicleWindowError50DS::frame,"actual local flare numeric/material/strip visitor refused");
+                if(!visited){
+                    std::fprintf(stderr,"ra_local_flare_refused record=%zu status=%u pc=%x\n",selectedDraw.record,
+                        unsigned(material.status),unsigned(material.sourcePC));
+                    return fail(d,VehicleWindowError50DS::frame,"actual local flare numeric/material/strip visitor refused");
+                }
                 const auto& scissor=selectedDraw.scissor;
                 if(next.operands&&scissor[0]<scissor[2]&&scissor[1]<scissor[3]){
                     if(!finishRaLocalFlareFrame(next))

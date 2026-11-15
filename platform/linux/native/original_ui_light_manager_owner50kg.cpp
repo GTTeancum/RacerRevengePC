@@ -6,6 +6,7 @@
 #include "original_ui_garage_visibility50kg.h"
 #include "../../../src/game/original_ui_lit_geometry50km.h"
 #include <cstring>
+#include <cstdio>
 #include <cmath>
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_constructor50la.h"
@@ -148,13 +149,40 @@ bool OriginalUiLightManagerOwner50KG::sourceIdentity()const noexcept {
         scalar_->nativeGameplayGeneration_==nativeProjectionGameplayGeneration_&&
         !(nativeProjectionUi_&&nativeProjectionGameplayGeneration_);
 }
+// Read-only diagnostic: which current() clause refuses (one line, on request).
+bool lightManagerCurrentDiagnose50KG=false;
+static int raReleaseFail50KG=0; //read-only diagnostic: last refusing line
 bool OriginalUiLightManagerOwner50KG::current()const noexcept {
+    if(lightManagerCurrentDiagnose50KG){lightManagerCurrentDiagnose50KG=false;
+        std::fprintf(stderr,"light_manager_current constructed=%d retired=%d identity=%d entity=%d registry=%d cacheA4=%d fieldA8=%d"
+            " ui=%d gameplay=%llu ra_zones=%d ra_scope=%d ra_release=%d inputs_empty=%d\n",int(constructed_),int(retired_),
+            int(sourceIdentity()),int(entity_.kind==K::lightManager147ED0&&entity_.sessionGeneration==generation_&&
+                entity_.objectKey==key(&entity_)&&entity_.reference00==1&&entity_.parent1C==&entities_->root10_&&
+                entity_.mask20==0x402u&&!entity_.firstChild18),
+            int(registryCurrent()),int(bool(cacheA4_)),int(fieldA8_),int(bool(nativeProjectionUi_)),
+            (unsigned long long)nativeProjectionGameplayGeneration_,int(bool(raZones_)),
+            int(raZones_&&raZonesScopeCurrent()),int(raZones_&&raZonesReleasePreflight()),int(nativeProjectionInputsEmpty()));
+        if(raZones_&&raZonesScopeCurrent()){const auto& r=*raZones_;
+            std::fprintf(stderr,"light_manager_ra_release zone=%d list=%d published=%d ui_lights=%d scene_lights=%d count94=%u"
+                " ambient=%d directional=%d local=%u dir40=%d registry_failed=%d next=%u count90=%u attempted=%d complete=%d portal_links=%u\n",
+                int(bool(zone_)),int(bool(list_)),int(bool(listPublished_)),int(bool(uiLightsOwner_)),int(bool(sceneLightsOwner_)),
+                unsigned(count94_),int(bool(r.firstAmbient)),int(bool(r.firstDirectional)),unsigned(r.localRegisteredCount()),
+                int(bool(directional40Live_)),int(bool(registryFailed_)),unsigned(r.next),unsigned(count90_),int(bool(zonesAttempted_)),
+                int(bool(zonesComplete_)),unsigned(r.portalLinksPublished));
+            raZonesReleasePreflight();std::fprintf(stderr,"light_manager_ra_release_line %d\n",raReleaseFail50KG);}}
     if(!constructed_||retired_||!sourceIdentity()||entity_.kind!=K::lightManager147ED0||
        entity_.sessionGeneration!=generation_||entity_.objectKey!=key(&entity_)||entity_.reference00!=1||
        entity_.parent1C!=&entities_->root10_||entity_.mask20!=0x402u||entity_.firstChild18||
        !registryCurrent()||cacheA4_||fieldA8_!=-1||
        ((nativeProjectionUi_||nativeProjectionGameplayGeneration_)&&
-        !(raZones_?raZonesReleasePreflight():nativeProjectionInputsEmpty())))return false;
+        !(raZones_?(raZonesReleasePreflight()||
+            // While the race runs, the world topology is still in use, so it
+            // cannot pass its release preflight; the zones' gameplay scope
+            // must be current. Release is checked when it is requested.
+            // PORT STAND-IN (flagged): only RA's world lends its zones to the
+            // light manager; the other courses hold none here.
+            (nativeProjectionGameplayGeneration_&&!nativeProjectionUi_&&raZonesScopeCurrent())):
+            nativeProjectionInputsEmpty())))return false;
     const auto view=entities_->entityAuthority_.view();
     return contains(view,&entity_)&&game::original_entity_chain_detail50LA::forest(view);
 }
@@ -717,7 +745,9 @@ bool OriginalUiLightManagerOwner50KG::raZonesScopeCurrent()const noexcept {
     const auto& race=issuer_->sourceRace28COwner_;
     if(!race||!race->counted_||race->rolledBack_||race->application_!=entities_||race->world74_.get()!=raZones_->world||
        race->resultsFeedbackThread_!=std::this_thread::get_id()||
-       race->nativeTrackLoadStep_!=game::OriginalRaceConstructor50LA::NativeTrackLoadStep::aubRetired)return false;
+       // AUB retired, or the track load already returned (1AA508) after it.
+       (race->nativeTrackLoadStep_!=game::OriginalRaceConstructor50LA::NativeTrackLoadStep::aubRetired&&
+        race->nativeTrackLoadStep_!=game::OriginalRaceConstructor50LA::NativeTrackLoadStep::nativeAdaptedReturn))return false;
     const auto* world=raZones_->canonical->world();
     return world&&world->zones.size()==10u;
 }
@@ -725,48 +755,48 @@ bool OriginalUiLightManagerOwner50KG::raZonesReleasePreflight()const noexcept {
     if(!raZonesScopeCurrent()||zone_||list_||listPublished_||uiLightsOwner_||sceneLightsOwner_||
        count94_!=(std::uint32_t(bool(raZones_->firstAmbient))+std::uint32_t(bool(raZones_->firstDirectional))+raZones_->localRegisteredCount())||
        directional40Live_!=bool(raZones_->firstDirectional)||registryFailed_||raZones_->next>10u||
-       count90_!=(zonesAttempted_?10u:0u)||(zonesComplete_&&raZones_->next!=10u))return false;
+       count90_!=(zonesAttempted_?10u:0u)||(zonesComplete_&&raZones_->next!=10u)){raReleaseFail50KG=__LINE__;return false;}
     const auto& r=*raZones_;std::uint32_t counted=0;
     for(std::size_t i=0;i<183u;++i)if(auto* entity=r.localRegistered[i]){
         const auto* light=r.world->nativeLocalLightFor(entity);
-        if(!r.firstDirectional||!light||light->ordinalC8!=static_cast<std::int32_t>(i+2u))return false;
-        if(light->type34==4u){if(i+2u<172u||i+2u>174u||r.localPrimary[i]||light->observerOwner||light->observerD0)return false;}
-        else if((light->type34!=1u&&light->type34!=3u)||entity!=r.localPrimary[i])return false;
+        if(!r.firstDirectional||!light||light->ordinalC8!=static_cast<std::int32_t>(i+2u)){raReleaseFail50KG=__LINE__;return false;}
+        if(light->type34==4u){if(i+2u<172u||i+2u>174u||r.localPrimary[i]||light->observerOwner||light->observerD0){raReleaseFail50KG=__LINE__;return false;}}
+        else if((light->type34!=1u&&light->type34!=3u)||entity!=r.localPrimary[i]){raReleaseFail50KG=__LINE__;return false;}
     }
-    if(r.portalLinksPublished>20u)return false;
+    if(r.portalLinksPublished>20u){raReleaseFail50KG=__LINE__;return false;}
     const auto* authored=r.canonical->world();
-    if(!authored||authored->portals.size()!=10u)return false;
+    if(!authored||authored->portals.size()!=10u){raReleaseFail50KG=__LINE__;return false;}
     bool gap=false;std::size_t portalCount=0;
     for(std::size_t i=0;i<r.portals.size();++i){const auto* p=r.portals[i];
         if(!p){gap=true;continue;}
         if(gap||i>r.portalLinksPublished/2u||!zonesComplete_||!r.portalParent||
            p->parent1C!=r.portalParent||p->mask20||p->firstChild18||
-           !entities_->entityAuthority_.canRetire(*p))return false;
+           !entities_->entityAuthority_.canRetire(*p)){raReleaseFail50KG=__LINE__;return false;}
         //A next actual source Portal can precede its148D00 call. Validate
         //against SAME private World-owned ordered tail, not arbitrary extra
         //children that merely happen to share parent/count authority.
         if(!r.world->nativePortalTailCurrent148D00(r.portalParent,p)||
-           (p->next14&&!r.world->nativePortalTailCurrent148D00(r.portalParent,p->next14)))return false;
+           (p->next14&&!r.world->nativePortalTailCurrent148D00(r.portalParent,p->next14))){raReleaseFail50KG=__LINE__;return false;}
         ++portalCount;
     }
     if((portalCount&&!entities_->entityAuthority_.canRetire(*r.portalParent))||
-       (!portalCount&&r.portalParent)||portalCount<(r.portalLinksPublished+1u)/2u)return false;
+       (!portalCount&&r.portalParent)||portalCount<(r.portalLinksPublished+1u)/2u){raReleaseFail50KG=__LINE__;return false;}
     std::array<const RaPortalLink27F3B0*,10> heads{};
     for(std::size_t i=0;i<r.portalLinks.size();++i){
-        if(i>=r.portalLinksPublished){if(r.portalLinks[i])return false;continue;}
+        if(i>=r.portalLinksPublished){if(r.portalLinks[i]){raReleaseFail50KG=__LINE__;return false;}continue;}
         const auto ordinal=i/2u;const auto& labels=authored->portals[ordinal].zones;
-        if(!labels[0]||labels[0]>10u||!labels[1]||labels[1]>10u||labels[0]==labels[1])return false;
+        if(!labels[0]||labels[0]>10u||!labels[1]||labels[1]>10u||labels[0]==labels[1]){raReleaseFail50KG=__LINE__;return false;}
         const auto from=labels[i%2u]-1u,to=labels[1u-i%2u]-1u;
         const auto* link=r.portalLinks[i].get();
         if(!link||!r.zones[from]||!r.zones[to]||link->next00!=heads[from]||
            link->neighbor04!=&r.zones[to]->entity||link->portal08!=r.portals[ordinal]||
            (link->distanceWritten?(link->field0C!=link->field10||link->field0C>0x7f7fffffu):
-                                  (link->field0C||link->field10!=0x7f7fffff)))return false;
+                                  (link->field0C||link->field10!=0x7f7fffff))){raReleaseFail50KG=__LINE__;return false;}
         heads[from]=link;
     }
     for(std::size_t i=0;i<10;++i){const auto& zone=r.zones[i];const auto& list=r.lists[i];
-        if(i>r.next&&(zone||list||r.listPublished[i]||r.ambientKnown[i]))return false;
-        if(!zone){if(list||r.listPublished[i]||r.ambientKnown[i]||i<r.next)return false;continue;}
+        if(i>r.next&&(zone||list||r.listPublished[i]||r.ambientKnown[i])){raReleaseFail50KG=__LINE__;return false;}
+        if(!zone){if(list||r.listPublished[i]||r.ambientKnown[i]||i<r.next){raReleaseFail50KG=__LINE__;return false;}continue;}
         const auto& z=*zone;const auto& c=z.entity;++counted;
         if(!zonesAttempted_||!nodes88_||!lists8C_||!ambient60_||!ambient80_||!directional44_||
            !z.constructed||!z.published||nodes88_[i]!=zone.get()||
@@ -777,12 +807,12 @@ bool OriginalUiLightManagerOwner50KG::raZonesReleasePreflight()const noexcept {
            z.field30!=heads[i]||
            z.field3C||z.field40||z.field44||z.fieldA0||
            z.first34!=(list&&list->lightAliases_>=1?list.get():nullptr)||
-           z.second38!=(list&&list->lightAliases_>=2?list.get():nullptr))return false;
+           z.second38!=(list&&list->lightAliases_>=2?list.get():nullptr)){raReleaseFail50KG=__LINE__;return false;}
         if(list){if(!r.listPublished[i]||lists8C_[i]!=list.get()||
-            !list->lightHistoryCurrent(this,issuer_,entities_)||list->lightReleasedAliases_)return false;
-            for(auto* member:list->lightMembers_)if(member){bool found=false;for(auto* p:r.localPrimary)if(p==member)found=true;if(!found)return false;}}
-        else if(r.listPublished[i]||r.ambientKnown[i])return false;
-        if(i<r.next&&(!list||!list->complete_||list->lightAliases_!=2||!r.ambientKnown[i]||z.index48!=i))return false;
+            !list->lightHistoryCurrent(this,issuer_,entities_)||list->lightReleasedAliases_){raReleaseFail50KG=__LINE__;return false;}
+            for(auto* member:list->lightMembers_)if(member){bool found=false;for(auto* p:r.localPrimary)if(p==member)found=true;if(!found){raReleaseFail50KG=__LINE__;return false;}}}
+        else if(r.listPublished[i]||r.ambientKnown[i]){raReleaseFail50KG=__LINE__;return false;}
+        if(i<r.next&&(!list||!list->complete_||list->lightAliases_!=2||!r.ambientKnown[i]||z.index48!=i)){raReleaseFail50KG=__LINE__;return false;}
     }
     return counted<=entities_->objectCount423F60()&&localMembershipsCurrent();
 }

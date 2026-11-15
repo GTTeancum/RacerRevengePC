@@ -6,7 +6,18 @@
 #include "original_race_display_lifetime50la.h"
 #include <array>
 #include "../../src/game/original_native_collision_categories.h"
+#include <cstdlib>
 #include <cstring>
+namespace ra_source_camera50LA {
+// The one place that says whether the pod load 2129C0 runs at race load.
+// PORT STAND-IN (flagged): the route-2 test switch; retired when the pod load
+// is the one load path on every course.
+bool podLoadConstructsWreckRows()noexcept {
+    static const bool value=[]{const char* v=std::getenv("RR_RA_OWNED_PREPARATION");
+        return v&&v[0]=='1'&&!v[1];}();
+    return value;
+}
+}
 #include <cstdio>
 #include "original_source_particle_config_invocation50la.inl"
 #include <cstdio>
@@ -280,9 +291,7 @@ bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
         // separate source-adopted owned preparation below stays fenced: it
         // was never completed past 2C1170 and is not entered.
         {
-            static const bool ownedPreparation=[]{const char* v=std::getenv("RR_RA_OWNED_PREPARATION");
-                return v&&std::string(v)=="1";}();
-            if(!ownedPreparation){
+            if(!ra_source_camera50LA::podLoadConstructsWreckRows()){
                 std::fprintf(stderr,"ra_native_track_load_complete pc=1aa508 controller_load=existing_native_staging");
                 std::fputc(10,stderr);pc=0x1a6d98;return true;
             }
@@ -422,7 +431,7 @@ bool OwnershipBridge::stageNativeRetainedWreckCold(original_camera_session50KX::
        session.actual_.followQueries.get()!=follow_.get()||!rosterResources_||!rosterResources_->wreckBacking_||
        !session.readsBound_||!session.identitiesCurrent()||session.closed_||session.abandoned_||
        !camera_->generation||session.generation_!=camera_->generation)return false;
-    if(nativeWreckAttempted_)return nativeWreckPrepared_;
+    if(nativeWreckAttempted_)return nativeWreckPrepared_||(inputs_.wreck.empty()&&!podLoadConstructsWreckRows());
     nativeWreckAttempted_=true;
         auto& backing=*rosterResources_->wreckBacking_;
         if(backing.applicationIdentity()!=session.actual_.applicationEntities.get()||
@@ -433,6 +442,14 @@ bool OwnershipBridge::stageNativeRetainedWreckCold(original_camera_session50KX::
             const auto& racer=session.racerEntities_[i];
             if(!racer.prepared()||racer.racer.objectKey!=session.racerKey(i))return false;
             racers[i]=&racer.racer;
+        }
+        // No wreck rows in this world (the pod load does not run, as on every
+        // other course today): nothing to bind before Follow; the backing is
+        // released unbound at retirement. Follow then runs with zero rows.
+        if(inputs_.wreck.empty()){
+            if(podLoadConstructsWreckRows())return false;
+            std::fprintf(stderr,"wreck_rows_reserved rows=0 pod_load=0");std::fputc(10,stderr);
+            return true;
         }
         std::string error;
         if(!backing.bindActualRacers(racers,session.actual_.bank.count(),session.generation_,error))return false;
@@ -473,6 +490,12 @@ bool OwnershipBridge::retireNativeRetainedWreckCold(original_camera_session50KX:
     // Never bypass real source memberships; close rejects any attached tail.
     try {if(!session.actual_.bank.visit(0,[&](){return follow_->close();}))return false;}
     catch(...){return false;}
+    if(!nativeWreckPrepared_&&inputs_.wreck.empty()){
+        // Zero-row world: nothing was bound or published; release the
+        // never-bound reservations (refused if anything was adopted).
+        if(!backing.releaseUnboundColdReservations())return false;
+        podExclusions_.reset();nativeWreckRetired_=true;return true;
+    }
     if(!backing.retireNativeSourcePrefixAll(storage_.get()->world))return false;
     if(!backing.retireNativeColdQueries(&storage_.get()->world))return false;
     // Any actual query publications have already passed their concrete source

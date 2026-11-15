@@ -25,6 +25,12 @@ namespace rr::game { class OriginalResults10450LA; }
 
 // Existing main-TU instrumentation; no second allocator or counter is defined.
 extern thread_local std::uint64_t allocations;
+namespace ra_source_camera50LA {
+// True when the pod load 2129C0 runs at race load (today: the route-2 test
+// switch RR_RA_OWNED_PREPARATION=1). One definition, in
+// original_race_world_load_prefix50la.cpp, which also uses it as its fence.
+bool podLoadConstructsWreckRows()noexcept;
+}
 namespace ra_cold_roster50LA {
 struct Diagnostic {std::size_t slot=0;const char* stage=nullptr;const char* failure=nullptr;std::string detail;};
 class Operation final {
@@ -862,8 +868,15 @@ inline bool Owner::prepareRuntimeRosterQueryStorage(
             return fail(d,"wreck retained cold backing rejected; partial owners retained");
         const auto* reservations=retained.wreckBacking_->reservations();
         if(!reservations)return fail(d,"wreck stable reservations unavailable");
-        for(const auto& row:*reservations)
-            input.wreck.push_back({row.queries,row.assets,row.identities});
+        // Wreck query rows are reserved in the world only where the pod load
+        // (2129C0) constructs them before the camera's 179A80 prepare. That is
+        // the same rule on every course: the other twelve reserve none until
+        // the pod load runs there. Today only the route-2 test switch runs it.
+        // PORT STAND-IN (flagged): rows follow the switch until the pod load
+        // is the one load path on every course; then they are always reserved.
+        if(ra_source_camera50LA::podLoadConstructsWreckRows())
+            for(const auto& row:*reservations)
+                input.wreck.push_back({row.queries,row.assets,row.identities});
 
         runtimeQueries_->rosterTerrain_=&terrain;runtimeQueries_->rosterMovement_=&movement;
         runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,

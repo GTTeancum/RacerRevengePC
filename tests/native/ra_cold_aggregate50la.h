@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include "ra_cold_aggregate_prefix50la.h"
 #include "../../src/assets/original_particle_source_config50la.h"
 #include "../../src/assets/original_config_process_globals50la.h"
@@ -4339,8 +4340,12 @@ private:
         const g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA& record,
         Visitor&& visitor,rr::assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
         d={};g::CameraViewOutput49F camera;
-        if(terminal_||closed_||!world_||!world_->drawPlanCurrent()||!runtimeQueries_||!sceneApplication_||
-           !runtimeQueries_->readNativeLocalFlareCamera(record,*sceneApplication_,camera)){
+        if(terminal_||closed_||!world_||!world_->drawPlanCurrent()||!runtimeQueries_||!sceneApplication_){
+            static bool reported=false; //read-only diagnostic
+            if(!reported){reported=true;std::fprintf(stderr,"ra_local_flare_owner_refused terminal=%d closed=%d world=%d plan=%d runtime=%d app=%d\n",
+                int(terminal_),int(closed_),int(bool(world_)),int(world_&&world_->drawPlanCurrent()),int(bool(runtimeQueries_)),int(bool(sceneApplication_)));}
+            d.status=rr::assets::OriginalStandardMaterialStatus50LA::input;d.sourcePC=0x14b2c0;return false;}
+        if(!runtimeQueries_->readNativeLocalFlareCamera(record,*sceneApplication_,camera)){
             d.status=rr::assets::OriginalStandardMaterialStatus50LA::input;d.sourcePC=0x14b2c0;return false;}
         g::OriginalPodCableStripCold50LA* strip=nullptr;
         std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> table;

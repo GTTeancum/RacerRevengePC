@@ -5,6 +5,7 @@
 #include "../../platform/linux/native/original_ui_shared_dialogs50kg.h"
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
 
+namespace rr::platform { extern bool lightManagerCurrentDiagnose50KG; } //read-only diagnostic switch
 namespace original_main_entry50KG {
 bool Application::passResultsProcessPredecessors50LA(const rr::game::OriginalRaceConstructor50LA& race,
     const rr::game::InputEvent48Z* event,rr::game::OriginalResults104Diagnostic50LA& d)const noexcept {
@@ -44,6 +45,7 @@ bool Application::passResultsProcessPredecessors50LA(const rr::game::OriginalRac
     if(!light||!light->current()||!aural||!aural->current()||(!scopeLive&&!dispatcherClosed)){
         static bool reported=false;
         if(!reported){reported=true;
+            if(light){rr::platform::lightManagerCurrentDiagnose50KG=true;(void)light->current();}
             std::fprintf(stderr,"results_predecessors light=%d light_current=%d aural=%d aural_current=%d scope=%d"
                 " scope_live=%d dispatcher_live=%d\n",bool(light),light&&light->current(),
                 bool(aural),aural&&aural->current(),bool(scope),scope&&scope->live().okay(),scope&&scope->dispatcherLive_);}

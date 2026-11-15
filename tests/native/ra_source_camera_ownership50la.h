@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #include "ra_cold_roster_resources50la.h"
 #include "native_racer_cables50hw_fixture.h"
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
@@ -1558,17 +1559,25 @@ class OwnershipBridge final {
     bool readNativeLocalFlareCamera(
         const g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA& record,
         const g::OriginalApplicationEntities50LA& application,g::CameraViewOutput49F& out)const noexcept {
-        const auto* publication=nativeStaticDraw();if(!publication)return false;
+        static int reported=0; //read-only diagnostic: the first refusals name their gate
+        const auto refuse=[&](int gate)noexcept{if(reported<4){++reported;
+            std::fprintf(stderr,"ra_local_flare_camera_refused gate=%d\n",gate);}return false;};
+        const auto* publication=nativeStaticDraw();if(!publication)return refuse(1);
         bool owned=false;for(const auto& row:*publication)if(&row==&record){owned=true;break;}
         if(!owned||record.kind!=g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA::Kind::lightFlare||
-           !record.flareIdentity||!camera_||!camera_->session)return false;
+           !record.flareIdentity||!camera_||!camera_->session)return refuse(2);
         const auto& session=*camera_->session;
-        if(session.actual_.applicationEntities.get()!=&application||
-           session.display_.rendererCurrentScene0!=&session.viewport_||
-           &session.actual_.visibility!=freshLighting_.get()||!session.spatial_.registration34.attached||
-           !session.spatial_.parent38||session.spatial_.parent38>session.visibilityKeys_.count||
-           record.viewport!=std::array<std::int32_t,4>{{session.viewport_.x1E0,session.viewport_.y1E4,
-               session.viewport_.width1E8,session.viewport_.height1EC}})return false;
+        if(session.actual_.applicationEntities.get()!=&application)return refuse(3);
+        if(session.display_.rendererCurrentScene0!=&session.viewport_)return refuse(4);
+        if(&session.actual_.visibility!=freshLighting_.get())return refuse(5);
+        if(!session.spatial_.registration34.attached||
+           !session.spatial_.parent38||session.spatial_.parent38>session.visibilityKeys_.count)return refuse(6);
+        if(record.viewport!=std::array<std::int32_t,4>{{session.viewport_.x1E0,session.viewport_.y1E4,
+               session.viewport_.width1E8,session.viewport_.height1EC}}){
+            if(reported<4)std::fprintf(stderr,"ra_local_flare_viewport record=%d,%d,%d,%d session=%d,%d,%d,%d\n",
+                int(record.viewport[0]),int(record.viewport[1]),int(record.viewport[2]),int(record.viewport[3]),
+                int(session.viewport_.x1E0),int(session.viewport_.y1E4),int(session.viewport_.width1E8),int(session.viewport_.height1EC));
+            return refuse(7);}
         out=session.matrices_;return true;
     }
     bool prepareNativeStaticDraw(Diagnostic& d)noexcept {
