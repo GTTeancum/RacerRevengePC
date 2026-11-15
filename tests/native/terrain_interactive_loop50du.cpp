@@ -2501,6 +2501,12 @@ void Context::run() {
       require50DU(sourceColors.component[3].modelPackets50LA&&sourceColors.component[4].modelPackets50LA,
           "actual player lower model matrix packet owners unavailable");
      }
+     if(racerVisuals[0]->hasCanonicalChariotBodyColors50LA()){
+      // The chariot's own 241280 owner: own lights, distance, map-2 and fog bits.
+      sourceColors.component[0].modelPackets50LA=nativeChariotModels[0]->modelPackets();
+      require50DU(sourceColors.component[0].modelPackets50LA,
+          "actual player chariot model matrix packet owner unavailable");
+     }
     }
     if(!buildVehicleDrawBatch50CO(s,x.bindings,drawInput,next,drawWorkspace,drawDiagnostic,
         originalBodyColors?&sourceColors:nullptr)){
@@ -2901,11 +2907,13 @@ void Context::run() {
      renderFrame.sourceDiffuseCamera50LA=sourceCameraSession->racerDiffuseCamera();
      renderFrame.sourceBodyGlobals50LA=sourceModelRenderGlobals.get();
      if(racerVisuals[0]&&racerVisuals[0]->hasCanonicalBodyColors50LA()){
-     renderFrame.sourceBodyModelPackets50LA={{nativeLeftModels[0]->modelPackets(),
-         nativeRightModels[0]->modelPackets()}};
+     // Index = draw component: 0 chariot, 1/2 left/right, 3/4 lower pair.
+     renderFrame.sourceBodyModelPackets50LA={{
+         racerVisuals[0]->hasCanonicalChariotBodyColors50LA()?nativeChariotModels[0]->modelPackets():nullptr,
+         nativeLeftModels[0]->modelPackets(),nativeRightModels[0]->modelPackets()}};
      if(racerRigs[0]->modelCount==5){
-      renderFrame.sourceBodyModelPackets50LA[2]=nativeBottomLeftModels[0]->modelPackets();
-      renderFrame.sourceBodyModelPackets50LA[3]=nativeBottomRightModels[0]->modelPackets();
+      renderFrame.sourceBodyModelPackets50LA[3]=nativeBottomLeftModels[0]->modelPackets();
+      renderFrame.sourceBodyModelPackets50LA[4]=nativeBottomRightModels[0]->modelPackets();
      }
      }
     }
@@ -3108,6 +3116,11 @@ void Context::run() {
          require50DU(sourceColors.component[3].modelPackets50LA&&sourceColors.component[4].modelPackets50LA,
              "actual opponent lower model matrix packet owners unavailable");
         }
+        if(racerVisuals[racer]->hasCanonicalChariotBodyColors50LA()){
+         sourceColors.component[0].modelPackets50LA=nativeChariotModels[racer]->modelPackets();
+         require50DU(sourceColors.component[0].modelPackets50LA,
+             "actual opponent chariot model matrix packet owner unavailable");
+        }
        }
        lightsTiming.reset();
        {render_diagnostics50GQ::Scope drawTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::OpponentDrawBatch);
@@ -3167,11 +3180,12 @@ void Context::run() {
       opponents[nextRacePresentation.submittedOpponents-1u].hiddenDestroyed50PD=destroyedRacer;
       if(racerVisuals[racer]&&racerVisuals[racer]->hasCanonicalBodyColors50LA()){
        opponents[nextRacePresentation.submittedOpponents-1u].sourceBodyModelPackets50LA=
-           {{nativeLeftModels[racer]->modelPackets(),nativeRightModels[racer]->modelPackets()}};
+           {{racerVisuals[racer]->hasCanonicalChariotBodyColors50LA()?nativeChariotModels[racer]->modelPackets():nullptr,
+             nativeLeftModels[racer]->modelPackets(),nativeRightModels[racer]->modelPackets()}};
        if(racerRigs[racer]->modelCount==5){
         auto& models=opponents[nextRacePresentation.submittedOpponents-1u].sourceBodyModelPackets50LA;
-        models[2]=nativeBottomLeftModels[racer]->modelPackets();
-        models[3]=nativeBottomRightModels[racer]->modelPackets();
+        models[3]=nativeBottomLeftModels[racer]->modelPackets();
+        models[4]=nativeBottomRightModels[racer]->modelPackets();
        }
       }
       if(nativeSelectedLights){

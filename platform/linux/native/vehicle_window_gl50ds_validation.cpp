@@ -19,8 +19,10 @@ U componentIndex(game::VehicleDrawComponent50CM component) noexcept {
 bool sourceBodyComponent50LA(U component, U componentCount) noexcept {
     // The generic draw interface also accepts four components. Source body
     // admission requires a complete three-model pod or actual five-model pod.
+    // Every model, chariot included, runs the same 241280 owner path; which
+    // route it takes is decided by its material programs, not its index.
     return (componentCount == 3 || componentCount == 5) &&
-        component >= 1 && component <= sourceBodyCount50LA && component < componentCount;
+        component < sourceBodyCount50LA && component < componentCount;
 }
 
 U trackSpanChunkCount(U indexCount, bool textured, U maximumTriangles) noexcept {
@@ -38,10 +40,13 @@ bool validateMaterialPolicy(const VehicleWindowMaterialBinding50DS& material,
         (material.fixedBlendAlpha && material.blend != VehicleWindowBlend50DS::additive) ||
         (material.blend == VehicleWindowBlend50DS::opaque && material.alphaScale != 1.f))
         return fail(d, VehicleWindowError50DS::material, "invalid explicit blend/alpha material policy");
+    // A single diffuse pass 1 may carry GS source alpha (A0 B1 C0 D1, e.g. the
+    // pod canopy); its shader emits As/128 as the GL factor (alphaScale 1).
     if (material.sourceDiffuseCompressed50LA &&
         (material.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
-         material.blend != VehicleWindowBlend50DS::opaque || material.unlit ||
-         material.sourcePrelit || material.fixedBlendAlpha || material.alphaScale != 1.f))
+         (material.blend != VehicleWindowBlend50DS::opaque &&
+          !(material.blend == VehicleWindowBlend50DS::sourceAlpha && material.sourceSingleDiffuseRgba50LA)) ||
+         material.unlit || material.sourcePrelit || material.fixedBlendAlpha || material.alphaScale != 1.f))
         return fail(d, VehicleWindowError50DS::material,
             "source compressed diffuse requires a lit opaque base-map texture policy");
     if (material.sourceSpecularPair50LA) {
@@ -57,6 +62,21 @@ bool validateMaterialPolicy(const VehicleWindowMaterialBinding50DS& material,
     } else if (material.specularTextureIndex50LA != assets::unresolvedMaterialTexture50EA ||
         material.sourceBaseFog50LA || material.sourceBaseAlphaTest50LA || material.sourceSpecularFog50LA || material.sourceSpecularAlphaTest50LA)
         return fail(d, VehicleWindowError50DS::material, "unpaired material must not carry specular state");
+    if (material.extraPass50PP == VehicleWindowExtraPass50PP::none) {
+        if (material.extraPassTextureIndex50PP != assets::unresolvedMaterialTexture50EA ||
+            material.extraPassFixScale50PP != 0.f || material.extraPassFog50PP || material.extraPassAlphaTest50PP)
+            return fail(d, VehicleWindowError50DS::material, "single-pass material must not carry second-pass state");
+    } else if ((material.extraPass50PP != VehicleWindowExtraPass50PP::specularFixed &&
+                material.extraPass50PP != VehicleWindowExtraPass50PP::specularDestinationAlpha) ||
+        !material.sourceSingleDiffuseRgba50LA ||
+        material.extraPassTextureIndex50PP == assets::unresolvedMaterialTexture50EA ||
+        !std::isfinite(material.extraPassFixScale50PP) ||
+        (material.extraPass50PP == VehicleWindowExtraPass50PP::specularFixed &&
+         (material.extraPassFixScale50PP < 0.f || material.extraPassFixScale50PP > 255.f / 128.f)) ||
+        (material.extraPass50PP == VehicleWindowExtraPass50PP::specularDestinationAlpha &&
+         (material.extraPassFixScale50PP != 0.f || material.blend != VehicleWindowBlend50DS::opaque)))
+        return fail(d, VehicleWindowError50DS::material,
+            "second pass requires a single diffuse pass 1, a real map and its GS FIX or opaque Ad form");
     return true;
 }
 
@@ -81,7 +101,7 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
         request.context, request.isCurrent, input.specularTextures50LA->publicationToken()))
         return fail(d, VehicleWindowError50DS::material,
             "map-2 publication requires the same current context, callback and thread");
-    bool anyPair = false;
+    bool anyPair = false, anyExtra = false;
     for (U c = 0; c < owner.componentCount(); ++c) {
         d.component = c;
         d.material = d.texture = assets::unresolvedMaterialTexture50EA;
@@ -99,16 +119,23 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
             if (binding.sourceDiffuseCompressed50LA &&
                 !sourceBodyComponent50LA(c, owner.componentCount()))
                 return fail(d, VehicleWindowError50DS::material,
-                    "source compressed diffuse requires actual engine components in a three/five-model pod");
+                    "source compressed diffuse requires actual pod components in a three/five-model pod");
             if (binding.sourceSpecularPair50LA) {
                 if (!sourceBodyComponent50LA(c, owner.componentCount()))
                     return fail(d, VehicleWindowError50DS::material,
-                        "source specular pair requires actual engine components in a three/five-model pod");
+                        "source specular pair requires actual pod components in a three/five-model pod");
                 anyPair = true;
                 const auto* map2 = input.specularTextures50LA ?
                     input.specularTextures50LA->asset(binding.specularTextureIndex50LA) : nullptr;
                 if (!map2 || !map2->name)
                     return fail(d, VehicleWindowError50DS::material, "source pair has no actual published map 2");
+            }
+            if (binding.extraPass50PP != VehicleWindowExtraPass50PP::none) {
+                anyExtra = true;
+                const auto* extra = input.specularTextures50LA ?
+                    input.specularTextures50LA->asset(binding.extraPassTextureIndex50PP) : nullptr;
+                if (!extra || !extra->name)
+                    return fail(d, VehicleWindowError50DS::material, "second pass has no actual published map");
             }
             if (binding.mode == VehicleWindowMaterialMode50DS::untextured) {
                 if (binding.textureIndex != assets::unresolvedMaterialTexture50EA)
@@ -123,8 +150,8 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
             }
         }
     }
-    if (anyPair != bool(input.specularTextures50LA))
-        return fail(d, VehicleWindowError50DS::material, "map-2 bank presence differs from source pair table");
+    if ((anyPair || anyExtra) != bool(input.specularTextures50LA))
+        return fail(d, VehicleWindowError50DS::material, "map-2 bank presence differs from source pair/second-pass table");
     d.component = maxComponents;
     d.material = d.texture = assets::unresolvedMaterialTexture50EA;
     return true;

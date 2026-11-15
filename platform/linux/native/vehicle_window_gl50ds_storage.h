@@ -68,10 +68,13 @@ inline constexpr U nativeShadowRacerCount = 1 + maxVehicleWindowOpponents50DS;
 // Optional models are rendered normally; no additional shadow parity is claimed.
 inline constexpr U nativeShadowCasterCount = 3 * nativeShadowRacerCount;
 inline constexpr U maxComponents = game::maxVehicleDrawComponents50CM;
-// Bounded body slots: primary left/right, then actual optional lower left/right.
-// Body slot N maps only to component N + 1; chariot has no source body slot.
-inline constexpr U sourceBodyCount50LA = 4;
-static_assert(maxComponents == 5, "source body slots require the exact five-component topology");
+// Bounded body slots, one per draw component: chariot, primary left/right, then
+// actual optional lower left/right. Body slot N is component N. Admission comes
+// from each component's own material programs (SpecularMapDualCompressed pair,
+// DiffuseCompressed single), never from which model it is (0x150ABC/0x150B3C).
+inline constexpr U sourceBodyCount50LA = 5;
+static_assert(maxComponents == 5 && sourceBodyCount50LA == maxComponents,
+    "source body slots require the exact five-component topology");
 inline constexpr game::VehicleDrawComponent50CM components[] = {
     game::VehicleDrawComponent50CM::chariot, game::VehicleDrawComponent50CM::leftEngine,
     game::VehicleDrawComponent50CM::rightEngine, game::VehicleDrawComponent50CM::bottomLeftEngine,
@@ -297,6 +300,9 @@ struct VehicleWindowGl50DS::Storage {
         U textureIndex = assets::unresolvedMaterialTexture50EA, name = 0;
         U specularName50LA = 0;
         std::uint64_t textureIdentity50LA = 0, specularIdentity50LA = 0;
+        // Second pass texture (policy.extraPass50PP), from the map-2 bank.
+        U extraPassName50PP = 0;
+        std::uint64_t extraPassIdentity50PP = 0;
         VehicleWindowMaterialBinding50DS policy{};
         float uv[4] = {1.f, 1.f, 0.f, 0.f};
     };
@@ -322,6 +328,10 @@ struct VehicleWindowGl50DS::Storage {
     struct SpecularGroup50LA { U indexStart = 0, indexCount = 0; };
     struct SpecularGeometry50LA {
         bool enabled = false, singleDiffuse = false;
+        // A second SpecularMapCompressed pass reads the same camera-normal UV
+        // stream as map 2, at every distance (33B8C0 has no 0x200 test).
+        bool extraPassUv50PP = false;
+        bool needsUv50PP() const noexcept { return enabled || extraPassUv50PP; }
         U fogBuffers[2]{};
         game::original_racer_diffuse50LA::Geometry diffuseGeometry;
         U buffers[2]{}, groupCount = 0;
@@ -330,6 +340,9 @@ struct VehicleWindowGl50DS::Storage {
     };
     std::array<SpecularGeometry50LA, sourceBodyCount50LA> sourceSpecularGeometry50LA;
     bool hasSpecularPairs50LA = false, hasSingleDiffuse50LA = false;
+    bool hasExtraPasses50PP = false;
+    // Per-frame receipts (printed with native_fixed_specular).
+    std::uint64_t podExtraPassDraws50PP = 0, podExtraPassAlphaSaturatedSpans50PP = 0;
     // Single-sample paired bodies use fixed-function blending (src*DST_ALPHA
     // + dst, alpha replaced; destination alpha kept in source byte/128 scale)
     // instead of per-triangle destination feedback. The same split runs on
@@ -906,6 +919,10 @@ bool uiCoverageDisjointTraced=false;
         U archetype = 0, bool effectsOnly = false) noexcept;
     bool drawOpaqueOpponent(std::uint8_t bank, U opponent) noexcept;
     bool drawTransparentPod(std::uint8_t bank, U opponent = maxVehicleWindowOpponents50DS) noexcept;
+    // Pass 2 of a two-pass pod material over the span pass 1 just drew. Leaves
+    // pass 1's material state bound again on return.
+    bool drawPodExtraPass50PP(const Material& material, U slot, U archetype, U component, U ordinal,
+        const assets::SceneSpan48D& span) noexcept;
     static bool begin(void* context, std::uint8_t bank) noexcept;
     static bool bindMaterial(void* context, game::VehicleDrawComponent50CM component, U material) noexcept;
     struct PlayerTimingCounter {std::uint64_t calls=0,wallNs=0;};

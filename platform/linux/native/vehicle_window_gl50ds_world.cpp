@@ -181,13 +181,13 @@ bool VehicleWindowGl50DS::Storage::pairCompareEligible(U slot,U archetype,U comp
         const assets::SceneSpan48D& span) noexcept {
         auto& c=pairCompare;
         if(c.failed||!gl.blitFramebuffer||!gl.readPixels||!coverageArray)return false;
-        if(component<1||component>sourceBodyCount50LA||slot>frameOpponentCount)return false;
+        if(component>=sourceBodyCount50LA||slot>frameOpponentCount)return false;
         const auto selected=racerView(archetype);
         if(!selected.materials||!selected.resources||!sourceBodyComponent50LA(component,selected.resources->componentCount))return false;
         const auto& material=selected.materials[selected.materialOffsets[component]+span.material_index];
         if(!material.policy.sourceSpecularPair50LA)return false;
-        if(selected.specular[component-1].singleDiffuse&&!frameDiffuseSelected50LA[slot][component-1])return false;
-        if(!frameSpecularSecond50LA[slot][component-1]||!fixedSpecularBlend50LA||!gl.blendFuncSeparate)return false;
+        if(selected.specular[component].singleDiffuse&&!frameDiffuseSelected50LA[slot][component])return false;
+        if(!frameSpecularSecond50LA[slot][component]||!fixedSpecularBlend50LA||!gl.blendFuncSeparate)return false;
         if(!specularSpanAlphaAdmitted50LA(slot,archetype,component,ordinal,span))return false;
         // One sampled span every eighth frame, rotating through last
         // frame's admitted spans so every pod/component/span is visited.

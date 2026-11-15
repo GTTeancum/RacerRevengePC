@@ -1,5 +1,6 @@
 // Out-of-line native implementation; owner layout and operation bodies are unchanged.
 #include "original_racer_visual50hw_fixture.h"
+#include <iostream>
 
 namespace native_racer50HW {
 
@@ -618,6 +619,7 @@ void Visual::bindCanonicalEngineBaseMap(const g::OriginalRacerModelSceneOwner50L
     }
 
 void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInput50LA,4>& models,
+        const CanonicalEngineModelInput50LA& chariot,
         const a::OriginalStandardMaterialDomain50LA& domain,
         bool useOriginalBodyColors50LA) {
         namespace s=visual_detail::shared;
@@ -631,12 +633,21 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                 (!input.model&&!input.geometry&&!input.references),
                 "Canonical engine input extent differs from actual model family");
         }
+        // The chariot is the same model class on the same 241280 path, so its
+        // SpecularMapDualCompressed and DiffuseCompressed materials take the
+        // same routes as the engines' (program registry 150ABC/150B3C keys on
+        // the program name only). It joins after bindCanonicalChariot so its
+        // multi-pass materials keep their authenticated base-map binding.
+        s::need((!chariot.model&&!chariot.geometry&&!chariot.references)||
+            (chariot.model&&chariot.geometry&&chariot.references&&canonicalChariotBound_),
+            "Canonical chariot body input requires the bound actual chariot model");
+        const bool chariotVisit=useOriginalBodyColors50LA&&chariot.model;
         struct EngineDraft {
             std::vector<p::VehicleWindowMaterialBinding50DS> bindings;
             std::vector<pod_materials50ed_fixture::Selection> selections;
             std::vector<std::uint8_t> bodyColorModes;
         };
-        std::array<EngineDraft,4> drafts;
+        std::array<EngineDraft,5> drafts; // [4] = chariot (component 0)
         auto samplers=samplers_;
         std::size_t totalBodyColorCount=0,totalSpecularPairCount=0;
         // Resource pointers and level borrows are cold-call-only dedup keys.
@@ -651,16 +662,64 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
         std::vector<SpecularProjection> specularProjections;
         std::vector<a::MaterialTextureSlotInput50EA> specularSlots;
         std::vector<p::MaterialTextureSampler50EB> specularSamplers;
+        // One load-once 64x64 native1555 projection bank shared by every map
+        // the original lowers from a specular TGA: the dual program's map 2 and
+        // a later SpecularMapCompressed pass. The cold key is resource, level
+        // and the consuming context's TEXA/wrap; slots stay distinct.
+        const auto projectSpecular50PP=[&](const a::OriginalStandardTextureResource50LA& texture,
+                const a::OriginalStandardTextureLevelView50LA& level,
+                const std::array<std::int32_t,5>& texaWrap)->std::uint32_t {
+            for(std::uint32_t i=0;i<specularProjections.size();++i){
+                const auto& projection=specularProjections[i];
+                if(projection.resource==&texture&&projection.level==0&&projection.texaWrap==texaWrap)return i;
+            }
+            s::need(specularProjections.size()<32,"Canonical second-map native bank capacity");
+            const auto ta0=texaWrap[0],ta1=texaWrap[1],aem=texaWrap[2];
+            a::TextureMip48E native;native.width=native.height=64;native.rgba.resize(4096u*4u);
+            for(std::size_t pixel=0;pixel<4096;++pixel){
+                const auto word=level.packed1555[pixel];
+                native.rgba[4*pixel]=static_cast<std::uint8_t>((word&31u)<<3);
+                native.rgba[4*pixel+1]=static_cast<std::uint8_t>(((word>>5)&31u)<<3);
+                native.rgba[4*pixel+2]=static_cast<std::uint8_t>(((word>>10)&31u)<<3);
+                native.rgba[4*pixel+3]=static_cast<std::uint8_t>((word&0x8000u)?ta1:((aem&&word==0)?0:ta0));
+            }
+            // The resource already owns the original row projection.
+            // No second flip, RGB5 replication, mip generation, source
+            // decoder or Controls/specmap3 identity enters this copy.
+            SpecularProjection projection;projection.resource=&texture;
+            projection.texaWrap=texaWrap;projection.identity=visual_detail::nextSpecularIdentity50LA();
+            a::DecodeError48C encodeError;
+            s::need(a::encodeTextureLevel48E(native,projection.bytes,encodeError)&&
+                projection.bytes.size()==native.rgba.size()+16&&
+                std::equal(native.rgba.begin(),native.rgba.end(),projection.bytes.begin()+16),
+                "Canonical second-map native RGBA serialization differs");
+            const auto index=static_cast<std::uint32_t>(specularProjections.size());
+            specularProjections.push_back(std::move(projection));
+            specularSamplers.push_back({p::MaterialTextureFilter50EB::linear,p::MaterialTextureFilter50EB::linear,
+                texaWrap[3]?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat,
+                texaWrap[4]?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat});
+            return index;
+        };
+        std::size_t totalExtraPassCount=0;
         constexpr std::array<unsigned,4> coldOrder{{1,0,3,2}};
-        for(unsigned visit=0;visit<engineCount;++visit){
-            const unsigned engine=coldOrder[visit],component=engine+1u;
+        // Engines first in their unchanged cold order, so their map-2 bank
+        // indices do not move; the chariot visit follows and reuses any
+        // identical map-2 projection (specmap5) through the same dedup.
+        const unsigned visitCount=engineCount+(chariotVisit?1u:0u);
+        for(unsigned visit=0;visit<visitCount;++visit){
+            const bool chariotModel=visit==engineCount;
+            const unsigned engine=chariotModel?4u:coldOrder[visit],component=chariotModel?0u:engine+1u;
             const auto drawComponent=static_cast<g::VehicleDrawComponent50CM>(component);
-            const auto& model=*models[engine].model;
-            const auto& geometry=*models[engine].geometry;
-            const auto& references=*models[engine].references;
-            const auto modelIndex=engine==0?leftModelIndex_:engine==1?rightModelIndex_:lowerModelIndex_[engine-2u];
-            const auto& psgMember=engine==0?leftPsgMember_:engine==1?rightPsgMember_:lowerPsg_[engine-2u].member;
-            const auto& psgSha256=engine==0?leftPsgSha256_:engine==1?rightPsgSha256_:lowerPsg_[engine-2u].sha256;
+            const auto& input=chariotModel?chariot:models[engine];
+            const auto& model=*input.model;
+            const auto& geometry=*input.geometry;
+            const auto& references=*input.references;
+            const auto modelIndex=chariotModel?chariotModelIndex_:
+                engine==0?leftModelIndex_:engine==1?rightModelIndex_:lowerModelIndex_[engine-2u];
+            const auto& psgMember=chariotModel?chariotPsgMember_:
+                engine==0?leftPsgMember_:engine==1?rightPsgMember_:lowerPsg_[engine-2u].member;
+            const auto& psgSha256=chariotModel?chariotPsgSha256_:
+                engine==0?leftPsgSha256_:engine==1?rightPsgSha256_:lowerPsg_[engine-2u].sha256;
             s::need(!canonicalRightBound_&&!canonicalLeftBound_&&!canonicalLowerBound_[0]&&!canonicalLowerBound_[1]&&
                 !materialsPublished_&&!canonicalEngineSpecularMaterials_.loaded()&&domain.prepared()&&
                 !domain.materials382B38()->populationTerminal()&&!domain.materials382B38()->demandTerminal()&&
@@ -720,7 +779,7 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
             auto& selections=drafts[engine].selections;selections=textures[component];
             auto& bodyColorModes=drafts[engine].bodyColorModes;
             bodyColorModes.resize(scene->materials.size(),0);
-            std::size_t bodyColorCount=0;
+            std::size_t bodyColorCount=0,pairCount=0,singleCount=0,hostCount=0,extraCount=0;
             for(std::size_t ordinal=0;ordinal<scene->materials.size();++ordinal){
                 const auto* handle=references.handle1C4(ordinal);
                 const a::OriginalStandardMaterialObject50LA* material=nullptr;
@@ -728,10 +787,22 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                 s::need(handle&&handle==model.fields().materials1C4+ordinal&&
                     domain.materials382B38()->resolve298E60(*handle,material,diagnostic)&&
                     material&&material->constructed29B550()&&material->row40()&&*material->row40()==*handle&&
-                    material->passCount48()&&*material->passCount48()==1&&material->source()&&
+                    material->passCount48()&&*material->passCount48()>=1&&material->source()&&
                     material->source()->member()&&material->source()->originalBytes()&&
                     material->textures383400()==domain.textures383400().get(),
                     "Canonical engine model1C4 does not resolve a complete actual material");
+                // Every declared pass is drawn (24A620 walks all enabled passes;
+                // 29BED0 registers each pass in its own collector slot). Pod data
+                // holds at most TotalShaderPasses 2: pass 1 DiffuseCompressed,
+                // pass 2 SpecularMapCompressed (stock canopy glass and two other
+                // surfaces). Same rule for every component and every pod;
+                // anything else is refused rather than partly drawn.
+                const auto passCount=*material->passCount48();
+                s::need(passCount<=2,"Canonical pod material declares more than two passes");
+                if(passCount==2&&!useOriginalBodyColors50LA){
+                    // Source-lighting opt-out: the older base-map binding stays.
+                    ++hostCount;continue;
+                }
                 const auto source=materialSources_.find(rig_detail::lower(scene->materials[ordinal]));
                 s::need(source!=materialSources_.end()&&
                     visual_detail::sameSourceMember(*material->source()->member(),source->second.member)&&
@@ -757,6 +828,8 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                     "Canonical engine program has no admitted host base-map projection");
                 s::need(!(flame||singleDiffuse)||*pass.mapCount20==1,
                     "Canonical engine single-map program requires its original single map");
+                s::need(passCount==1||singleDiffuse,
+                    "Canonical two-pass pod material requires a DiffuseCompressed first pass");
                 s::need(pass.state30->contextCount()>=1&&pass.state30->contextCount()<=2&&
                     (!(flame||singleDiffuse)||pass.state30->contextCount()==1)&&(*pass.uv1E)[0]==0,
                     "Canonical engine native base-map context/UV projection is unsupported");
@@ -837,13 +910,18 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                         value(Field::textureCoordinatesSTQorUV)==0&&value(Field::colorClampingMethod)==1&&
                         value(Field::alphaCorrectionValue)==0&&value(Field::alphaBlendingControlInUnitsOfPixels)==0&&
                         value(Field::onePassAntiAliasingOnOff)==0&&value(Field::fragmentValueControlFixedOrNot)==0&&
-                        value(Field::foggingOnOff)==1&&blend==0&&depth==0&&value(Field::depthTestMethod)==2&&
-                        value(Field::alphaTestOnOff)==1&&value(Field::alphaTestMethod)==6&&
-                        value(Field::alphaReferenceValue)==0&&value(Field::processingMethodWhenFailedInAlphaTest)==0&&
+                        value(Field::foggingOnOff)==1&&depth==0&&value(Field::depthTestMethod)==2&&
+                        // Blend and alpha test come from the pass data: opaque
+                        // (blend 0) or GS source alpha A0 B1 C0 D1 (checked above,
+                        // e.g. a canopy pass 1); ATE off (authored 0) or
+                        // the template GREATER/0/KEEP.
+                        (value(Field::alphaTestOnOff)==0||(value(Field::alphaTestOnOff)==1&&
+                            value(Field::alphaTestMethod)==6&&value(Field::alphaReferenceValue)==0&&
+                            value(Field::processingMethodWhenFailedInAlphaTest)==0))&&
                         value(Field::destinationAlphaTestOnOff)==0,
                         "Canonical single diffuse context has no admitted static RGBA/fog/alpha/depth projection");
                     const auto* retainedMaterial=componentMaterials_[component][ordinal];
-                    s::need(retainedMaterial&&retainedMaterial->passes.size()==1&&material->name00(),
+                    s::need(retainedMaterial&&retainedMaterial->passes.size()==static_cast<std::size_t>(passCount)&&material->name00(),
                         "Canonical single diffuse authored pass ownership differs");
                     const auto& authored=retainedMaterial->passes.front();
                     for(const auto* fields:{&retainedMaterial->general,&authored.fields})
@@ -877,7 +955,116 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                     binding.sourceBaseFog50LA=value(Field::foggingOnOff)!=0;
                     binding.sourceBaseAlphaTest50LA=value(Field::alphaTestOnOff)!=0;
                     binding.depthEqual=true;
-                    bodyColorModes[ordinal]=1;++bodyColorCount;
+                    // Source-alpha pass 1 (canopy glass): the shader emits As/128 as
+                    // the GL source factor, so no host alpha scale is applied.
+                    if(blend)binding.alphaScale=1.f;
+                    bodyColorModes[ordinal]=1;++bodyColorCount;++singleCount;
+                    if(passCount==2){
+                        // Pass 2 of the SAME material and surface. Program
+                        // SpecularMapCompressed (registry 150B1C -> 33B8C0):
+                        // UV = camera-normal XY * 0.5 + 0.5 from the model root
+                        // basis scaled by qNormal (33BF90..33C048, 33C230/33C250),
+                        // the same basis/UV the dual program gives map 2; colour =
+                        // the DiffuseCompressed light sum (33C228..33C308); F = 255
+                        // (constant 0xFF0, no 41.x & 2 test); no 41.x & 0x200
+                        // map-2 distance test anywhere in 33B8C0. GS ALPHA is the
+                        // pass's own A0 B2 D1 with C = FIX or C = Ad.
+                        a::OriginalStandardMaterialPassView50LA pass2;
+                        a::OriginalStandardProgramRowView50LA program2;
+                        s::need(material->pass4C(1,pass2)&&pass2.references04&&*pass2.references04>0&&
+                            pass2.program18&&pass2.texture1A&&pass2.uv1E&&pass2.mapCount20&&*pass2.mapCount20==1&&
+                            pass2.flags21&&(*pass2.flags21&2u)&&(*pass2.uv1E)[0]==0&&!pass2.animation10&&
+                            !pass2.textureAnimation10&&pass2.parameterCount28&&*pass2.parameterCount28==0&&
+                            pass2.parameterMask24&&!*pass2.parameterMask24&&!pass2.parameters34&&
+                            pass2.state30&&pass2.state30->contextCount()==1&&
+                            domain.programs382B70()->row(*pass2.program18,program2)&&program2.canonicalName&&
+                            rig_detail::lower(program2.canonicalName)=="specularmapcompressed",
+                            "Canonical pod second pass has no admitted SpecularMapCompressed projection");
+                        const auto& authored2=retainedMaterial->passes[1];
+                        for(const char* key:{"VertexAnimation","TextureAnimation","PixelAnimation"}){
+                            const auto animation=rig_detail::lower(visual_detail::field(authored2.fields,key));
+                            s::need(animation.empty()||animation=="none",
+                                "Canonical pod second pass authored animation is unsupported");
+                        }
+                        a::OriginalStandardMaterialMapBindingView50LA extraMap;
+                        s::need(domain.materials382B38()->prepareColdRepresentativeMap249610(
+                            domain.coldCollector14D440(),*handle,1,0,extraMap,diagnostic)&&
+                            extraMap.preparation==a::OriginalStandardMaterialMapPreparation50LA::ready&&
+                            extraMap.textureToken==(*pass2.texture1A)[0]&&extraMap.texture,
+                            "Canonical pod second-pass map representative is unavailable");
+                        const auto& extra=extraMap.contextAfter249610;
+                        const auto extraValue=[&](Field field){return extra.fields[static_cast<std::size_t>(field)].value;};
+                        const auto c2=extraValue(Field::inputAlphaC),fix2=extraValue(Field::fixedAlphaValue);
+                        const auto alphaTest2=extraValue(Field::alphaTestOnOff);
+                        s::need(extra.runtime435670==0&&extraValue(Field::alphaBlendingOnOff)==1&&
+                            extraValue(Field::inputColorA)==0&&extraValue(Field::inputColorB)==2&&
+                            extraValue(Field::inputColorD)==1&&(c2==1||(c2==2&&fix2>=0&&fix2<=255))&&
+                            extraValue(Field::zWriteDisabled)==1&&extraValue(Field::depthTestMethod)==2&&
+                            extraValue(Field::environmentContext0or1)==0&&
+                            extraValue(Field::textureFunction)==0&&extraValue(Field::textureColorComponent)==1&&
+                            extraValue(Field::textureMappingOnOff)==1&&extraValue(Field::gouraudShadingOnOff)==1&&
+                            extraValue(Field::textureCoordinatesSTQorUV)==0&&extraValue(Field::colorClampingMethod)==1&&
+                            extraValue(Field::alphaCorrectionValue)==0&&
+                            extraValue(Field::alphaBlendingControlInUnitsOfPixels)==0&&
+                            extraValue(Field::onePassAntiAliasingOnOff)==0&&
+                            extraValue(Field::fragmentValueControlFixedOrNot)==0&&
+                            extraValue(Field::destinationAlphaTestOnOff)==0&&
+                            (extraValue(Field::foggingOnOff)==0||extraValue(Field::foggingOnOff)==1)&&
+                            (alphaTest2==0||(alphaTest2==1&&extraValue(Field::alphaTestMethod)==6&&
+                                extraValue(Field::alphaReferenceValue)==0&&
+                                extraValue(Field::processingMethodWhenFailedInAlphaTest)==0)),
+                            "Canonical pod second-pass context has unsupported GS alpha/depth/texture state");
+                        // C = Ad reads the alpha pass 1 left at that pixel. Only an
+                        // opaque pass 1 leaves its own As there (GS writes As).
+                        s::need(c2!=1||blend==0,
+                            "Canonical pod destination-alpha second pass requires an opaque first pass");
+                        const auto ta0=extraValue(Field::sourceAlphaValueWhenAis0);
+                        const auto ta1=extraValue(Field::sourceAlphaValueWhenAis1);
+                        const auto aem=extraValue(Field::methodOfExpandingTextureAlpha);
+                        const auto extraU=extraValue(Field::wrapModeHorizontal),extraV=extraValue(Field::wrapModeVertical);
+                        s::need(ta0>=0&&ta0<=255&&ta1>=0&&ta1<=255&&(aem==0||aem==1)&&
+                            (extraU==0||extraU==1)&&(extraV==0||extraV==1),
+                            "Canonical pod second-pass TEXA/wrap is unsupported");
+                        a::OriginalStandardTextureRowView50LA extraRow;
+                        s::need(domain.textures383400()->row((*pass2.texture1A)[0],extraRow)&&
+                            extraRow.name00&&extraRow.references08&&*extraRow.references08>0&&extraRow.object04&&
+                            extraRow.object04==extraMap.texture&&extraRow.object04->constructed24DA30()&&
+                            extraRow.object04->references00()&&*extraRow.object04->references00()>0&&
+                            extraRow.object04->name20()&&extraRow.object04->sourceMember()&&
+                            extraRow.object04->originalBytes()&&authored2.pass==2&&
+                            rig_detail::lower(authored2.microprogram)=="specularmapcompressed"&&
+                            authored2.textures.size()==1&&authored2.textures[0].slot==1&&
+                            visual_detail::sameSourceMember(*extraRow.name00,prefix+authored2.textures[0].name)&&
+                            visual_detail::sameSourceMember(*extraRow.object04->name20(),*extraRow.name00+".tga")&&
+                            visual_detail::sameSourceMember(*extraRow.object04->sourceMember(),*extraRow.object04->name20()),
+                            "Canonical pod second-pass map differs from its actual authored TGA owner");
+                        const auto& extraTexture=*extraRow.object04;
+                        Provider::MemberView extraMember;
+                        const auto& extraBytes=*extraTexture.originalBytes();
+                        s::need(provider->lookup132820(*extraTexture.sourceMember(),extraMember)==Provider::Lookup::present&&
+                            extraMember.member&&extraMember.data&&extraMember.size==extraBytes.size()&&
+                            std::equal(extraBytes.begin(),extraBytes.end(),extraMember.data),
+                            "Canonical pod second-pass bytes differ from the same actual mounted source");
+                        a::OriginalStandardTextureLevelView50LA extraLevel;
+                        s::need(extraTexture.sourceFormat()&&
+                            *extraTexture.sourceFormat()==a::OriginalStandardTextureSourceFormat50LA::tgaBgr24&&
+                            extraTexture.formatAC()&&*extraTexture.formatAC()==1555&&
+                            extraTexture.bitsPerPixelE8()&&*extraTexture.bitsPerPixelE8()==16&&
+                            extraTexture.level100(0,extraLevel)&&extraLevel.width104==64&&extraLevel.height110==64&&
+                            extraLevel.storage==a::OriginalStandardTextureLevelStorage50LA::tgaConverted1555&&
+                            extraLevel.packed1555&&extraLevel.packed1555Words==4096,
+                            "Canonical pod second-pass largest native1555 level is unsupported");
+                        const auto extraIndex=projectSpecular50PP(extraTexture,extraLevel,{{ta0,ta1,aem,extraU,extraV}});
+                        specularSlots.push_back({{component+1,static_cast<std::uint32_t>(ordinal),2,1},
+                            specularProjections[extraIndex].identity,a::MaterialTextureRequirement50EA::required});
+                        binding.extraPass50PP=c2==2?p::VehicleWindowExtraPass50PP::specularFixed:
+                            p::VehicleWindowExtraPass50PP::specularDestinationAlpha;
+                        binding.extraPassTextureIndex50PP=extraIndex;
+                        binding.extraPassFixScale50PP=c2==2?static_cast<float>(fix2)/128.f:0.f;
+                        binding.extraPassFog50PP=extraValue(Field::foggingOnOff)!=0;
+                        binding.extraPassAlphaTest50PP=alphaTest2!=0;
+                        ++totalExtraPassCount;++extraCount;
+                    }
                 }else if(useOriginalBodyColors50LA&&!flame){
                     // The source pair is admitted together; no active parameter,
                     // animation or alternate one-node program path is substituted.
@@ -972,39 +1159,7 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                         secondLevel.packed1555&&secondLevel.packed1555Words==4096,
                         "Canonical second-map largest native1555 level is unsupported");
                     const std::array<std::int32_t,5> texaWrap{{ta0,ta1,aem,secondU,secondV}};
-                    std::uint32_t specularIndex=a::unresolvedMaterialTexture50EA;
-                    for(std::uint32_t i=0;i<specularProjections.size();++i){
-                        const auto& projection=specularProjections[i];
-                        if(projection.resource==&secondTexture&&projection.level==0&&projection.texaWrap==texaWrap){
-                            specularIndex=i;break;
-                        }
-                    }
-                    if(specularIndex==a::unresolvedMaterialTexture50EA){
-                        s::need(specularProjections.size()<32,"Canonical second-map native bank capacity");
-                        a::TextureMip48E native;native.width=native.height=64;native.rgba.resize(4096u*4u);
-                        for(std::size_t pixel=0;pixel<4096;++pixel){
-                            const auto word=secondLevel.packed1555[pixel];
-                            native.rgba[4*pixel]=static_cast<std::uint8_t>((word&31u)<<3);
-                            native.rgba[4*pixel+1]=static_cast<std::uint8_t>(((word>>5)&31u)<<3);
-                            native.rgba[4*pixel+2]=static_cast<std::uint8_t>(((word>>10)&31u)<<3);
-                            native.rgba[4*pixel+3]=static_cast<std::uint8_t>((word&0x8000u)?ta1:((aem&&word==0)?0:ta0));
-                        }
-                        // The resource already owns the original row projection.
-                        // No second flip, RGB5 replication, mip generation, source
-                        // decoder or Controls/specmap3 identity enters this copy.
-                        SpecularProjection projection;projection.resource=&secondTexture;
-                        projection.texaWrap=texaWrap;projection.identity=visual_detail::nextSpecularIdentity50LA();
-                        a::DecodeError48C encodeError;
-                        s::need(a::encodeTextureLevel48E(native,projection.bytes,encodeError)&&
-                            projection.bytes.size()==native.rgba.size()+16&&
-                            std::equal(native.rgba.begin(),native.rgba.end(),projection.bytes.begin()+16),
-                            "Canonical second-map native RGBA serialization differs");
-                        specularIndex=static_cast<std::uint32_t>(specularProjections.size());
-                        specularProjections.push_back(std::move(projection));
-                        specularSamplers.push_back({p::MaterialTextureFilter50EB::linear,p::MaterialTextureFilter50EB::linear,
-                            secondU?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat,
-                            secondV?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat});
-                    }
+                    const std::uint32_t specularIndex=projectSpecular50PP(secondTexture,secondLevel,texaWrap);
                     specularSlots.push_back({{component+1,static_cast<std::uint32_t>(ordinal),1,2},
                         specularProjections[specularIndex].identity,a::MaterialTextureRequirement50EA::required});
                     binding.sourceDiffuseCompressed50LA=true;
@@ -1012,13 +1167,19 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                     binding.sourceBaseFog50LA=value(Field::foggingOnOff)!=0;
                     binding.sourceSpecularFog50LA=secondValue(Field::foggingOnOff)!=0;
                     binding.sourceSpecularAlphaTest50LA=alphaTest!=0;binding.depthEqual=true;
-                    bodyColorModes[ordinal]=1;++bodyColorCount;++totalSpecularPairCount;
-                }
+                    bodyColorModes[ordinal]=1;++bodyColorCount;++totalSpecularPairCount;++pairCount;
+                }else ++hostCount;
+                // Lower engines (2, 3) and the chariot (4) must keep the base
+                // blend/depth policy their earlier base-map binding admitted.
                 if(engine>=2u){
                     const auto& retained=windowBindings_[component][ordinal];
+                    // A source-alpha single diffuse pass 1 moves its /128 alpha
+                    // factor into the shader; blend and depth must still agree.
                     s::need(binding.blend==retained.blend&&binding.depthWrite==retained.depthWrite&&
-                        binding.fixedBlendAlpha==retained.fixedBlendAlpha&&binding.alphaScale==retained.alphaScale,
-                        "Canonical lower-engine context changes the existing native base-map policy");
+                        binding.fixedBlendAlpha==retained.fixedBlendAlpha&&
+                        (binding.alphaScale==retained.alphaScale||
+                            (binding.sourceSingleDiffuseRgba50LA&&binding.blend==p::VehicleWindowBlend50DS::sourceAlpha)),
+                        "Canonical lower-engine/chariot context changes the existing native base-map policy");
                 }
                 const auto u=wrapU?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat;
                 const auto v=wrapV?p::MaterialTextureWrap50EB::clampToEdge:p::MaterialTextureWrap50EB::repeat;
@@ -1034,15 +1195,19 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
             s::need(!useOriginalBodyColors50LA||bodyColorCount,
                 "Canonical engine has no actual body-color material");
             totalBodyColorCount+=bodyColorCount;
+            // Cold, once per pod model per load: muted-run route receipt.
+            if(useOriginalBodyColors50LA)
+                std::cerr<<"pod_material_routes pod="<<podId<<" component="<<visual_detail::role(component)
+                    <<" pair="<<pairCount<<" single="<<singleCount<<" extra_pass="<<extraCount<<" host="<<hostCount<<'\n';
         }
         if(useOriginalBodyColors50LA)
             s::need(totalBodyColorCount&&totalSpecularPairCount<=totalBodyColorCount&&
-                specularSlots.size()==totalSpecularPairCount&&
-                specularProjections.empty()==(totalSpecularPairCount==0)&&
+                specularSlots.size()==totalSpecularPairCount+totalExtraPassCount&&
+                specularProjections.empty()==(totalSpecularPairCount+totalExtraPassCount==0)&&
                 specularSamplers.size()==specularProjections.size(),"Canonical second-map publication is incomplete");
         // A pure single-map engine family owns no map2 bank. Mixed families
         // retain only the genuine dual slots, in their unchanged cold order.
-        if(useOriginalBodyColors50LA&&totalSpecularPairCount){
+        if(useOriginalBodyColors50LA&&(totalSpecularPairCount||totalExtraPassCount)){
             std::vector<a::MaterialTextureAssetInput50EA> specularInput;
             specularInput.reserve(specularProjections.size());
             for(const auto& projection:specularProjections)
@@ -1067,6 +1232,11 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                     engine==1?canonicalBodyColorModes50LA_:canonicalLowerBodyColorModes50LA_[engine-2u];
                 modes.swap(drafts[engine].bodyColorModes);
             }
+        }
+        if(chariotVisit){
+            windowBindings_[0].swap(drafts[4].bindings);
+            textures[0].swap(drafts[4].selections);
+            canonicalChariotBodyColorModes50LA_.swap(drafts[4].bodyColorModes);
         }
         samplers_.swap(samplers);
         canonicalRightBound_=canonicalLeftBound_=true;
@@ -1108,6 +1278,14 @@ bool Visual::canonicalEngineSourceColors50LA(const g::NativeGcSelectedLightsCand
                 next.component[component]={modes.data(),static_cast<std::uint32_t>(modes.size()),&lights};
                 next.component[component].prepareSpecular50LA=true;
             }
+        }
+        if(!canonicalChariotBodyColorModes50LA_.empty()){
+            // The chariot's own 14A0A0 rows at its own position (component 0).
+            constexpr auto chariot=static_cast<unsigned>(g::VehicleDrawComponent50CM::chariot);
+            if(!canonicalChariotBound_||!lights.component(chariot))return false;
+            next.component[chariot]={canonicalChariotBodyColorModes50LA_.data(),
+                static_cast<std::uint32_t>(canonicalChariotBodyColorModes50LA_.size()),&lights};
+            next.component[chariot].prepareSpecular50LA=true;
         }
         output=next;return true;
     }

@@ -149,6 +149,13 @@ void main() {
                     sourceSingleFogColor50LA.xyz * (255.0 - f)) / 256.0);
             }
             if (sourceSingleAlphaTest50LA != 0 && sourceByte.a < 1.0) discard;
+            // Alpha kept in GS byte/128 scale: the GL source factor of a
+            // source-alpha pass 1 (A0 B1 C0 D1), or the destination alpha a
+            // following C = Ad pass reads (DST_ALPHA, as the pair map 2 does).
+            if (sourcePairFixedBlend50LA != 0) {
+                viewerOutput = vec4(sourceByte.rgb / 255.0, min(sourceByte.a / 128.0, 1.0));
+                return;
+            }
             viewerOutput = sourceByte / 255.0;
             return;
         }
@@ -170,6 +177,15 @@ void main() {
                     return;
                 }
 #endif
+                if (sourcePairFixedBlend50LA == 2) {
+                    // GS C = FIX (second pod pass): ((Cs * FIX) >> 7) + Cd under
+                    // ONE,ONE. alphaScale = FIX/128 is exact in binary32, the
+                    // floor is the GS shift and a source term past 255 already
+                    // saturates the sum, so the clamp before blending is exact.
+                    viewerOutput = vec4(min(floor(sourceByte.rgb * alphaScale), 255.0) / 255.0,
+                        min(sourceByte.a / 128.0, 1.0));
+                    return;
+                }
                 if (sourcePairFixedBlend50LA != 0) {
                     viewerOutput = vec4(sourceByte.rgb / 255.0, min(sourceByte.a / 128.0, 1.0));
                     return;

@@ -1006,7 +1006,13 @@ void Context::run() {
      engines[2]=engineInput(*nativeBottomLeftModels[slot]);
      engines[3]=engineInput(*nativeBottomRightModels[slot]);
     }
-    racerVisuals[slot]->bindCanonicalEngineModels(engines,*nativeModelDomain,nativeSelectedLights);
+    // Chariot base maps first; its own pair/single materials then join the
+    // same load-once map-2 bank as the engines (one rule for every model).
+    auto& chariotModel=*nativeChariotModels[slot];
+    racerVisuals[slot]->bindCanonicalChariot(*chariotModel.modelScene(),*chariotModel.modelGeometry(),
+        *chariotModel.materialReferences(),*nativeModelDomain);
+    racerVisuals[slot]->bindCanonicalEngineModels(engines,engineInput(chariotModel),
+        *nativeModelDomain,nativeSelectedLights);
     model.bindRendererMaterialFlame(coldFlame);
     leftModel.bindRendererMaterialFlame(coldFlame);
     if(racerRigs[slot]->modelCount==5){
@@ -1015,9 +1021,6 @@ void Context::run() {
      auto& bottomLeftModel=*nativeBottomLeftModels[slot];
      bottomLeftModel.bindRendererMaterialFlame(coldFlame);
     }
-    auto& chariotModel=*nativeChariotModels[slot];
-    racerVisuals[slot]->bindCanonicalChariot(*chariotModel.modelScene(),*chariotModel.modelGeometry(),
-        *chariotModel.materialReferences(),*nativeModelDomain);
    });
   }
   if(nativeGcWater){
@@ -2960,6 +2963,7 @@ void Context::run() {
    .racerRigs=racerRigs,
    .nativeBottomLeftModels=nativeBottomLeftModels,
    .nativeBottomRightModels=nativeBottomRightModels,
+   .nativeChariotModels=nativeChariotModels,
    .drawWorkspace=drawWorkspace,
    .sourceFogRenderPhase=sourceFogRenderPhase,
    .dynamicEventCursor=dynamicEventCursor,

@@ -132,11 +132,8 @@ bool prepareSourceSpecularGeometry(const SceneGraph49P& graph, SceneNodeIndex49P
     const VehicleDrawSelection50CM& selection, const VehicleDrawMesh50CM& mesh,
     const BodyMatrix48G& rootWorld, VehicleDrawSubmission50CM& next,
     VehicleDrawDiagnostic50CM& d) noexcept {
-    if ((selection.component != VehicleDrawComponent50CM::leftEngine &&
-         selection.component != VehicleDrawComponent50CM::rightEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomLeftEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomRightEngine) ||
-        !mesh.semanticScene || selection.sourceNodeCount <= 1 ||
+    // Any component: 241280 runs for every pod model, chariot included.
+    if (!mesh.semanticScene || selection.sourceNodeCount <= 1 ||
         selection.sourceNodeCount > maxModelBoundsNodes49O ||
         mesh.semanticScene->nodes.size() != selection.sourceNodeCount)
         return reject(d, VehicleDrawError50CM::sourceSpecular);
@@ -207,11 +204,8 @@ bool prepareSourceColors(const VehicleDrawSelection50CM& selection,
     const BodyMatrix48G* nodeWorld, const OriginalRacerModelPacket50LA* packet,
     VehicleDrawWorkspace50CM& workspace, VehicleDrawDiagnostic50CM& d) noexcept {
     namespace light = original_racer_lighting50KM;
-    if ((selection.component != VehicleDrawComponent50CM::leftEngine &&
-         selection.component != VehicleDrawComponent50CM::rightEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomLeftEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomRightEngine) ||
-        !input.materialModes || !input.materialCount || !input.selectedLights ||
+    // Any component whose own material owner set the mode; not engine-only.
+    if (!input.materialModes || !input.materialCount || !input.selectedLights ||
         !input.selectedLights->ready() || !mesh.semanticScene)
         return reject(d, VehicleDrawError50CM::sourceColors);
     const auto& scene = *mesh.semanticScene;
@@ -374,11 +368,8 @@ bool prepareVehicleDrawSkin(const VehicleDrawSelection50CM& selection, const Veh
     skin.sourceColors = false;
     if (!sourceColors) return true;
     const auto& input = *sourceColors;
-    if ((selection.component != VehicleDrawComponent50CM::leftEngine &&
-         selection.component != VehicleDrawComponent50CM::rightEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomLeftEngine &&
-         selection.component != VehicleDrawComponent50CM::bottomRightEngine) ||
-        !input.materialModes || !input.materialCount || !input.selectedLights ||
+    // Any component whose own material owner set the mode; not engine-only.
+    if (!input.materialModes || !input.materialCount || !input.selectedLights ||
         !input.selectedLights->ready() || !mesh.semanticScene)
         return reject(d, VehicleDrawError50CM::sourceColors);
     const auto& scene = *mesh.semanticScene;

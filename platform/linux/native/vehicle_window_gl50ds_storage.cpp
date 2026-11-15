@@ -283,6 +283,14 @@ bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& 
                 !map2 || map2->name != material.specularName50LA || map2->identity != material.specularIdentity50LA)
                 return fail(d, VehicleWindowError50DS::material, "player source pair texture identity changed");
         }
+        for (U m = 0; m < materialCount; ++m) {
+            const auto& material = materials[m];
+            if (material.policy.extraPass50PP == VehicleWindowExtraPass50PP::none) continue;
+            const auto* extra = request.materials.specularTextures50LA ?
+                request.materials.specularTextures50LA->asset(material.policy.extraPassTextureIndex50PP) : nullptr;
+            if (!extra || extra->name != material.extraPassName50PP || extra->identity != material.extraPassIdentity50PP)
+                return fail(d, VehicleWindowError50DS::material, "player second-pass texture identity changed");
+        }
         for (U i = 0; i < racerArchetypeCount; ++i) {
             const auto& archetype = racerArchetypes[i];
             if (request.mode == VehicleWindowMode50DS::callerMaterialTextures &&
@@ -309,6 +317,12 @@ bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& 
                     if (texture->identity != material.textureIdentity50LA || !map2 ||
                         map2->name != material.specularName50LA || map2->identity != material.specularIdentity50LA)
                         return fail(d, VehicleWindowError50DS::material, "racer source pair texture identity changed");
+                }
+                if (material.policy.extraPass50PP != VehicleWindowExtraPass50PP::none) {
+                    const auto* extra = archetype.specularTextures50LA ?
+                        archetype.specularTextures50LA->asset(material.policy.extraPassTextureIndex50PP) : nullptr;
+                    if (!extra || extra->name != material.extraPassName50PP || extra->identity != material.extraPassIdentity50PP)
+                        return fail(d, VehicleWindowError50DS::material, "racer second-pass texture identity changed");
                 }
             }
             if (archetype.cables.textures) {
@@ -611,6 +625,16 @@ bool VehicleWindowGl50DS::Storage::createMaterials(const VehicleWindowMaterials5
                     resolved.textureIdentity50LA = base->identity;
                     resolved.specularName50LA = map2->name; resolved.specularIdentity50LA = map2->identity;
                     hasSpecularPairs50LA = true;
+                }
+                if (binding.extraPass50PP != VehicleWindowExtraPass50PP::none) {
+                    const auto* extra = input.specularTextures50LA ?
+                        input.specularTextures50LA->asset(binding.extraPassTextureIndex50PP) : nullptr;
+                    if (!extra || !extra->name)
+                        return fail(*diagnostic, VehicleWindowError50DS::material, "second-pass texture disappeared during create");
+                    resolved.extraPassName50PP = extra->name; resolved.extraPassIdentity50PP = extra->identity;
+                    // The additive pass draws with the deferred effects of its racer.
+                    materialSummary[c].hasDeferredEffects = true;
+                    hasExtraPasses50PP = true;
                 }
                 if (binding.mode == VehicleWindowMaterialMode50DS::requiredTexture && !resolved.name) {
                     diagnostic->component = c;
@@ -1351,8 +1375,8 @@ bool VehicleWindowGl50DS::Storage::createSpecularGroups50LA(U archetype, U body,
         const auto selected = racerView(archetype);
         if (!selected.materials) return true;
         if (body >= sourceBodyCount50LA)
-            return fail(*diagnostic, VehicleWindowError50DS::assets, "source pair requires an engine body slot");
-        const U c = body + 1;
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "source pair requires a pod body slot");
+        const U c = body;
         // Three-model pods have no lower scenes, meshes or material offsets.
         // Leave their two absent body slots empty before indexing any of them.
         if (c >= selected.resources->componentCount) return true;
@@ -1363,6 +1387,7 @@ bool VehicleWindowGl50DS::Storage::createSpecularGroups50LA(U archetype, U body,
         for (U m = 0; m < scene.materials.size(); ++m) {
             const auto& policy=selected.materials[selected.materialOffsets[c]+m].policy;
             out.enabled = out.enabled || policy.sourceSpecularPair50LA;
+            out.extraPassUv50PP = out.extraPassUv50PP || policy.extraPass50PP != VehicleWindowExtraPass50PP::none;
             singleModes[m]=policy.sourceSingleDiffuseRgba50LA?1u:0u;
             out.singleDiffuse=out.singleDiffuse||policy.sourceSingleDiffuseRgba50LA;
         }
@@ -1371,10 +1396,10 @@ bool VehicleWindowGl50DS::Storage::createSpecularGroups50LA(U archetype, U body,
                 return fail(*diagnostic,VehicleWindowError50DS::assets,"single diffuse original group/quantized palette inputs rejected");
             hasSingleDiffuse50LA=true;
         }
-        if (!out.enabled && !out.singleDiffuse) return true;
+        if (!out.enabled && !out.singleDiffuse && !out.extraPassUv50PP) return true;
         if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
             return fail(*diagnostic, VehicleWindowError50DS::assets,
-                "source pair requires an actual engine in a three/five-model pod");
+                "source pair requires an actual pod model in a three/five-model pod");
         if (mesh.semanticScene != &scene || scene.lods.empty() ||
             scene.lods[0].surfaces.size() != mesh.spanCount || mesh.spanCount > game::maxVehicleDrawSpans50CM)
             return fail(*diagnostic, VehicleWindowError50DS::assets, "source pair requires exact semantic LOD0 spans");
@@ -1432,7 +1457,7 @@ bool VehicleWindowGl50DS::Storage::createSpecularGroups50LA(U archetype, U body,
 
 bool VehicleWindowGl50DS::Storage::createDiffuseFogBuffers50LA(U archetype,U body,SpecularGeometry50LA& target) noexcept {
         if(!target.singleDiffuse)return true;
-        const auto selected=racerView(archetype);const U c=body+1;
+        const auto selected=racerView(archetype);const U c=body;
         const auto bytes=std::size_t(selected.meshes[c]->vertexCount)*sizeof(float);
         constexpr U attribute=vehicleGlSourceFogAttribute50LA;
         for(U bank=0;bank<2;++bank){
@@ -1453,14 +1478,14 @@ bool VehicleWindowGl50DS::Storage::createDiffuseFogBuffers50LA(U archetype,U bod
 
 bool VehicleWindowGl50DS::Storage::createSpecularUvBuffers50LA(U archetype, U body, SpecularGeometry50LA& target) noexcept {
         if(!createDiffuseFogBuffers50LA(archetype,body,target))return false;
-        if (!target.enabled) return true;
+        if (!target.needsUv50PP()) return true;
         if (body >= sourceBodyCount50LA)
-            return fail(*diagnostic, VehicleWindowError50DS::assets, "map-2 UVs require an engine body slot");
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "map-2 UVs require a pod body slot");
         const auto selected = racerView(archetype);
-        const U c = body + 1;
+        const U c = body;
         if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
             return fail(*diagnostic, VehicleWindowError50DS::assets,
-                "map-2 UVs require an actual engine in a three/five-model pod");
+                "map-2 UVs require an actual pod model in a three/five-model pod");
         constexpr U attribute = vehicleGlSpecularUvAttribute50LA;
         const std::size_t bytes = std::size_t(selected.meshes[c]->vertexCount) * sizeof(std::array<float, 2>);
         for (U bank = 0; bank < 2; ++bank) {
@@ -1503,7 +1528,7 @@ bool VehicleWindowGl50DS::Storage::createRacerSkin50LA(const game::VehicleDrawMe
                 !mesh->vertexCount || mesh->vertexCount > game::maxRigidVertices49S ||
                 !mesh->sourceNodeCount || mesh->sourceNodeCount > game::maxRigidPalette49S ||
                 mesh->spanCount > game::maxVehicleDrawSpans50CM) continue;
-            if (c >= 1 && c <= sourceBodyCount50LA && specular[c - 1].singleDiffuse) continue;
+            if (c < sourceBodyCount50LA && specular[c].singleDiffuse) continue;
             const auto& scene = *mesh->semanticScene;
             if (scene.lods.empty() || scene.lods[0].surfaces.size() != mesh->spanCount) continue;
             const double q = scene.quantization[1];
@@ -1993,6 +2018,15 @@ bool VehicleWindowGl50DS::Storage::createRacerArchetypes(const VehicleWindowRequ
                         material.textureIdentity50LA = base->identity;
                         material.specularName50LA = map2->name; material.specularIdentity50LA = map2->identity;
                         hasSpecularPairs50LA = true;
+                    }
+                    if (binding.extraPass50PP != VehicleWindowExtraPass50PP::none) {
+                        const auto* extra = target.specularTextures50LA ?
+                            target.specularTextures50LA->asset(binding.extraPassTextureIndex50PP) : nullptr;
+                        if (!extra || !extra->name)
+                            return fail(*diagnostic, VehicleWindowError50DS::material, "racer second-pass texture disappeared during create");
+                        material.extraPassName50PP = extra->name; material.extraPassIdentity50PP = extra->identity;
+                        target.materialSummary[c].hasDeferredEffects = true;
+                        hasExtraPasses50PP = true;
                     }
                     if (binding.mode == VehicleWindowMaterialMode50DS::requiredTexture && !material.name)
                         return fail(*diagnostic, VehicleWindowError50DS::material,

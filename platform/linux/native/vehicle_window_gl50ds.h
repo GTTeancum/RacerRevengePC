@@ -81,6 +81,15 @@ enum class VehicleWindowMaterialMode50DS : std::uint8_t {
 };
 // Explicit host material policy; defaults retain the previous opaque path.
 enum class VehicleWindowBlend50DS : std::uint8_t { opaque, sourceAlpha, additive };
+// Second shader pass of the SAME pod material and surface (PSM
+// TotalShaderPasses 2; 29BED0 gives each pass its own collector slot and
+// 24A620 draws every enabled pass). Pod data has one form only: program
+// SpecularMapCompressed (33B8C0) on a DiffuseCompressed pass 1. It maps the
+// component's camera-normal UV (the map-2 basis), colours with the same
+// source diffuse RGBA, F = 255, ZWRITE off, GS ALPHA A=Cs B=0 D=Cd with
+// C = FIX (specularFixed) or C = Ad (specularDestinationAlpha). Lowered from
+// the pass data by the common pod material lowering, never by name.
+enum class VehicleWindowExtraPass50PP : std::uint8_t { none, specularFixed, specularDestinationAlpha };
 struct VehicleWindowMaterialBinding50DS {
     // Original material index is this entry's array index. No pass/slot or
     // texture is inferred. untextured must retain the unresolved sentinel;
@@ -128,6 +137,13 @@ struct VehicleWindowMaterialBinding50DS {
     // zone-ambient .w = 64 that 148B60/148F30 store for every zone. Keyed on
     // geometry data only; identical for every course and material.
     bool sourceColorStreamAbsent = false;
+    // Optional second pass (see VehicleWindowExtraPass50PP). Requires the
+    // single diffuse source route on pass 1. Its texture is an entry of the
+    // same specularTextures50LA bank as map 2. fixScale = FIX/128 (C = FIX).
+    VehicleWindowExtraPass50PP extraPass50PP = VehicleWindowExtraPass50PP::none;
+    std::uint32_t extraPassTextureIndex50PP = assets::unresolvedMaterialTexture50EA;
+    float extraPassFixScale50PP = 0.f;
+    bool extraPassFog50PP = false, extraPassAlphaTest50PP = false;
 };
 struct VehicleWindowComponentMaterials50DS {
     const VehicleWindowMaterialBinding50DS* bindings = nullptr;
@@ -146,7 +162,8 @@ struct VehicleWindowMaterials50DS {
     VehicleWindowComponentMaterials50DS component[game::maxVehicleDrawComponents50CM]{};
     std::uint32_t componentCount = game::defaultVehicleDrawComponents50CM;
     // Independently retained immutable second-map publication. Required exactly
-    // when this material table contains an authenticated source specular pair.
+    // when this material table contains an authenticated source specular pair
+    // or a second pass (extraPass50PP).
     const MaterialTextureGl50EB* specularTextures50LA = nullptr;
 };
 // Explicit native policy, not GS sample parity. Source owners retain the actual
@@ -678,12 +695,12 @@ struct VehicleWindowOpponent50DS {
     // sourcePrelit and nonopaque spans do not participate in this policy.
     NativeRacerLightingPolicy50DS lightingPolicy = NativeRacerLightingPolicy50DS::unchangedHost;
     const game::NativeGcSelectedLightsCandidate* selectedLights = nullptr;
-    // Actual engine-model preparation owners, borrowed only through submit.
-    // Indices 0/1 are primary left/right components 1/2; indices 2/3 are actual
-    // optional lower left/right components 3/4, null for three-model pods.
+    // Actual model preparation owners, borrowed only through submit.
+    // Index N is draw component N: 0 chariot, 1/2 primary left/right, 3/4
+    // actual optional lower left/right (null for three-model pods).
     // Keep each owner paired with its own current/retained successful batch.
     // View-dependent distance/flags refresh even for retained stopped meshes.
-    std::array<game::OriginalRacerModelPackets50LA*, 4> sourceBodyModelPackets50LA{};
+    std::array<game::OriginalRacerModelPackets50LA*, game::maxVehicleDrawComponents50CM> sourceBodyModelPackets50LA{};
     // Original 2261B0/226750 hide every model of a destroyed racer (28C6E0).
     // The entry stays in the fixed field; none of its geometry is drawn.
     bool hiddenDestroyed50PD = false;
@@ -811,10 +828,10 @@ struct VehicleWindowFrame50DS {
     // opponent descriptors supply their corresponding existing model owners.
     const game::OriginalRaceFogFields* sourceBodyFog50LA = nullptr;
     const game::OriginalRacerModelRenderGlobals50LA* sourceBodyGlobals50LA = nullptr;
-    // Indices 0/1 are primary left/right components 1/2; indices 2/3 are actual
-    // optional lower left/right components 3/4, null for three-model pods.
+    // Index N is draw component N: 0 chariot, 1/2 primary left/right, 3/4
+    // actual optional lower left/right (null for three-model pods).
     // Borrow only through submit, paired with each component's successful batch.
-    std::array<game::OriginalRacerModelPackets50LA*, 4> sourceBodyModelPackets50LA{};
+    std::array<game::OriginalRacerModelPackets50LA*, game::maxVehicleDrawComponents50CM> sourceBodyModelPackets50LA{};
     // Actual RC numeric owner, accepted only within its private withDraw
     // borrow and the same Window's canonical material/atlas callback.
     // It lends no caller-authored OriginalGcParticleDraw receipt.

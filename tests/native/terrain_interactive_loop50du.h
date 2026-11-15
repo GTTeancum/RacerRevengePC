@@ -408,6 +408,8 @@ struct Context final {
     nativeBottomLeftModelsType& nativeBottomLeftModels;
     using nativeBottomRightModelsType = std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>;
     nativeBottomRightModelsType& nativeBottomRightModels;
+    using nativeChariotModelsType = std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>;
+    nativeChariotModelsType& nativeChariotModels;
     using drawWorkspaceType = rr::game::VehicleDrawWorkspace50CM;
     drawWorkspaceType& drawWorkspace;
     using sourceFogRenderPhaseType = original_camera_session50KX::Session::GameplayFogRenderPhase;

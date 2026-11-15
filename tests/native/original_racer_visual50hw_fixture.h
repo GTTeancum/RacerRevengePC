@@ -205,11 +205,13 @@ public:
     // references1C4 and shared382B38/383400 owners select the existing native
     // base-map bank. Authenticate this model's own Rig PSG root, source rows,
     // palette and all material ordinals before publishing copied descriptors.
-    // Chariot body lighting and pass1/map1 display remain the existing host policy;
-    // no source-color mask, second-map bank, specular output or flame is introduced.
+    // This binds pass1/map1 only. With original body colours on, the chariot's
+    // single-pass SpecularMapDualCompressed / DiffuseCompressed materials are
+    // then lowered onto the engine routes by bindCanonicalEngineModels.
     // Whole actual materials retain every authored pass/map, including the
-    // extra pod_wndw/12c_4 passes; only pass1/map1 is displayed here.
-    // Call after canonical population and before GPU/window publication.
+    // extra pod_wndw/12c_4 passes; only pass1/map1 is displayed for those.
+    // Call after canonical population, before bindCanonicalEngineModels and
+    // before GPU/window publication.
     void bindCanonicalChariot(const g::OriginalRacerModelSceneOwner50LA& model,
         const a::OriginalStandardModelGeometry50LA& geometry,
         const a::OriginalStandardMaterialReferences50LA& references,
@@ -275,7 +277,10 @@ public:
     // Prepare every actual engine before publishing one load-once map2 bank.
     // Cold source order remains right, left, optional lower-right, lower-left.
     // Each retains its own source identity, palette, bounds and component slots.
+    // The optional chariot input (already bound by bindCanonicalChariot) is
+    // lowered last onto the same routes, keyed on each material's program.
     void bindCanonicalEngineModels(const std::array<CanonicalEngineModelInput50LA,4>& models,
+        const CanonicalEngineModelInput50LA& chariot,
         const a::OriginalStandardMaterialDomain50LA& domain,
         bool useOriginalBodyColors50LA=false);
     bool canonicalRightBound()const noexcept{return canonicalRightBound_;}
@@ -299,6 +304,9 @@ public:
     }
     bool canonicalEngineSourceColors50LA(const g::NativeGcSelectedLightsCandidate& lights,
         std::uint32_t actualRacerSlot,g::VehicleDrawBatchSourceColors50LA& output)const noexcept;
+    // True once the chariot's own pair/single materials are on the source routes;
+    // the caller then supplies the chariot's own model packets (component 0).
+    bool hasCanonicalChariotBodyColors50LA()const noexcept {return !canonicalChariotBodyColorModes50LA_.empty();}
     rr::platform::VehicleWindowMaterials50DS windowMaterials(const rr::platform::MaterialTextureGl50EB* gpu,
         const rr::platform::MaterialTextureGl50EB* specularGpu=nullptr)const;
 private:
@@ -314,6 +322,7 @@ private:
     std::string chariotPsgMember_,chariotPsgSha256_;
     g::SceneNodeIndex49P chariotModelIndex_=g::SceneNodeIndex49P::none;
     bool canonicalChariotBound_=false;
+    std::vector<std::uint8_t> canonicalChariotBodyColorModes50LA_;
     std::string leftPsgMember_,leftPsgSha256_;
     g::SceneNodeIndex49P leftModelIndex_=g::SceneNodeIndex49P::none;
     bool canonicalLeftBound_=false;

@@ -202,7 +202,7 @@ bool VehicleWindowGl50DS::Storage::retainedMesh(const game::VehicleDrawBatch50CO
                 !part.sourceColorOwner50LA || !part.sourceColorPublication50LA ||
                 !part.sourceColorGraphicsSequence50LA)
                 return fail(d, VehicleWindowError50DS::frame,
-                    "source diffuse requires the actual engine mask and light identity in a three/five-model pod");
+                    "source diffuse requires the actual component mask and light identity in a three/five-model pod");
             for (U m = 0; m < count; ++m) {
                 d.material = m;
                 const auto& binding = selected.materials[selected.materialOffsets[c] + m].policy;
@@ -529,21 +529,21 @@ bool VehicleWindowGl50DS::Storage::prepareSpecularFrame50LA(const game::VehicleD
             if (!retainedMesh(batch, d, archetype, &normalReceipts[slot])) return false;
             const auto& models = slot ? frame.opponents[slot - 1].sourceBodyModelPackets50LA :
                 frame.sourceBodyModelPackets50LA;
-            // These four fixed slots preserve each component's own model,
+            // These five fixed slots preserve each component's own model,
             // semantic normals/root/bounds and stopped-geometry preparation.
             for (U bodySlot = 0; bodySlot < sourceBodyCount50LA; ++bodySlot) {
                 frameSpecularSecond50LA[slot][bodySlot] = false;
                 auto* model = models[bodySlot];
                 frameDiffuseSelected50LA[slot][bodySlot]=true;
-                if (!selected.specular[bodySlot].enabled && !selected.specular[bodySlot].singleDiffuse) {
+                if (!selected.specular[bodySlot].needsUv50PP() && !selected.specular[bodySlot].singleDiffuse) {
                     if (model) return fail(d, VehicleWindowError50DS::frame,
                         "source model view owner supplied without paired body");
                     continue;
                 }
-                const U c = bodySlot + 1;
+                const U c = bodySlot;
                 if (!sourceBodyComponent50LA(c, batch.componentCount))
                     return fail(d, VehicleWindowError50DS::frame,
-                        "source body slot has no actual engine in this three/five-model batch");
+                        "source body slot has no actual model in this three/five-model batch");
                 game::OriginalRacerModelDistanceFlags50LA modelView{};
                 const auto& body = batch.component[c];
                 if (!model || !body.sourceSpecularGeometry50LA ||
@@ -569,7 +569,8 @@ bool VehicleWindowGl50DS::Storage::prepareSpecularFrame50LA(const game::VehicleD
                             return fail(d,VehicleWindowError50DS::frame,"single diffuse original palette fog operands rejected");
                     }else std::fill_n(fog,body.vertexCount,255.f);
                 }
-                if(!selected.specular[bodySlot].enabled)continue;
+                // A second SpecularMapCompressed pass uses the same UV stream.
+                if(!selected.specular[bodySlot].needsUv50PP())continue;
                 game::OriginalRacerSpecularResult50LA result{};
                 if (body.skin) {
                     if (!game::prepareOriginalRacerSpecularCoefficients50LA(*selected.meshes[c], body, actual, modelView,
@@ -603,8 +604,8 @@ bool VehicleWindowGl50DS::Storage::uploadSpecularUvs50LA(std::uint8_t bank, U sl
         const auto selected = racerView(archetype);
         for (U bodySlot = 0; bodySlot < sourceBodyCount50LA; ++bodySlot) {
             const auto& body = selected.specular[bodySlot];
-            if (!body.enabled && !body.singleDiffuse) continue;
-            const U c = bodySlot + 1, uvSlot = slot * sourceBodyCount50LA + bodySlot;
+            if (!body.needsUv50PP() && !body.singleDiffuse) continue;
+            const U c = bodySlot, uvSlot = slot * sourceBodyCount50LA + bodySlot;
             if(body.singleDiffuse){
                 game::OriginalRacerDiffuseCameraSnapshot50LA current;
                 if(!frameDiffuseEndpoint50LA||!frameDiffuseEndpoint50LA->read(current)||
@@ -617,19 +618,21 @@ bool VehicleWindowGl50DS::Storage::uploadSpecularUvs50LA(std::uint8_t bank, U sl
                     frameDiffuseFog50LA.get()+uvSlot*game::maxRigidVertices49S);
                 if(!check("upload actual current single diffuse fog bytes"))return false;
             }
-            if(!body.enabled)continue;
+            if(!body.needsUv50PP())continue;
             if (slot <= frameOpponentCount && c < (slot ? frameOpponentBatches[slot - 1] : framePlayerBatch).componentCount &&
                 (slot ? frameOpponentBatches[slot - 1] : framePlayerBatch).component[c].skin) continue;
             if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
                 return fail(*diagnostic, VehicleWindowError50DS::assets,
-                    "source map-2 upload has no actual engine in this three/five-model pod");
+                    "source map-2 upload has no actual model in this three/five-model pod");
             drawGl.bindBuffer(arrayBuffer, body.buffers[bank]);
             // CPU preparation still admits every current-camera UV. The same
             // original distance flag prevents all map-2 draws for this body;
             // other passes' results do not depend on this attribute. Every
             // map-2-enabled body uploads its complete stream, even after a skip,
             // bank switch, shared-archetype draw or failed prior submission.
-            if (frameSpecularSecond50LA[slot][bodySlot])
+            // 33B8C0 (second pod pass) never reads the 0x200 map-2 distance
+            // bit, so a body with such a pass needs its UVs at every distance.
+            if (frameSpecularSecond50LA[slot][bodySlot] || body.extraPassUv50PP)
                 drawGl.bufferSubData(arrayBuffer, 0,
                     std::intptr_t(selected.meshes[c]->vertexCount) * sizeof(std::array<float, 2>),
                     frameSpecularUvs50LA.get() + uvSlot * game::maxRigidVertices49S);
@@ -1369,7 +1372,10 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
 bool VehicleWindowGl50DS::Storage::applyPodMaterial(const Material& material, bool suppress, const float* overrideUv,
         const game::original_racer_lighting50KM::LightMatrices* selectedLights) noexcept {
         const bool sourceDiffuse = material.policy.sourceDiffuseCompressed50LA;
-        if (sourceDiffuse && (!selectedLights || suppress || !material.name))
+        // A non-opaque single diffuse pass (pod canopy pass 1) still receives the
+        // player path's discard-only first draw; the shader discards first.
+        if (sourceDiffuse && (!selectedLights || !material.name ||
+            (suppress && material.policy.blend == VehicleWindowBlend50DS::opaque)))
             return fail(*diagnostic, VehicleWindowError50DS::material,
                 "source diffuse requires the authenticated unsuppressed textured body draw");
         configureBlend(material.policy);
@@ -1394,6 +1400,11 @@ bool VehicleWindowGl50DS::Storage::applyPodMaterial(const Material& material, bo
             // Source color30 is AARRGGBB; 13EB90 reverses it for GS FOGCOL.
             gl.uniform4f(u.sourceSingleFogColor50LA,float((color>>16)&255u),float((color>>8)&255u),float(color&255u),0.f);
         }
+        // Byte/128 alpha for a source-alpha single pass, or for the alpha a
+        // following C = Ad second pass reads. Every other pod material: 0.
+        gl.uniform1i(u.sourcePairFixedBlend50LA,material.policy.sourceSingleDiffuseRgba50LA&&
+            (material.policy.blend==VehicleWindowBlend50DS::sourceAlpha||
+             material.policy.extraPass50PP==VehicleWindowExtraPass50PP::specularDestinationAlpha)?1:0);
         // Retain source-alpha/additive effect appearance and explicit emissive
         // materials. Generated source body RGB has already been lit on CPU;
         // only the remaining opaque pod surfaces use host illumination.
@@ -1456,19 +1467,25 @@ bool VehicleWindowGl50DS::Storage::drawSpecularSpanRoute50LA(std::uint8_t bank, 
         const auto selected = racerView(archetype);
         const Material* material = selected.materials ?
             &selected.materials[selected.materialOffsets[component] + span.material_index] : nullptr;
-        if(component>=1&&component<=sourceBodyCount50LA&&selected.specular[component-1].singleDiffuse&&
-           !frameDiffuseSelected50LA[slot][component-1])return true;
+        if(component<sourceBodyCount50LA&&selected.specular[component].singleDiffuse&&
+           !frameDiffuseSelected50LA[slot][component])return true;
         if (!material || !material->policy.sourceSpecularPair50LA) {
             VehicleGlTimingScope50CV timing(request.enableGameplayDisplayWallTiming&&slot==0&&archetype==0?
                 observePlayerTiming:nullptr,this,VehicleGlTimingPhase50CV::unpairedSpan,component);
             drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
-            return check("draw unchanged original unpaired source span");
+            if (!check("draw unchanged original unpaired source span")) return false;
+            // Pass 2 of an opaque two-pass material follows its own pass 1 over
+            // the same surface (consecutive collector slots in the original).
+            if (material && material->policy.blend == VehicleWindowBlend50DS::opaque &&
+                material->policy.extraPass50PP != VehicleWindowExtraPass50PP::none)
+                return drawPodExtraPass50PP(*material, slot, archetype, component, ordinal, span);
+            return true;
         }
         if (!sourceBodyComponent50LA(component, selected.resources->componentCount))
             return fail(*diagnostic, VehicleWindowError50DS::assets,
-                "body pair requires an actual engine in a three/five-model pod");
-        const U bodySlot = component - 1;
+                "body pair requires an actual model in a three/five-model pod");
+        const U bodySlot = component;
         const auto& groups = selected.specular[bodySlot];
         if (!groups.enabled || ordinal >= game::maxVehicleDrawSpans50CM ||
             !groups.spanCount[ordinal] || !sourcePairColors50LA[bank] || !gl.textureBarrier)
@@ -1762,8 +1779,8 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
         for (U c = 0; c < selected.resources->componentCount; ++c) {
             // Source selected191 suppresses the complete model, including its
             // deferred flame/effect materials, not just the opaque body maps.
-            if(c>0&&c<=sourceBodyCount50LA&&selected.specular[c-1].singleDiffuse&&
-               !frameDiffuseSelected50LA[slot][c-1])continue;
+            if(c<sourceBodyCount50LA&&selected.specular[c].singleDiffuse&&
+               !frameDiffuseSelected50LA[slot][c])continue;
             bool bound = false;
             for (U i = 0; i < selected.meshes[c]->spanCount; ++i) {
                 const auto& span = selected.meshes[c]->spans[i];
@@ -1781,7 +1798,9 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
                 const float* uv = opponent < maxVehicleWindowOpponents50DS ?
                     opponentMaterialUvs[opponent * opponentMaterialStride +
                         selected.materialOffsets[c] + span.material_index].value : nullptr;
-                if (!applyPodMaterial(material, false, uv)) return false;
+                const auto* candidate = opponent < maxVehicleWindowOpponents50DS ?
+                    frameOpponentLights[opponent] : framePlayerLights;
+                if (!applyPodMaterial(material, false, uv, candidate ? candidate->component(c) : nullptr)) return false;
                 if (part) selectRacerSkinSpan50LA(*part, span.material_index);
                 drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
@@ -1789,9 +1808,84 @@ bool VehicleWindowGl50DS::Storage::drawTransparentPod(std::uint8_t bank, U oppon
                 ++diagnostic->transparentPodDraws;
                 diagnostic->transparentPodIndices += span.index_count;
             }
+            // Second passes of this model's non-opaque two-pass materials, after
+            // all their first passes (pass 1 and pass 2 own consecutive collector
+            // slots, drained slot by slot). STAND-IN order: the original drains
+            // every racer's pass 1 before any racer's pass 2 (Mat_Stbl order);
+            // here each racer's pair stays together, as its effects already do.
+            for (U i = 0; bound && i < selected.meshes[c]->spanCount; ++i) {
+                const auto& span = selected.meshes[c]->spans[i];
+                const auto& material = selected.materials[selected.materialOffsets[c] + span.material_index];
+                if (material.policy.blend == VehicleWindowBlend50DS::opaque ||
+                    material.policy.extraPass50PP == VehicleWindowExtraPass50PP::none) continue;
+                const game::VehicleDrawSubmission50CM* part = opponent < maxVehicleWindowOpponents50DS ?
+                    &frameOpponentBatches[opponent].component[c] :
+                    c < framePlayerBatch.componentCount ? &framePlayerBatch.component[c] : nullptr;
+                const float* uv = opponent < maxVehicleWindowOpponents50DS ?
+                    opponentMaterialUvs[opponent * opponentMaterialStride +
+                        selected.materialOffsets[c] + span.material_index].value : nullptr;
+                const auto* candidate = opponent < maxVehicleWindowOpponents50DS ?
+                    frameOpponentLights[opponent] : framePlayerLights;
+                if (!applyPodMaterial(material, false, uv, candidate ? candidate->component(c) : nullptr)) return false;
+                if (part) selectRacerSkinSpan50LA(*part, span.material_index);
+                if (!drawPodExtraPass50PP(material, slot, opponent < maxVehicleWindowOpponents50DS ?
+                        frameOpponentArchetypes[opponent] : 0, c, i, span)) return false;
+            }
         }
         resetPodState();
         return check("restore opaque state after deferred pod effects");
+    }
+
+bool VehicleWindowGl50DS::Storage::drawPodExtraPass50PP(const Material& material, U slot, U archetype,
+        U component, U ordinal, const assets::SceneSpan48D& span) noexcept {
+        // Pass 2 = SpecularMapCompressed 33B8C0 over the SAME vertices pass 1
+        // just drew: the camera-normal UV stream (sourceSpecularUv50LA), the
+        // same source RGBA (sourceColor), MODULATE byte/128, F = 255 (GS fog
+        // with FGE scales RGB by 255/256), ZWRITE off, GS depth GEQUAL = GL
+        // LEQUAL on identical positions. GS ALPHA from the pass data:
+        //   C = FIX: Cd + ((Cs * FIX) >> 7), byte exact under ONE,ONE;
+        //   C = Ad : Cd + Cs * Ad / 128 with pass 1's alpha stored in byte/128
+        //            scale, the fixed pair map-2 blend (DST_ALPHA, ONE).
+        // GS writes the pass's own As; alpha factors ONE, ZERO do the same.
+        const auto& policy = material.policy;
+        const bool fixed = policy.extraPass50PP == VehicleWindowExtraPass50PP::specularFixed;
+        if (policy.extraPass50PP == VehicleWindowExtraPass50PP::none || !material.extraPassName50PP ||
+            !policy.sourceSingleDiffuseRgba50LA || component >= sourceBodyCount50LA ||
+            !racerView(archetype).specular[component].extraPassUv50PP || !gl.blendFuncSeparate)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "pod second pass lost its source UV/texture resources");
+        // Same rule as the pair: stored byte/128 alpha represents Ad up to 127.
+        if (!fixed && !specularSpanAlphaAdmitted50LA(slot, archetype, component, ordinal, span))
+            ++podExtraPassAlphaSaturatedSpans50PP; // STAND-IN: saturates instead of an exact bridge
+        const auto& u = shader->uniforms();
+        unbindSpecularFeedback50LA();
+        gl.bindTexture(texture2D, material.extraPassName50PP);
+        gl.uniform1i(u.useSourceDiffuseCompressed50LA, 1);
+        gl.uniform1i(u.sourceSingleDiffuseRgba50LA, 0);
+        gl.uniform1i(u.sourcePairPass50LA, 2);
+        gl.uniform1i(u.sourcePairFog50LA, policy.extraPassFog50PP ? 1 : 0);
+        gl.uniform1i(u.sourcePairAlphaTest50LA, policy.extraPassAlphaTest50PP ? 1 : 0);
+        gl.uniform1i(u.sourcePairFixedBlend50LA, fixed ? 2 : 1);
+        gl.uniform1f(u.alphaScale, fixed ? policy.extraPassFixScale50PP : 1.f);
+        gl.uniform1i(u.suppressDraw, 0);
+        gl.enable(0x0B71); gl.depthFunc(0x0203); gl.depthMask(0);
+        gl.enable(0x0BE2); gl.blendEquation(0x8006);
+        if (fixed) gl.blendFuncSeparate(1, 1, 1, 0);           // RGB: ONE, ONE; A: ONE, ZERO
+        else gl.blendFuncSeparate(0x0304, 1, 1, 0);            // RGB: DST_ALPHA, ONE; A: ONE, ZERO
+        drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
+            reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
+        const bool drawn = check("draw original second pod pass");
+        if (drawn) ++podExtraPassDraws50PP;
+        // Put pass 1's state back: consecutive spans of the same material may
+        // be drawn without another material bind (player 50CV path).
+        gl.uniform1i(u.sourcePairPass50LA, 0); gl.uniform1i(u.sourcePairFog50LA, 0);
+        gl.uniform1i(u.sourcePairAlphaTest50LA, 0);
+        gl.uniform1i(u.sourceSingleDiffuseRgba50LA, 1);
+        gl.uniform1i(u.sourcePairFixedBlend50LA, policy.blend == VehicleWindowBlend50DS::sourceAlpha ||
+            policy.extraPass50PP == VehicleWindowExtraPass50PP::specularDestinationAlpha ? 1 : 0);
+        gl.uniform1f(u.alphaScale, policy.alphaScale);
+        configureBlend(policy);
+        gl.bindTexture(texture2D, material.name);
+        return drawn && check("restore first pod pass state");
     }
 
 bool VehicleWindowGl50DS::Storage::bindRacerSkin50LA(const game::VehicleDrawSubmission50CM& part,
@@ -1814,8 +1908,8 @@ bool VehicleWindowGl50DS::Storage::bindRacerSkin50LA(const game::VehicleDrawSubm
         gl.uniform3fv(u.skinLightDirections50LA, 3, skin.lightDirections[0].data());
         gl.uniform4fv(u.skinColorRows50LA, 4, skin.colorRows[0].data());
         float specular[6]{};
-        if (component >= 1 && component <= sourceBodyCount50LA && slot <= maxVehicleWindowOpponents50DS) {
-            const auto& axes = frameSpecularCoefficients50LA[slot][component - 1].cameraNormalAxes;
+        if (component < sourceBodyCount50LA && slot <= maxVehicleWindowOpponents50DS) {
+            const auto& axes = frameSpecularCoefficients50LA[slot][component].cameraNormalAxes;
             for (U axis = 0; axis < 3; ++axis) { specular[axis * 2] = axes[axis][0]; specular[axis * 2 + 1] = axes[axis][1]; }
         }
         gl.uniform2fv(u.skinSpecular50LA, 3, specular);
@@ -2060,11 +2154,11 @@ bool VehicleWindowGl50DS::Storage::checkGpuSkin50LA(std::uint8_t bank) noexcept 
                 gl.uniform3fv(k.lights, 3, skin.lightDirections[0].data());
                 gl.uniform4fv(k.colors, 4, skin.colorRows[0].data());
                 float specular[6]{};
-                const bool body = c >= 1 && c <= sourceBodyCount50LA;
+                const bool body = c < sourceBodyCount50LA;
                 if (body)
                     for (U axis = 0; axis < 3; ++axis) {
-                        specular[axis * 2] = frameSpecularCoefficients50LA[slot][c - 1].cameraNormalAxes[axis][0];
-                        specular[axis * 2 + 1] = frameSpecularCoefficients50LA[slot][c - 1].cameraNormalAxes[axis][1];
+                        specular[axis * 2] = frameSpecularCoefficients50LA[slot][c].cameraNormalAxes[axis][0];
+                        specular[axis * 2 + 1] = frameSpecularCoefficients50LA[slot][c].cameraNormalAxes[axis][1];
                     }
                 gl.uniform2fv(k.specular, 3, specular);
                 drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
@@ -2082,9 +2176,9 @@ bool VehicleWindowGl50DS::Storage::checkGpuSkin50LA(std::uint8_t bank) noexcept 
                 gl.getBufferSubData(transformFeedbackBuffer50LA, 0,
                     static_cast<std::intptr_t>(std::size_t(part.vertexCount) * gpuSkinCheckFloats50LA * sizeof(float)),
                     captured.data());
-                const std::array<float, 2>* map2Reference = body && selected.specular[c - 1].enabled &&
+                const std::array<float, 2>* map2Reference = body && selected.specular[c].enabled &&
                     frameSpecularUvs50LA ? frameSpecularUvs50LA.get() +
-                    (slot * sourceBodyCount50LA + c - 1) * game::maxRigidVertices49S : nullptr;
+                    (slot * sourceBodyCount50LA + c) * game::maxRigidVertices49S : nullptr;
                 ++parts;
                 for (U v = 0; v < part.vertexCount; ++v) {
                     const float* g = captured.data() + std::size_t(v) * gpuSkinCheckFloats50LA;
@@ -2155,6 +2249,7 @@ bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexc
         s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;s.coveragePairBatchedGroups=0;
         s.coveragePairUnproven={};s.coveragePairUnprovenOperands=s.coveragePairBreakRegion=0;
         s.coveragePairBreakCap=s.coveragePairBreakEnd=0;s.coveragePairExactFallbackSpans=0;
+        s.podExtraPassDraws50PP=s.podExtraPassAlphaSaturatedSpans50PP=0;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
         s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
@@ -2315,6 +2410,8 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
             std::fprintf(stderr,"native_fixed_specular enabled=%u exact_fallback_spans=%llu coverage_fixed=%u coverage_fixed_spans=%llu\n",
                 s.fixedSpecularBlend50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairExactFallbackSpans),
                 s.coverageFixedSpecular50LA?1u:0u,static_cast<unsigned long long>(s.coveragePairFixedSpans));
+        // Second pod passes are counted through the transparent racers below;
+        // the line is printed after them (native_pod_extra_pass).
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;
@@ -2331,15 +2428,24 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // The shared inactive VBOs currently hold the last opaque opponent.
         // Restore the player's independent stream before its deferred effects.
         if (s.frameOpponentCount && s.materials && !s.uploadRacer(bank, s.framePlayerBatch, 0, true)) return false;
+        // Source fog and camera-normal UV streams also hold the last opaque
+        // opponent; effect spans on the source routes (canopy passes) read them.
+        const bool sourceEffectStreams = s.materials && (s.hasExtraPasses50PP || s.hasSingleDiffuse50LA);
+        if (sourceEffectStreams && s.frameOpponentCount && !s.uploadSpecularUvs50LA(bank, 0, 0)) return false;
         if (!s.drawTransparentPod(bank)) return false;
         if (s.materials) for (U i = 0; i < s.frameOpponentCount; ++i) {
             s.diagnostic->opponentIndex = i;
             if (s.frameOpponentHidden[i]) continue;
             if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i], true) ||
+                (sourceEffectStreams && !s.uploadSpecularUvs50LA(bank, i + 1, s.frameOpponentArchetypes[i])) ||
                 !s.drawTransparentPod(bank, i)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
+        if(s.request.enableGameplayDisplayWallTiming&&s.hasExtraPasses50PP)
+            std::fprintf(stderr,"native_pod_extra_pass draws=%llu alpha_saturated_spans=%llu\n",
+                static_cast<unsigned long long>(s.podExtraPassDraws50PP),
+                static_cast<unsigned long long>(s.podExtraPassAlphaSaturatedSpans50PP));
         s.traceRaStage("transparent_racers",stageStart);
         // Original water: after the opaque world and pods, before Binder and
         // particles. PENDING emulator check W-E1 (exact render-list slot).
