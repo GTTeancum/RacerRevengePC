@@ -8,6 +8,7 @@
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_water_surface50ws.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/native_chariot_rigid_mount50rm.h"
 #include "original_manager_fields.h"
 #include <functional>
 // Complete original lexical suffix; caller prefix outlives every owner below.
@@ -2422,6 +2423,19 @@ SessionExit50DU Context::run() {
    std::cerr<<"racer_wreck_speed50 slot="<<slot<<" pod="<<racerRigs[slot]->podId<<" key="<<w.keyPresent
        <<" authored="<<std::bit_cast<float>(w.authoredBits)<<" speed50="<<std::bit_cast<float>(w.speed50Bits)
        <<" bits=0x"<<std::hex<<w.speed50Bits<<std::dec<<'\n';
+  }
+  // PC EXTENSION, NOT ORIGINAL (flagged): [Pod Animation] ChariotRigidMount,
+  // asked of every racer's own PHY with the 158920 rule (absent = 0 = the
+  // original chariot). The one place that fills the table.
+  rr::game::resetNativeChariotRigidMounts50RM();
+  for(std::size_t slot=0;slot<racerBank.count();++slot){
+   require50DU(slot<racerRigs.size()&&racerRigs[slot],"chariot rigid mount: racer PHY rig absent");
+   require50DU(rr::game::loadNativeChariotRigidMount50RM(slot,racerRigs[slot]->phy),
+       "chariot rigid mount: PHY [Pod Animation] ChariotRigidMount rejected");
+   const auto& mount=rr::game::nativeChariotRigidMounts50RM[slot];
+   std::cerr<<"chariot_rigid_mount slot="<<slot<<" pod="<<racerRigs[slot]->podId<<" key="<<mount.keyPresent
+       <<" value="<<mount.authored<<" forced="<<mount.forced<<" active="<<mount.active
+       <<" enabled="<<rr::game::chariotRigidMountSwitches50RM().enabled<<'\n';
   }
   racerBank.visit(0,[&](){
    const auto& j=s.bodies.joint;

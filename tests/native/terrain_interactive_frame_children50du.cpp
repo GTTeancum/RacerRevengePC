@@ -11,6 +11,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/native_chariot_rigid_mount50rm.h"
 #include "../../src/game/packed_vehicle_tail50r.h"
 #include "../../src/game/native_test_undertrack50ut.h"
 #include "../../src/game/native_zero_gravity50zg.h"
@@ -443,6 +444,13 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      return boostAccepted;},"native boost controller");
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
+ // PC EXTENSION, NOT ORIGINAL (flagged): [Pod Animation] ChariotRigidMount.
+ // Every racer, human and AI, one path; does nothing unless that racer's own
+ // PHY asks for it (no stock PHY does) and the racer is intact (state40==0).
+ // Runs after the unchanged 21A660; a hold republishes the stage's own scene
+ // mirrors. See src/game/native_chariot_rigid_mount50rm.h.
+ if(rr::game::afterChariotLifecycle50RM(actualRacerSlot,s,x.bindings,x.parameters.activation,
+     x.secondaryInputs.targetRelative2F0)==rr::game::ChariotRigidMountResult50RM::held)f::project(s,x.bindings);
  if(nativeSelectedLights){
   auto& sequence=gcGraphicsSequence[actualRacerSlot];
   require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"GC graphics publication overflow");
