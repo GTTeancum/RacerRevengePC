@@ -2415,9 +2415,11 @@ std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
     std::ifstream input(path,std::ios::binary|std::ios::ate);
     if(!input)throw std::runtime_error("cannot open original UI archive: "+path.string());
     const std::streamoff bytes=input.tellg();
-    if(bytes<0 || static_cast<std::uint64_t>(bytes)!=identity->bytes)
-        throw std::runtime_error("original UI archive size mismatch: "+path.string());
-    std::vector<std::uint8_t> raw(identity->bytes);
+    // The stock size is a receipt (the archive owner logs it); the read is
+    // bounded by the shared UI decode capacity the owner decodes within.
+    if(bytes<=0 || static_cast<std::uint64_t>(bytes)>rr::assets::DecodeLimits48C{}.resource_file_bytes)
+        throw std::runtime_error("original UI archive outside the shared UI capacity: "+path.string());
+    std::vector<std::uint8_t> raw(static_cast<std::size_t>(bytes));
     input.seekg(0);
     input.read(reinterpret_cast<char*>(raw.data()),static_cast<std::streamsize>(raw.size()));
     if(!input)throw std::runtime_error("cannot read complete original UI archive: "+path.string());

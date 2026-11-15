@@ -1,8 +1,13 @@
 // NEW 2026-10-10 reconstruction, not recovered original lost source.
 #include "original_ui_archive50kg.h"
 #include <array>
+#include <atomic>
 #include <cstring>
+#include <deque>
+#include <iostream>
+#include <mutex>
 #include <new>
+#include <string>
 #include <utility>
 
 namespace rr::assets {
@@ -90,6 +95,59 @@ HashResult hashMatches(const std::uint8_t* data, std::size_t size,
             return HashResult::mismatch;
     return HashResult::match;
 }
+// Lower-case hex SHA-256 of a buffer (same block function as hashMatches).
+std::string sha256Hex(const std::uint8_t* data, std::size_t size) {
+    std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+        0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
+    std::size_t at = 0;
+    for (; size - at >= 64; at += 64) shaBlock(data + at, h);
+    std::array<std::uint8_t, 128> tail{};
+    const std::size_t remainder = size - at;
+    if (remainder) std::memcpy(tail.data(), data + at, remainder);
+    tail[remainder] = 0x80;
+    const std::size_t padded = remainder < 56 ? 64 : 128;
+    const std::uint64_t bits = static_cast<std::uint64_t>(size) * 8u;
+    for (unsigned i = 0; i < 8; ++i)
+        tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
+    shaBlock(tail.data(), h);
+    if (padded == 128) shaBlock(tail.data() + 64, h);
+    constexpr char hex[] = "0123456789abcdef";
+    std::string out(64, '0');
+    for (unsigned i = 0; i < 64; ++i) out[i] = hex[(h[i / 8] >> ((7u - i % 8) * 4)) & 15u];
+    return out;
+}
+// One rule for every UI and LOC archive (the original reads whatever UI\*.RES
+// and LOC.RES the disc holds: no checksum, byte size or member count gate).
+// The catalog's archive and member rows are RECEIPTS. A stock archive keeps
+// the exact catalog path below unchanged. Any other archive is decoded within
+// the shared capacity and each member whose bytes differ from the catalog gets
+// ONE process-wide identity row built from the bytes actually loaded; the
+// member lookup returns that row, so every consumer that compares identity
+// pointers, sizes or digests sees one consistent object. Rows are host memory,
+// indexed like memberCatalog (bounds-checked), never removed or changed.
+// FLAG stand-ins: (1) member NAMES and ORDER must still equal the catalog,
+// because ~80 port consumers address UI members by catalog ordinal where the
+// original looks them up by name; (2) the archive identity object (and so the
+// provider's mount label) stays the catalog's, the stand-in the course commit
+// retired for course mounts; mount checks stay self-consistent because the
+// provider takes its label from that same object.
+struct AdmittedMemberRegistry {
+    std::mutex lock;                                 // serialises publication only
+    std::deque<OriginalUiMemberIdentity50KG> rows;   // stable addresses
+    std::deque<std::string> text;                    // owns the digests
+    // Published once per index (release); readers load without the lock.
+    std::array<std::atomic<const OriginalUiMemberIdentity50KG*>,
+        sizeof(memberCatalog) / sizeof(memberCatalog[0])> byCatalog{};
+};
+AdmittedMemberRegistry& admittedRegistry() {
+    static AdmittedMemberRegistry registry;
+    return registry;
+}
+const OriginalUiMemberIdentity50KG* admittedRow(std::size_t catalogIndex) noexcept {
+    auto& r = admittedRegistry();
+    if (catalogIndex >= r.byCatalog.size()) return nullptr;
+    return r.byCatalog[catalogIndex].load(std::memory_order_acquire);
+}
 unsigned char fold(unsigned char c) noexcept {
     if (c == '\\') return '/';
     return c >= 'A' && c <= 'Z' ? static_cast<unsigned char>(c + ('a' - 'A')) : c;
@@ -169,6 +227,7 @@ const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
     OriginalUiArchiveId50KG id, std::size_t ordinal) noexcept {
     const auto* archive = originalUiArchiveIdentity50KG(id);
     if (!archive || ordinal >= archive->memberCount) return nullptr;
+    if (const auto* admitted = admittedRow(archive->firstMember + ordinal)) return admitted;
     return &memberCatalog[archive->firstMember + ordinal];
 }
 struct OriginalUiArchive50KG::Storage {
@@ -200,23 +259,52 @@ bool OriginalUiArchive50KG::loadImpl(OriginalUiArchiveId50KG id,
     if (!expected) { diagnostic.status = Status::unknownArchive; return false; }
     try {
         if (isCancelled(hooks)) { diagnostic.status = Status::cancelled; return false; }
-        if (input.size() != expected->bytes) { diagnostic.status = Status::archiveIdentity; return false; }
-        const auto archiveHash = hashMatches(input.data(), input.size(), expected->sha256, hooks);
-        if (archiveHash != HashResult::match) {
-            diagnostic.status = archiveHash == HashResult::cancelled ? Status::cancelled : Status::archiveIdentity;
-            return false;
+        // Archive identity is a receipt: stock bytes take the exact catalog
+        // path; any other archive is admitted by its own structure below.
+        bool stock = input.size() == expected->bytes;
+        if (stock) {
+            const auto archiveHash = hashMatches(input.data(), input.size(), expected->sha256, hooks);
+            if (archiveHash == HashResult::cancelled) { diagnostic.status = Status::cancelled; return false; }
+            stock = archiveHash == HashResult::match;
         }
-        // Existing decoder hard limits remain in force (128 MiB decoded maximum).
+        if (!stock) {
+            try { std::cerr << "ui_archive_identity archive=" << expected->discPath << " bytes=" << input.size()
+                            << " stock=0\n"; } catch (...) {}
+        }
+        // Shared UI decode capacity (DecodeLimits48C defaults: 64 MiB file,
+        // 128 MiB decoded). A stock archive keeps its exact stock limits.
         DecodeLimits48C limits;
-        limits.resource_file_bytes = expected->bytes;
+        if (stock) limits.resource_file_bytes = expected->bytes;
         limits.resource_entries = static_cast<std::uint32_t>(expected->memberCount);
         ResArchive48C parsed;
         if (!decodeResource48C(input, parsed, diagnostic.resource, hooks, limits)) {
             diagnostic.status = diagnostic.resource.kind == DecodeKind48C::cancelled ? Status::cancelled : Status::resource;
             return false;
         }
+        // FLAG stand-in: the member count and names/order are the catalog's.
         if (parsed.entries.size() != expected->memberCount) { diagnostic.status = Status::memberTable; return false; }
-        for (std::size_t i = 0; i < expected->memberCount; ++i) {
+        // Non-stock: every member's own extent and digest; changed rows are
+        // staged here and published only after the whole archive is admitted.
+        struct Staged { std::size_t index; std::uint32_t offset, bytes; std::string sha; };
+        std::vector<Staged> staged;
+        for (std::size_t i = 0; !stock && i < expected->memberCount; ++i) {
+            diagnostic.member = i;
+            if (isCancelled(hooks)) { diagnostic.status = Status::cancelled; return false; }
+            const auto& actual = parsed.entries[i];
+            const auto& member = memberCatalog[expected->firstMember + i];
+            if (actual.name != member.name || actual.logical_offset > parsed.decoded.size() ||
+                actual.bytes > parsed.decoded.size() - actual.logical_offset) {
+                diagnostic.status = Status::memberTable; return false;
+            }
+            const auto* data = parsed.decoded.data() + actual.logical_offset;
+            if (actual.logical_offset == member.logicalOffset && actual.bytes == member.bytes) {
+                const auto result = hashMatches(data, actual.bytes, member.sha256, hooks);
+                if (result == HashResult::cancelled) { diagnostic.status = Status::cancelled; return false; }
+                if (result == HashResult::match && !admittedRow(expected->firstMember + i)) continue;
+            }
+            staged.push_back({expected->firstMember + i, actual.logical_offset, actual.bytes, sha256Hex(data, actual.bytes)});
+        }
+        for (std::size_t i = 0; stock && i < expected->memberCount; ++i) {
             diagnostic.member = i;
             if (isCancelled(hooks)) { diagnostic.status = Status::cancelled; return false; }
             const auto& actual = parsed.entries[i];
@@ -226,6 +314,8 @@ bool OriginalUiArchive50KG::loadImpl(OriginalUiArchiveId50KG id,
                 member.logicalOffset > parsed.decoded.size() || member.bytes > parsed.decoded.size() - member.logicalOffset) {
                 diagnostic.status = Status::memberTable; return false;
             }
+            // A stock load never mixes with rows admitted from other bytes.
+            if (admittedRow(expected->firstMember + i)) { diagnostic.status = Status::memberIdentity; return false; }
             const auto result = hashMatches(parsed.decoded.data() + member.logicalOffset, member.bytes, member.sha256, hooks);
             if (result != HashResult::match) {
                 diagnostic.status = result == HashResult::cancelled ? Status::cancelled : Status::memberIdentity;
@@ -241,6 +331,28 @@ bool OriginalUiArchive50KG::loadImpl(OriginalUiArchiveId50KG id,
         // cancellation checks finish before that no-throw ownership transfer.
         if (!transfer) candidate->encoded = input;
         if (isCancelled(hooks)) { diagnostic.status = Status::cancelled; return false; }
+        // Non-stock member rows are published after every check and before the
+        // no-throw ownership transfer, so a refused load leaves input unchanged.
+        if (!stock) {
+            auto& r = admittedRegistry();
+            std::lock_guard<std::mutex> guard(r.lock);
+            // A row already published for this index must describe the same
+            // bytes (a second load of the same archive); otherwise refuse.
+            for (const auto& s : staged) {
+                if (s.index >= r.byCatalog.size()) { diagnostic.status = Status::memberTable; return false; }
+                const auto* existing = r.byCatalog[s.index].load(std::memory_order_relaxed);
+                if (existing && (existing->logicalOffset != s.offset || existing->bytes != s.bytes ||
+                    s.sha != existing->sha256)) { diagnostic.status = Status::memberIdentity; return false; }
+            }
+            for (const auto& s : staged) {
+                if (r.byCatalog[s.index].load(std::memory_order_relaxed)) continue;
+                r.text.push_back(s.sha);
+                r.rows.push_back({memberCatalog[s.index].name, s.offset, s.bytes, r.text.back().c_str()});
+                r.byCatalog[s.index].store(&r.rows.back(), std::memory_order_release);
+            }
+            try { std::cerr << "ui_archive_members archive=" << expected->discPath << " members="
+                            << expected->memberCount << " changed=" << staged.size() << "\n"; } catch (...) {}
+        }
         if (transfer) candidate->encoded.swap(*transfer);
         storage_ = std::move(candidate); // Only publication point, after all authentication.
         diagnostic = {};
@@ -258,7 +370,9 @@ std::size_t OriginalUiArchive50KG::memberCount() const noexcept {
 }
 OriginalUiMemberView50KG OriginalUiArchive50KG::member(std::size_t ordinal) const noexcept {
     if (!storage_ || ordinal >= storage_->identity->memberCount) return {};
-    const auto* identity = &memberCatalog[storage_->identity->firstMember + ordinal];
+    const auto* identity = originalUiMemberIdentity50KG(storage_->identity->id, ordinal);
+    if (!identity || identity->logicalOffset > storage_->decoded.size() ||
+        identity->bytes > storage_->decoded.size() - identity->logicalOffset) return {};
     return {identity, storage_->decoded.data() + identity->logicalOffset, identity->bytes};
 }
 OriginalUiMemberView50KG OriginalUiArchive50KG::find(const std::string& name) const noexcept {

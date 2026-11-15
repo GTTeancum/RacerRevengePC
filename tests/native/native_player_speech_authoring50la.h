@@ -9,6 +9,7 @@
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include <array>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <new>
 #include <string>
@@ -102,6 +103,7 @@ private:
         "NumberOfLowDamageSounds","NumberOfWallHitSounds","NumberOfPassedSounds",
         "NumberOfAttackedSounds","NumberOfPassingSounds","NumberOfAttackingSounds",
         "NumberOfDeathSounds","NumberOfWinSounds","NumberOfLoseSounds"};
+    // Stock speech layouts: RECEIPTS only (capture() reads the layout by name).
     inline static constexpr std::array<Specification,23> specifications_{{
         {1,96,91,{291,1330,844,655}}, {2,112,107,{291,810,584,655}},
         {3,89,84,{291,810,584,655}}, {4,89,84,{291,810,584,655}},
@@ -179,6 +181,9 @@ private:
             auto& category=categories_[member-1];if(!category.declaredCount.present)return false;
             const unsigned sum=member==1?unsigned(counts_[0])+counts_[1]+counts_[2]+counts_[3]:
                 member==2?unsigned(counts_[4])+counts_[5]:unsigned(counts_[6])+counts_[7]+counts_[8];
+            // FLAG stand-in (racer-keyed, not an original branch): POD26's curses.ini
+            // omits Event2. Retire into one rule for every pod (an absent EventN is a
+            // hole the original's Config read skips) when a pod needs it.
             const bool sparse=identity_->racer60==26u&&member==1u;
             if(category.count!=sum+(sparse?1u:0u))return false;
             for(unsigned i=0;i<category.count;++i){auto& row=category.events[i];d.eventId=i+1;
@@ -200,15 +205,36 @@ private:
         try {
             const auto* identity=original_player_identity50IK::find(rig->podId);
             if(!identity)return {};
-            const Specification* specification=nullptr;
-            for(const auto& row:specifications_)if(row.racer60==identity->racer60)specification=&row;
-            if(!specification||rig->originalArchive.entries.size()!=specification->memberCount||
-               rig->manifest.at("source_container_sha256").get<std::string>()!=identity->archiveSha256)return {};
+            if(rig->manifest.at("source_container_sha256").get<std::string>()!=identity->archiveSha256)return {};
+            const std::string prefix="audio\\speech\\"+native_racer50HW::rig_detail::lower(identity->podId)+"\\";
+            constexpr const char* suffixes[]={"sounds.ini","curses.ini","taunts.ini","special.ini"};
+            // The original finds the four speech members by name (132820), so
+            // the layout is read from this pod's own archive: member count,
+            // ordinal and size of each speech INI. The stock table above is a
+            // receipt ("pod_speech_layout ... stock=0" when the layout differs).
+            Specification derived{};derived.racer60=identity->racer60;
+            std::array<std::size_t,4> ordinals{};
+            {const auto& entries=rig->originalArchive.entries;derived.memberCount=entries.size();
+             for(std::size_t i=0;i<4;++i){bool found=false;
+                 for(std::size_t k=0;k<entries.size();++k)
+                     if(native_racer50HW::rig_detail::lower(entries[k].name)==prefix+suffixes[i]){
+                         if(found)return {};
+                         found=true;ordinals[i]=k;derived.sizes[i]=entries[k].bytes;
+                     }
+                 if(!found)return {};
+             }
+             derived.firstOrdinal=ordinals[0];}
+            const Specification* specification=&derived;
+            {const Specification* stock=nullptr;
+             for(const auto& row:specifications_)if(row.racer60==identity->racer60)stock=&row;
+             const bool same=stock&&stock->memberCount==derived.memberCount&&stock->sizes==derived.sizes&&
+                 ordinals[0]==stock->firstOrdinal&&ordinals[1]==stock->firstOrdinal+1&&
+                 ordinals[2]==stock->firstOrdinal+2&&ordinals[3]==stock->firstOrdinal+3;
+             if(!same)std::cerr<<"pod_speech_layout pod="<<identity->podId<<" members="<<derived.memberCount
+                               <<" first="<<ordinals[0]<<" stock=0\n";}
             auto next=std::unique_ptr<Authoring>(new Authoring);
             next->provider_=std::move(provider);next->rig_=std::move(rig);next->metadata_=std::move(metadata);
             next->identity_=identity;next->revision_=next->provider_->revision();next->thread_=std::this_thread::get_id();
-            const std::string prefix="audio\\speech\\"+native_racer50HW::rig_detail::lower(identity->podId)+"\\";
-            constexpr const char* suffixes[]={"sounds.ini","curses.ini","taunts.ini","special.ini"};
             const char* hashes[]={original_player_identity50IK::speechCountsSha256(*identity),
                 identity->cursesSha256,identity->tauntsSha256,identity->specialSha256};
             for(std::size_t i=0;i<4;++i){d.member=i;auto& member=next->members_[i];
@@ -219,7 +245,7 @@ private:
                    *mount.archiveName!=next->rig_->resourceFile.generic_string()||
                    *mount.archiveSha256!=identity->archiveSha256||mount.archiveBytes!=identity->archiveBytes||
                    mount.memberCount!=specification->memberCount){d.status=Status::mount;return {};}
-                const auto ordinal=specification->firstOrdinal+i;
+                const auto ordinal=ordinals[i];
                 const auto& source=next->rig_->originalArchive.entries[ordinal];
                 const auto& decoded=next->rig_->originalArchive.decoded;
                 if(!view.member||!view.data||*view.member!=member.name||source.name!=member.name||

@@ -9,7 +9,7 @@
 #include <string>
 
 namespace original_course_roster50KG {
-inline constexpr bool supportsPreparedRider(std::uint32_t racer60) noexcept {
+inline bool supportsPreparedRider(std::uint32_t racer60) noexcept { // find() reads the disc: not constexpr
     const auto* entry=rr::game::original_racer_selection50IJ::findByRacer60(racer60);
     return entry&&entry->humanJoinImplemented&&original_player_identity50IK::find(racer60);
 }

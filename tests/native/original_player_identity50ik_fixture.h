@@ -1,17 +1,36 @@
 #pragma once
-// Authenticated original identities, including four default-unlocked riders.
-// Identity metadata does not imply source bytes are installed or admit a
-// Course/roster destination; those owners retain separate readiness gates.
-// Digests identify source
-// bytes, not generated output. Constructor21079C/21081C/210820 binds racer60
-// to Pod%02d; the human's host slot never determines its resource/audio ID.
+// Pod identities for every pod, player and AI: ONE place defines the rule.
+// Constructor21079C/21081C/210820 binds racer60 to Pod%02d; the human's host
+// slot never determines its resource/audio ID.
+//
+// The original reads whatever PODS/PODnn/PODnn.RES the disc holds. The pod
+// load (2129C0) opens the RES bank (12CEA0: header, block-size table, member
+// directory, zlib blocks), finds members by name (132820) and reads the PHY
+// and the speech INIs through Config (1577D0, [Indices] NumberOf*Sounds).
+// Nothing checks a checksum, byte size or member count. The 23 stock rows in
+// `originals` are therefore RECEIPTS, not admission gates: find() returns the
+// identity of the pod archive actually on the disc (admission:: below) and
+// logs one line "pod_archive_identity pod=.. bytes=.. stock=1|0". Every
+// consumer keeps comparing the bytes it reads against that identity, so a
+// file that changes after admission is still refused. A stock archive gets
+// its stock row unchanged (same object, same values: bit-identical).
+// The loose PODnnANN.INI announcer pins below are NOT part of this rule yet
+// (no converted announcer exists); FLAG: retire them the same way when one does.
 #include "../../src/game/original_racer_selection50ij.h"
+#include "../../src/assets/import_decode48c.h"
+#include "pod_materials50ed_fixture.h"
+#include "runtime_asset_paths50lb.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace original_player_identity50IK {
 struct Identity {
@@ -190,12 +209,10 @@ inline constexpr std::array<Identity,23> originals{{
      "6c1bf5e505b1cd6ec434513387d9bcd28aed94802173349df3897c7fedd486b9",
      2478,30,"4168d648c1714682a34c316845b4e927abad2432e9b0e746d868dd6bafc91a49"}
 }};
-inline constexpr const Identity* find(std::uint32_t racer60) noexcept {
+// Stock receipt lookups (the shipped rows). Admission and every consumer use
+// find() further down, never these, except to report "stock=1|0".
+inline constexpr const Identity* stockFind(std::uint32_t racer60) noexcept {
     for(const auto& entry:originals)if(entry.racer60==racer60)return &entry;
-    return nullptr;
-}
-inline constexpr const Identity* find(std::string_view podId) noexcept {
-    for(const auto& entry:originals)if(entry.podId==podId)return &entry;
     return nullptr;
 }
 inline std::filesystem::path archivePath(const std::filesystem::path& discRoot,const Identity& identity) {
@@ -204,9 +221,11 @@ inline std::filesystem::path archivePath(const std::filesystem::path& discRoot,c
 inline std::filesystem::path announcerPath(const std::filesystem::path& discRoot,const Identity& identity) {
     return discRoot/"AUDIO/SPEECH/DAX/INRACE"/(std::string(identity.podId)+"ANN.INI");
 }
-// Eleven independently authored originals have byte-identical counts. This
-// does not make their category names/PCM interchangeable: those hashes differ.
-inline constexpr std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
+// Stock receipt: what each shipped sounds.ini [Indices] says. Eleven
+// independently authored originals have byte-identical counts; their category
+// names/PCM still differ. Admitted pods take their counts from their own
+// sounds.ini (admission:: below); these rows only feed the stock receipt.
+inline constexpr std::array<std::uint8_t,9> stockSpeechCounts(const Identity& identity) noexcept {
     if(identity.racer60==14)return {2,3,3,3,4,4,3,3,3};
     if(identity.racer60==21)return {2,4,3,5,3,5,3,3,3};
     if(identity.racer60==25)return {3,2,5,4,5,4,5,5,1};
@@ -215,7 +234,7 @@ inline constexpr std::array<std::uint8_t,9> speechCounts(const Identity& identit
     return identity.racer60==1?std::array<std::uint8_t,9>{4,4,6,5,6,6,4,3,2}:
         std::array<std::uint8_t,9>{2,3,3,3,4,4,3,3,3};
 }
-inline constexpr const char* speechCountsSha256(const Identity& identity) noexcept {
+inline constexpr const char* stockSpeechCountsSha256(const Identity& identity) noexcept {
     if(identity.racer60==14)return "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2";
     if(identity.racer60==21)return "a8113a836b77c3fe9c4cc7aa1cbeba5dcdc34b6b9c4c90b6ba3990b5cef19333";
     if(identity.racer60==25)return "5bb23574bb9c0d3be740d67153091ac5aa767dee0e6e97cfe35f5e3411a9f799";
@@ -223,5 +242,167 @@ inline constexpr const char* speechCountsSha256(const Identity& identity) noexce
     if(identity.racer60==19)return "24c40bf4fc181e88c0361742dec94c76d91c522ba358c5533bde2769fdfaa3ec";
     return identity.racer60==1?"57639f26df9b7eac14d08e1aa0b67689cfe1674a03e52c1dbd856ba523a6834e":
         "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2";
+}
+
+// ---- Common pod-archive admission (the one rule; host memory only) ----
+namespace admission {
+// Shared pod-archive capacity, the one place it is defined. These are the
+// tightest native caps any pod reader already applies (selected-player audio
+// decode: 512 entries, 16 MiB decoded, 256-byte names; INI/PHY members are
+// extracted with an 8 KiB cap by every pod reader). The file itself may not
+// exceed the decoded cap. Every pod reader bounds its own writes to these.
+inline rr::assets::DecodeLimits48C limits() noexcept {
+    rr::assets::DecodeLimits48C l;
+    l.resource_file_bytes=16u*1024u*1024u;l.resource_decoded_bytes=16u*1024u*1024u;
+    l.resource_entries=512;l.resource_name_bytes=256;
+    return l;
+}
+inline constexpr std::size_t maximumTextMemberBytes=8192;
+inline constexpr const char* speechKeys[9]={
+    "numberoflowdamagesounds","numberofwallhitsounds","numberofpassedsounds",
+    "numberofattackedsounds","numberofpassingsounds","numberofattackingsounds",
+    "numberofdeathsounds","numberofwinsounds","numberoflosesounds"};
+// One admitted row per stock slot (the racer60 -> Pod%02d binding is the
+// original's own data). Strings are owned here and never change after the
+// row is built, so the Identity pointers into them stay valid for the process.
+struct Row {
+    Identity identity{};
+    bool stock=true;
+    std::array<std::uint8_t,9> speech{};
+    std::string archive,phy,curses,taunts,special,sounds;
+};
+inline std::string folded(std::string_view s) {
+    std::string out(s);
+    for(auto& c:out){if(c=='/')c='\\';else if(c>='A'&&c<='Z')c=char(c+('a'-'A'));}
+    return out;
+}
+inline std::string_view trimmed(std::string_view t) noexcept {
+    while(!t.empty()&&(t.front()==' '||t.front()=='\t'||t.front()=='\r'))t.remove_prefix(1);
+    while(!t.empty()&&(t.back()==' '||t.back()=='\t'||t.back()=='\r'))t.remove_suffix(1);
+    return t;
+}
+// sounds.ini [Indices] NumberOf*Sounds, as Config reads them. Each count is
+// stored in a uint8_t (PodSpeechCounts50HG); a larger value is refused here,
+// before any store. Missing or repeated keys are refused (every port speech
+// reader requires all nine).
+inline std::array<std::uint8_t,9> speechFrom(const std::vector<std::uint8_t>& ini) {
+    std::array<std::uint8_t,9> out{};std::array<bool,9> seen{};
+    const std::string_view text(reinterpret_cast<const char*>(ini.data()),ini.size());
+    bool indices=false;
+    for(std::size_t at=0;at<text.size();){
+        auto end=text.find('\n',at);if(end==std::string_view::npos)end=text.size();
+        const auto line=trimmed(text.substr(at,end-at));at=end+1;
+        if(line.empty()||line.front()==';')continue;
+        if(line.front()=='['){indices=line.size()>=2&&line.back()==']'&&folded(line.substr(1,line.size()-2))=="indices";continue;}
+        if(!indices)continue;
+        const auto equal=line.find('=');if(equal==std::string_view::npos)continue;
+        const auto key=folded(trimmed(line.substr(0,equal)));const auto value=trimmed(line.substr(equal+1));
+        for(std::size_t i=0;i<9;++i)if(key==speechKeys[i]){
+            if(seen[i])throw std::runtime_error("sounds.ini repeats "+key);
+            if(value.empty()||value.size()>3)throw std::runtime_error("sounds.ini count extent "+key);
+            unsigned v=0;for(const char c:value){if(c<'0'||c>'9')throw std::runtime_error("sounds.ini count "+key);v=v*10u+unsigned(c-'0');}
+            if(v>255u)throw std::runtime_error("sounds.ini count exceeds its uint8 storage "+key);
+            out[i]=static_cast<std::uint8_t>(v);seen[i]=true;
+        }
+    }
+    for(std::size_t i=0;i<9;++i)if(!seen[i])throw std::runtime_error(std::string("sounds.ini lacks ")+speechKeys[i]);
+    return out;
+}
+// Reads the pod archive on the disc and fills the row. Stock bytes keep the
+// stock row; any other archive gets a row derived from its own data: size
+// and digest of the file, digests of its PHY and speech INIs found by name,
+// speech counts from its sounds.ini. Throws when the archive cannot be read
+// within the shared capacity or lacks a member the pod load needs; the caller
+// then keeps the stock row, so every consumer refuses the bytes as before.
+inline void derive(Row& row) {
+    namespace d=pod_materials50ed_fixture::detail;
+    const Identity stock=row.identity; // a copy: row is replaced below
+    const auto lim=limits();
+    const auto path=archivePath(runtime_asset_paths50LB::resolve("work/native/project/disc"),stock);
+    std::error_code error;const auto size=std::filesystem::file_size(path,error);
+    if(error)throw std::runtime_error("archive unreadable");
+    if(!size||size>lim.resource_file_bytes)throw std::runtime_error("archive outside the shared pod capacity");
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+    {std::ifstream in(path,std::ios::binary);
+     in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
+     if(!in||in.peek()!=std::char_traits<char>::eof())throw std::runtime_error("archive read/extent");}
+    const auto digest=d::sha256(bytes);
+    if(bytes.size()==stock.archiveBytes&&digest==stock.archiveSha256){
+        std::cerr<<"pod_archive_identity pod="<<stock.podId<<" bytes="<<bytes.size()<<" stock=1\n";
+        return;
+    }
+    rr::assets::ResArchive48C archive;rr::assets::DecodeError48C why;
+    if(!rr::assets::decodeResource48C(bytes,archive,why,nullptr,lim))throw std::runtime_error("archive decode "+why.code);
+    const auto member=[&](const std::string& wanted){
+        const auto key=folded(wanted);const rr::assets::ResourceEntry48C* found=nullptr;
+        for(const auto& e:archive.entries)if(folded(e.name)==key){
+            if(found)throw std::runtime_error("ambiguous member "+wanted);found=&e;}
+        if(!found)throw std::runtime_error("archive lacks "+wanted);
+        std::vector<std::uint8_t> out;
+        if(!rr::assets::extractResMember48C(archive,found->name,out,why,maximumTextMemberBytes))
+            throw std::runtime_error("member outside the 8 KiB text capacity "+wanted);
+        return out;
+    };
+    const auto pod=folded(stock.podId);
+    const auto speech="audio\\speech\\"+pod+"\\";
+    const auto sounds=member(speech+"sounds.ini");
+    Row next;next.identity=stock;next.stock=false;
+    next.speech=speechFrom(sounds);
+    next.archive=digest;next.sounds=d::sha256(sounds);
+    next.phy=d::sha256(member("pods\\"+pod+"\\"+pod+".phy"));
+    next.curses=d::sha256(member(speech+"curses.ini"));
+    next.taunts=d::sha256(member(speech+"taunts.ini"));
+    next.special=d::sha256(member(speech+"special.ini"));
+    row=std::move(next);
+    auto& id=row.identity;
+    id.archiveBytes=bytes.size();id.archiveSha256=row.archive.c_str();id.phySha256=row.phy.c_str();
+    id.cursesSha256=row.curses.c_str();id.tauntsSha256=row.taunts.c_str();id.specialSha256=row.special.c_str();
+    std::cerr<<"pod_archive_identity pod="<<id.podId<<" bytes="<<id.archiveBytes<<" stock=0 members="
+             <<archive.entries.size()<<" phy_stock="<<(row.phy==stock.phySha256?1:0)<<" speech=";
+    for(std::size_t i=0;i<9;++i)std::cerr<<(i?",":"")<<unsigned(row.speech[i]);
+    std::cerr<<'\n';
+}
+inline const Row& row(std::size_t slot) noexcept {
+    static std::array<Row,originals.size()> rows;
+    static std::array<std::once_flag,originals.size()> once;
+    std::call_once(once[slot],[slot]{
+        auto& r=rows[slot];r.identity=originals[slot];r.stock=true;r.speech=stockSpeechCounts(originals[slot]);
+        try{derive(r);}
+        catch(const std::exception& e){
+            r=Row{};r.identity=originals[slot];r.stock=true;r.speech=stockSpeechCounts(originals[slot]);
+            try{std::cerr<<"pod_archive_identity pod="<<originals[slot].podId<<" refused="<<e.what()<<'\n';}catch(...){}
+        }catch(...){r=Row{};r.identity=originals[slot];r.stock=true;r.speech=stockSpeechCounts(originals[slot]);}
+    });
+    return rows[slot];
+}
+inline std::size_t slotOf(std::uint32_t racer60) noexcept {
+    for(std::size_t i=0;i<originals.size();++i)if(originals[i].racer60==racer60)return i;
+    return originals.size();
+}
+} // namespace admission
+
+// Every consumer: the identity of the pod archive on the disc. A stock
+// archive (or one that cannot be admitted) returns the stock row itself.
+inline const Identity* find(std::uint32_t racer60) noexcept {
+    const auto slot=admission::slotOf(racer60);
+    if(slot==originals.size())return nullptr;
+    const auto& r=admission::row(slot);
+    return r.stock?&originals[slot]:&r.identity;
+}
+inline const Identity* find(std::string_view podId) noexcept {
+    for(const auto& entry:originals)if(entry.podId==podId)return find(entry.racer60);
+    return nullptr;
+}
+inline std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
+    const auto slot=admission::slotOf(identity.racer60);
+    if(slot==originals.size())return stockSpeechCounts(identity);
+    const auto& r=admission::row(slot);
+    return r.stock?stockSpeechCounts(originals[slot]):r.speech;
+}
+inline const char* speechCountsSha256(const Identity& identity) noexcept {
+    const auto slot=admission::slotOf(identity.racer60);
+    if(slot==originals.size())return stockSpeechCountsSha256(identity);
+    const auto& r=admission::row(slot);
+    return r.stock?stockSpeechCountsSha256(originals[slot]):r.sounds.c_str();
 }
 } // namespace original_player_identity50IK

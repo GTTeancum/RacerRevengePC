@@ -90,7 +90,9 @@ class Catalog final {
         namespace identities=original_player_identity50IK;
         namespace detail=native_racer50HW::rig_detail;
         const auto disc=runtime_asset_paths50LB::resolve("work/native/project/disc");
-        for(std::size_t i=0;i<identities::originals.size();++i){const auto& identity=identities::originals[i];
+        // Common pod admission: each slot's identity is the archive actually on
+        // the disc (original_player_identity50IK::find, stock row as receipt).
+        for(std::size_t i=0;i<identities::originals.size();++i){const auto& identity=*identities::find(identities::originals[i].racer60);
             try {
                 auto raw=runtime_startup50fl::readBytes(identities::archivePath(disc,identity));
                 detail::need(raw.size()==identity.archiveBytes&&
@@ -118,7 +120,7 @@ class Catalog final {
             auto roster=original_course_roster50KG::directDiscRoster(riders[i]);bool complete=true;
             for(const auto& row:roster.at("racers")){
                 bool verified=false;
-                for(std::size_t pod=0;pod<identities::originals.size();++pod){const auto& identity=identities::originals[pod];
+                for(std::size_t pod=0;pod<identities::originals.size();++pod){const auto& identity=*identities::find(identities::originals[pod].racer60);
                     if(row.at("pod_id")==identity.podId&&row.at("resource_sha256")==identity.archiveSha256&&
                        row.at("phy_sha256")==identity.phySha256&&originalPods_[pod].size()==identity.archiveBytes)
                         verified=true;

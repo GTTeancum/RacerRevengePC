@@ -17,20 +17,15 @@ template<class A,class B> bool sameOwner(const std::shared_ptr<A>& a,
     const std::shared_ptr<B>& b)noexcept {
     return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
 }
-// Reuse the exact original CAM identity catalog, without invoking Follow's
-// source reader or constructing a camera. This is native input admission only.
-struct CamIdentity {std::int32_t pod;std::size_t bytes;const char* sha256;};
-#include "../../src/game/original_follow_cam_catalog.inc"
-inline bool camIdentity(std::uint32_t pod,const std::vector<std::uint8_t>& bytes)noexcept {
-    for(const auto& row:catalog)if(row.pod>=0&&static_cast<std::uint32_t>(row.pod)==pod)
-        return bytes.size()==row.bytes&&rr::assets::ta_cut_authoring_candidate_detail::hashMatches(
-            bytes.data(),bytes.size(),row.sha256);
-    return false;
+// Native input admission only, without invoking Follow's source reader or
+// constructing a camera. The stock CAM catalog is a receipt (the Follow
+// reader logs non-stock bytes); admission here is the Follow reader's own
+// native text capacity (8 KiB), the same for every pod.
+inline bool camIdentity(std::uint32_t,const std::uint8_t* bytes,std::size_t size)noexcept {
+    return bytes&&size>0&&size<8192;
 }
-inline bool camIdentity(std::uint32_t pod,const std::uint8_t* bytes,std::size_t size)noexcept {
-    for(const auto& row:catalog)if(row.pod>=0&&static_cast<std::uint32_t>(row.pod)==pod)
-        return bytes&&size==row.bytes&&rr::assets::ta_cut_authoring_candidate_detail::hashMatches(bytes,size,row.sha256);
-    return false;
+inline bool camIdentity(std::uint32_t pod,const std::vector<std::uint8_t>& bytes)noexcept {
+    return camIdentity(pod,bytes.data(),bytes.size());
 }
 using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
 inline bool trackMember(const Provider& provider,rr::game::OriginalCameraStartCourse course,

@@ -574,6 +574,13 @@ bool OriginalUiIpumTextureCache50KG::loadAdditionalOriginal(std::size_t sourceIn
         if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
         if(additional_[sourceIndex])return fail(d,Error::alreadyLoaded);
         const auto& record=additionalSources[sourceIndex];
+        // Decided by the texture's own stored format, for every rider: a member
+        // whose PST kind (u32 at +4) is not an IPU page (2) has no IPU image;
+        // the ordinary PST path reads it. Every stock source is kind 2.
+        if(archive&&archive->loaded()){
+            const auto view=archive->find(record.member);
+            if(view.data&&view.size>=8&&u32(view.data+4)!=2u){d={};return true;}
+        }
         std::vector<std::vector<std::uint8_t>> images;
         if(!decodeOriginalMips(archive,record.member,record.sourceBytes,record.sourceSha256,
             record.sourceMips,record.mipCount,images,d,hooks,limits)||
@@ -681,6 +688,10 @@ bool OriginalUiIpumTextureCache50KG::loadAdditional(std::size_t sourceIndex,std:
         if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
         if(additional_[sourceIndex])return fail(d,Error::alreadyLoaded);
         const auto& record=additionalSources[sourceIndex];
+        if(archive&&archive->loaded()){ // Not an IPU page by its own PST kind: nothing to retain.
+            const auto view=archive->find(record.member);
+            if(view.data&&view.size>=8&&u32(view.data+4)!=2u){d={};return true;}
+        }
         const auto* sourceMember=record.member;const auto* sourceSha256=record.sourceSha256;
         const auto sourceBytes=record.sourceBytes;const auto mipCount=record.mipCount;
         const auto& sourceMips=record.sourceMips;const auto& retainedMipRecords=record.retainedMips;

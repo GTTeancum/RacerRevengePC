@@ -1,6 +1,7 @@
 #include "original_follow_camera.h"
 #include <array>
 #include <cstring>
+#include <iostream>
 namespace rr::game {
 namespace {
 struct CamIdentity {std::int32_t pod;std::size_t bytes;const char* sha256;};
@@ -72,10 +73,14 @@ OriginalFollowResult loadOriginalFollowCam(std::int32_t pod,std::int32_t layout,
     const std::uint8_t* bytes,std::size_t byteCount,
     OriginalFollowPreset* storage,std::size_t capacity,OriginalFollowPresetBank& out) noexcept {
     using Status=OriginalFollowStatus;
-    const CamIdentity* id=nullptr;for(const auto& c:catalog)if(c.pod==pod){id=&c;break;}
-    if(!id||!bytes||byteCount!=id->bytes||!hashMatches(bytes,byteCount,id->sha256))return {Status::authoring,0x2867d4,0};
-    // Native capacity/syntax admission is checked AFTER source byte identity.
-    // The exact23 originals contain only comments, bracket sections and plain
+    // One rule for every pod's loose PODnn.CAM: the original reads whatever the
+    // disc holds (Config 1577D0). The stock catalog is a receipt; the bytes are
+    // admitted by the native capacity/syntax checks below, the same for all.
+    if(!bytes||!byteCount)return {Status::authoring,0x2867d4,0};
+    {const CamIdentity* id=nullptr;for(const auto& c:catalog)if(c.pod==pod){id=&c;break;}
+     const bool stock=id&&byteCount==id->bytes&&hashMatches(bytes,byteCount,id->sha256);
+     if(!stock){try{std::cerr<<"pod_cam_identity pod="<<pod<<" bytes="<<byteCount<<" stock=0\n";}catch(...){}}}
+    // The stock originals contain only comments, bracket sections and plain
     // key=value ASCII tokens. No guessed binaryTEXTCI or broader INI grammar.
     std::array<char,8192> text{};
     if(byteCount>=text.size())return {Status::capacity,0x1577d0,0};

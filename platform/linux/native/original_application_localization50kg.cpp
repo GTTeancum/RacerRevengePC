@@ -32,6 +32,19 @@ OriginalUiMemberView50KG textMember(const OriginalUiArchive50KG& archive)noexcep
  return view;
 }
 std::string_view cString(std::string_view s)noexcept {const auto end=s.find('\0');return end==s.npos?s:s.substr(0,end);}
+// One rule for the English table of any LOC.RES (the stock 10637 bytes is a
+// receipt, not a gate): 467 NUL-terminated rows, each at most the 480-char
+// ceiling the index maxima allow (14C0EC refuses 481+), so the text can never
+// exceed 467*481 bytes; the exact-extent scan validates the content itself.
+constexpr std::size_t maxEnglishTextBytes=467u*481u;
+bool englishTextExtentOk(std::size_t size)noexcept{return size>0&&size<=maxEnglishTextBytes;}
+// UI.loc row-table offset, read from the index header (+8) as 14BC30 does
+// (stock 13688), bounded so 467 eight-byte rows fit inside the member.
+bool indexTable(const OriginalUiMemberView50KG& index,std::size_t& table)noexcept{
+ if(!index.data||index.size<28)return false;
+ table=u32(index.data+8);
+ return table<=index.size&&(index.size-table)/8>=467;
+}
 }
 std::atomic<std::uint8_t>& OriginalApplicationLocalization50KG::countGuard83E4()noexcept {static std::atomic<std::uint8_t> value{0};return value;}
 std::atomic<std::int32_t>& OriginalApplicationLocalization50KG::countAssertion427078()noexcept {static std::atomic<std::int32_t> value{0};return value;}
@@ -140,8 +153,9 @@ bool OriginalApplicationLocalization50KG::loadIndex14BC30(Diagnostic& d)noexcept
  const std::size_t first=u32(index.data+4),table=u32(index.data+8);
  if(count!=467||first>=table||table>index.size||std::size_t(count)>(index.size-table)/8||table-first<=1)
   return fail(d,Status::shape,0x14BDD8,true);
+ // Name-table extent comes from the header (stock 13616 bytes); the
+ // allocations below are sized by it and every name read is bounded by it.
  const auto nameBytes=table-first-1;
- if(nameBytes!=13616)return fail(d,Status::shape,0x14C24C,true);
  try{
   // Bounded native allocation/shape preflight: no source mutation on failure,
   // while already-published constructor ownership is retained. Original valid
@@ -205,7 +219,7 @@ bool OriginalApplicationLocalization50KG::scanEnglishBin(const OriginalUiMemberV
  std::array<std::size_t,467>& offsets,std::array<std::size_t,467>& lengths,Diagnostic& d)noexcept {
  // Native malformed-input envelope. Original14C748 has no in-row bound and
  //14C724 logs a short file then returns count; neither is fabricated success.
- if(!member.data||member.size!=10637)return fail(d,Status::shape,0x14C654,true);
+ if(!member.data||!englishTextExtentOk(member.size))return fail(d,Status::shape,0x14C654,true);
  std::array<std::size_t,467> nextOffsets{},nextLengths{};std::size_t cursor=0;
  for(std::size_t i=0;i<nextOffsets.size();++i){
   if(cursor>=member.size)return fail(d,Status::shape,0x14C710,true,i);
@@ -221,16 +235,17 @@ bool OriginalApplicationLocalization50KG::scanEnglishBin(const OriginalUiMemberV
 bool OriginalApplicationLocalization50KG::selectedRowsCurrent()const noexcept {
  if(phase_!=Phase::selected||!archive_||!text00_||!rows04_||count10_!=467||
     !baseKnown_||base12_[0]!='U'||base12_[1]!='I'||base12_[2]!=0||
-    textBytes_!=10637||publishedTextRows_!=467||selectionEpoch_!=1)return false;
+    !englishTextExtentOk(textBytes_)||publishedTextRows_!=467||selectionEpoch_!=1)return false;
  const auto text=textMember(*archive_);const auto index=indexMember(*archive_);
+ std::size_t table=0;
  if(!text.data||text.size!=textBytes_||text.identity!=textIdentity_||
-    !index.data||index.size!=17688||index.identity!=indexIdentity_)return false;
+    !index.identity||index.size!=index.identity->bytes||index.identity!=indexIdentity_||!indexTable(index,table))return false;
  std::array<std::size_t,467> offsets{},lengths{};Diagnostic d;
  if(!scanEnglishBin(text,offsets,lengths,d)||offsets!=textOffsets_||lengths!=textLengths_||
     std::memcmp(text00_.get(),text.data,textBytes_)!=0)return false;
  for(std::size_t i=0;i<467;++i){
   if(!rows04_[i].textKnown||rows04_[i].text0!=text00_.get()+offsets[i]||
-     rows04_[i].maximum4!=std::bit_cast<std::int16_t>(u16(index.data+13688+i*8+4)))return false;
+     rows04_[i].maximum4!=std::bit_cast<std::int16_t>(u16(index.data+table+i*8+4)))return false;
  }
  return true;
 }
@@ -239,10 +254,10 @@ bool OriginalApplicationLocalization50KG::firstEnglishPrefixCurrent()const noexc
     selectionEpoch_||selectedBorrowCount_||!textLookupName_.empty()||count10_!=467||
     !rows04_||!names24_||!names28_||!hash2C_||!baseKnown_||
     base12_[0]!='U'||base12_[1]!='I'||base12_[2]!=0)return false;
- const auto index=indexMember(*archive_);
- if(!index.data||index.size!=17688||index.identity!=indexIdentity_)return false;
+ const auto index=indexMember(*archive_);std::size_t table=0;
+ if(!index.identity||index.size!=index.identity->bytes||index.identity!=indexIdentity_||!indexTable(index,table))return false;
  for(std::size_t i=0;i<467;++i)if(rows04_[i].textKnown||rows04_[i].text0||
-    rows04_[i].maximum4!=std::bit_cast<std::int16_t>(u16(index.data+13688+i*8+4)))return false;
+    rows04_[i].maximum4!=std::bit_cast<std::int16_t>(u16(index.data+table+i*8+4)))return false;
  return true;
 }
 bool OriginalApplicationLocalization50KG::selectEnglish14C5F0(const Application& root,Diagnostic& d)noexcept {
@@ -264,7 +279,7 @@ bool OriginalApplicationLocalization50KG::prepareFirstEnglish14C5F0(PreparedEngl
  if(ownerThread_!=std::this_thread::get_id()||!current())return fail(d,Status::authority,0x14C5FC,bool(issuer_));
  if(!firstEnglishPrefixCurrent()||out.buffer||out.issuer)return fail(d,Status::phase,0x14C670,true);
  const auto text=textMember(*archive_);
- if(!text.identity||!text.data||text.size!=10637)return fail(d,Status::shape,0x14C5FC,true);
+ if(!text.identity||!text.data||!englishTextExtentOk(text.size))return fail(d,Status::shape,0x14C5FC,true);
  std::uint32_t pc=0x14C9AC;
  try{
   PreparedEnglish prepared;
@@ -293,7 +308,7 @@ bool OriginalApplicationLocalization50KG::publishFirstEnglish14C690(PreparedEngl
  OriginalStandardArchiveProvider50LA::MemberView mounted;
  std::array<std::size_t,467> offsets{},lengths{};
  if(!prepared.buffer||prepared.issuer!=this||!sameOwner(prepared.issuedOwner.lock(),issuedOwner_.lock())||
-    prepared.member.identity!=text.identity||prepared.member.data!=text.data||prepared.member.size!=10637||
+    prepared.member.identity!=text.identity||prepared.member.data!=text.data||prepared.member.size!=text.size||!englishTextExtentOk(text.size)||
     prepared.lookup!="loc\\english\\L_UI_ENG.bin"||
     provider_->lookup132820(prepared.lookup,mounted)!=OriginalStandardArchiveProvider50LA::Lookup::present||
     mounted.revision!=prepared.providerRevision||mounted.data!=text.data||mounted.size!=text.size||
