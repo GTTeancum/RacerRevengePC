@@ -1055,6 +1055,8 @@ void VehicleWindowGl50DS::Storage::resetPodState() noexcept {
             gl.useProgram(trackProgram);
             gl.uniform1i(worldFogEnabledUniform, 0);
             gl.uniform1i(gsAlphaPassUniform,0);gl.uniform1i(environmentMapUniform,0);gl.uniform1i(gsAlphaPayloadUniform,0);
+            // A span's "no colour stream" flag never outlives the pass that set it.
+            gl.uniform1i(trackSourceColorAbsentUniform,0);
         }
         gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthMask(1); gl.depthFunc(0x0201);
         gl.useProgram(shader->program());
@@ -1152,7 +1154,11 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                 U boundSpan = assets::unresolvedMaterialTexture50EA;
                 // Only this uninterrupted track pass owns these material bindings.
                 // Do not infer state from pass setup, another program, or a prior frame.
-                I trackIntegerValues[9]{};
+                // One slot per uniform: 0 useTexture, 1 discard, 2 fog, 3 projection,
+                // 4 effect, 5 unlit, 6 shadow, 7 gsAlphaPass, 8 environmentMap,
+                // 9 sourceColorAbsent. A shared slot lets one uniform's cached value
+                // suppress the other's write, so the result depended on draw order.
+                I trackIntegerValues[10]{};
                 U trackTextureName = 0;
                 std::uint8_t trackAlphaReference = 0;
                 unsigned char trackAlphaScaleBytes[sizeof(float)]{};
@@ -1234,7 +1240,7 @@ bool VehicleWindowGl50DS::Storage::drawTrack(bool transparent) noexcept {
                         if (!reuseMaterial)
                             s.gl.uniform4f(s.trackUvTranslationUniform,uOffset,vOffset,0.f,0.f);
                         integerUniform(4, s.trackEffectModeUniform, effectMode(span.material.policy));
-                        integerUniform(8, s.trackSourceColorAbsentUniform,
+                        integerUniform(9, s.trackSourceColorAbsentUniform,
                             span.material.policy.sourceColorStreamAbsent ? 1 : 0);
                         // Byte identity preserves signed zero without changing the value.
                         if (!reuseMaterial || std::memcmp(trackAlphaScaleBytes,
@@ -3054,6 +3060,10 @@ bool VehicleWindowGl50DS::Storage::drawWater() noexcept {
         gl.uniform1i(trackEffectModeUniform, 1);
         gl.uniform1f(trackAlphaScaleUniform, (255.f / 128.f) * (255.f / 128.f));
         gl.uniform1i(trackUnlitUniform, 1);
+        // The VU program always emits EnvColor / FrothColor bytes per vertex:
+        // the water has a colour stream. Without this the flag left by the last
+        // transparent world span replaced them with 128/64 and lit the froth.
+        gl.uniform1i(trackSourceColorAbsentUniform, 0);
         gl.uniform1i(trackUseSourceNormalsUniform, 0); gl.uniform1i(trackProjectionPassUniform, 0);
         gl.uniform4f(trackUvTranslationUniform, 0.f, 0.f, 0.f, 0.f);
         gl.uniform1i(nativeShadowEnabledUniform, 0); gl.uniform1i(nativeShadowOpponentCountUniform, 0);
