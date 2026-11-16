@@ -46,6 +46,13 @@ These are native host keys, not a claim to recover a retail PC keyboard layout.
   consumers. The source conditioning, shaping, rate filters and twin-engine
   binder remain intact. Opposing keys on an axis center it.
 - Keyboard Escape/F5/Backspace retain existing native host navigation actions.
+- Zero-g lean (PC enhancement, not original; default preset 0 only): A leans
+  left and D leans right on packet4, the byte the controller's right stick X
+  writes (right stick X leans on a controller). The original reader conditions
+  packet4 into channel 2, which nothing in a preset-0 race reads; A and D are
+  bound nowhere else in a race. The lean acts only while the pod is in zero-g
+  flight (`src/game/native_zero_gravity50zg.h`): N64 tilt, target -1/0/+1,
+  0 below speed 200, ramp 3.2/s, halving per frame when released under 0.1.
 
 The host Controls help now reflects normal/twin mode and the selected transport.
 Keyboard re-arming includes steering keys as well as the old twin/action keys.

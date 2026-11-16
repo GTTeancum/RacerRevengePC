@@ -63,7 +63,7 @@ struct SessionRows {
     double countdownRemaining=0,raceSeconds=0;
 };
 template<std::size_t NodeCapacity> struct SessionStorage : SessionRows {
-    static_assert(NodeCapacity==rr::game::maxUndertrackNodes50ET || NodeCapacity==265 || NodeCapacity==268 || NodeCapacity==270 || NodeCapacity==213 || NodeCapacity==173);
+    static_assert(NodeCapacity==rr::game::maxUndertrackNodes50ET || NodeCapacity==rr::game::courseNavigationCapacity50MB);
     static constexpr std::size_t nodeCapacity=NodeCapacity;
     float positions[NodeCapacity][3]{};
     double distanceToFinish[NodeCapacity]{};
@@ -72,58 +72,61 @@ template<std::size_t NodeCapacity> struct SessionStorage : SessionRows {
     double finishForward[2]{};
 };
 using Session=SessionStorage<rr::game::maxUndertrackNodes50ET>;
-// Exact MB presentation extent. This HOST observer does not create lap samples.
-// Only the real final Map view can keep its new route usable.
-class MbSession final:public SessionStorage<265> {
+// Typed observers of the shared navigation store (track_navigation_view50mb.h):
+// capacity-sized, live node count from the course's own map spline. This HOST
+// observer does not create lap samples. Only the real final Map view can keep
+// its new route usable.
+using CourseSessionStorage50HM=SessionStorage<rr::game::courseNavigationCapacity50MB>;
+class MbSession final:public CourseSessionStorage50HM {
     rr::game::TrackNavigationView50EU navigation_{};
     friend bool initialize(MbSession&,const rr::game::TrackNavigationView50EU&,
         const rr::game::LapProgressTrackView50MB&,std::uint32_t,const Config&) noexcept;
 public:
     bool runtimeValid() const noexcept {
         return navigation_.runtimeValid() &&
-            navigation_.role()==rr::game::NavigationRole50MB::Map && navigation_.count()==265;
+            navigation_.role()==rr::game::NavigationRole50MB::Map && navigation_.count()!=0;
     }
 };
 // Distinct exact TC observer retains the genuine final Map268 view.
-class TcSession final:public SessionStorage<268> {
+class TcSession final:public CourseSessionStorage50HM {
     rr::game::TrackNavigationView50TC navigation_{};
     friend bool initialize(TcSession&,const rr::game::TrackNavigationView50TC&,
         const rr::game::LapProgressTrackView50TC&,std::uint32_t,const Config&) noexcept;
 public:
     bool runtimeValid() const noexcept {
         return navigation_.runtimeValid() &&
-            navigation_.role()==rr::game::NavigationRole50TC::Map && navigation_.count()==268;
+            navigation_.role()==rr::game::NavigationRole50TC::Map && navigation_.count()!=0;
     }
 };
 // Distinct exact TB observer retains the genuine final Map270 view.
-class TbSession final:public SessionStorage<270> {
+class TbSession final:public CourseSessionStorage50HM {
     rr::game::TrackNavigationView50TB navigation_{};
     friend bool initialize(TbSession&,const rr::game::TrackNavigationView50TB&,
         const rr::game::LapProgressTrackView50TB&,std::uint32_t,const Config&) noexcept;
 public:
     bool runtimeValid() const noexcept {
         return navigation_.runtimeValid() &&
-            navigation_.role()==rr::game::NavigationRole50TB::Map && navigation_.count()==270;
+            navigation_.role()==rr::game::NavigationRole50TB::Map && navigation_.count()!=0;
     }
 };
-class GbSession final:public SessionStorage<213> {
+class GbSession final:public CourseSessionStorage50HM {
     rr::game::TrackNavigationView50GB navigation_{};
     friend bool initialize(GbSession&,const rr::game::TrackNavigationView50GB&,
         const rr::game::LapProgressTrackView50GB&,std::uint32_t,const Config&) noexcept;
 public:
     bool runtimeValid() const noexcept {
         return navigation_.runtimeValid() &&
-            navigation_.role()==rr::game::NavigationRole50GB::Map && navigation_.count()==213;
+            navigation_.role()==rr::game::NavigationRole50GB::Map && navigation_.count()!=0;
     }
 };
-class McSession final:public SessionStorage<173> {
+class McSession final:public CourseSessionStorage50HM {
     rr::game::TrackNavigationView50MC navigation_{};
     friend bool initialize(McSession&,const rr::game::TrackNavigationView50MC&,
         const rr::game::LapProgressTrackView50MC&,std::uint32_t,const Config&) noexcept;
 public:
     bool runtimeValid() const noexcept {
         return navigation_.runtimeValid() &&
-            navigation_.role()==rr::game::NavigationRole50MC::Map && navigation_.count()==173;
+            navigation_.role()==rr::game::NavigationRole50MC::Map && navigation_.count()!=0;
     }
 };
 template<class T> concept SessionType=std::is_same_v<T,Session>||std::is_same_v<T,MbSession>||std::is_same_v<T,TcSession>||std::is_same_v<T,TbSession>||std::is_same_v<T,GbSession>||std::is_same_v<T,McSession>;
@@ -274,7 +277,7 @@ inline bool initialize(MbSession& out,const rr::game::TrackNavigationView50EU& m
     const rr::game::LapProgressTrackView50MB& laps,std::uint32_t racerCount,
     const Config& config={}) noexcept {
     if(!map.runtimeValid()||map.role()!=rr::game::NavigationRole50MB::Map||
-       map.count()!=265||!laps.matches(map)) return detail::fail(out,Error::Configuration);
+       !map.count()||!laps.matches(map)) return detail::fail(out,Error::Configuration);
     // Non-owning read facade lives only during this synchronous copy. The final
     // view retained below owns the same immutable graph and actual live world.
     struct MapFacade {
@@ -283,7 +286,7 @@ inline bool initialize(MbSession& out,const rr::game::TrackNavigationView50EU& m
         bool gatesPrepared;
     } facade{{map.track().nodes(),map.count()},map.nodes(),map.gatesPrepared()};
     MbSession candidate;
-    if(!detail::initializeStorage(static_cast<SessionStorage<265>&>(candidate),
+    if(!detail::initializeStorage(static_cast<CourseSessionStorage50HM&>(candidate),
             facade,laps.data(),racerCount,config)) return detail::fail(out,candidate.error);
     candidate.navigation_=map;out=std::move(candidate);return true;
 }
@@ -292,7 +295,7 @@ inline bool initialize(TcSession& out,const rr::game::TrackNavigationView50TC& m
     const rr::game::LapProgressTrackView50TC& laps,std::uint32_t racerCount,
     const Config& config={}) noexcept {
     if(!map.runtimeValid()||map.role()!=rr::game::NavigationRole50TC::Map||
-       map.count()!=268||!laps.matches(map)) return detail::fail(out,Error::Configuration);
+       !map.count()||!laps.matches(map)) return detail::fail(out,Error::Configuration);
     // Non-owning read facade lives only during this synchronous copy. The final
     // view retained below owns the same immutable graph and actual live world.
     struct MapFacade {
@@ -301,7 +304,7 @@ inline bool initialize(TcSession& out,const rr::game::TrackNavigationView50TC& m
         bool gatesPrepared;
     } facade{{map.track().nodes(),map.count()},map.nodes(),map.gatesPrepared()};
     TcSession candidate;
-    if(!detail::initializeStorage(static_cast<SessionStorage<268>&>(candidate),
+    if(!detail::initializeStorage(static_cast<CourseSessionStorage50HM&>(candidate),
             facade,laps.data(),racerCount,config)) return detail::fail(out,candidate.error);
     candidate.navigation_=map;out=std::move(candidate);return true;
 }
@@ -310,7 +313,7 @@ inline bool initialize(TbSession& out,const rr::game::TrackNavigationView50TB& m
     const rr::game::LapProgressTrackView50TB& laps,std::uint32_t racerCount,
     const Config& config={}) noexcept {
     if(!map.runtimeValid()||map.role()!=rr::game::NavigationRole50TB::Map||
-       map.count()!=270||!laps.matches(map)) return detail::fail(out,Error::Configuration);
+       !map.count()||!laps.matches(map)) return detail::fail(out,Error::Configuration);
     // Non-owning read facade lives only during this synchronous copy. The final
     // view retained below owns the same immutable graph and actual live world.
     struct MapFacade {
@@ -319,7 +322,7 @@ inline bool initialize(TbSession& out,const rr::game::TrackNavigationView50TB& m
         bool gatesPrepared;
     } facade{{map.track().nodes(),map.count()},map.nodes(),map.gatesPrepared()};
     TbSession candidate;
-    if(!detail::initializeStorage(static_cast<SessionStorage<270>&>(candidate),
+    if(!detail::initializeStorage(static_cast<CourseSessionStorage50HM&>(candidate),
             facade,laps.data(),racerCount,config)) return detail::fail(out,candidate.error);
     candidate.navigation_=map;out=std::move(candidate);return true;
 }
@@ -328,7 +331,7 @@ inline bool initialize(GbSession& out,const rr::game::TrackNavigationView50GB& m
     const rr::game::LapProgressTrackView50GB& laps,std::uint32_t racerCount,
     const Config& config={}) noexcept {
     if(!map.runtimeValid()||map.role()!=rr::game::NavigationRole50GB::Map||
-       map.count()!=213||!laps.matches(map)) return detail::fail(out,Error::Configuration);
+       !map.count()||!laps.matches(map)) return detail::fail(out,Error::Configuration);
     // Non-owning read facade lives only during this synchronous copy. The final
     // view retained below owns the same immutable graph and actual live world.
     struct MapFacade {
@@ -337,7 +340,7 @@ inline bool initialize(GbSession& out,const rr::game::TrackNavigationView50GB& m
         bool gatesPrepared;
     } facade{{map.track().nodes(),map.count()},map.nodes(),map.gatesPrepared()};
     GbSession candidate;
-    if(!detail::initializeStorage(static_cast<SessionStorage<213>&>(candidate),
+    if(!detail::initializeStorage(static_cast<CourseSessionStorage50HM&>(candidate),
             facade,laps.data(),racerCount,config)) return detail::fail(out,candidate.error);
     candidate.navigation_=map;out=std::move(candidate);return true;
 }
@@ -345,7 +348,7 @@ inline bool initialize(McSession& out,const rr::game::TrackNavigationView50MC& m
     const rr::game::LapProgressTrackView50MC& laps,std::uint32_t racerCount,
     const Config& config={}) noexcept {
     if(!map.runtimeValid()||map.role()!=rr::game::NavigationRole50MC::Map||
-       map.count()!=173||!laps.matches(map)) return detail::fail(out,Error::Configuration);
+       !map.count()||!laps.matches(map)) return detail::fail(out,Error::Configuration);
     // Non-owning read facade lives only during this synchronous copy. The final
     // view retained below owns the same immutable graph and actual live world.
     struct MapFacade {
@@ -354,7 +357,7 @@ inline bool initialize(McSession& out,const rr::game::TrackNavigationView50MC& m
         bool gatesPrepared;
     } facade{{map.track().nodes(),map.count()},map.nodes(),map.gatesPrepared()};
     McSession candidate;
-    if(!detail::initializeStorage(static_cast<SessionStorage<173>&>(candidate),
+    if(!detail::initializeStorage(static_cast<CourseSessionStorage50HM&>(candidate),
             facade,laps.data(),racerCount,config)) return detail::fail(out,candidate.error);
     candidate.navigation_=map;out=std::move(candidate);return true;
 }

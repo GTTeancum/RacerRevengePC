@@ -21,7 +21,7 @@ namespace original_track_sky50KX {
 // The native root samples at presentation from its current recovered camera,
 // rather than claiming the complete retail world-service/render chronology.
 class Owner final {
-    std::array<std::int32_t,28> zoneCube_{};
+    std::array<std::int32_t,256> zoneCube_{}; // zone-row capacity (live-world zone bound)
     std::uint32_t zoneCount_=0;
     bool prepared_=false;
     static const std::string* field(const rr::assets::ParameterBlock48F& block,

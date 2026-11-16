@@ -15,6 +15,9 @@ struct SelectedControlInput50KY {
     game::ControlActionRow49D sourceActions{};
     std::uint32_t preset=0;
     bool twinEngine=false,cameraCycleBound=false,manualResetBound=false;
+    // PC enhancement: zero-g lean on packet byte 4 (right stick X; keyboard A/D),
+    // default control preset (0) only. Nothing in the original reads byte 4 there.
+    bool zeroGLean=false;
     std::int32_t cameraCycleCode=-1,manualResetCode=-1;
     std::int32_t temporaryLookCodes[2]={-1,-1};
 };
@@ -57,6 +60,13 @@ inline bool bindSelectedControlInput50KY(const game::ControlPresets49D& preferen
         if(!key(a.action694,26)||!key(a.action690,22))return false;
         result.keyboard.axes[2]={KeyboardAxisSource50DR::KeyPair,80,79,KeyboardOpposingKeys50DR::Center};
         result.keyboard.axes[3]={KeyboardAxisSource50DR::KeyPair,82,81,KeyboardOpposingKeys50DR::Center};
+    }
+    if(slot.preset11048==0u){
+        // Zero-g lean: A (SDL 4) left, D (SDL 7) right on packet byte 4, the
+        // byte the right stick X writes. Neither key is bound anywhere else in
+        // a race (checked against every key above and the host keys).
+        result.keyboard.axes[0]={KeyboardAxisSource50DR::KeyPair,4,7,KeyboardOpposingKeys50DR::Center};
+        result.zeroGLean=true;
     }
     out=result;return true;
 }

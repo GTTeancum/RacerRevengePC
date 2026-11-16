@@ -58,11 +58,11 @@ class Owner final {
   if(!bound_||faulted_||call.source.actionIndex||
      call.source.triggerCollider<mb_collision_world50MB::Owner::triggerIdentity)return false;
   const auto trigger=call.source.triggerCollider-mb_collision_world50MB::Owner::triggerIdentity;
-  if(trigger>=3)return false;
+  if(trigger>=world_->source_.liveCount())return false;
   const auto collider=g::nativeTriggerCollider50GA(world_->triggers_,call.source.otherCollider);
   if(collider>=world_->triggers_.colliders.size())return false;
   if(!call.source.entering)return servicing_&&!active_&&!suspended_&&!borrow_&&call.querySerial==0;
-  if(!active_||!borrow_||call.querySerial!=serial_||collider/2!=slot_||world_->source_.source(trigger).targetNodeIndex>=292)return false;
+  if(!active_||!borrow_||call.querySerial!=serial_||collider/2!=slot_||world_->source_.source(trigger).targetNodeIndex>=world_->aiNodeCount_)return false;
   if(!(collider&1u)&&world_->source_.source(trigger).reset)
    return borrow_->physicalOwners&&borrow_->physicalWorkspace&&borrow_->frame.fields.vehicle58==1u;
   return true;
@@ -101,13 +101,15 @@ public:
   // The root supplies identities read by genuine visits to the completed Bank.
   // Cold geometry preparation never predicts or publishes racer identities.
   for(std::size_t i=0;i<bank.count()*2;++i){const auto id=actualRacerIdentities[i/2][i%2];
-   if(!id||(id>=world->triggerIdentity&&id<world->triggerIdentity+3))return false;
+   if(!id||(id>=world->triggerIdentity&&id<world->triggerIdentity+mb_trigger_authoring::capacity))return false;
    for(std::size_t j=0;j<i;++j)if(actualRacerIdentities[j/2][j%2]==id)return false;
   }
   if(!world->triggers_.colliders.setCount(bank.count()*2))return false;
   for(std::size_t i=0;i<bank.count()*2;++i)world->triggers_.colliders[i].identity=actualRacerIdentities[i/2][i%2];
-  for(std::size_t i=0;i<3;++i){world->triggers_.ignoreColliderCount[i]=playerPrefixCount34;
-   for(std::size_t j=0;j<playerPrefixCount34;++j)world->triggers_.ignoreColliders[i][j]=actualRacerIdentities[j][0];
+  // IgnoreTrigger PLAYER: the player-prefix main colliders (absent = none).
+  for(std::size_t i=0;i<world->source_.liveCount();++i){const bool ignore=world->source_.source(i).ignorePlayer;
+   world->triggers_.ignoreColliderCount[i]=ignore?playerPrefixCount34:0;
+   if(ignore)for(std::size_t j=0;j<playerPrefixCount34;++j)world->triggers_.ignoreColliders[i][j]=actualRacerIdentities[j][0];
   }
   if(!bank.bindSourceQueryOwner(*this,generation_))return false;
   bank_=&bank;world_=std::move(world);world_->triggers_.ready=true;world_->actionOwner_=this;bound_=true;
@@ -180,7 +182,7 @@ public:
   servicing_=true;
   struct End {Owner& owner;~End(){owner.servicing_=false;}} end{*this};
   const auto fail=[&](){faulted_=true;return false;};
-  for(std::size_t t=0;t<3;++t){const auto& state=world_->triggers_.triggers[t];const auto& source=world_->source_.source(t);
+  for(std::size_t t=0;t<world_->source_.liveCount();++t){const auto& state=world_->triggers_.triggers[t];const auto& source=world_->source_.source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t i=0;i<state.collider.highWaterD0;++i){const auto id=state.collider.membersCC[i];if(!id)continue;
     const auto c=g::nativeTriggerCollider50GA(world_->triggers_,id);if(c>=world_->triggers_.colliders.size()||!geometry_[c].valid)return fail();

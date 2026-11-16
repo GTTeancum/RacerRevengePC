@@ -1,4 +1,5 @@
 #pragma once
+#include "course_archive_receipt50ci.h"
 #include "mc_cold_sources50la.h"
 #include "authored_runtime_ground50cp_fixture.h"
 #include <memory>
@@ -57,14 +58,16 @@ public:
  // source strings in this fixed libstdc++ parent profile. Recheck retained
  // capacities after preparation; do not reclaim this reservation early.
  static std::size_t maximumDescriptorPayloadBytes(const mc_cold_sources50LA::Owner& source)noexcept {
-  if(!source.ready()||source.world().instances.size()!=458)return std::numeric_limits<std::size_t>::max();
+  if(!source.ready())return std::numeric_limits<std::size_t>::max();
   std::size_t world=0;worldBytes(world,source.world());
   std::size_t n=sizeof(Owner)+sizeof(original::ColdScene);add(n,world);add(n,world);
-  add(n,89u*sizeof(typename decltype(original::ColdScene::owners)::value_type));
   std::size_t count=0;for(const auto& i:source.world().instances)if(hasCollisionMember(source.archive(),i.collision_member)){
    ++count;const auto text=std::max<std::size_t>(15,i.collision_member.size())+1;add(n,text);add(n,text);
   }
-  if(count!=89)return std::numeric_limits<std::size_t>::max();
+  // Placed COL owners from the data (the stock count is a receipt), bounded
+  // by the native collision owner store.
+  if(!count||count>original::hardCollisionOwners50IG)return std::numeric_limits<std::size_t>::max();
+  add(n,count*sizeof(typename decltype(original::ColdScene::owners)::value_type));
   // Exact MC scene path and retained3097-byte WTT; full original
   //260-byte path extent for both staging and retained string is conservative.
   add(n,4u*260u+2u*3097u+65536u);return n;
@@ -75,10 +78,9 @@ public:
   if(thread_!=std::this_thread::get_id()){error="MC ground owner thread mismatch";return false;}
   if(attempted_){error="MC ground owner already attempted";return false;}attempted_=true;
   try{
-   need(source&&source->ready()&&source->world().zones.size()==28&&source->world().portals.size()==28&&
-       source->world().instances.size()==458&&source->map().gatesPrepared()&&source->map().count()==173&&
-       source->ai().gatesPrepared()&&source->ai().count()==173,
-       "MC ground requires actual authenticated source and exact gate extents");
+   need(source&&source->ready()&&!source->world().zones.empty()&&source->map().gatesPrepared()&&source->map().count()&&
+       source->ai().gatesPrepared()&&source->ai().count(),
+       "MC ground requires the actual cold source and prepared gates");
    auto next=std::make_unique<original::ColdScene>();next->world=source->world();
    next->stackCount=1; // No retained JSON audit allocation; source receipts are external.
    for(std::size_t zone=0;zone<next->world.zones.size();++zone){
@@ -90,7 +92,8 @@ public:
    }
    std::size_t count=0;for(const auto& instance:next->world.instances)
     if(hasCollisionMember(source->archive(),instance.collision_member))++count;
-   need(count==89&&count<=original::hardCollisionOwners50IG,"MC exact placed COL count");
+   course_archive_receipt50CI::countReceipt("mc_runtime_ground","placed_col",count,89);
+   need(count&&count<=original::hardCollisionOwners50IG,"MC placed COL count exceeds the native collision owner store");
    // A single cold reservation precedes every mesh/name borrow. No subsequent
    // resize, sorting or deduplication is allowed after publication.
    next->owners.reserve(count);a::DecodeError48C decode;
@@ -130,7 +133,7 @@ public:
    height.sourceDomain.terrain330=g::UndertrackHeightOwner50EW::Absent;
    height.sourceDomain.water334=g::UndertrackHeightOwner50EW::Present;
    const auto graph=source->map().track();
-   need(actualGridRank<=7&&graph.count()==173,"MC actual grid rank/map bound");
+   need(actualGridRank<=7&&graph.count(),"MC actual grid rank/map bound");
    std::uint32_t previous=0;
    for(;previous<graph.count();++previous){const auto& node=graph.nodes()[previous];
     need(node.nextCount&&node.nextCount<=g::maxUndertrackNext50ET,"MC grid predecessor edge");

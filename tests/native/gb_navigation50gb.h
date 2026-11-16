@@ -1,5 +1,6 @@
 #pragma once
 #include "gb_cold_sources50la.h"
+#include "course_navigation_topology50nt.h"
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -20,22 +21,8 @@ class Owner final {
     Phase phase_=Phase::Empty;
     bool fail(Diagnostic& d,const char* message){d.phase=phase_;d.message=message;return false;}
     bool topologyMatches(const g::LiveZoneWorld50EN& actual) const {
-        if(actual.zoneCount!=13||actual.portalCount!=17||actual.portalLinkCount!=34||
-           !actual.portalHeads||!actual.portalLinks||!actual.portals)return false;
-        // Ephemeral ordered verification only; no alternate live world escapes.
-        g::CollectionRef50BX heads[13]{};g::LiveZonePortalLink50EN links[34]{};
-        g::PortalGeometry50EO portals[17]{};g::LiveZoneWorld50EN expected{};
-        const g::LiveZoneWorldStorage50EN backing{heads,13,links,34,portals,17};
-        if(g::prepareLiveZoneWorld50EN(source_->navigation_->authoredPortals,17,13,backing,expected)!=
-            g::LiveZoneStatus50EN::Complete)return false;
-        for(std::size_t i=0;i<13;++i)if(actual.portalHeads[i]!=heads[i])return false;
-        for(std::size_t i=0;i<34;++i){const auto& p=actual.portalLinks[i];
-            if(p.next!=links[i].next||p.zone!=links[i].zone||p.portal!=links[i].portal)return false;}
-        for(std::size_t i=0;i<17;++i){
-            if(std::memcmp(actual.portals[i].vertices,portals[i].vertices,sizeof portals[i].vertices)||
-               std::memcmp(&actual.portals[i].normal,&portals[i].normal,sizeof portals[i].normal)||
-               std::memcmp(actual.portals[i].edgeNormals,portals[i].edgeNormals,sizeof portals[i].edgeNormals))return false;}
-        return true;
+        const auto& s=*source_->navigation_;
+        return course_navigation_topology50NT::matches(s.authoredPortals,s.authoredPortalCount,s.authoredZoneCount,actual);
     }
 public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
@@ -45,7 +32,7 @@ public:
     static constexpr std::size_t persistentPayloadBytes() noexcept {return sizeof(storage::Indices);}
     static constexpr std::size_t ownerBytes() noexcept {return sizeof(Owner);}
     static constexpr std::size_t topologyScratchBytes() noexcept {
-        return 13*sizeof(g::CollectionRef50BX)+34*sizeof(g::LiveZonePortalLink50EN)+17*sizeof(g::PortalGeometry50EO)+sizeof(g::LiveZoneWorld50EN);
+        return course_navigation_topology50NT::scratchBytes();
     }
     Phase phase() const noexcept {return phase_;}
     bool runtimeReady() const noexcept {return ownerThread_==std::this_thread::get_id()&&source_&&source_->ready()&&
@@ -54,8 +41,8 @@ public:
         d={};if(ownerThread_!=std::this_thread::get_id())return fail(d,"GB navigation owner thread mismatch");
         if(prepareAttempted_)return fail(d,"GB navigation source preparation is one-attempt");
         prepareAttempted_=true;phase_=Phase::Source;
-        if(!source||!source->ready()||source->map().count()!=213||source->ai().count()!=257)
-            return fail(d,"GB authentic complete cold source required");
+        if(!source||!source->ready()||!source->map().count()||!source->ai().count())
+            return fail(d,"GB complete cold source required");
         source_=std::move(source);phase_=Phase::Prepared;d.phase=phase_;return true;
     }
     bool bindWorld(const g::GbCollisionWorldLease& lease,Diagnostic& d){
@@ -70,12 +57,12 @@ public:
             struct Navigation {Graph track;const g::TrackNavigationNode50EU* nodes;
                 std::uint8_t* nodeIndex78;bool gatesPrepared,indicesPrepared;};
             const auto& s=*source_->navigation_;
-            Navigation map{{s.map.track.nodes,213},s.map.nodes,next->map,true,false};
-            Navigation ai{{s.ai.track.nodes,257},s.ai.nodes,next->ai,true,false};
+            Navigation map{{s.map.track.nodes,s.map.track.count},s.map.nodes,next->map,true,false};
+            Navigation ai{{s.ai.track.nodes,s.ai.track.count},s.ai.nodes,next->ai,true,false};
             phase_=Phase::MapIndices;
-            if(!g::navigation_detail50MB::bind<213>(*lease.world(),map,d.navigation))return fail(d,"GB full213 MAP zone indices rejected");
+            if(!g::navigation_detail50MB::bind<g::courseNavigationCapacity50MB>(*lease.world(),map,d.navigation))return fail(d,"GB MAP zone indices rejected");
             phase_=Phase::AiIndices;
-            if(!g::navigation_detail50MB::bind<257>(*lease.world(),ai,d.navigation))return fail(d,"GB full257 AI zone indices rejected");
+            if(!g::navigation_detail50MB::bind<g::courseNavigationCapacity50MB>(*lease.world(),ai,d.navigation))return fail(d,"GB AI zone indices rejected");
             indices_=std::move(next);phase_=Phase::RuntimeReady;d.phase=phase_;return true;
         }catch(const std::exception& e){return fail(d,e.what());}
     }

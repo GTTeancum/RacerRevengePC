@@ -1923,7 +1923,7 @@ SessionExit50DU Context::run() {
     if(!secondaryRow)return false;
     auto removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
     if(removed.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
-    for(std::size_t i=0;i<3;++i){auto* member=mbCollisionWorld->triggerMembership(i);if(!member)return false;
+    for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){auto* member=mbCollisionWorld->triggerMembership(i);if(!member)return false;
      removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,member->state,membershipWork);
      if(removed.status!=LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;
     }
@@ -2925,17 +2925,27 @@ SessionExit50DU Context::run() {
   std::string error;const bool ready=scZeroSky.prepare(scColdSources,error);
   require50DU(ready,error.empty()?"SC zero-sky authoring rejected":error.c_str());
  }
- // MA/SA/GA take the same data branch: the course world owner holds the archive
- // it admitted and actualWorld is that archive's SCB. [Environment]
- // NumberOfSkyCubes (default 1) decides; the cube, its tiles and the clear
- // colour come from the data (sky_course_data50gw.inl), zone rows from
- // CubeFileForZoneN (original_track_sky50kx prepareFromCourseData). The
- // legacy export route (no course world owner) keeps the stock rows.
+ // Every course with a course world owner takes the same data branch: the
+ // owner holds the archive it admitted and actualWorld is that archive's SCB.
+ // [Environment] NumberOfSkyCubes (default 1) decides; the cube (the CUB's
+ // own base cube), its tiles and the clear colour come from the data
+ // (sky_course_data50gw.inl), zone rows from CubeFileForZoneN
+ // (original_track_sky50kx prepareFromCourseData). Decoded archives: MA, SA,
+ // GA, MB, TC, TA, GC; indexed (compact) archives: GB, TB, RC. The legacy
+ // export route (no course world owner) keeps the stock rows.
+ // PORT STAND-IN (flagged): MC keeps its own sky owner (mc_sky50MC, its own
+ // payload ledger and clear-colour route) and RA its own route this round.
  const rr::assets::ResArchive48C* courseWorldArchive=
      isMaTrack&&maOriginalWorld?maOriginalWorld->archive():isSaTrack&&saOriginalWorld?saOriginalWorld->archive():
-     isGaTrack&&gaOriginalWorld?gaOriginalWorld->archive():nullptr;
+     isGaTrack&&gaOriginalWorld?gaOriginalWorld->archive():isMbTrack&&mbOriginalWorld?mbOriginalWorld->archive():
+     isTcTrack&&tcOriginalWorld?tcOriginalWorld->archive():isTaTrack&&taOriginalWorld?taOriginalWorld->archive():
+     isGcTrack&&gcOriginalWorld?gcOriginalWorld->archive():nullptr;
+ const rr::assets::IndexedResArchive48C* courseIndexedArchive=
+     isGbTrack&&gbColdSources?&gbColdSources->archive():isTbTrack&&tbColdSources?&tbColdSources->archive():
+     isRcTrack&&rcColdSources?&rcColdSources->archive():nullptr;
+ const bool courseDataSky=courseWorldArchive||courseIndexedArchive;
  bool courseZoneSkyRows=false;
- if(courseWorldArchive){
+ if(courseDataSky){
   const rr::assets::ParameterBlock48F* environment=nullptr;
   for(const auto& b:actualWorld.parameters.blocks)if(b.name=="environment")environment=&b;
   long cubes=1;
@@ -2945,7 +2955,7 @@ SessionExit50DU Context::run() {
    if(f.name.rfind("cubefileforzone",0)==0)courseZoneSkyRows=true;
   }
   // PORT STAND-IN (flagged): the zero-sky owner is built from SC's cold source
-  // only; a MA/SA/GA archive authoring zero cubes is refused, not misdrawn.
+  // only; another course archive authoring zero cubes is refused, not misdrawn.
   require50DU(cubes>0,"course archive authors zero sky cubes: zero-sky owner for this course not built");
  }
  // Late environment storage participates in the parent's same MC payload ledger.
@@ -2982,18 +2992,21 @@ SessionExit50DU Context::run() {
   const bool loaded=mcSkyOwner->prepare(mcColdSources,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.c_str());
   reserveMcEnvironment(mcSkyOwner->retainedPayloadBytes(),"MC retained sky exceeds remaining payload");
- }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
-  const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
-  require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
- }else if(courseWorldArchive){
-  const bool loaded=skyOwner->loadFromCourseData(*courseWorldArchive,actualWorld,skyDiagnostic);
+ }else if(courseDataSky){
+  const bool loaded=courseWorldArchive?skyOwner->loadFromCourseData(*courseWorldArchive,actualWorld,skyDiagnostic):
+      skyOwner->loadFromCourseData(*courseIndexedArchive,actualWorld,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
   std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
       <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
   // Stock comparison receipt: every value the stock sky row pinned, against
   // what the data path read (a stock archive must report match=1 on each).
-  {
-   const auto& row=sky50gw_fixture::detail::source(trackSource);
+  // Receipt only: a course whose stock sky was never pinned (GB, TC, ...)
+  // has no stock row; that is logged, never a refusal.
+  const sky50gw_fixture::detail::Source* stockSkyRow=nullptr;
+  try{stockSkyRow=&sky50gw_fixture::detail::source(trackSource);}catch(const std::exception&){stockSkyRow=nullptr;}
+  if(!stockSkyRow)std::cerr<<"course_sky_stock_compare track="<<trackSession->world->code<<" stock_row=none\n";
+  else{
+   const auto& row=*stockSkyRow;
    const rr::assets::ParameterBlock48F* environment=nullptr;const rr::assets::ParameterBlock48F* fog=nullptr;
    for(const auto& b:actualWorld.parameters.blocks){if(b.name=="environment")environment=&b;if(b.name=="fog")fog=&b;}
    const auto value=[](const rr::assets::ParameterBlock48F* b,const char* key)->std::string{
@@ -3002,7 +3015,8 @@ SessionExit50DU Context::run() {
    std::string member="skies\\"+cube,stockMember=row.cubMember;
    const auto lower=[](std::string t){for(auto& c:t)if(c>='A'&&c<='Z')c=static_cast<char>(c+32);return t;};
    std::vector<std::uint8_t> cub;rr::assets::DecodeError48C cubError;
-   const bool cubRead=rr::assets::extractResMember48C(*courseWorldArchive,member,cub,cubError);
+   const bool cubRead=courseWorldArchive?rr::assets::extractResMember48C(*courseWorldArchive,member,cub,cubError):
+       courseIndexedArchive->extractMember(member,cub,cubError,8u*1024u*1024u);
    const bool cubMatch=cubRead&&cub.size()==row.cubBytes&&pod_materials50ed_fixture::detail::sha256(cub)==row.cubSha;
    const bool scbMatch=actualWorld.parameters.original_bytes.size()==row.sceneBytes&&
        pod_materials50ed_fixture::detail::sha256(actualWorld.parameters.original_bytes)==row.sceneSha;
@@ -3024,15 +3038,19 @@ SessionExit50DU Context::run() {
   require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
   std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
       <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
+ }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
+  // Legacy export route of a compact course (no course world owner).
+  const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
+  require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
  }else if(!isScTrack)require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  original_track_sky50KX::Owner sourceSkySelection;
- // MA/SA always select per zone (rows default to cube 1); GA joins when its
- // data authors CubeFileForZone rows.
- if(isMaSaTrack||(isGaTrack&&courseWorldArchive&&courseZoneSkyRows)||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
+ // MA/SA/MB/TC/RC/TB/GB/MC always select per zone (rows default to cube 1);
+ // GA, TA and GC join when their data authors CubeFileForZone rows.
+ if(isMaSaTrack||((isGaTrack||isTaTrack||isGcTrack)&&courseDataSky&&courseZoneSkyRows)||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
   std::string skySelectionError;
   const bool skySelected=scAuthoredSky?sourceSkySelection.prepareFromCourseData(scSkyData->world,skySelectionError):
-      courseWorldArchive?sourceSkySelection.prepareFromCourseData(actualWorld,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
+      courseDataSky?sourceSkySelection.prepareFromCourseData(actualWorld,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
       (isMbTrack?sourceSkySelection.prepareMbSource(*mbOriginalWorld,skySelectionError):
       sourceSkySelection.prepare(actualWorld,trackSource,skySelectionError));
   require50DU(skySelected,skySelectionError.empty()?"source zone-selected sky authoring rejected":skySelectionError.c_str());
@@ -3908,7 +3926,7 @@ SessionExit50DU Context::run() {
      if(!secondaryRow)return false;
      auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
      if(r.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
-     for(std::size_t i=0;i<3;++i){auto* membership=mbCollisionWorld->triggerMembership(i);
+     for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){auto* membership=mbCollisionWorld->triggerMembership(i);
       if(!membership)return false;
       r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership->state,membershipWork);
       if(r.status!=LiveZoneStatus50EN::Complete||membership->state.attached||membership->state.object)return false;

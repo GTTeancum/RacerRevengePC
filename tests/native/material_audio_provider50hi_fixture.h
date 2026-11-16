@@ -137,7 +137,9 @@ public:
             d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
                 "RC actual material host range64..79 unavailable");
             std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::rc);
-            d::need(source->extractMember(selected->aubName,aub,decode,selected->aubBytes),
+            // Found by name, bounded by the shared course-archive capacity;
+            // the stock AUB size is a receipt (prepareCatalog).
+            d::need(source->extractMember(selected->aubName,aub,decode,course_archive_receipt50CI::maximumArchiveBytes()),
                 "RC same-source AUB extraction rejected");
             rcSource_=std::move(source);
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::rc,*selected);
@@ -154,7 +156,9 @@ public:
             d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
                 "TB actual material host range64..79 unavailable");
             std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::tb);
-            d::need(source->extractMember(selected->aubName,aub,decode,selected->aubBytes),
+            // Found by name, bounded by the shared course-archive capacity;
+            // the stock AUB size is a receipt (prepareCatalog).
+            d::need(source->extractMember(selected->aubName,aub,decode,course_archive_receipt50CI::maximumArchiveBytes()),
                 "TB same-source AUB extraction rejected");
             tbSource_=std::move(source);
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::tb,*selected);
@@ -171,7 +175,9 @@ public:
             d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
                 "GB actual material host range64..79 unavailable");
             std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::gb);
-            d::need(source->extractMember(selected->aubName,aub,decode,selected->aubBytes),
+            // Found by name, bounded by the shared course-archive capacity;
+            // the stock AUB size is a receipt (prepareCatalog).
+            d::need(source->extractMember(selected->aubName,aub,decode,course_archive_receipt50CI::maximumArchiveBytes()),
                 "GB same-source AUB extraction rejected");
             gbSource_=std::move(source);
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::gb,*selected);
@@ -188,7 +194,7 @@ public:
             d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
                 "MC actual material host range64..79 unavailable");
             std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::mc);
-            d::need(source->archive().extractMember(selected->aubName,aub,decode,selected->aubBytes),
+            d::need(source->archive().extractMember(selected->aubName,aub,decode,course_archive_receipt50CI::maximumArchiveBytes()),
                 "MC same-source AUB extraction rejected");
             mcSource_=std::move(source);
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::mc,*selected);
@@ -236,16 +242,24 @@ private:
             }
             course_archive_receipt50CI::countReceipt("material_audio","unique_clips",requests.size(),selected->uniqueClips);
             d::need(a::loadAudioBank50HC(audioRoot,requests,bank_,error),"50HI real material PCM bank failed");
-            if(track==Track::rc)for(const auto& clip:bank_.clips)d::need(rc_audio_originals50RC::authentic(clip),"RC actual material PCM identity differs");
-            if(track==Track::tb)for(const auto& clip:bank_.clips)d::need(tb_audio_originals50TB::authentic(clip),"TB actual material PCM identity differs");
+            // Stock PCM identities and GB/MC traversal counts: receipts (the
+            // clips are the disc's own sfx files the AUB names).
+            const auto pcmReceipt=[&](const char* site,auto&& authentic){std::size_t other=0;
+                for(const auto& clip:bank_.clips)if(!authentic(clip))++other;
+                course_archive_receipt50CI::countReceipt(site,"non_stock_pcm",other,0);};
+            if(track==Track::rc)pcmReceipt("material_audio_rc",[](const auto& c){return rc_audio_originals50RC::authentic(c);});
+            if(track==Track::tb)pcmReceipt("material_audio_tb",[](const auto& c){return tb_audio_originals50TB::authentic(c);});
             if(track==Track::mc){
-                d::need(catalog_.orderedObjectMaterials.size()==3,"MC exact source material assignment count differs");
-                for(const auto& clip:bank_.clips)d::need(mc_material_audio_originals50MC::authentic(clip),"MC actual material PCM identity differs");
+                course_archive_receipt50CI::countReceipt("material_audio_mc","object_materials",catalog_.orderedObjectMaterials.size(),3);
+                pcmReceipt("material_audio_mc",[](const auto& c){return mc_material_audio_originals50MC::authentic(c);});
             }
             if(track==Track::gb){
-                d::need(catalog_.orderedObjectMaterials.size()==38,"GB exact material assignment count differs");
-                for(std::size_t i=0;i<20;++i)d::need(catalog_.collisionSectionKeys[i]==i+1&&catalog_.driveSectionKeys[i]==i+1,"GB exact material section identity differs");
-                for(const auto& clip:bank_.clips)d::need(gb_audio_originals50GB::authentic(clip),"GB actual material PCM identity differs");
+                course_archive_receipt50CI::countReceipt("material_audio_gb","object_materials",catalog_.orderedObjectMaterials.size(),38);
+                std::size_t reread=0;
+                for(std::size_t i=0;i<collisionRowCount_;++i)if(catalog_.collisionSectionKeys[i]!=i+1)++reread;
+                for(std::size_t i=0;i<driveRowCount_;++i)if(catalog_.driveSectionKeys[i]!=i+1)++reread;
+                course_archive_receipt50CI::countReceipt("material_audio_gb","reread_sections",reread,0);
+                pcmReceipt("material_audio_gb",[](const auto& c){return gb_audio_originals50GB::authentic(c);});
             }
             // All source owners retain distinct slots, including SA17..32,
             // whose source section selection rereads16. Only PCM is shared.

@@ -63,10 +63,12 @@ using navigation_storage_detail50MB::Navigation;
 using navigation_storage_detail50MB::Scratch;
 using navigation_storage_detail50MB::Metadata;
 struct Storage final {
-    Navigation<173> map;Navigation<173> ai;
-    Metadata<173> mapMetadata;Metadata<173> aiMetadata;
-    std::array<std::uint32_t,173> mapFieldMask{};
-    LiveZonePortalInput50EN authoredPortals[28]{};
+    // Shared capacity store (track_navigation_view50mb.h); live counts.
+    Navigation<courseNavigationCapacity50MB> map;Navigation<courseNavigationCapacity50MB> ai;
+    Metadata<courseNavigationCapacity50MB> mapMetadata;Metadata<courseNavigationCapacity50MB> aiMetadata;
+    std::array<std::uint32_t,courseNavigationCapacity50MB> mapFieldMask{};
+    LiveZonePortalInput50EN authoredPortals[courseNavigationPortalCapacity50MB]{};
+    std::uint32_t authoredZoneCount=0,authoredPortalCount=0; // live counts from the SCB
     const mc_cold_sources50LA::Owner* const sourceIdentity;
     const std::thread::id ownerThread=std::this_thread::get_id();
     bool gatesReady=false;
@@ -76,7 +78,7 @@ private:
     friend class ::mc_cold_sources50LA::Owner;
 };
 struct Indices final {
-    std::uint8_t map[173]{},ai[173]{};
+    std::uint8_t map[courseNavigationCapacity50MB]{},ai[courseNavigationCapacity50MB]{};
     const McCollisionWorldLease world;
 private:
     explicit Indices(const McCollisionWorldLease& lease):world(lease){}
@@ -99,9 +101,9 @@ public:
     bool valid() const noexcept {return source_&&storage_&&
         storage_->ownerThread==std::this_thread::get_id()&&storage_->sourceIdentity==source_.get()&&storage_->gatesReady;}
     bool runtimeValid() const noexcept {return valid()&&indices_&&indices_->world.valid()&&
-        indices_->world.sourceIdentity()==source_.get()&&count()==capacity();}
+        indices_->world.sourceIdentity()==source_.get()&&count()&&count()<=capacity();}
     NavigationRole50MC role() const noexcept {return role_;}
-    std::size_t capacity() const noexcept {return valid()?(role_==NavigationRole50MC::Map?173u:173u):0u;}
+    std::size_t capacity() const noexcept {return valid()?courseNavigationCapacity50MB:0u;}
     std::uint32_t count() const noexcept {return valid()?(role_==NavigationRole50MC::Map?storage_->map.track.count:storage_->ai.track.count):0u;}
     const UndertrackNode50ET* nodes() const noexcept {return valid()?(role_==NavigationRole50MC::Map?storage_->map.track.nodes:storage_->ai.track.nodes):nullptr;}
 };

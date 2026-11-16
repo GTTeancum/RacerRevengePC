@@ -4,6 +4,7 @@
 #include "terrain_interactive_world50du.h"
 #include "terrain_interactive_loop_types50du.h"
 #include "runtime_allocation_counter50fl.h"
+#include "../../src/game/native_zero_gravity50zg.h"
 #include "type2_fixture_io50i.h" // Sole non-inline reader implementation provider.
 #include "runtime_startup50fl_fixture.h"
 #include "runtime_asset_paths50lb.h"
@@ -274,6 +275,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  rr::platform::SelectedControlInput50KY humanControlInput{};
  require50DU(allAiEnabled||rr::platform::bindSelectedControlInput50KY(controlPresets,
      playerActionIndexFFC,playerSource5C,humanControlInput),"selected human preset/configuration is outside the exposed original rows");
+ // PC enhancement (native_zero_gravity50zg.h): the player's zero-g lean is
+ // bound in the default control preset only (right stick X; keyboard A/D).
+ rr::game::zeroGravity50ZG.setHumanLeanBound(!allAiEnabled&&humanControlInput.zeroGLean);
+ std::cerr<<"zero_g_lean bound="<<(!allAiEnabled&&humanControlInput.zeroGLean?1:0)
+     <<" preset="<<humanControlInput.preset<<'\n';
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
  // Product Course owns one real Player and seven original AI. This is a
  // separate native roster, never the legacy one-AI diagnostic slice.

@@ -1,6 +1,7 @@
 #pragma once
 // MC-only source-backed semantic projection. Not compiled or run in this packet.
 // Shared decodeWorld48F/validateWorldSemantics48F remain unchanged and strict.
+#include <iostream>
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/import_world48f.h"
 #include <algorithm>
@@ -137,8 +138,10 @@ inline bool decodeWorld(const std::vector<std::uint8_t>& input, World48F& output
     using namespace detail;
     error = {};
     try {
-        require(input.size()==187711&&pod_materials50ed_fixture::detail::sha256(input)=="26f5d637533ee9840e916e02d5cef7b06d68352f1b7e0b11a48bf050d73df51e",
-            DecodeKind48C::malformed,"mc.world.identity",0,"Exact original MC SCB required");
+        // Common course rule (course_archive_receipt50ci.h): the stock SCB
+        // identity is a receipt; the decoder's own rules below admit the data.
+        if(!(input.size()==187711&&pod_materials50ed_fixture::detail::sha256(input)=="26f5d637533ee9840e916e02d5cef7b06d68352f1b7e0b11a48bf050d73df51e"))
+            std::cerr<<"course_member_identity site=mc_world_semantics member=tracks\\mc.scb bytes="<<input.size()<<" stock=0\n";
         World48F world;auto representationLimits=limits;representationLimits.retainDuplicateLabels=true;
         if(!decodeParameters48F(input,world.parameters,error,hooks,representationLimits))return false;
         for(const auto& block:world.parameters.blocks)for(std::size_t i=1;i<block.fields.size();++i)

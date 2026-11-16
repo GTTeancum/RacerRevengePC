@@ -12,6 +12,7 @@
 #include "../../src/assets/import_world48f.h"
 #include <cfenv>
 #include <charconv>
+#include <iostream>
 #include <string>
 
 // Cold authenticated bridge for original TA/GC/GA/MA/SA/RA/MB/TC sky members. Cube geometry is the direct
@@ -390,6 +391,9 @@ class Owner final {
     std::unique_ptr<Storage> storage_;
     std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
     bool loadGb(const Request&,Diagnostic&) noexcept;
+    // One body for both archive kinds; extract(member,bytes,error) reads one
+    // named member of the course's own archive (sky_course_data50gw.inl).
+    template<class Extract> bool loadCourseDataWith(Extract&& extract,const a::World48F& world,Diagnostic& d) noexcept;
 public:
     // Course-neutral single-cube load from an already decoded course archive
     // and the World48F decoded from that archive's SCB (the course's own cold
@@ -397,6 +401,9 @@ public:
     // sky_course_data50gw.inl. No identity pins: member names, tile extents and
     // clear colour all come from the data; CUB format is still enforced.
     bool loadFromCourseData(const a::ResArchive48C& archive,const a::World48F& world,
+        Diagnostic& d) noexcept;
+    // Same rule for a course held as an indexed (compact) archive: GB, TB, RC.
+    bool loadFromCourseData(const a::IndexedResArchive48C& archive,const a::World48F& world,
         Diagnostic& d) noexcept;
     Owner() = default;
     Owner(const Owner&) = delete;

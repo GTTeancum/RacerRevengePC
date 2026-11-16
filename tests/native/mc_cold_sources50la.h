@@ -8,6 +8,7 @@
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/ai_authoring50iu.h"
 #include "../../src/assets/original_standard_archive_provider50la.h"
+#include "../../src/assets/original_track_cut_identity50la.h"
 #include "../../src/game/track_navigation_view50mc.h"
 #include "../../src/game/track_navigation_shared50mb.inl"
 #include <array>
@@ -93,7 +94,7 @@ public:
    instances*(sizeof(std::string)+4*sizeof(void*)+256)+65536;
  }
  static constexpr std::size_t navigationPayloadBytes()noexcept{return sizeof(NavigationStorage);}
- static constexpr std::size_t gateScratchBytes()noexcept{return sizeof(storage::Scratch<173>)+sizeof(storage::Metadata<173>)+173u;}
+ static constexpr std::size_t gateScratchBytes()noexcept{return sizeof(storage::Scratch<g::courseNavigationCapacity50MB>)+sizeof(storage::Metadata<g::courseNavigationCapacity50MB>)+g::courseNavigationCapacity50MB;}
  std::size_t retainedPayloadBytes()const noexcept {
   if(thread_!=std::this_thread::get_id())return 0;std::size_t n=sizeof(Owner);
   if(archive_)add(n,archive_->retainedPayloadBytes());
@@ -127,42 +128,57 @@ public:
    if(!reserve(availableCpuPayloadBytes,sizeof(NavigationStorage),d))return fail(d,"MC exact navigation storage exceeds remaining budget");
    navigation_.reset(new NavigationStorage(this));
    phase_=Phase::World;
-   {if(!reserve(availableCpuPayloadBytes,parameterDecodeReservation(sources[0].bytes,557,2685,458)+4*sources[0].bytes,d))return fail(d,"MC World reservation exceeds remaining budget");
-    std::vector<std::uint8_t> raw;a::WorldLimits48F options;options.input_bytes=sources[0].bytes;options.blocks=557;options.fields_per_block=29;
-    options.zones=28;options.portals=28;options.instances=458;
-    if(!member(0,raw,d)||!mc_world_semantics50MC::decodeWorld(raw,world_,d.decode,nullptr,options)||world_.zones.size()!=28||world_.portals.size()!=28||world_.instances.size()!=458)
-     return fail(d,"MC source-backed complete World rejected");
-    for(std::size_t i=0;i<zoneCount;++i)if(world_.zones[i].zone!=i+1)return fail(d,"MC source zone order rejected");
-    for(std::size_t i=0;i<portalCount;++i){const auto& p=world_.portals[i];auto& target=navigation_->authoredPortals[i];
+   // Common course rule (SC's model): shared decoder limits and the SCB's own
+   // counts; the stock extents are receipts. Phase reservation from the member
+   // actually read (stock densities as the estimate), retained World re-checked.
+   {std::vector<std::uint8_t> raw;if(!member(0,raw,d))return fail(d,"MC World member missing");
+    if(!reserve(availableCpuPayloadBytes,parameterDecodeReservation(raw.size(),557,2685,458)+4*raw.size(),d))return fail(d,"MC World parse phase reservation exceeds remaining budget");
+    a::WorldLimits48F options;options.input_bytes=std::max(options.input_bytes,raw.size());
+    if(!mc_world_semantics50MC::decodeWorld(raw,world_,d.decode,nullptr,options)||world_.zones.empty()||world_.zones.size()>256||
+       world_.portals.size()>g::courseNavigationPortalCapacity50MB)
+     return fail(d,"MC World rejected (decode, or zones/portals beyond the shared navigation capacity)");
+    course_archive_receipt50CI::countReceipt("mc_cold_sources","zones",world_.zones.size(),zoneCount);
+    course_archive_receipt50CI::countReceipt("mc_cold_sources","portals",world_.portals.size(),portalCount);
+    course_archive_receipt50CI::countReceipt("mc_cold_sources","instances",world_.instances.size(),458);
+    if(!reserve(availableCpuPayloadBytes,0,d))return fail(d,"MC retained World exceeds remaining budget");
+    for(std::size_t i=0;i<world_.zones.size();++i)if(world_.zones[i].zone!=i+1)return fail(d,"MC source zone order rejected");
+    navigation_->authoredZoneCount=static_cast<std::uint32_t>(world_.zones.size());
+    navigation_->authoredPortalCount=static_cast<std::uint32_t>(world_.portals.size());
+    for(std::size_t i=0;i<world_.portals.size();++i){const auto& p=world_.portals[i];auto& target=navigation_->authoredPortals[i];
      target.zoneA=p.zones[0];target.zoneB=p.zones[1];
      // Source projection retains decimal -> binary64 -> binary32 values.
      for(unsigned j=0;j<4;++j)for(unsigned k=0;k<3;++k)target.vertices[j].v[k]=static_cast<float>(p.vertices[j][k]);}}
    phase_=Phase::Tob;
-   {if(!reserve(availableCpuPayloadBytes,parameterDecodeReservation(sources[3].bytes,1268,3016,0)+4*sources[3].bytes,d))return fail(d,"MC TOB reservation exceeds remaining budget");
-    std::vector<std::uint8_t> raw;a::WorldLimits48F options;options.input_bytes=sources[3].bytes;options.blocks=1268;options.fields_per_block=14;
-    if(!member(3,raw,d)||!a::decodeParameters48F(raw,tob_,d.decode,nullptr,options)||tob_.blocks.size()!=1268)
-     return fail(d,"MC strict TOB rejected");}
+   {std::vector<std::uint8_t> raw;if(!member(3,raw,d))return fail(d,"MC TOB member missing");
+    if(!reserve(availableCpuPayloadBytes,parameterDecodeReservation(raw.size(),1268,3016,0)+4*raw.size(),d))return fail(d,"MC TOB parse reservation exceeds remaining budget");
+    a::WorldLimits48F options;options.input_bytes=std::max(options.input_bytes,raw.size());options.retainDuplicateLabels=false;
+    // Shared decoder limits; the stock block count is a receipt.
+    if(!a::decodeParameters48F(raw,tob_,d.decode,nullptr,options))return fail(d,"MC TOB rejected");
+    course_archive_receipt50CI::countReceipt("mc_cold_sources","tob_blocks",tob_.blocks.size(),1268);
+    if(!reserve(availableCpuPayloadBytes,0,d))return fail(d,"MC retained TOB exceeds remaining budget");}
    phase_=Phase::MapGates;
    {if(!reserve(availableCpuPayloadBytes,4*sources[1].bytes+gateScratchBytes(),d))return fail(d,"MC Map gate reservation exceeds remaining budget");
     std::vector<std::uint8_t> raw;if(!member(1,raw,d))return fail(d,"MC original full Map spline rejected");
-    {auto scratch=std::make_unique<storage::Scratch<173>>();
-     if(!g::navigation_detail50MB::read<173>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->map,d.navigation))return fail(d,"MC full173 Map gates rejected");
+    {auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+     if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->map,d.navigation))return fail(d,"MC Map gates rejected");
      d.mapGatesCommitted=true;
-     if(navigation_->map.track.count!=173||!navigation_->map.gatesPrepared||navigation_->map.indicesPrepared)return fail(d,"MC exact Map spline extent rejected");
+     course_archive_receipt50CI::countReceipt("mc_cold_sources","map_nodes",navigation_->map.track.count,mapNodeCount);
+     if(!navigation_->map.track.count||!navigation_->map.gatesPrepared||navigation_->map.indicesPrepared)return fail(d,"MC exact Map spline extent rejected");
      std::copy(std::begin(scratch->fieldMask),std::end(scratch->fieldMask),navigation_->mapFieldMask.begin());
     }
     phase_=Phase::MapMetadata;
-    if(!a::ai_authoring_detail50IU::readTrackMetadata<173>(reinterpret_cast<const char*>(raw.data()),raw.size(),navigation_->map,navigation_->mapMetadata,d.metadata))return fail(d,"MC full Map metadata rejected");}
+    if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),navigation_->map,navigation_->mapMetadata,d.metadata))return fail(d,"MC full Map metadata rejected");}
    phase_=Phase::AiGates;
    {if(!reserve(availableCpuPayloadBytes,4*sources[2].bytes+gateScratchBytes(),d))return fail(d,"MC Ai gate reservation exceeds remaining budget");
     std::vector<std::uint8_t> raw;if(!member(2,raw,d))return fail(d,"MC original full Ai spline rejected");
-    {auto scratch=std::make_unique<storage::Scratch<173>>();
-     if(!g::navigation_detail50MB::read<173>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->ai,d.navigation))return fail(d,"MC full173 Ai gates rejected");
+    {auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+     if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->ai,d.navigation))return fail(d,"MC Ai gates rejected");
      d.aiGatesCommitted=true;
-     if(navigation_->ai.track.count!=173||!navigation_->ai.gatesPrepared||navigation_->ai.indicesPrepared)return fail(d,"MC exact Ai spline extent rejected");
+     course_archive_receipt50CI::countReceipt("mc_cold_sources","ai_nodes",navigation_->ai.track.count,aiNodeCount);
+     if(!navigation_->ai.track.count||!navigation_->ai.gatesPrepared||navigation_->ai.indicesPrepared)return fail(d,"MC exact Ai spline extent rejected");
     }
     phase_=Phase::AiMetadata;
-    if(!a::ai_authoring_detail50IU::readTrackMetadata<173>(reinterpret_cast<const char*>(raw.data()),raw.size(),navigation_->ai,navigation_->aiMetadata,d.metadata))return fail(d,"MC full Ai metadata rejected");}
+    if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),navigation_->ai,navigation_->aiMetadata,d.metadata))return fail(d,"MC full Ai metadata rejected");}
    phase_=Phase::Tuning;
    {if(!reserve(availableCpuPayloadBytes,4*sources[4].bytes,d))return fail(d,"MC tuning reservation exceeds remaining budget");
     std::vector<std::uint8_t> raw;if(!member(4,raw,d)||!a::readAiTrackTuning50IU(reinterpret_cast<const char*>(raw.data()),raw.size(),tuning_,d.metadata))return fail(d,"MC source tuning rejected");}
@@ -184,8 +200,8 @@ public:
  const std::vector<std::uint8_t>& originalTob()const noexcept{requireThread();return tob_.original_bytes;}
  const a::ParameterDocument48F& triggerParameters()const noexcept{requireThread();return tob_;}
  const g::AiTrackTuning50IU& aiTuning()const noexcept{requireThread();return tuning_;}
- const std::array<std::uint32_t,173>& mapFieldMask()const noexcept {
-  requireThread();static const std::array<std::uint32_t,173> empty{};return navigation_?navigation_->mapFieldMask:empty;
+ const std::array<std::uint32_t,g::courseNavigationCapacity50MB>& mapFieldMask()const noexcept {
+  requireThread();static const std::array<std::uint32_t,g::courseNavigationCapacity50MB> empty{};return navigation_?navigation_->mapFieldMask:empty;
  }
  g::TrackNavigationView50MC map()const noexcept {
   auto self=weak_from_this().lock();return documentsReady()&&self?g::TrackNavigationView50MC{std::move(self),navigation_,{},g::NavigationRole50MC::Map}:g::TrackNavigationView50MC{};
@@ -196,7 +212,7 @@ public:
  g::AiTrackMetadataView50MC mapMetadata()const noexcept{return g::AiTrackMetadataView50MC{map()};}
  g::AiTrackMetadataView50MC aiMetadata()const noexcept{return g::AiTrackMetadataView50MC{ai()};}
  bool prepareGrid(std::uint32_t rank,g::GridCenterResult50AC& out)const noexcept {
-  return documentsReady()&&source_grid50IG::detail::prepare(navigation_->map,mapNodeCount,rank,out);
+  return documentsReady()&&source_grid50IG::detail::prepare(navigation_->map,g::courseNavigationCapacity50MB,rank,out);
  }
  // Read-only lookup of the existing authentic MC mount. An absent mount
  // succeeds with an empty result; an incompatible or foreign-thread mount
@@ -209,7 +225,8 @@ public:
    if(!Provider::sameName(mount.name,"TRACKS/MC.RES"))continue;
    d.mount=i;const auto& source=mount.mcSource;
    if(!source||!source->ready()||mount.mcThread!=std::this_thread::get_id()||
-      mount.digest!=archiveSha||mount.archiveBytes!=archiveBytes||mount.retainedBytes!=source->archive_->compactBytes()||
+      mount.digest!=a::originalTrackMountDigest50LA("TRACKS/MC.RES",archiveSha)||
+      mount.archiveBytes!=a::originalTrackMountBytes50LA("TRACKS/MC.RES",archiveBytes)||mount.retainedBytes!=source->archive_->compactBytes()||
       mount.backing||mount.ui||mount.rcSource||mount.tbSource||mount.gbSource||mount.rows.size()!=source->archive_->entries().size())
     return Provider::fail(d,Provider::Status::identity);
    for(std::size_t j=0;j<source->archive_->entries().size();++j){const auto member=source->archive_->member(j);const auto& row=mount.rows[j];
@@ -254,7 +271,10 @@ public:
    if(active){d={};return true;}
   }
   if(canonicalMountReservationBytes()>availableAdditionalPayloadBytes)return Provider::fail(d,Provider::Status::capacity);
-  try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/MC.RES";next->digest=archiveSha;/*FLAG: mount label stays the stock digest (receipt only; real bytes are the source)*/next->archiveBytes=archiveBytes;
+  try {auto next=std::make_unique<Provider::Mount>();next->name="TRACKS/MC.RES";
+   // One rule for every course mount (original_track_cut_identity50la.h): the
+   // admitted archive's digest/size. Stock disc: the stock digest.
+   next->digest=a::originalTrackMountDigest50LA(next->name,archiveSha);next->archiveBytes=a::originalTrackMountBytes50LA(next->name,archiveBytes);
    next->mcSource=std::move(self);next->mcThread=thread_;next->retainedBytes=archive_->compactBytes();next->rows.reserve(archive_->entries().size());
    for(std::size_t i=0;i<archive_->entries().size();++i){const auto m=archive_->member(i);d.ordinal=i;
     if(!m.identity||!m.data||m.size!=m.identity->bytes||!Provider::nameOkay(m.identity->name))return Provider::fail(d,Provider::Status::identity);

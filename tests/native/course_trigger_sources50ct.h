@@ -1,5 +1,5 @@
 #pragma once
-// Course trigger sources for the legacy-ground courses (MA, SA, GA): ONE rule,
+// Course trigger sources for the legacy-ground courses (MA, SA, GA) and MB: ONE rule,
 // read from the course's own TOB by the common trigger reader
 // (sc_trigger_authoring50la.h, the reader SC already uses). The original's
 // trigger reader walks [Triggers] NumberOfTriggers of whatever TOB the course
@@ -7,8 +7,9 @@
 // [Triggers] block (or NumberOfTriggers 0) has no trigger owners.
 //
 // The stock archive/TOB identities and counts are receipts
-// (course_archive_receipt50ci.h). Storage is capacity-sized (the native
-// trigger group's 13) with a live count, as SC's.
+// (course_archive_receipt50ci.h). Storage is capacity-sized (the common
+// reader's capacity) with a live count, as SC's; each native chain's own
+// trigger group refuses a live set above ITS capacity (GA's 13).
 #include "course_archive_receipt50ci.h"
 #include "sc_trigger_authoring50la.h"
 #include "ga_trigger_authoring_fixture.h"   // Action kinds + shared text helpers (unchanged)
@@ -28,8 +29,15 @@
 namespace course_trigger_sources50CT {
 namespace a=rr::assets;namespace g=rr::game;
 inline constexpr std::size_t capacity=sc_trigger_authoring50LA::count;
-static_assert(capacity==g::nativeTriggerCapacity50GA);
 using Action=ga_trigger_authoring::Action;
+// What the consuming native chain implements. The reader reads every authored
+// value; a chain that does not implement one refuses it here (flagged stand-in)
+// instead of ignoring it. Defaults = the MA/SA/GA chains.
+struct Support {
+ bool reset=false;          // LostAI Reset TRUE (pose reset): MB's chain implements it
+ bool ignoreAi=false;       // IgnoreTrigger AI
+ bool randomPercent=false;  // RandomTriggerPercent other than 100
+};
 struct ActionSource {
  Action kind=Action::LostAI;
  std::uint32_t targetNodeIndex=0,animationIndex=0;
@@ -46,7 +54,7 @@ struct Source {
  g::CollisionSphere48J sphere{};
  g::NativeTriggerBox50MA box{};
  float yaw=0,pitch=0,roll=0;
- bool startEnabled=true,oneTimeOnly=false,ignorePlayer=false,reset=false;
+ bool startEnabled=true,oneTimeOnly=false,ignorePlayer=false,ignoreAi=false,reset=false;
  std::int32_t randomTriggerPercent=100;
  std::array<ActionSource,sc_trigger_authoring50LA::maxActions> actions{};
 };
@@ -72,7 +80,7 @@ public:
  // here; the exact live AI node count is checked again per target when the
  // action owner binds its destinations (cold contacts).
  bool load(const std::filesystem::path& archivePath,const Stock& stock,std::size_t zoneCount,
-     std::uint32_t aiNodeBound,std::string& error){
+     std::uint32_t aiNodeBound,std::string& error,Support support={}){
   if(attempted_){error="course trigger owner requires a fresh stable lifetime";return false;}attempted_=true;
   try{using namespace ga_trigger_authoring::detail;namespace f=pod_materials50ed_fixture::detail;
    const auto site=std::string("triggers_")+stock.code;
@@ -106,11 +114,14 @@ public:
     s.name=raw.name;s.zone=raw.sourceZoneOrdinal;s.actionCount=raw.actionCount;
     s.startEnabled=raw.startEnabled;s.oneTimeOnly=raw.oneTimeOnly;
     s.sphere.center=vector(field(b,"position"));
-    // PORT STAND-IN (flagged): native trigger groups implement a 100% trigger
-    // chance and PLAYER as the only IgnoreTrigger scope; others are refused.
-    need(raw.randomTriggerPercent==100.f,label+"RandomTriggerPercent other than 100 is not supported natively");
-    s.randomTriggerPercent=100;
-    if(raw.ignoreTrigger){need(*raw.ignoreTrigger=="PLAYER",label+"IgnoreTrigger other than PLAYER is not supported natively");s.ignorePlayer=true;}
+    // PORT STAND-IN (flagged): a native chain without a trigger-chance roll
+    // or an AI ignore list refuses those authored values (Support).
+    need(support.randomPercent||raw.randomTriggerPercent==100.f,label+"RandomTriggerPercent other than 100 is not supported natively");
+    s.randomTriggerPercent=static_cast<std::int32_t>(raw.randomTriggerPercent);
+    if(raw.ignoreTrigger){
+     if(*raw.ignoreTrigger=="PLAYER")s.ignorePlayer=true;
+     else{need(support.ignoreAi&&*raw.ignoreTrigger=="AI",label+"IgnoreTrigger other than PLAYER is not supported natively");s.ignoreAi=true;}
+    }
     if(raw.shape==sc_trigger_authoring50LA::Shape::sphere){
      s.shapeType=5;s.sphere.radius=number(field(b,"radius"));need(s.sphere.radius>0.f,label+"sphere radius rejected");
     }else{
@@ -127,14 +138,21 @@ public:
       case sc_trigger_authoring50LA::ActionKind::LostAI:
        out.kind=Action::LostAI;out.targetNodeIndex=in.targetAiNodeIndex;
        // 1B5A60/1B5A98 initialise Reset=0; 1B27C0 then writes racer.C80 only.
-       // PORT STAND-IN (flagged): an authored Reset TRUE (pose reset) is refused.
-       need(!in.authoredReset.value_or(false),label+"LostAI Reset is not supported natively");out.reset=false;
+       // PORT STAND-IN (flagged): a chain without the pose reset refuses an
+       // authored Reset TRUE (MB's chain implements it: Support::reset).
+       need(support.reset||!in.authoredReset.value_or(false),label+"LostAI Reset is not supported natively");
+       out.reset=in.authoredReset.value_or(false);
        break;
       case sc_trigger_authoring50LA::ActionKind::Animation:
        out.kind=Action::Animation;out.animationIndex=in.animationNumber-1;break;
       case sc_trigger_authoring50LA::ActionKind::PodSound:
        out.kind=Action::PodSound;out.filename=in.filename;out.position=vector(field(ab,"position"));
        out.minDistance=number(field(ab,"mindistance"));out.maxDistance=number(field(ab,"maxdistance"));break;
+      case sc_trigger_authoring50LA::ActionKind::Sound:
+      case sc_trigger_authoring50LA::ActionKind::Particles:
+       // PORT STAND-IN (flagged): the MA/SA/GA/MB native chains have no
+       // ordinary Sound or Particles trigger action; refused, not ignored.
+       need(false,label+"Sound/Particles trigger action is not supported on this native chain");break;
      }
     }
     // Action-1 mirror for the LostAI-only chains (MA layout).
@@ -180,4 +198,7 @@ inline constexpr Stock stockSa{"SA","tracks\\sa.tob",sa_trigger_authoring::archi
  sa_trigger_authoring::tobSha,sa_trigger_authoring::tobBytes,sa_trigger_authoring::count};
 inline constexpr Stock stockGa{"GA","tracks\\ga.tob",watchtower_source_fixture::archiveSha,watchtower_source_fixture::archiveBytes,
  watchtower_source_fixture::objects.sha,watchtower_source_fixture::objects.bytes,ga_trigger_authoring::count};
+// MB (receipts only; values from the MB route's own stock pins).
+inline constexpr Stock stockMb{"MB","tracks\\mb.tob","6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",4421779,
+ "f25f10fff204f124e5525ff2c4a7c1e72f9ce17476e1404d1932f6ab6e8c776d",19909,3};
 } // namespace course_trigger_sources50CT

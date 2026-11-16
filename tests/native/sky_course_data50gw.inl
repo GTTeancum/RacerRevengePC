@@ -30,7 +30,7 @@ inline const std::string* uniqueField(const a::ParameterBlock48F& b, const char*
 }
 } // namespace course_data_detail50GW
 
-inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
+template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
     const a::World48F& world, Diagnostic& d) noexcept {
     using namespace detail;namespace cd=course_data_detail50GW;
     try {
@@ -60,11 +60,28 @@ inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
             cubeFile->find('\0')==std::string::npos,"Course sky CubeFile1 name unsupported");
         const std::string member="skies\\"+*cubeFile;
         Bytes cub;a::DecodeError48C error;
-        // Bounded by the shared extractor ceiling (8 MiB) and the member's own extent.
-        need(a::extractResMember48C(archive,member,cub,error),
-            "Course sky CUB member "+member+": "+error.detail);
-        need(cub.size()>=cubFirstTileOffset,"Course sky CUB shorter than its header");
-        requireCubFormat(cub);
+        need(extract(member,cub,error),"Course sky CUB member "+member+": "+error.detail);
+        // The CUB's own cube table (1295B0/1289C0): u32 1, u32 cube count n,
+        // u32 table end (12+4n), then n cube-header offsets. A CUB may hold
+        // more than one internal cube (GB's 7: the base cube plus the
+        // ambient-flash cubes); cube 0 is the base cube drawn, exactly what
+        // the GB loader submits. FLAG: further internal cubes are read for
+        // their extent only (no flash chronology is invented).
+        need(cub.size()>=16,"Course sky CUB shorter than its cube table");
+        const std::uint32_t internalCubes=u32(cub.data()+4);
+        need(u32(cub.data())==1&&internalCubes>=1&&internalCubes<=64&&u32(cub.data()+8)==12u+4u*internalCubes&&
+            cub.size()>=12u+4u*internalCubes,"Course sky CUB cube table");
+        const std::size_t cubeHeader=u32(cub.data()+12);
+        const std::size_t cubeEnd=internalCubes>1?u32(cub.data()+16):cub.size();
+        need(cubeHeader>=12u+4u*internalCubes&&cubeHeader+80u<=cubeEnd&&cubeEnd<=cub.size(),"Course sky CUB base cube extent");
+        {   // Same per-cube format facts load() enforces through requireCubFormat.
+            const auto* header=cub.data()+cubeHeader;
+            need(u32(header)==32&&u16(header+4)==0&&u16(header+6)==0,"CUB exact supported texture/flags");
+            for(unsigned face=0;face<6;++face)
+                need(u16(header+8+face*2)==cubMasks[face]&&u32(header+20+face*4)==cubSizes[face],"CUB authored tile mask/sizes");
+            for(unsigned i=0;i<9;++i)need(f32(header+44+i*4)==cubSourcePose[i],"CUB authored origin/look/up");
+        }
+        if(internalCubes>1)std::cerr<<"course_sky_data cub_internal_cubes="<<internalCubes<<" drawn=base\n";
         const auto& fog=cd::uniqueBlock(world.parameters,"fog","Course sky [Fog]");
         const auto* rgb=cd::uniqueField(fog,"colorrgb");
         need(rgb&&rgb->find('\0')==std::string::npos,"Course sky [Fog] ColorRGB missing");
@@ -75,15 +92,15 @@ inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
         std::array<Bytes, tileCount> images;
         std::array<a::MaterialTextureAssetInput50EA, tileCount> textures{};
         std::array<a::MaterialTextureSlotInput50EA, tileCount> slots{};
-        std::size_t offset=cubFirstTileOffset; std::uint32_t index=0;
+        std::size_t offset=cubeHeader+80u; std::uint32_t index=0;
         for (std::uint32_t face = 0; face < 6; ++face) for (std::uint32_t tile = 0; tile < 16; ++tile) {
             if (!(cubMasks[face] & (1u << tile))) continue;
             need(index < tileCount, "Sky tile count bound");
-            need(offset <= cub.size(), "Course sky tile offset");
+            need(offset <= cubeEnd, "Course sky tile offset");
             // Tile extent = its own 44-byte descriptor + four length-prefixed
-            // mips, walked inside the remaining CUB bytes only.
+            // mips, walked inside the base cube's bytes only.
             std::size_t largest=0,largestBytes=0;
-            const auto bytes=walkTile(cub.data()+offset,cub.size()-offset,largest,largestBytes);
+            const auto bytes=walkTile(cub.data()+offset,cubeEnd-offset,largest,largestBytes);
             decodeLargestMip(cub.data()+offset,largest,largestBytes,images[index]);
             need(images[index].size() == 65552 && std::memcmp(images[index].data(), "RRTEX001", 8) == 0 &&
                 u32(images[index].data()+8) == 128 && u32(images[index].data()+12) == 128,
@@ -94,7 +111,7 @@ inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
             appendTileQuad(next->mesh, next->spans, face, tile, index);
             ++index;
         }
-        need(index == tileCount && offset == cub.size(), "Complete CUB source tile closure");
+        need(index == tileCount && offset == cubeEnd, "Complete CUB base cube tile closure");
         closeBounds(next->mesh);
         const a::MaterialTextureAssetsInput50EA bankInput{textures.data(), tileCount, slots.data(), tileCount,
             {tileCount,tileCount,3146496,3145728,128}};
@@ -102,5 +119,16 @@ inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
         storage_ = std::move(next); return true;
     } catch (const std::exception& e) { try { d.message = e.what(); } catch (...) {} return false; }
     catch (...) { try { d.message = "Unexpected cold course-data sky load failure"; } catch (...) {} return false; }
+}
+inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
+    const a::World48F& world, Diagnostic& d) noexcept {
+    // Bounded by the shared extractor ceiling (8 MiB) and the member's own extent.
+    return loadCourseDataWith([&](const std::string& member,std::vector<std::uint8_t>& out,a::DecodeError48C& error){
+        return a::extractResMember48C(archive,member,out,error);},world,d);
+}
+inline bool Owner::loadFromCourseData(const a::IndexedResArchive48C& archive,
+    const a::World48F& world, Diagnostic& d) noexcept {
+    return loadCourseDataWith([&](const std::string& member,std::vector<std::uint8_t>& out,a::DecodeError48C& error){
+        return archive.extractMember(member,out,error,8u*1024u*1024u);},world,d);
 }
 } // namespace sky50gw_fixture

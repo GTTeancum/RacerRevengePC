@@ -1212,18 +1212,15 @@ SessionExit50DU Context::run() {
       material_audio50HI::Track::ga:isRaTrack?material_audio50HI::Track::ra:isTcTrack?material_audio50HI::Track::tc:isScTrack?material_audio50HI::Track::sc:isMbTrack?material_audio50HI::Track::mb:isMaTrack?material_audio50HI::Track::ma:isSaTrack?material_audio50HI::Track::sa:
       trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta));
   require50DU(materialAudioReady,audioError.empty()?"native material audio preparation failed":audioError.c_str());
-  require50DU(!isTbTrack||(materialAudio->tbSourceIdentity()==tbColdSources.get()&&
-      materialAudio->collisionRowCount()==24&&materialAudio->driveRowCount()==20&&
-      materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==28),
-      "TB actual material rows or exclusive host extras192..219 differ");
-  require50DU(!isGbTrack||(materialAudio->gbSourceIdentity()==gbColdSources.get()&&
-      materialAudio->collisionRowCount()==20&&materialAudio->driveRowCount()==20&&
-      materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==24),
-      "GB actual material rows or exclusive host extras192..215 differ");
-  require50DU(!isMcTrack||(materialAudio->mcSourceIdentity()==mcColdSources.get()&&
-      materialAudio->collisionRowCount()==12&&materialAudio->driveRowCount()==8&&
-      materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==4),
-      "MC actual material rows or exclusive host extras192..195 differ");
+  // Same-source identity is required; the row counts come from the AUB
+  // (the provider bounds them to the native voice layout; stock counts are
+  // receipts there). The extra-voice block stays at 192.
+  require50DU(!isTbTrack||(materialAudio->tbSourceIdentity()==tbColdSources.get()&&materialAudio->extraVoiceFirst()==192),
+      "TB material audio must come from the same compact source (extras from 192)");
+  require50DU(!isGbTrack||(materialAudio->gbSourceIdentity()==gbColdSources.get()&&materialAudio->extraVoiceFirst()==192),
+      "GB material audio must come from the same compact source (extras from 192)");
+  require50DU(!isMcTrack||(materialAudio->mcSourceIdentity()==mcColdSources.get()&&materialAudio->extraVoiceFirst()==192),
+      "MC material audio must come from the same compact source (extras from 192)");
   if(isMcTrack)reserveMcAudioPayload(materialAudio->retainedPayloadBytes(),
       "MC actual material audio retained payload exceeds remaining ledger");
   if(isRaTrack){

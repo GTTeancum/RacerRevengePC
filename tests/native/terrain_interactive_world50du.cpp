@@ -715,6 +715,7 @@ SessionExit50DU Context::run() {
  std::unique_ptr<mb_source_trigger50MB::Owner> mbSourceTriggers;
  mb_navigation50MB::Diagnostic mbNavigationDiagnostic;
  std::size_t mbNavigationPayload=0;
+ std::string mbGroundArchiveSha256;std::size_t mbGroundArchiveBytes=0;
  if(isMbTrack){
   require50DU(mbOriginalDisc&&directOriginalHuman,"MB requires its original-disc human route");
   constexpr auto navigationPayload=mb_navigation50MB::Owner::persistentPayloadBytes()+mb_navigation50MB::Owner::ownerBytes();
@@ -726,17 +727,22 @@ SessionExit50DU Context::run() {
   mbStorageLimits.coldPayloadBytes-=navigationPayload;
   mbOriginalWorld=std::make_shared<mb_original_world50LM::Owner>();
   {
+   // Common course-archive rule (course_archive_receipt50ci.h): the stock
+   // archive and SCB identities are receipts; the SCB is found by name. The
+   // ground below authenticates the digest of these same bytes.
    auto raw=runtime_startup50fl::readBytes(trackSession->archive);
-   require50DU(raw.size()==mb_original_world50LM::archiveBytes&&
-       pod_materials50ed_fixture::detail::sha256(raw)==mb_original_world50LM::archiveSha,
-       "MB visual bootstrap original archive identity");
+   require50DU(!raw.empty()&&raw.size()<=course_archive_receipt50CI::maximumArchiveBytes(),
+       "MB course archive exceeds the shared course-archive capacity");
+   course_archive_receipt50CI::receipt("mb_bootstrap","MB",raw,mb_original_world50LM::archiveSha,mb_original_world50LM::archiveBytes);
+   mbGroundArchiveSha256=pod_materials50ed_fixture::detail::sha256(raw);mbGroundArchiveBytes=raw.size();
    rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;rr::assets::World48F sourceWorld;
    std::vector<std::uint8_t> sourceScb;
-   require50DU(rr::assets::decodeResource48C(raw,archive,error)&&
-       rr::assets::extractResMember48C(archive,"tracks\\mb.scb",sourceScb,error)&&
-       sourceScb.size()==mb_original_world50LM::scbBytesCount&&
-       pod_materials50ed_fixture::detail::sha256(sourceScb)==mb_original_world50LM::scbSha&&
-       rr::assets::decodeWorld48F(sourceScb,sourceWorld,error),"MB authentic visual bootstrap SCB");
+   require50DU(rr::assets::decodeResource48C(raw,archive,error,nullptr,course_archive_receipt50CI::limits())&&
+       rr::assets::extractResMember48C(archive,"tracks\\mb.scb",sourceScb,error,course_archive_receipt50CI::maximumArchiveBytes())&&
+       !sourceScb.empty(),"MB bootstrap SCB member missing");
+   course_archive_receipt50CI::memberReceipt("mb_bootstrap","tracks\\mb.scb",sourceScb,0,0,
+       mb_original_world50LM::scbBytesCount,mb_original_world50LM::scbSha);
+   require50DU(rr::assets::decodeWorld48F(sourceScb,sourceWorld,error),"MB bootstrap SCB rejected");
    mb_original_world50LM::Diagnostic d;
    const bool loaded=mbOriginalWorld->load(raw,sourceWorld,d);
    require50DU(loaded,d.message.empty()?"MB visual cold owner rejected":d.message.c_str());
@@ -749,7 +755,11 @@ SessionExit50DU Context::run() {
   names.collisionTypeTag=query.collisionTypeTag;names.groupTypeTag=query.groupTypeTag;
   names.preservedFlags31=static_cast<std::uint8_t>(qfilter.flags31&0xf0u);
   names.preservedFlagsF8=static_cast<std::uint8_t>(qfilter.flagsF8&0xc0u);
-  std::string error;const bool groundReady=mbCollisionWorld->prepareGround(groundRequest,mbNavigation.map(),names,error);
+  // The ground authenticates the archive actually read (its digest/size);
+  // the session row's stock SHA was a receipt above.
+  groundRequest.archiveSha256=mbGroundArchiveSha256.c_str();groundRequest.archiveBytes=mbGroundArchiveBytes;
+  std::string error;const bool groundReady=mbCollisionWorld->prepareGround(groundRequest,mbNavigation.map(),
+      mbNavigation.ai().count(),names,error);
   require50DU(groundReady,error.empty()?"MB actual collision owner rejected":error.c_str());
  }
  authored_runtime_ground50cp_fixture::ColdScene legacyGround{};
@@ -1185,8 +1195,12 @@ SessionExit50DU Context::run() {
   for(const auto& candidate:preparedCandidates)stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
  }
  if(isMbTrack){
-  require50DU(ground.owners.size()==trackSession->terrainOwners&&mbCollisionWorld->candidateStorage().size()==131&&mbCollisionWorld->bindingStorage().size()==131,
-      "MB actual terrain and trigger closure changed");
+  // Closure from the data: every placed COL owner plus the TOB's live
+  // triggers; the stock 128 / 131 are receipts.
+  course_archive_receipt50CI::countReceipt("mb_static_closure","placed_col",ground.owners.size(),trackSession->terrainOwners);
+  require50DU(mbCollisionWorld->candidateStorage().size()==ground.owners.size()+mbCollisionWorld->triggerCount()&&
+      mbCollisionWorld->bindingStorage().size()==mbCollisionWorld->candidateStorage().size(),
+      "MB terrain and trigger closure must cover every placed owner and live trigger");
   for(const auto& candidate:mbCollisionWorld->candidateStorage())stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
  }
  std::unique_ptr<sa_animated_world::Owner> saAnimatedWorld;
@@ -1578,7 +1592,7 @@ SessionExit50DU Context::run() {
       "MB combined navigation/storage native payload exceeded existing allowance");
   const bool indexed=mbNavigation.bindWorld(mbCollisionWorld->lease(),mbNavigationDiagnostic);
   require50DU(indexed,mbNavigationDiagnostic.message.empty()?"MB same-world navigation indices rejected":mbNavigationDiagnostic.message.c_str());
-  require50DU(mbCollisionWorld->attachTriggers(),"MB authentic three-trigger memberships rejected");
+  require50DU(mbCollisionWorld->attachTriggers(),"MB live trigger memberships rejected");
  }
  if(!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)require50DU(trackStorageOwner.prepare(originalMainApplication.entities(),ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
      trackStorageDiagnostic),trackStorageDiagnostic.message.empty()?"original track storage preparation failed":

@@ -1,6 +1,7 @@
 #pragma once
 #include "gb_cold_sources50la.h"
 #include "ga_trigger_authoring_fixture.h"
+#include "sc_trigger_authoring50la.h"
 #include <array>
 #include <limits>
 #include <memory>
@@ -68,9 +69,22 @@ public:
      d.peakReservedPayloadBytes>availableAdditionalCpuPayloadBytes)
    return fail(d,Status::Capacity,"GB trigger preparation exceeds remaining source allowance");
   try{using namespace detail;
-   need(cold&&cold->ready()&&cold->world().zones.size()==13&&cold->world().portals.size()==17&&
-    cold->ai().count()==257&&cold->originalTob().size()==tobBytes&&pod_materials50ed_fixture::detail::sha256(cold->originalTob())==tobSha,
-    "GB exact actual trigger source identity");
+   need(cold&&cold->ready(),"GB trigger source requires actual cold owner");
+   // The common trigger reader reads the course's own TOB first (one log line
+   // "course_triggers site=GB count=N kinds=..."; stock: 18 triggers).
+   {sc_trigger_authoring50LA::Owner reader;sc_trigger_authoring50LA::Owner::Diagnostic common{};
+    const bool read=reader.decode(cold->triggerParameters(),cold->world().zones.size(),cold->ai().count(),"GB",common);
+    const bool stockTob=cold->originalTob().size()==tobBytes&&pod_materials50ed_fixture::detail::sha256(cold->originalTob())==tobSha;
+    if(!stockTob)std::cerr<<"course_member_identity site=gb_triggers member=tracks\\gb.tob bytes="<<cold->originalTob().size()<<" stock=0\n";
+    // PORT STAND-IN (flagged): GB's native trigger, animation, particle and
+    // PodSound owners (gb_trigger_actions50gb.h, gb_collision_world50gb.h and
+    // the GB application route) implement the stock GB set only; a non-stock
+    // TOB is refused here, readable or not, until GB joins the common route's
+    // owners (absent = none). The reader above already reads it.
+    need(stockTob,read?"GB course archive TOB is not the stock TOB: GB trigger/animation/particle owners read the stock set only (needs the GB route on the common owners)":
+     "GB course archive TOB rejected by the common trigger reader (see course_triggers line)");}
+   need(cold->world().zones.size()==13&&cold->world().portals.size()==17&&cold->ai().count()==257,
+    "GB stock trigger set requires the stock world/AI extents");
    const auto& p=cold->triggerParameters();need(!p.preservesDuplicateLabels&&p.blocks.size()==70&&p.original_bytes==cold->originalTob()&&
     integer(field(block(p,"triggers"),"numberoftriggers"))==count,"GB original trigger document/count");
    constexpr std::uint32_t targets[lostCount]={189,240,30,253,40,196,46,247,49,85,206,111,228,234,151};

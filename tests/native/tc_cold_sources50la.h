@@ -1,5 +1,6 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
+#include "course_archive_receipt50ci.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/ai_authoring50iu.h"
 #include "../../src/game/track_navigation_view50tc.h"
@@ -78,9 +79,10 @@ class Owner final : public std::enable_shared_from_this<Owner> {
         const auto& pin=sources[index];const a::ResourceEntry48C* match=nullptr;
         for(const auto& entry:archive_.entries)if(canonical(entry.name)==canonical(pin.name)){
             if(match)return false;match=&entry;}
-        return match&&match->logical_offset==pin.offset&&match->bytes==pin.bytes&&
-            a::extractResMember48C(archive_,pin.name,bytes,d.decode,pin.bytes)&&bytes.size()==pin.bytes&&
-            pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha;
+        // Found by name; the stock offset/size/SHA is a receipt (common rule).
+        if(!match||!a::extractResMember48C(archive_,match->name,bytes,d.decode,match->bytes)||bytes.size()!=match->bytes)return false;
+        course_archive_receipt50CI::memberReceipt("tc_cold_sources",pin.name,bytes,pin.offset,match->logical_offset,pin.bytes,pin.sha);
+        return true;
     }
     static bool vectorField(const a::ParameterBlock48F& block,const char* key,g::Vector3_48C& out){
         const std::string* value=nullptr;
@@ -114,7 +116,7 @@ public:
         parametersPayload(n,tob_);if(navigation_)add(n,sizeof(storage::Storage));return n;
     }
     static constexpr std::size_t gateScratchBytes() noexcept {
-        return sizeof(storage::Scratch<293>)+sizeof(storage::Metadata<293>)+293u;
+        return sizeof(storage::Scratch<g::courseNavigationCapacity50MB>)+sizeof(storage::Metadata<g::courseNavigationCapacity50MB>)+g::courseNavigationCapacity50MB;
     }
     static constexpr std::size_t navigationPayloadBytes() noexcept {return sizeof(storage::Storage);}
     // Actual native decode hard ceilings stay unchanged. Phase reservations
@@ -126,14 +128,18 @@ public:
         if(attempted_){d.message="TC cold source preparation is one-attempt";d.phase=phase_;return false;}
         attempted_=true;d={};phase_=Phase::Authenticate;
         try{
-            if(original.size()!=archiveBytes||pod_materials50ed_fixture::detail::sha256(original)!=archiveSha)
-                return fail(d,"TC original archive identity differs");
+            // Common rule (course_archive_receipt50ci.h): the stock identity,
+            // entry count and decoded size are receipts; shared decode limits.
+            course_archive_receipt50CI::receipt("tc_cold_sources","TC",original,archiveSha,archiveBytes);
             if(!budget(availableCpuPayloadBytes,decodedBytes+sizeof(storage::Storage)+gateScratchBytes(),d))
                 return fail(d,"TC source/navigation reservation exceeds existing remaining CPU budget");
-            phase_=Phase::Archive;a::DecodeLimits48C limits;
-            limits.resource_file_bytes=archiveBytes;limits.resource_decoded_bytes=decodedBytes;limits.resource_entries=archiveEntries;
-            if(!a::decodeResource48C(original,archive_,d.decode,nullptr,limits)||archive_.entries.size()!=archiveEntries||archive_.decoded.size()!=decodedBytes)
-                return fail(d,"TC original archive framing rejected");
+            phase_=Phase::Archive;
+            if(!a::decodeResource48C(original,archive_,d.decode,nullptr,course_archive_receipt50CI::limits())||archive_.entries.empty())
+                return fail(d,"TC archive framing rejected");
+            course_archive_receipt50CI::countReceipt("tc_cold_sources","entries",archive_.entries.size(),archiveEntries);
+            course_archive_receipt50CI::countReceipt("tc_cold_sources","decoded_bytes",archive_.decoded.size(),decodedBytes);
+            if(!budget(availableCpuPayloadBytes,sizeof(storage::Storage)+gateScratchBytes(),d))
+                return fail(d,"TC decoded archive plus navigation exceeds remaining CPU budget");
             {
                 std::set<std::string> names;
                 for(const auto& e:archive_.entries)if(!names.insert(canonical(e.name)).second)return fail(d,"TC ambiguous member identity");
@@ -143,10 +149,15 @@ public:
             {
                 if(!budget(availableCpuPayloadBytes,sources[0].bytes,d))return fail(d,"TC SCB extraction exceeds remaining CPU budget");
                 std::vector<std::uint8_t> raw;
-                if(!member(0,raw,d)||!a::decodeWorld48F(raw,world_,d.decode)||world_.zones.size()!=zoneCount||world_.portals.size()!=portalCount)
-                    return fail(d,"TC authentic SCB topology decode rejected");
-                for(std::size_t i=0;i<zoneCount;++i)if(world_.zones[i].zone!=i+1)return fail(d,"TC SCB zone order rejected");
-                for(std::size_t i=0;i<portalCount;++i){const auto& p=world_.portals[i];
+                if(!member(0,raw,d)||!a::decodeWorld48F(raw,world_,d.decode)||world_.zones.empty()||world_.zones.size()>256||
+                   world_.portals.size()>g::courseNavigationPortalCapacity50MB)
+                    return fail(d,"TC SCB topology decode rejected or beyond the shared navigation capacity");
+                course_archive_receipt50CI::countReceipt("tc_cold_sources","zones",world_.zones.size(),zoneCount);
+                course_archive_receipt50CI::countReceipt("tc_cold_sources","portals",world_.portals.size(),portalCount);
+                for(std::size_t i=0;i<world_.zones.size();++i)if(world_.zones[i].zone!=i+1)return fail(d,"TC SCB zone order rejected");
+                navigation_->authoredZoneCount=static_cast<std::uint32_t>(world_.zones.size());
+                navigation_->authoredPortalCount=static_cast<std::uint32_t>(world_.portals.size());
+                for(std::size_t i=0;i<world_.portals.size();++i){const auto& p=world_.portals[i];
                     if(p.parameter_block>=world_.parameters.blocks.size())return fail(d,"TC portal source block invalid");
                     auto& target=navigation_->authoredPortals[i];target.zoneA=p.zones[0];target.zoneB=p.zones[1];
                     for(unsigned axis=0;axis<4;++axis)if(!vectorField(world_.parameters.blocks[p.parameter_block],
@@ -165,14 +176,14 @@ public:
                 if(!budget(availableCpuPayloadBytes,sources[1].bytes+gateScratchBytes(),d))return fail(d,"TC MAP gate reservation exceeds remaining CPU budget");
                 std::vector<std::uint8_t> raw;if(!member(1,raw,d))return fail(d,"TC full MAP member authentication rejected");
                 {
-                    auto scratch=std::make_unique<storage::Scratch<268>>();
-                    if(!g::navigation_detail50MB::read<268>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->map,d.navigation))return fail(d,"TC full268 MAP gates rejected");
+                    auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+                    if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->map,d.navigation))return fail(d,"TC MAP gates rejected");
                     d.mapGatesCommitted=true;
-                    if(navigation_->map.track.count!=mapNodeCount)return fail(d,"TC exact MAP count rejected");
+                    course_archive_receipt50CI::countReceipt("tc_cold_sources","map_nodes",navigation_->map.track.count,mapNodeCount);
                     std::copy(std::begin(scratch->fieldMask),std::end(scratch->fieldMask),navigation_->mapFieldMask.begin());
                 }
                 phase_=Phase::MapMetadata;
-                if(!a::ai_authoring_detail50IU::readTrackMetadata<268>(reinterpret_cast<const char*>(raw.data()),raw.size(),
+                if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),
                     navigation_->map,navigation_->mapMetadata,d.metadata))return fail(d,"TC full268 MAP metadata rejected");
             }
             phase_=Phase::AiGates;
@@ -180,13 +191,13 @@ public:
                 if(!budget(availableCpuPayloadBytes,sources[2].bytes+gateScratchBytes(),d))return fail(d,"TC AI gate reservation exceeds remaining CPU budget");
                 std::vector<std::uint8_t> raw;if(!member(2,raw,d))return fail(d,"TC full AI member authentication rejected");
                 {
-                    auto scratch=std::make_unique<storage::Scratch<293>>();
-                    if(!g::navigation_detail50MB::read<293>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->ai,d.navigation))return fail(d,"TC full293 AI gates rejected");
+                    auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+                    if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),actualLibm,*scratch,navigation_->ai,d.navigation))return fail(d,"TC AI gates rejected");
                     d.aiGatesCommitted=true;
-                    if(navigation_->ai.track.count!=aiNodeCount)return fail(d,"TC exact AI count rejected");
+                    course_archive_receipt50CI::countReceipt("tc_cold_sources","ai_nodes",navigation_->ai.track.count,aiNodeCount);
                 }
                 phase_=Phase::AiMetadata;
-                if(!a::ai_authoring_detail50IU::readTrackMetadata<293>(reinterpret_cast<const char*>(raw.data()),raw.size(),
+                if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(raw.data()),raw.size(),
                     navigation_->ai,navigation_->aiMetadata,d.metadata))return fail(d,"TC full293 AI metadata rejected");
             }
             phase_=Phase::Tuning;
@@ -208,8 +219,8 @@ public:
     const std::vector<std::uint8_t>& originalTob() const noexcept {requireOwnerThread();return tob_.original_bytes;}
     const a::ParameterDocument48F& triggerParameters() const noexcept {requireOwnerThread();return tob_;}
     const g::AiTrackTuning50IU& aiTuning() const noexcept {requireOwnerThread();return tuning_;}
-    const std::array<std::uint32_t,268>& mapFieldMask() const noexcept {
-        requireOwnerThread();static const std::array<std::uint32_t,268> empty{};return navigation_?navigation_->mapFieldMask:empty;
+    const std::array<std::uint32_t,g::courseNavigationCapacity50MB>& mapFieldMask() const noexcept {
+        requireOwnerThread();static const std::array<std::uint32_t,g::courseNavigationCapacity50MB> empty{};return navigation_?navigation_->mapFieldMask:empty;
     }
     g::TrackNavigationView50TC map() const noexcept {
         auto self=weak_from_this().lock();return ready()&&self?g::TrackNavigationView50TC{std::move(self),navigation_,{},g::NavigationRole50TC::Map}:g::TrackNavigationView50TC{};

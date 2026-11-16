@@ -19,20 +19,20 @@ bool advancePlayerTrackNavigation50EU(const TrackNavigationView50TB& map,const T
     const TrackNavigationInput50EU& in,TrackNavigationProgress50EU& p,TrackNavigationReceipt50EU& r,
     TrackNavigationDiagnostic50EU& d) noexcept {
     if(!joinedTB(map,ai))return navigation_detail50MB::fail(d,TrackNavigationError50EU::NotPrepared,0x1a0da0);
-    return navigation_detail50MB::advance<270,269>(readOnlyTB(map),readOnlyTB(ai),in,p,r,d);
+    return navigation_detail50MB::advance<courseNavigationCapacity50MB,courseNavigationCapacity50MB>(readOnlyTB(map),readOnlyTB(ai),in,p,r,d);
 }
 bool advancePlayerTrackNavigationEffects50GH(const TrackNavigationView50TB& map,const TrackNavigationView50TB& ai,
     const TrackNavigationInput50EU& in,const TrackNavigationMapEffects50GH& effects,
     TrackNavigationProgress50EU& p,TrackNavigationReceipt50EU& r,TrackNavigationDiagnostic50EU& d) noexcept {
     if(!joinedTB(map,ai))return navigation_detail50MB::fail(d,TrackNavigationError50EU::NotPrepared,0x1a0da0);
-    return navigation_detail50MB::advanceEffects<270,269>(readOnlyTB(map),readOnlyTB(ai),in,effects,p,r,d);
+    return navigation_detail50MB::advanceEffects<courseNavigationCapacity50MB,courseNavigationCapacity50MB>(readOnlyTB(map),readOnlyTB(ai),in,effects,p,r,d);
 }
 bool undertrackBindings50EU(const TrackNavigationView50TB& view,const std::uint32_t* visibility,
     const std::uint32_t* collision,std::size_t count,UndertrackTableBindings50ET& out) noexcept {
     if(!view.runtimeValid())return false;
     return view.role()==NavigationRole50TB::Map?
-        navigation_detail50MB::bindings<270>(readOnlyTB(view),visibility,collision,count,out):
-        navigation_detail50MB::bindings<269>(readOnlyTB(view),visibility,collision,count,out);
+        navigation_detail50MB::bindings<courseNavigationCapacity50MB>(readOnlyTB(view),visibility,collision,count,out):
+        navigation_detail50MB::bindings<courseNavigationCapacity50MB>(readOnlyTB(view),visibility,collision,count,out);
 }
 bool selectUndertrackReposition50ET(const UndertrackTrackView50TB& view,const UndertrackProgress50ET& progress,
     const UndertrackInput50ET& in,UndertrackSelection50ET& out,UndertrackDiagnostic50ET& d) noexcept {

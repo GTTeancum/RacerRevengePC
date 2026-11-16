@@ -64,21 +64,33 @@ inline bool zeroGravityFlightForSlot50ZG(std::size_t slot) noexcept {
 // AI steering frame (patch C, ai_runtime50iv.h). The original 172E60 measures
 // heading in world XZ with a world-up sign flip; the N64 autopilot in ZON
 // measures it about the pod's own up. podFrame() re-expresses the same
-// direction in the pod's basis (local copies only): forward (0,0,1), up.y 1,
-// yaw rate about the pod's up. Untouched (original values) unless called.
+// direction in the pod's basis (local copies only), up.y 1, yaw rate about
+// the pod's up. Untouched (original values) unless called.
+//
+// The frame is the pod's basis turned 90 deg about its own up, so the pod's
+// forward is (1,0,0), not (0,0,1). Reason: 172E60 reads both angles with the
+// original angle reader (player_finish50ia.h directionAngle), whose x == 0
+// branch returns 0 for +z instead of +pi/2. In the plain pod basis the pod's
+// own forward is exactly (0,0,1), so every flight step read the pod as 90 deg
+// off its target: steering pinned at -1 (full left), one engine at 1 %, and the
+// roll rate pinned at its limit (silo-veng-r3/r16/r22, zerog136h-TA). A turn
+// about up is a pure shift of that angle measure (atan2(z,x) -> -pi/2), so the
+// heading error 172E60 forms is the same as in the plain pod basis; only the
+// exact-zero branch is no longer hit. direction = (ahead, up, -right) . d.
 struct AiSteerFrame50ZG {
     float direction[3]{},forward[3]{},upY=0.f,angularA4=0.f;
     AiSteerFrame50ZG(const float d[3],const float f[3],float y,float a) noexcept {
         for(unsigned i=0;i<3;++i){direction[i]=d[i];forward[i]=f[i];}upY=y;angularA4=a;}
-    // local16 = parentless main190 matrix (columns right, up, forward);
+    // local16 = parentless main190 matrix (rows right, up, forward at 0, 4, 8);
     // angular = world angular velocity.
     void podFrame(const float* local16,const float* angular) noexcept {
         const float* right=local16;const float* up=local16+4;const float* ahead=local16+8;
         const float d[3]{direction[0],direction[1],direction[2]};
-        direction[0]=d[0]*right[0]+d[1]*right[1]+d[2]*right[2];
-        direction[1]=d[0]*up[0]+d[1]*up[1]+d[2]*up[2];
-        direction[2]=d[0]*ahead[0]+d[1]*ahead[1]+d[2]*ahead[2];
-        forward[0]=0.f;forward[1]=0.f;forward[2]=1.f;upY=1.f;
+        const float alongRight=d[0]*right[0]+d[1]*right[1]+d[2]*right[2];
+        const float alongUp=d[0]*up[0]+d[1]*up[1]+d[2]*up[2];
+        const float alongAhead=d[0]*ahead[0]+d[1]*ahead[1]+d[2]*ahead[2];
+        direction[0]=alongAhead;direction[1]=alongUp;direction[2]=-alongRight;
+        forward[0]=1.f;forward[1]=0.f;forward[2]=0.f;upY=1.f;
         angularA4=angular[0]*up[0]+angular[1]*up[1]+angular[2]*up[2];
     }
 };

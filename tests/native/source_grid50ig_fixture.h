@@ -66,7 +66,7 @@ inline bool prepare(const TrackNavigation50EU& map,std::uint32_t rank,GridCenter
     return detail::prepare(map,maxUndertrackNodes50ET,rank,out);
 }
 inline bool prepare(const TrackNavigationView50EU& view,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
-    if(!view.gatesPrepared()||view.role()!=NavigationRole50MB::Map||view.count()!=265||view.capacity()!=265)return false;
+    if(!view.gatesPrepared()||view.role()!=NavigationRole50MB::Map||!view.count()||view.count()>view.capacity())return false;
     struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
     struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
     const Navigation map{{view.track().nodes(),view.count()},view.nodes(),true};

@@ -539,6 +539,16 @@ void Context::run() {
       if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
       hostInput.keys.down[key]=on?1:0;
      }
+     // RR_TEST_LEAN=a|d: hold A (or D), the zero-g lean keys, 2 s of every
+     // 4 s (offset 1 s from the pitch hold), so the lean sense shows in logs.
+     static const std::size_t lean50DU=[]{const char* v=std::getenv("RR_TEST_LEAN");
+         return !v?std::size_t(0):std::string(v)=="a"?std::size_t(4):std::string(v)=="d"?std::size_t(7):std::size_t(0);}();
+     if(lean50DU){
+      const bool on=(((monotonicNow50DU()/1000000000ull)+1ull)%4ull)<2ull;
+      if(on&&!hostInput.keys.down[lean50DU])hostInput.keys.pressed[lean50DU]=1;
+      if(!on&&hostInput.keys.down[lean50DU])hostInput.keys.released[lean50DU]=1;
+      hostInput.keys.down[lean50DU]=on?1:0;
+     }
      // RR_TEST_REPAIR=1: hold the player's repair key (R) 2 s of every 6 s,
      // as a player keeping a scraped pod alive (the bot cannot read damage).
      static const bool repair50DU=[]{const char* v=std::getenv("RR_TEST_REPAIR");return v&&std::string(v)=="1";}();
@@ -3046,10 +3056,11 @@ void Context::run() {
     // TC has an actual48-tile sky request and retains the matching matrix.
     // Only a course authoring zero sky cubes omits both indices and matrix.
     renderFrame.skyWorldViewProjection=scZeroSky.ready()?nullptr:skyView.worldViewProjection;
-    // GA selects per zone exactly when its data authored CubeFileForZone rows
-    // (continuation prepared the selection owner; select() is false otherwise).
+    // GA, TA and GC select per zone exactly when their data authored
+    // CubeFileForZone rows (continuation prepared the selection owner;
+    // select() is false otherwise).
     bool gaZoneSkyProbe=false;
-    const bool gaZoneSky=isGaTrack&&sourceSkySelection.select(0u,gaZoneSkyProbe);
+    const bool gaZoneSky=sourceSkySelection.select(0u,gaZoneSkyProbe);
     if(isMaSaTrack||gaZoneSky||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&

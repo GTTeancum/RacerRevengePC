@@ -1,5 +1,7 @@
 #pragma once
 #include "mb_original_world50lm.h"
+#include "course_archive_receipt50ci.h"
+#include "course_navigation_topology50nt.h"
 #include "../../src/game/track_navigation_view50mb.h"
 #include "../../src/game/track_navigation_shared50mb.inl"
 #include "../../src/assets/ai_authoring50iu.h"
@@ -46,25 +48,10 @@ class Owner {
     }
     bool fail(Diagnostic& d,const char* message){d.phase=phase_;d.message=message;return false;}
     bool topologyMatches(const g::LiveZoneWorld50EN& actual,Diagnostic& d) const {
-        if(actual.zoneCount!=16||actual.portalCount!=17||actual.portalLinkCount!=34||
-           !actual.portalHeads||!actual.portalLinks||!actual.portals)return false;
-        // Ephemeral verification topology only. No second live world survives.
-        g::CollectionRef50BX heads[16]{};g::LiveZonePortalLink50EN links[34]{};
-        g::PortalGeometry50EO portals[17]{};g::LiveZoneWorld50EN expected{};
-        const g::LiveZoneWorldStorage50EN backing{heads,16,links,34,portals,17};
-        if(g::prepareLiveZoneWorld50EN(storage_->authoredPortals,17,16,backing,expected)!=
-            g::LiveZoneStatus50EN::Complete)return false;
-        for(std::size_t i=0;i<16;++i)if(actual.portalHeads[i]!=heads[i])return false;
-        for(std::size_t i=0;i<34;++i){const auto& p=actual.portalLinks[i];
-            if(p.next!=links[i].next||p.zone!=links[i].zone||p.portal!=links[i].portal)return false;}
-        // Distance caches are runtime-mutated, not topology. Prepared geometry
-        // retains the source binary32 vertices, normal and all edge normals.
-        for(std::size_t i=0;i<17;++i){
-            if(std::memcmp(actual.portals[i].vertices,portals[i].vertices,sizeof portals[i].vertices)||
-               std::memcmp(&actual.portals[i].normal,&portals[i].normal,sizeof portals[i].normal)||
-               std::memcmp(actual.portals[i].edgeNormals,portals[i].edgeNormals,sizeof portals[i].edgeNormals))return false;
-        }
-        (void)d;return true;
+        // One rule (course_navigation_topology50nt.h): the SCB's own zone and
+        // portal counts, read at prepareGates.
+        (void)d;return course_navigation_topology50NT::matches(storage_->authoredPortals,
+            storage_->authoredPortalCount,storage_->authoredZoneCount,actual);
     }
 public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
@@ -74,7 +61,7 @@ public:
     static constexpr std::size_t persistentPayloadBytes() noexcept {
         return sizeof(storage::Storage)+sizeof(storage::Indices);
     }
-    static constexpr std::size_t coldScratchBytes() noexcept {return sizeof(storage::Scratch<292>);}
+    static constexpr std::size_t coldScratchBytes() noexcept {return sizeof(storage::Scratch<g::courseNavigationCapacity50MB>);}
     static constexpr std::size_t ownerBytes() noexcept {return sizeof(Owner);}
     Phase phase() const noexcept {return phase_;}
     bool gatesReady() const noexcept {return storage_&&storage_->gatesReady;}
@@ -85,26 +72,34 @@ public:
         gateAttempted_=true;phase_=Phase::Authenticate;
         if(availableCpuPayloadBytes<persistentPayloadBytes())return fail(d,"MB navigation exceeds remaining session CPU payload budget");
         const auto* archive=source.archive();
-        if(!source.loaded()||!archive||archive->entries.size()!=487||archive->decoded.size()!=16392192)
+        if(!source.loaded()||!archive||archive->entries.empty())
             return fail(d,"actual loaded MB archive owner required");
+        // Common course rule (course_archive_receipt50ci.h): the stock archive
+        // extent and the three stock member pins are receipts; members by name.
+        course_archive_receipt50CI::countReceipt("mb_navigation","entries",archive->entries.size(),487);
         try {
             a::DecodeError48C error;std::vector<std::uint8_t> map,ai,scene;
             const auto extract=[&](const char* member,std::size_t bytes,const char* hash,std::vector<std::uint8_t>& out){
-                return a::extractResMember48C(*archive,member,out,error,bytes)&&out.size()==bytes&&
-                    pod_materials50ed_fixture::detail::sha256(out)==hash;
+                if(!a::extractResMember48C(*archive,member,out,error,course_archive_receipt50CI::maximumArchiveBytes())||out.empty())return false;
+                course_archive_receipt50CI::memberReceipt("mb_navigation",member,out,0,0,bytes,hash);return true;
             };
             if(!extract("tracks\\mmb.spl",56754,"09319ed7e51176fc80ff6597ff3e62f85137ccb221c4290d53e01d30a9a432f4",map)||
                !extract("tracks\\amb.spl",60710,"8e931fc08aa7cb4cb5a8922ac5b177307f6bea51ed2a7a86d74e2adb4fc9af19",ai)||
                !extract("tracks\\mb.scb",mb_original_world50LM::scbBytesCount,mb_original_world50LM::scbSha,scene))
-                return fail(d,"MB navigation original M/A/SCB authentication failed");
+                return fail(d,"MB navigation M/A spline or SCB member missing");
             storage_.reset(new storage::Storage);
             {
                 a::World48F world;
-                if(!a::decodeWorld48F(scene,world,error)||world.zones.size()!=16||world.portals.size()!=17)
-                    return fail(d,"MB navigation SCB topology decode failed");
-                for(std::size_t i=0;i<16;++i)if(world.zones[i].zone!=i+1)
+                if(!a::decodeWorld48F(scene,world,error)||world.zones.empty()||world.zones.size()>256||
+                   world.portals.size()>g::courseNavigationPortalCapacity50MB)
+                    return fail(d,"MB navigation SCB topology decode failed or exceeds the shared navigation capacity");
+                course_archive_receipt50CI::countReceipt("mb_navigation","zones",world.zones.size(),16);
+                course_archive_receipt50CI::countReceipt("mb_navigation","portals",world.portals.size(),17);
+                for(std::size_t i=0;i<world.zones.size();++i)if(world.zones[i].zone!=i+1)
                     return fail(d,"MB navigation SCB zone order rejected");
-                for(std::size_t i=0;i<17;++i){const auto& p=world.portals[i];
+                storage_->authoredZoneCount=static_cast<std::uint32_t>(world.zones.size());
+                storage_->authoredPortalCount=static_cast<std::uint32_t>(world.portals.size());
+                for(std::size_t i=0;i<world.portals.size();++i){const auto& p=world.portals[i];
                     if(p.parameter_block>=world.parameters.blocks.size())return fail(d,"MB portal block invalid");
                     auto& out=storage_->authoredPortals[i];out.zoneA=p.zones[0];out.zoneB=p.zones[1];
                     for(unsigned k=0;k<4;++k)if(!vectorField(world.parameters.blocks[p.parameter_block],
@@ -115,24 +110,26 @@ public:
             scene.clear();scene.shrink_to_fit();
             phase_=Phase::MapGates;
             {
-                auto scratch=std::make_unique<storage::Scratch<265>>();
-                if(!g::navigation_detail50MB::read<265>(reinterpret_cast<const char*>(map.data()),map.size(),
-                    libm,*scratch,storage_->map,d.navigation)||storage_->map.track.count!=265)
-                    return fail(d,"MB full map gate preparation failed");
+                auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+                if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(map.data()),map.size(),
+                    libm,*scratch,storage_->map,d.navigation))
+                    return fail(d,"MB map gate preparation failed");
+                course_archive_receipt50CI::countReceipt("mb_navigation","map_nodes",storage_->map.track.count,265);
             }
             phase_=Phase::MapMetadata;
-            if(!a::ai_authoring_detail50IU::readTrackMetadata<265>(reinterpret_cast<const char*>(map.data()),map.size(),
+            if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(map.data()),map.size(),
                 storage_->map,storage_->mapMetadata,d.metadata))return fail(d,"MB full map metadata failed");
             map.clear();map.shrink_to_fit();
             phase_=Phase::AiGates;
             {
-                auto scratch=std::make_unique<storage::Scratch<292>>();
-                if(!g::navigation_detail50MB::read<292>(reinterpret_cast<const char*>(ai.data()),ai.size(),
-                    libm,*scratch,storage_->ai,d.navigation)||storage_->ai.track.count!=292)
-                    return fail(d,"MB full AI gate preparation failed");
+                auto scratch=std::make_unique<storage::Scratch<g::courseNavigationCapacity50MB>>();
+                if(!g::navigation_detail50MB::read<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(ai.data()),ai.size(),
+                    libm,*scratch,storage_->ai,d.navigation))
+                    return fail(d,"MB AI gate preparation failed");
+                course_archive_receipt50CI::countReceipt("mb_navigation","ai_nodes",storage_->ai.track.count,292);
             }
             phase_=Phase::AiMetadata;
-            if(!a::ai_authoring_detail50IU::readTrackMetadata<292>(reinterpret_cast<const char*>(ai.data()),ai.size(),
+            if(!a::ai_authoring_detail50IU::readTrackMetadata<g::courseNavigationCapacity50MB>(reinterpret_cast<const char*>(ai.data()),ai.size(),
                 storage_->ai,storage_->aiMetadata,d.metadata))return fail(d,"MB full AI metadata failed");
             storage_->gatesReady=true;phase_=Phase::GatesReady;d.phase=phase_;return true;
         } catch(const std::exception& e){return fail(d,e.what());}
@@ -146,12 +143,12 @@ public:
             struct Graph {const g::UndertrackNode50ET* nodes;std::uint32_t count;};
             struct Navigation {Graph track;const g::TrackNavigationNode50EU* nodes;
                 std::uint8_t* nodeIndex78;bool gatesPrepared,indicesPrepared;};
-            Navigation map{{storage_->map.track.nodes,265},storage_->map.nodes,next->map,true,false};
-            Navigation ai{{storage_->ai.track.nodes,292},storage_->ai.nodes,next->ai,true,false};
+            Navigation map{{storage_->map.track.nodes,storage_->map.track.count},storage_->map.nodes,next->map,true,false};
+            Navigation ai{{storage_->ai.track.nodes,storage_->ai.track.count},storage_->ai.nodes,next->ai,true,false};
             phase_=Phase::MapIndices;
-            if(!g::navigation_detail50MB::bind<265>(*lease.world(),map,d.navigation))return fail(d,"MB map zone indices failed");
+            if(!g::navigation_detail50MB::bind<g::courseNavigationCapacity50MB>(*lease.world(),map,d.navigation))return fail(d,"MB map zone indices failed");
             phase_=Phase::AiIndices;
-            if(!g::navigation_detail50MB::bind<292>(*lease.world(),ai,d.navigation))return fail(d,"MB AI zone indices failed");
+            if(!g::navigation_detail50MB::bind<g::courseNavigationCapacity50MB>(*lease.world(),ai,d.navigation))return fail(d,"MB AI zone indices failed");
             indices_=std::move(next);phase_=Phase::RuntimeReady;d.phase=phase_;return true;
         } catch(const std::exception& e){return fail(d,e.what());}
     }

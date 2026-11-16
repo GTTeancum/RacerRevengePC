@@ -113,6 +113,9 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   for(unsigned i=0;i<3;++i)zg.position[i]=s.bodies.main.components.root.body.position.v[i];
   zg.steer=s.bodies.main.controls.player.raw.values[0];        // both: the racer's own steering channel
   zg.pitchStick=s.bodies.main.components.bindings.aeroAux50;    // stick Y as 48W binds it (human only read)
+  // Lean: channel 2 = conditioned (255 - packet byte 4), so right stick right /
+  // D gives -1; negate so + = right. Default preset only (input binding sets it).
+  zg.lean=zg.human&&rr::game::zeroGravity50ZG.humanLeanBound()?-s.bodies.main.controls.player.raw.values[2]:0.f;
   zg.speed=s.bodies.main.cachedSpeed34;
   zg.finished=(s.fields.impactFlagsCD8&1u)!=0u;
   zg.dt=s.bodies.main.schedule.factorPerSubstep;
@@ -571,9 +574,11 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   if(zeroGAttitudeLog&&actualRacerSlot==0&&main190<s.sceneNodeCount&&
      rr::game::zeroGravity50ZG.mode(0)==rr::game::ZeroGravityMode50ZG::Flight&&(zeroGAttitudeSteps++%15u)==0u){
    const auto& w=s.nodes[main190].world100.v;
-   std::fprintf(stderr,"zero_g_attitude step=%llu stick=%.3f steer=%.3f wing_x=(%.3f,%.3f,%.3f) nose_z=(%.3f,%.3f,%.3f) speed=%.1f\n",
+   std::fprintf(stderr,"zero_g_attitude step=%llu stick=%.3f steer=%.3f lean=%.3f tilt=%.3f wing_x=(%.3f,%.3f,%.3f) nose_z=(%.3f,%.3f,%.3f) speed=%.1f\n",
        (unsigned long long)zeroGAttitudeSteps,s.bodies.main.components.bindings.aeroAux50,
-       s.bodies.main.controls.player.raw.values[0],w[0],w[1],w[2],w[8],w[9],w[10],s.bodies.main.cachedSpeed34);
+       s.bodies.main.controls.player.raw.values[0],
+       rr::game::zeroGravity50ZG.humanLeanBound()?-s.bodies.main.controls.player.raw.values[2]:0.f,
+       rr::game::zeroGravity50ZG.tilt(0),w[0],w[1],w[2],w[8],w[9],w[10],s.bodies.main.cachedSpeed34);
   }
  }
  zeroGravityScope.reset();
