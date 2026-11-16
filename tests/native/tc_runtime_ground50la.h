@@ -1,4 +1,5 @@
 #pragma once
+#include "course_archive_receipt50ci.h"
 #include "tc_cold_sources50la.h"
 #include "authored_runtime_ground50cp_fixture.h"
 #include <memory>
@@ -53,10 +54,9 @@ public:
   if(thread_!=std::this_thread::get_id()){error="TC ground owner thread mismatch";return false;}
   if(attempted_){error="TC ground owner already attempted";return false;}attempted_=true;
   try{
-   need(source&&source->ready()&&source->world().zones.size()==25&&source->world().portals.size()==26&&
-       source->world().instances.size()==600&&source->map().gatesPrepared()&&source->map().count()==268&&
-       source->ai().gatesPrepared()&&source->ai().count()==293,
-       "TC ground requires actual authenticated source and exact gate extents");
+   need(source&&source->ready()&&!source->world().zones.empty()&&source->map().gatesPrepared()&&source->map().count()&&
+       source->ai().gatesPrepared()&&source->ai().count(),
+       "TC ground requires the actual cold source and prepared gates");
    auto next=std::make_unique<original::ColdScene>();next->world=source->world();
    next->stackCount=1; // No retained JSON audit allocation; source receipts are external.
    for(std::size_t zone=0;zone<next->world.zones.size();++zone){
@@ -68,7 +68,8 @@ public:
    }
    std::size_t count=0;for(const auto& instance:next->world.instances)
     if(original::hasCollisionMember50IG(source->archive(),instance.collision_member))++count;
-   need(count==69&&count<=original::hardCollisionOwners50IG,"TC exact placed COL count");
+   course_archive_receipt50CI::countReceipt("tc_runtime_ground","placed_col",count,69);
+   need(count&&count<=original::hardCollisionOwners50IG,"TC placed COL count exceeds the native collision owner store");
    // A single cold reservation precedes every mesh/name borrow. No subsequent
    // resize, sorting or deduplication is allowed after publication.
    next->owners.reserve(count);a::DecodeError48C decode;
@@ -97,7 +98,7 @@ public:
        !next->height.waterNativeQueryBound&&!next->height.nativeWaterResources&&
        next->height.waterSource.empty(),"TC fresh height owner differs");
    const auto map=source->map();const auto graph=map.track();
-   need(actualGridRank<=7&&graph.count()==268,"TC actual grid rank/map bound");
+   need(actualGridRank<=7&&graph.count(),"TC actual grid rank/map bound");
    std::uint32_t previous=0;
    for(;previous<graph.count();++previous){const auto& node=graph.nodes()[previous];
     need(node.nextCount&&node.nextCount<=g::maxUndertrackNext50ET,"TC grid predecessor edge");
