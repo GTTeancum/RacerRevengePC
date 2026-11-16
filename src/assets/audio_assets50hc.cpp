@@ -4,6 +4,7 @@
 #include "import_decode48c.h"
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iomanip>
@@ -129,7 +130,11 @@ void collect(const Bytes& bytes, std::vector<AudioRequest50HC>& out, std::size_t
             key(value); out.push_back({value, false, false, false});
         }
     }
-    flush(); need(out.size() - before == expected, "audio.authoring_count");
+    flush();
+    // Stock count kept as a receipt (the original reads whatever entries the
+    // INI holds); the request table below is bounded instead.
+    if (out.size() - before != expected)
+        std::fprintf(stderr, "audio_authoring_count read=%zu stock=%zu\n", out.size() - before, expected);
 }
 } // namespace
 
@@ -272,11 +277,19 @@ bool readRetainedAudioRequests50HC(const std::filesystem::path& root,
             "audio\\speech\\pod01\\curses.ini", "audio\\speech\\pod01\\taunts.ini", "audio\\speech\\pod01\\special.ini", "Pods\\Pod01\\Pod01.phy"};
         const std::size_t counts[] = {6,4,4,19,12,9,2};
         std::vector<AudioRequest50HC> result;
+        // The original opens these archives and reads their members by name;
+        // nothing checks a checksum, size or entry count. The shipped identity
+        // is a receipt (one line per archive); decoding uses the shared
+        // archive capacity (DecodeLimits48C defaults), so a replaced TA.RES or
+        // POD01.RES (DLC or a converted course/pod) no longer stops race audio.
+        // PORT STAND-IN (flagged, unchanged here): the race catalog takes its
+        // track-intro cues from TA's audio\introAud.ini on every course.
         for (unsigned i = 0; i < 2; ++i) {
-            const auto bytes = read(root/sources[i].path, sources[i].size);
-            need(bytes.size() == sources[i].size && sha256(bytes) == sources[i].hash, "audio.archive_identity");
-            ResArchive48C archive; DecodeError48C decode; DecodeLimits48C limits;
-            limits.resource_decoded_bytes = 16u*1024u*1024u; limits.resource_entries = 512; limits.resource_name_bytes = 256;
+            const DecodeLimits48C limits{};
+            const auto bytes = read(root/sources[i].path, limits.resource_file_bytes);
+            const bool stock = bytes.size() == sources[i].size && sha256(bytes) == sources[i].hash;
+            std::fprintf(stderr, "audio_archive_identity path=%s bytes=%zu stock=%d\n", sources[i].path, bytes.size(), stock ? 1 : 0);
+            ResArchive48C archive; DecodeError48C decode;
             need(decodeResource48C(bytes, archive, decode, nullptr, limits), "audio.resource_decode");
             if (i == 0) for (unsigned j = 0; j < 7; ++j) {
                 Bytes member; need(extractResMember48C(archive, members[j], member, decode, 8192), "audio.member_missing");
@@ -292,7 +305,11 @@ bool readRetainedAudioRequests50HC(const std::filesystem::path& root,
         constexpr char boost[] = "sfx\\race\\boost.vag";
         need(std::memcmp(elf.data()+0x2a8210, boost, sizeof(boost)) == 0, "audio.boost_source_literal");
         result.push_back({boost, false, false, false});
-        need(result.size() == 60, "audio.catalog_count"); out = std::move(result); return true;
+        // Stock catalog is 60 requests (receipt); bounded by the decoded INI
+        // members it came from (7 x 8192 + 8192 bytes, at most one request per
+        // line), so no fixed table is overrun. Consumers look cues up by name.
+        if (result.size() != 60) std::fprintf(stderr, "audio_catalog_count read=%zu stock=60\n", result.size());
+        need(!result.empty() && result.size() <= 8u*8192u, "audio.catalog_count"); out = std::move(result); return true;
     } catch (const std::exception& e) { error = e.what(); return false; }
 }
 } // namespace rr::assets
