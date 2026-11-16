@@ -1,4 +1,5 @@
 #pragma once
+#include "course_trigger_sources50ct.h"
 // Borrowed synchronous setup stage: its callers retain original early owners.
 #include "terrain_interactive_continuation50du.h"
 #include <filesystem>
@@ -174,11 +175,11 @@ struct Context final {
     gaOriginalWorldType& gaOriginalWorld;
     using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
     gaTriggerActionsType& gaTriggerActions;
-    using gaTriggerAuthoringType = std::unique_ptr<ga_trigger_authoring::Owner>;
+    using gaTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     gaTriggerAuthoringType& gaTriggerAuthoring;
     using gaTriggerCandidateFirstType = std::size_t;
     gaTriggerCandidateFirstType& gaTriggerCandidateFirst;
-    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_trigger_authoring::count>;
+    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     gaTriggerMembershipType& gaTriggerMembership;
     using gbAiMetadataType = rr::game::AiTrackMetadataView50GB;
     gbAiMetadataType& gbAiMetadata;
@@ -331,11 +332,11 @@ struct Context final {
     scOriginalWorldType& scOriginalWorld;
     using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
     maTriggerActionsType& maTriggerActions;
-    using maTriggerAuthoringType = std::unique_ptr<ma_trigger_authoring::Owner>;
+    using maTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     maTriggerAuthoringType& maTriggerAuthoring;
     using maTriggerCandidateFirstType = std::size_t;
     maTriggerCandidateFirstType& maTriggerCandidateFirst;
-    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ma_trigger_authoring::count>;
+    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     maTriggerMembershipType& maTriggerMembership;
     using mainPairCapacityType = std::size_t;
     mainPairCapacityType& mainPairCapacity;
@@ -617,11 +618,11 @@ struct Context final {
     saOriginalWorldType& saOriginalWorld;
     using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
     saTriggerActionsType& saTriggerActions;
-    using saTriggerAuthoringType = std::unique_ptr<sa_trigger_authoring::Owner>;
+    using saTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     saTriggerAuthoringType& saTriggerAuthoring;
     using saTriggerCandidateFirstType = std::size_t;
     saTriggerCandidateFirstType& saTriggerCandidateFirst;
-    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sa_trigger_authoring::count>;
+    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     saTriggerMembershipType& saTriggerMembership;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;

@@ -1,4 +1,5 @@
 #pragma once
+#include "course_trigger_sources50ct.h"
 #include <array>
 #include <cstdint>
 #include "terrain_interactive_cold_types50du.h"
@@ -100,7 +101,7 @@ struct OwnersContext final {
     freshTerrainProbeType& freshTerrainProbe;
     using gaAnimatedMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_animated_world::ownerCount>;
     gaAnimatedMembershipType& gaAnimatedMembership;
-    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_trigger_authoring::count>;
+    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     gaTriggerMembershipType& gaTriggerMembership;
     using gbAiMetadataType = rr::game::AiTrackMetadataView50GB;
     gbAiMetadataType& gbAiMetadata;
@@ -164,7 +165,7 @@ struct OwnersContext final {
     legacyGroundType& legacyGround;
     using mType = rr::game::MainBodyState49K;
     mType& m;
-    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ma_trigger_authoring::count>;
+    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     maTriggerMembershipType& maTriggerMembership;
     using mainContactFramesType = std::uint64_t;
     mainContactFramesType& mainContactFrames;
@@ -379,7 +380,7 @@ struct OwnersContext final {
     responseType& response;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sa_trigger_authoring::count>;
+    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     saTriggerMembershipType& saTriggerMembership;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;

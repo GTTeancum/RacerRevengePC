@@ -22,6 +22,9 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
             wma::identityReceipt("MA",stockArchive&&actualScbSha==scbSha,actualArchiveSha,original.size(),next->archive.decoded.size(),next->archive.entries.size(),actualScbSha,scbBytes.size());
             detail::validateBorrowedWorld(scbBytes,world,d.decode);
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
+            // Stock pin per admitted texture, only when its bytes are the stock bytes
+            // (course_archive_receipt50ci.h: a differing pin is a receipt, logged by detail::image).
+            std::map<std::string,const detail::SourceImage*> texturePins;
             std::vector<Bytes> images;
             std::vector<a::MaterialTextureSlotInput50EA> slots;
             constexpr std::uint64_t textureBase=assetIdentity<<48;
@@ -49,13 +52,13 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                         texture=next->entry("textures\\"+map.name+extension);if(texture)break;
                     }
                     shared::need(texture,"Original MA/SA required texture absent: "+map.name);
-                    const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
+                    const auto textureKey=detail::key(texture->name);
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
-                        "Original MA/SA material/ATM initial frame differs");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
+                        const auto* pin=detail::matchedSourceImage(textureKey,bytes,shared::sha256(bytes),false);
+                        texturePins.emplace(textureKey,pin);
                         std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
                         auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
                         shared::need(decodedAnimated==animated,"Original MA/SA texture animation source classification");
@@ -73,6 +76,12 @@ bool Owner::load(const Bytes& original,const a::World48F& world,Diagnostic& d)no
                         next->independentlyPinnedImages.push_back(independent?1:0);
                         if(independent)++d.independentlyPinnedImages;else ++d.runtimeIdentityImages;
                         found=textureIndices.emplace(textureKey,index).first;
+                    }
+                    {
+                        const auto pinned=texturePins.find(textureKey);
+                        const auto* pin=pinned==texturePins.end()?nullptr:pinned->second;
+                        if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
+                            "Original MA/SA material/ATM initial frame differs");
                     }
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
                     shared::need(index<wma::maxWorldSelections,"Original MA/SA authored pass count bound");

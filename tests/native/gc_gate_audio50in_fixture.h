@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -40,8 +41,11 @@ public:
     ~Owner()noexcept{if(ownership())mixer_->stop(voice);}
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
+    // requested: the PodSound action's own Filename (default: stock BIGDOOR).
+    // The stock file keeps its exact identity/framing checks; another file is
+    // admitted by the shared audio bank and mixer clip rules only.
     bool prepare(p::AudioMixer50HD&mixer,p::RaceAudioGroups50IC&groups,
-        const std::filesystem::path&audioRoot,std::string&error){
+        const std::filesystem::path&audioRoot,std::string&error,std::string requested=filename){
         if(attempted_){error="50IN Gate audio requires a fresh stable owner";return false;}
         attempted_=true;
         if(!groups.uses(mixer)||voice>=mixer.count()||mixer.active(voice)||
@@ -50,17 +54,20 @@ public:
             error="50IN Gate audio exclusive voice126/source World4D8 unavailable";return false;
         }
         try {
-            const std::vector<a::AudioRequest50HC> requests={{filename,false,false,false}};
+            for(auto&c:requested){if(c=='\\')c='/';if(c>='A'&&c<='Z')c=static_cast<char>(c+32);}
+            const bool stockFile=requested==filename;
+            if(!stockFile)std::cerr<<"course_member_identity site=pod_sound member="<<requested<<" stock=0\n";
+            const std::vector<a::AudioRequest50HC> requests={{requested.c_str(),false,false,false}};
             if(!a::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
-            const auto*sound=bank_.find(filename);
+            const auto*sound=bank_.find(requested.c_str());
             if(!sound||bank_.clips.size()!=1){error="50IN Gate audio catalog differs";return false;}
             const bool present=sound->state==a::AudioAssetState50HC::ready;
             if(present){
                 const auto&pcm=sound->pcm;
-                if(sound->sourceSha256!=sourceSha256||sound->sourceBytes!=26128||
+                if(stockFile&&(sound->sourceSha256!=sourceSha256||sound->sourceBytes!=26128||
                    pcm.sourceSha256!=sourceSha256||pcm.sampleRate!=22050||
                    pcm.channels!=1||pcm.frames!=45612||pcm.samples.size()!=45612||
-                   pcm.hasEmbeddedLoop||pcm.loopStart||pcm.loopEnd){
+                   pcm.hasEmbeddedLoop||pcm.loopStart||pcm.loopEnd)){
                     error="50IN Gate original BIGDOOR identity/mono/end framing differs";return false;
                 }
                 clip_={pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};

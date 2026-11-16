@@ -4,16 +4,19 @@
 #include <limits>
 namespace ma_trigger_candidates {
 namespace g=rr::game;
-inline std::size_t prepare(const ma_trigger_authoring::Owner& source,
+// Sources come from the course's own TOB (course_trigger_sources50ct.h); the
+// live count is the data's, bounded by the native owner store.
+inline std::size_t prepare(const course_trigger_sources50CT::Owner& source,
  ma_trigger_actions::Owner& actions,std::vector<g::Type2StaticCandidate49X>& candidates,
  std::vector<track_runtime_storage50IG::Binding>& bindings,std::uint8_t tag,
  std::uint8_t flags31,std::uint8_t flagsF8){
- if(!source.ready()||candidates.size()!=bindings.size()||
-    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-ma_trigger_authoring::count)
+ const auto live=source.liveCount();
+ if(!source.ready()||candidates.size()!=bindings.size()||live>track_runtime_storage50IG::hardTerrainOwners||
+    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-live)
   throw std::runtime_error("MA native trigger cold owner extent");
- const auto first=candidates.size();candidates.resize(first+ma_trigger_authoring::count);bindings.resize(candidates.size());
+ const auto first=candidates.size();candidates.resize(first+live);bindings.resize(candidates.size());
  for(std::size_t i=0;i<first;++i)bindings[i].candidate=&candidates[i];
- for(std::size_t i=0;i<ma_trigger_authoring::count;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
+ for(std::size_t i=0;i<live;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
   target.shapeType=authored.shapeType;target.nativeTriggers=&actions.nativeGroup();target.nativeTriggerIndex=i;
   target.nativeTriggerBox=authored.box;
   auto& c=target.candidate.collision;c.shapeType=authored.shapeType;
@@ -31,7 +34,7 @@ inline std::size_t prepare(const ma_trigger_authoring::Owner& source,
  }
  return first;
 }
-inline g::LiveZoneBounds50EN bounds(const ma_trigger_authoring::Source& source){
+inline g::LiveZoneBounds50EN bounds(const course_trigger_sources50CT::Source& source){
  g::LiveZoneBounds50EN out{};out.bounds.shapeTag=source.shapeType;
  for(unsigned n=0;n<16;n+=5)out.bounds.shapeWorld.v[n]=1.f;
  if(source.shapeType==6){out.bounds.shapeWorld=source.box.world;

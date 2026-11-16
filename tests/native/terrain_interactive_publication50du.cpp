@@ -66,6 +66,21 @@ using interactive_loop50DU::RacePresentation50HZ;
 using interactive_loop50DU::GameplayDisplayWallTotals50DU;
 using J=nlohmann::json;
 namespace {
+// Data branch for a course world's animated-texture owner (SC's presence rule,
+// for every course world that holds its admitted texture list): the world's
+// own materials name an .ATM texture, or they do not. A world owner that is
+// absent (legacy export route) keeps the previous unconditional route.
+template<class WorldOwner>
+bool worldAuthorsAnimatedTextures50DU(const WorldOwner* world) {
+ if(!world)return true;
+ const auto* textures=world->textures();
+ if(!textures)return true;
+ for(const auto& texture:*textures){
+  const auto& n=texture.path;
+  if(n.size()>=4&&(n[n.size()-4]=='.')&&(n[n.size()-3]|32)=='a'&&(n[n.size()-2]|32)=='t'&&(n[n.size()-1]|32)=='m')return true;
+ }
+ return false;
+}
 void require50DU(bool ok,const char* message) {
     if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
@@ -1249,7 +1264,8 @@ void Context::run() {
    require50DU(gcAtmLoaded,
        atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
   }
-  if(isGaTrack){
+  // ATM owner exactly when the course world's materials name an ATM texture.
+  if(isGaTrack&&worldAuthorsAnimatedTextures50DU(gaOriginalWorld.get())){
    ga_atm_animation_fixture::Diagnostic atmDiagnostic{};
    const bool loaded=gaOriginalWorld&&gaAtm.loadSource(trackSession->archive,*gaOriginalWorld,atmDiagnostic);
    if(!loaded)std::cerr<<"GA ATM load diagnostic animation="<<atmDiagnostic.animation<<" frame="<<atmDiagnostic.frame
@@ -1257,7 +1273,9 @@ void Context::run() {
        <<" source_detail="<<atmDiagnostic.source.detail<<'\n';
    require50DU(loaded,atmDiagnostic.message.empty()?"original GA ATM source bank rejected":atmDiagnostic.message.c_str());
   }
-  if(isMaSaTrack){
+  // ATM owner exactly when the course world's materials name an ATM texture.
+  if(isMaSaTrack&&(maOriginalWorld?worldAuthorsAnimatedTextures50DU(maOriginalWorld.get()):
+      worldAuthorsAnimatedTextures50DU(saOriginalWorld.get()))){
    ma_sa_atm_animation_fixture::Diagnostic diagnostic;
    const bool loaded=maOriginalWorld?maSaAtm.loadSource(trackSession->archive,trackSource,*maOriginalWorld,diagnostic):
        saOriginalWorld?maSaAtm.loadSource(trackSession->archive,trackSource,*saOriginalWorld,diagnostic):
@@ -1401,11 +1419,15 @@ void Context::run() {
        !gcParticleMaterials.loaded()||!gcParticleMaterials.ownsResources()))return false;
     if(isRaTrack&&(!raWorld||raWorld->terminalFailure()||!raWorld->coldStaticWorld()||
        !raWorld->skyAssets()||!raSession||!sourceCameraSession||!sourceCameraSession->ready()))return false;
-    if(isSaTrack&&(!saAnimatedWorld||!saAnimatedWorld->ready()||!saDynamicWindow.loaded()||
-       !saDynamicWindow.ownsResources()||!saTriggerActions||!saTriggerActions->ready()||
-       !maSaAtm.loaded()||!maSaAtm.ownsResources()))return false;
-    if(isMaTrack&&(!maTriggerActions||!maTriggerActions->ready()||!maSaAtm.loaded()||
-       !maSaAtm.ownsResources()))return false;
+    // MA/SA/GA (SC's rule): each owner is required exactly when the course
+    // data authors it. Animated owner + dynamic window when [Animations] has
+    // animations, trigger actions when NumberOfTriggers > 0, ATM when the
+    // world's materials name an ATM texture.
+    if(isSaTrack&&((saAnimatedWorld&&(!saAnimatedWorld->ready()||!saDynamicWindow.loaded()||
+       !saDynamicWindow.ownsResources()))||(saTriggerActions&&!saTriggerActions->ready())||
+       (worldAuthorsAnimatedTextures50DU(saOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
+    if(isMaTrack&&((maTriggerActions&&!maTriggerActions->ready())||
+       (worldAuthorsAnimatedTextures50DU(maOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
     if(isMbTrack&&(!mbOriginalWorld||!mbOriginalWorld->loaded()||
        !mbAtm.loaded()||!mbAtm.ownsResources()))return false;
     if(rcOriginalDisc&&(!humanOriginalHud||!rcColdSources||!rcColdSources->ready()||
@@ -1471,9 +1493,9 @@ void Context::run() {
     if(taOriginalDisc&&(!humanOriginalHud||!taOriginalWorld||!taOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(isGaTrack&&(!humanOriginalHud||!gaOriginalWorld||!gaOriginalWorld->loaded()||
-       !gaAnimatedWorld||!gaAnimatedWorld->ready()||!gaDynamicWindow.loaded()||
-       !gaDynamicWindow.ownsResources()||!gaTriggerActions||!gaTriggerActions->ready()||
-       !gaAtm.loaded()||!gaAtm.ownsResources()))return false;
+       (gaAnimatedWorld&&(!gaAnimatedWorld->ready()||!gaDynamicWindow.loaded()||
+       !gaDynamicWindow.ownsResources()))||(gaTriggerActions&&!gaTriggerActions->ready())||
+       (worldAuthorsAnimatedTextures50DU(gaOriginalWorld.get())?(!gaAtm.loaded()||!gaAtm.ownsResources()):gaAtm.loaded())))return false;
     for(std::size_t slot=0;slot<racerBank.count();++slot){
      if(!racerBank.active(slot)||!racerRigs[slot]||!racerCollisions[slot]||!racerVisuals[slot]||!racerCables[slot]||
         (originalAiOwnsSlot(slot)&&(!racerBank.read(slot,originalAiReads.initialized)||
@@ -1606,7 +1628,13 @@ void Context::run() {
   }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
-  renderRequest.track.maximumNormalBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:
+  // One shared ceiling for the MA/SA/GA course worlds (was keyed on the course:
+  // MA/SA 32/16/16 MiB, GA 16/8/8 MiB). The renderer validates the mesh it
+  // actually builds against it; it allocates the mesh's own size.
+  constexpr std::uint32_t courseWorldVertexCeiling=32u*1024u*1024u,courseWorldIndexCeiling=16u*1024u*1024u,
+      courseWorldNormalCeiling=16u*1024u*1024u;
+  const bool courseWorldCeiling=isMaSaTrack||isGaTrack;
+  renderRequest.track.maximumNormalBytes=courseWorldCeiling?courseWorldNormalCeiling:
       trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates&&!isRcTrack){
    const auto* projectionUvs=mcOriginalWorld?mcOriginalWorld->projectionUvs():gbOriginalWorld?gbOriginalWorld->projectionUvs():tbOriginalWorld?tbOriginalWorld->projectionUvs():tcOriginalWorld?tcOriginalWorld->projectionUvs():scOriginalWorld?scOriginalWorld->projectionUvs():mbOriginalWorld?mbOriginalWorld->projectionUvs():gcOriginalWorld?gcOriginalWorld->projectionUvs():gaOriginalWorld?gaOriginalWorld->projectionUvs():maOriginalWorld?maOriginalWorld->projectionUvs():
@@ -1621,9 +1649,9 @@ void Context::run() {
   const char* disableCulling=std::getenv("RR_DISABLE_TRACK_CULLING");
   renderRequest.track.enableFrustumCulling=!(disableCulling&&std::string(disableCulling)=="1");
   renderRequest.track.zoneCount=static_cast<std::uint32_t>(actualWorld.zones.size());
-  renderRequest.track.maximumVertexBytes=isMaSaTrack?32u*1024u*1024u:isGaTrack?16u*1024u*1024u:
+  renderRequest.track.maximumVertexBytes=courseWorldCeiling?courseWorldVertexCeiling:
       trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
-  renderRequest.track.maximumIndexBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:2u*1024u*1024u;
+  renderRequest.track.maximumIndexBytes=courseWorldCeiling?courseWorldIndexCeiling:2u*1024u*1024u;
   const auto* trackBank=mcOriginalWorld?mcOriginalWorld->bank():gbOriginalWorld?gbOriginalWorld->bank():tbOriginalWorld?tbOriginalWorld->bank():rcOriginalWorld?rcOriginalWorld->bank():tcOriginalWorld?tcOriginalWorld->bank():scOriginalWorld?scOriginalWorld->bank():mbOriginalWorld?mbOriginalWorld->bank():taOriginalWorld?taOriginalWorld->bank():gcOriginalWorld?gcOriginalWorld->bank():gaOriginalWorld?gaOriginalWorld->bank():maOriginalWorld?maOriginalWorld->bank():
        saOriginalWorld?saOriginalWorld->bank():trackMaterialOwner->bank();
   const auto* trackSpans=mcOriginalWorld?mcOriginalWorld->spans():gbOriginalWorld?gbOriginalWorld->spans():tbOriginalWorld?tbOriginalWorld->spans():rcOriginalWorld?rcOriginalWorld->spans():tcOriginalWorld?tcOriginalWorld->spans():scOriginalWorld?scOriginalWorld->spans():mbOriginalWorld?mbOriginalWorld->spans():taOriginalWorld?taOriginalWorld->spans():gcOriginalWorld?gcOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():maOriginalWorld?maOriginalWorld->spans():

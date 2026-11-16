@@ -4,6 +4,7 @@
 #include "original_world_material_admission50cm.h"
 #include "material_alpha50gx_fixture.h"
 #include "source_texture50fc_fixture.h"
+#include "course_archive_receipt50ci.h"
 
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_ipu_decoder.h"

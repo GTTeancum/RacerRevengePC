@@ -1141,9 +1141,11 @@ SessionExit50DU Context::run() {
       sourceCameraCycleAudio.prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
           audioRoot,*materialMixer,*audioGroups,audioError)),
       audioError.empty()?"original camera cycle audio owner unavailable":audioError.c_str());
-  if(isGaTrack){
+  // A PodSound voice exists exactly when the trigger data authors a PodSound
+  // action; the voice file is the action's own Filename (stock GA: BIGDOOR).
+  if(const auto* podSound=gaTriggerAuthoring?gaTriggerAuthoring->firstPodSound():nullptr){
    gaGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
-   const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError);
+   const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError,podSound->filename);
    require50DU(prepared&&gaGateAudio->available(),audioError.empty()?"GA original BIGDOOR PCM/World4D8 voice unavailable":audioError.c_str());
   }
   if(gcTriggerActions){
@@ -1665,7 +1667,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"GA original animation cold update"),"GA original animation cold membership failed");
  }
- if(gaAnimatedWorld)for(std::size_t i=0;i<gaTriggerMembership.size();++i){
+ if(gaTriggerAuthoring)for(std::size_t i=0;i<gaTriggerAuthoring->liveCount();++i){
   auto& membership=*gaTriggerMembership[i];const auto& authored=gaTriggerAuthoring->source(i);
   const auto bounds=ga_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(gaTriggerCandidateFirst+i+1);
@@ -1685,7 +1687,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"SC actual trigger cold update"),"SC trigger cold membership failed");
  }
- if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerMembership.size();++i){
+ if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerAuthoring->liveCount();++i){
   auto& membership=*maTriggerMembership[i];const auto& authored=maTriggerAuthoring->source(i);
   const auto bounds=ma_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(maTriggerCandidateFirst+i+1);
@@ -1695,7 +1697,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"MA authored trigger cold update"),"MA trigger cold membership failed");
  }
- if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerMembership.size();++i){
+ if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerAuthoring->liveCount();++i){
   auto& membership=*saTriggerMembership[i];const auto& authored=saTriggerAuthoring->source(i);
   const auto bounds=sa_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(saTriggerCandidateFirst+i+1);

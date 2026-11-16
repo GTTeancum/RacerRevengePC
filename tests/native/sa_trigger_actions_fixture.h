@@ -1,5 +1,7 @@
 #pragma once
 #include "sa_trigger_authoring_fixture.h"
+#include "course_trigger_sources50ct.h"
+#include "../../src/game/native_trigger_box_geometry50ma.h"
 #include "../../src/game/trigger_entry50in.h"
 #include "../../src/game/native_trigger_group50ga.h"
 #include "../../src/game/trigger_sphere50in.h"
@@ -25,7 +27,7 @@ struct ActionLease {
 struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0;};
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
- const sa_trigger_authoring::Owner* source_=nullptr;
+ const course_trigger_sources50CT::Owner* source_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
  g::NativeTriggerGroup50GA group_{};
@@ -72,11 +74,14 @@ class Owner final {
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- bool prepare(const sa_trigger_authoring::Owner& source,
+ bool prepare(const course_trigger_sources50CT::Owner& source,
      const std::array<RacerIdentities,racers>& identities,
      std::uint32_t playerPrefixCount34,std::uint32_t aiNodeCount,std::size_t racerCount=racers)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(!source.ready()||aiNodeCount<=sa_trigger_authoring::maxTargetNodeIndex||!racerCount||racerCount>racers||playerPrefixCount34>racerCount)return false;
+  // Every LostAI target must lie inside the live AI spline (checked per
+  // trigger below), not a stock node-count floor.
+  const auto live=source.liveCount();
+  if(!source.ready()||!live||!aiNodeCount||!racerCount||racerCount>racers||playerPrefixCount34>racerCount)return false;
   // Original1B5340 resolves PLAYER by source roster prefix[0,manager+34),
   // via1AF330(index)->main690. The caller supplies that genuine count and
   // source-order identities. It is not class58, AI role, or camera choice.
@@ -84,16 +89,20 @@ public:
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+sa_trigger_authoring::count))return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+course_trigger_sources50CT::capacity))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
-  for(std::size_t i=0;i<sa_trigger_authoring::count;++i){const auto& s=source.source(i);
-   if(s.randomTriggerPercent!=100||s.actionCount!=1||!s.startEnabled||s.oneTimeOnly||!s.ignorePlayer||
+  // PORT STAND-IN (flagged): this native action owner implements one LostAI
+  // action, StartEnabled TRUE and OneTimeOnly FALSE; other authored values
+  // are refused here, never ignored.
+  for(std::size_t i=0;i<live;++i){const auto& s=source.source(i);
+   if(s.randomTriggerPercent!=100||s.actionCount!=1||!s.startEnabled||s.oneTimeOnly||
+      s.actions[0].kind!=course_trigger_sources50CT::Action::LostAI||
       s.actions[0].reset||s.actions[0].targetNodeIndex>=aiNodeCount)return false;
   }
   // Shared MA/SA candidate extension: capacity13, default GA active count10.
   // Set exactly four before any state writes. No zero-filled extra triggers.
-  if(!group_.triggers.setCount(sa_trigger_authoring::count))return false;
+  if(!group_.triggers.setCount(live))return false;
   source_=&source;racers_=identities;racerCount_=racerCount;playerPrefixCount34_=playerPrefixCount34;originalAiNodeCount_=aiNodeCount;
   if(!group_.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)group_.colliders[i].identity=ids[i];
@@ -174,14 +183,19 @@ public:
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){
     const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
-    const auto& geometry=geometry_[c];const auto& root=geometry.resource->nodes[geometry.resource->root];
+    const auto& geometry=geometry_[c];bool overlap=false;
+    if(authored.shapeType==6){
+     // Box triggers: the same native shape6 exit kernel as MA's chain.
+     if(!g::nativeType2RootTriggerBoxOverlap50MA(*geometry.resource,geometry.world,authored.box,overlap))return fail(Status::Service);
+    }else{
+    const auto& root=geometry.resource->nodes[geometry.resource->root];
     g::TriggerSphereRootExitInput50IN input{};input.type2PreparedWorld=geometry.world;
     for(unsigned axis=0;axis<3;++axis){input.sphere.localCenter.v[axis]=authored.sphere.center.v[axis];input.rootCenter.v[axis]=root.center[axis];input.rootHalf.v[axis]=root.half[axis];}
     input.sphere.localCenter.v[3]=input.rootCenter.v[3]=input.rootHalf.v[3]=1.f;
     for(unsigned axis=0;axis<4;++axis)input.sphere.world.v[axis*5]=1.f;
     input.sphere.radius50=authored.sphere.radius;volatile float square=authored.sphere.radius*authored.sphere.radius;input.sphere.radiusSquared54=square;
-    bool overlap=false;
     if(g::overlapTriggerSphereType2Root50IN(input,overlap)!=g::TriggerSphereRootExitStatus50IN::Complete)return fail(Status::Service);
+    }
     observations[slot]={&group_.colliders[c],overlap};
    }
    g::TriggerEntryReceipt50IN receipt{};const auto result=service(t,observations.data(),state.collider.highWaterD0,receipt);
@@ -190,7 +204,7 @@ public:
   return Status::Complete;
  }
  g::NativeTriggerGroup50GA& nativeGroup()noexcept{return group_;}
- const sa_trigger_authoring::Owner* authoring()const noexcept{return source_;}
+ const course_trigger_sources50CT::Owner* authoring()const noexcept{return source_;}
  const g::TriggerEntryState50IN& state(std::size_t i)const{return group_.triggers.at(i);}
  std::uint32_t playerPrefixCount34()const noexcept{return playerPrefixCount34_;}
  const Counters& counters()const noexcept{return counters_;}

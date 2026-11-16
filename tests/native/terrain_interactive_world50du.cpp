@@ -1,5 +1,7 @@
 // Exact original suffix: world owners retire before the original early prefix.
 #include "native_last_failure50pd.h"
+#include "course_archive_receipt50ci.h"
+#include "course_trigger_sources50ct.h"
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "native_wreck_debris_sim50pd.h"
@@ -751,7 +753,26 @@ SessionExit50DU Context::run() {
   require50DU(groundReady,error.empty()?"MB actual collision owner rejected":error.c_str());
  }
  authored_runtime_ground50cp_fixture::ColdScene legacyGround{};
- if(!isRaTrack&&!isMbTrack&&!isScTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
+ // Common course-archive rule (course_archive_receipt50ci.h): the session
+ // row's stock SHA/size is a receipt; the ground, its height owners and the
+ // water resources authenticate the archive actually read (digest and size of
+ // these bytes), so a converted TRACKS/xx.RES in this slot loads by the same
+ // path. A stock archive yields the stock digest, so the stock path is unchanged.
+ std::string legacyGroundArchiveSha256;
+ if(!isRaTrack&&!isMbTrack&&!isScTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack){
+  {
+   const auto legacyGroundArchive=authored_runtime_ground50cp_fixture::read(groundRequest.archive);
+   require50DU(!legacyGroundArchive.empty()&&
+       legacyGroundArchive.size()<=course_archive_receipt50CI::maximumArchiveBytes(),
+       "legacy ground course archive exceeds the shared course-archive capacity");
+   course_archive_receipt50CI::receipt("legacy_ground",trackSession->world->code,legacyGroundArchive,
+       trackSession->archiveSha256,trackSession->archiveBytes);
+   legacyGroundArchiveSha256=pod_materials50ed_fixture::detail::sha256(legacyGroundArchive);
+   groundRequest.archiveSha256=legacyGroundArchiveSha256.c_str();
+   groundRequest.archiveBytes=legacyGroundArchive.size();
+  }
+  legacyGround=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
+ }
  require50DU(!isTbTrack||(tbCollisionWorld&&tbCollisionWorld->coldSource()==tbColdSources.get()&&tbCollisionWorld->ground()),
      "TB ground alias requires the actual same compact source owner");
  const auto& ground=isMcTrack?*mcCollisionWorld->ground():isGbTrack?*gbCollisionWorld->ground():isTbTrack?*tbCollisionWorld->ground():isRcTrack?*rcCollisionWorld->ground():isTcTrack?*tcCollisionWorld->ground():isScTrack?*scGround->ground():isMbTrack?mbCollisionWorld->ground():legacyGround;
@@ -1173,15 +1194,15 @@ SessionExit50DU Context::run() {
  std::shared_ptr<sc_trigger_authoring::Owner> scTriggerAuthoring;
  std::unique_ptr<sc_trigger_actions::Owner> scTriggerActions;
  std::size_t scTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
- std::unique_ptr<ma_trigger_authoring::Owner> maTriggerAuthoring;
+ std::unique_ptr<course_trigger_sources50CT::Owner> maTriggerAuthoring;
  std::unique_ptr<ma_trigger_actions::Owner> maTriggerActions;
- std::unique_ptr<sa_trigger_authoring::Owner> saTriggerAuthoring;
+ std::unique_ptr<course_trigger_sources50CT::Owner> saTriggerAuthoring;
  std::unique_ptr<sa_trigger_actions::Owner> saTriggerActions;
  std::size_t maTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::size_t saTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::unique_ptr<ga_animated_world::Owner> gaAnimatedWorld;
  ga_animated_world::Diagnostic gaAnimationDiagnostic{};
- std::unique_ptr<ga_trigger_authoring::Owner> gaTriggerAuthoring;
+ std::unique_ptr<course_trigger_sources50CT::Owner> gaTriggerAuthoring;
  std::unique_ptr<ga_trigger_actions::Owner> gaTriggerActions;
  std::size_t gaTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::unique_ptr<gc_animated_world50IG::Owner> gcAnimatedWorld;
@@ -1214,6 +1235,21 @@ SessionExit50DU Context::run() {
       "COL1 children=4, CHARACTER native mask=1, source node mappings=1/2 and 0/1; opening inactive, windmill loop15s.\n";
  }
  if(isGaTrack){
+  // One data rule (course_trigger_sources50ct.h): triggers and the animation
+  // count come from the course's own TOB. Zones from the loaded world; LostAI
+  // targets bounded by the native spline storage here and by the live AI
+  // spline when the actions bind (cold contacts).
+  gaTriggerAuthoring=std::make_unique<course_trigger_sources50CT::Owner>();std::string triggerError;
+  const bool triggersLoaded=gaTriggerAuthoring->load(trackSession->archive,course_trigger_sources50CT::stockGa,
+      actualWorld.zones.size(),static_cast<std::uint32_t>(rr::game::maxUndertrackNodes50ET),triggerError);
+  require50DU(triggersLoaded,triggerError.empty()?"GA trigger authoring failed":triggerError.c_str());
+  // Absent [Animations] (or 0) = no animated owner and no dynamic window. A
+  // stock TOB keeps its animated owner. PORT STAND-IN (flagged): a non-stock
+  // TOB that authors animations is refused until the common animation reader
+  // (W3) exists; the stock-shaped owner would misload it.
+  require50DU(!gaTriggerAuthoring->animationCount()||gaTriggerAuthoring->stockTob(),
+      "GA course archive authors animations: needs the common animation reader (W3)");
+  if(gaTriggerAuthoring->animationCount()){
   gaAnimatedWorld=std::make_unique<ga_animated_world::Owner>();
   const bool loaded=gaAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
       s.animationShared.motion,gaAnimationDiagnostic);
@@ -1221,38 +1257,69 @@ SessionExit50DU Context::run() {
   ga_animated_candidates::prepare(*gaAnimatedWorld,preparedCandidates,preparedBindings,
       query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
   for(const auto& candidate:preparedCandidates)stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
-  gaTriggerAuthoring=std::make_unique<ga_trigger_authoring::Owner>();std::string triggerError;
-  // Exact authenticated tracks/aga.spl header: NumNodes107. Recheck against
-  // the canonical live navigation owner before actions become ready below.
-  const bool triggersLoaded=gaTriggerAuthoring->load(trackSession->archive,107u,12u,triggerError);
-  require50DU(triggersLoaded,triggerError.empty()?"GA original trigger authoring failed":triggerError.c_str());
+  }
+  // An Animation action needs an animated owner to name (index < live count).
+  require50DU(!gaTriggerAuthoring->authors(course_trigger_sources50CT::Action::Animation)||
+      (gaAnimatedWorld&&gaTriggerAuthoring->highestAnimationIndex()<ga_animated_world::ownerCount),
+      "GA trigger Animation action names an animation the course data does not author");
+  if(!gaTriggerAuthoring->liveCount())gaTriggerAuthoring.reset();
+  else{
   gaTriggerActions=std::make_unique<ga_trigger_actions::Owner>();
   gaTriggerCandidateFirst=ga_trigger_candidates::prepare(*gaTriggerAuthoring,*gaTriggerActions,
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
-  std::cerr<<"GA ANIMATED WORLD: original Defensegate/opening,2 owners,605 vertices,6 surfaces,5 COL children; "
+  }
+  if(gaAnimatedWorld)std::cerr<<"GA ANIMATED WORLD: original Defensegate/opening,2 owners,605 vertices,6 surfaces,5 COL children; "
       "root-inclusive mappings1/2/3 and1/2, CHARACTER1, zones11/7, both authored inactive/nonlooping.\n";
  }
  if(isSaTrack){
+  // Same data rule as GA/MA (course_trigger_sources50ct.h).
+  saTriggerAuthoring=std::make_unique<course_trigger_sources50CT::Owner>();std::string error;
+  const bool authored=saTriggerAuthoring->load(trackSession->archive,course_trigger_sources50CT::stockSa,
+      actualWorld.zones.size(),static_cast<std::uint32_t>(rr::game::maxUndertrackNodes50ET),error);
+  require50DU(authored,error.empty()?"SA trigger authoring rejected":error.c_str());
+  // PORT STAND-IN (flagged): non-stock animations wait for the common
+  // animation reader (W3); absent = no animated owner / dynamic window.
+  require50DU(!saTriggerAuthoring->animationCount()||saTriggerAuthoring->stockTob(),
+      "SA course archive authors animations: needs the common animation reader (W3)");
+  // PORT STAND-IN (flagged): the SA action owner implements LostAI only.
+  require50DU(!saTriggerAuthoring->authors(course_trigger_sources50CT::Action::Animation)&&
+      !saTriggerAuthoring->authors(course_trigger_sources50CT::Action::PodSound),
+      "SA trigger Animation/PodSound actions need the common trigger action owner");
+  if(saTriggerAuthoring->animationCount()){
   saAnimatedWorld=std::make_unique<sa_animated_world::Owner>();
   const bool loaded=saAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
       s.animationShared.motion,saAnimationDiagnostic);
   require50DU(loaded,saAnimationDiagnostic.message.empty()?"original SA animated resources rejected":saAnimationDiagnostic.message.c_str());
   // All ten actual TOB animations use UseCollision=F. No collider registration
   // or fabricated static actor is added for these render/service owners.
-  saTriggerAuthoring=std::make_unique<sa_trigger_authoring::Owner>();std::string error;
-  const bool authored=saTriggerAuthoring->load(trackSession->archive,121u,25u,error);
-  require50DU(authored,error.empty()?"SA original trigger authoring rejected":error.c_str());
+  }
+  if(!saTriggerAuthoring->liveCount())saTriggerAuthoring.reset();
+  else{
   saTriggerActions=std::make_unique<sa_trigger_actions::Owner>();
   saTriggerCandidateFirst=sa_trigger_candidates::prepare(*saTriggerAuthoring,*saTriggerActions,
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  }
  }
  if(isMaTrack){
-  maTriggerAuthoring=std::make_unique<ma_trigger_authoring::Owner>();std::string error;
-  const bool authored=maTriggerAuthoring->load(trackSession->archive,213u,9u,error);
-  require50DU(authored,error.empty()?"MA original trigger authoring rejected":error.c_str());
+  // Same data rule as GA/SA (course_trigger_sources50ct.h).
+  maTriggerAuthoring=std::make_unique<course_trigger_sources50CT::Owner>();std::string error;
+  const bool authored=maTriggerAuthoring->load(trackSession->archive,course_trigger_sources50CT::stockMa,
+      actualWorld.zones.size(),static_cast<std::uint32_t>(rr::game::maxUndertrackNodes50ET),error);
+  require50DU(authored,error.empty()?"MA trigger authoring rejected":error.c_str());
+  // MA has no animated owner: an animation-authoring MA archive is refused
+  // rather than silently drawn without its animations. PORT STAND-IN (flagged).
+  require50DU(!maTriggerAuthoring->animationCount()||maTriggerAuthoring->stockTob(),
+      "MA course archive authors animations: needs the common animation reader (W3)");
+  // PORT STAND-IN (flagged): the MA action owner implements LostAI only.
+  require50DU(!maTriggerAuthoring->authors(course_trigger_sources50CT::Action::Animation)&&
+      !maTriggerAuthoring->authors(course_trigger_sources50CT::Action::PodSound),
+      "MA trigger Animation/PodSound actions need the common trigger action owner");
+  if(!maTriggerAuthoring->liveCount())maTriggerAuthoring.reset();
+  else{
   maTriggerActions=std::make_unique<ma_trigger_actions::Owner>();
   maTriggerCandidateFirst=ma_trigger_candidates::prepare(*maTriggerAuthoring,*maTriggerActions,
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  }
  }
  if(isScTrack){
   scTriggerAuthoring=std::make_shared<sc_trigger_authoring::Owner>();std::string error;
@@ -1543,18 +1610,19 @@ SessionExit50DU Context::run() {
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_animated_world::ownerCount> gaAnimatedMembership;
  if(gaAnimatedWorld)for(auto& membership:gaAnimatedMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
- std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_trigger_authoring::count> gaTriggerMembership;
- if(gaAnimatedWorld)for(auto& membership:gaTriggerMembership)
-  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ // Capacity-sized; one membership per live trigger (course_trigger_sources50ct.h).
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> gaTriggerMembership;
+ if(gaTriggerAuthoring)for(std::size_t i=0;i<gaTriggerAuthoring->liveCount();++i)
+  gaTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sc_trigger_authoring::count> scTriggerMembership;
  if(scTriggerAuthoring)for(std::size_t i=0;i<scTriggerAuthoring->liveCount();++i)
   scTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
- std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ma_trigger_authoring::count> maTriggerMembership;
- if(maTriggerAuthoring)for(auto& membership:maTriggerMembership)
-  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
- std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sa_trigger_authoring::count> saTriggerMembership;
- if(saTriggerAuthoring)for(auto& membership:saTriggerMembership)
-  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> maTriggerMembership;
+ if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerAuthoring->liveCount();++i)
+  maTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> saTriggerMembership;
+ if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerAuthoring->liveCount();++i)
+  saTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_trigger_authoring50IN::count> gcTriggerMembership;
  if(gcTriggerActions)for(auto& membership:gcTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
