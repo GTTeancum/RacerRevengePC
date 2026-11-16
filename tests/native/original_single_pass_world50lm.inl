@@ -61,6 +61,22 @@ inline const SourceImage* sourceImage(const std::string& member){
     }
     return found;
 }
+// Common course-archive rule (course_archive_receipt50ci.h): a stock pin is
+// the stock identity of a member NAME. When the bytes under that name are the
+// stock bytes the pin still verifies exactly; when they differ (a converted
+// archive reusing a generic stock name) the pin is a receipt and the image is
+// admitted like any unpinned image, from its own data.
+// image() logs the receipt; the cold loader asks again without logging.
+inline const SourceImage* matchedSourceImage(const std::string& member,const Bytes& source,
+    const std::string& sourceSha,bool logReceipt=true){
+    const auto* pin=sourceImage(member);
+    if(pin&&!(source.size()==pin->sourceBytes&&sourceSha==pin->sourceSha256)){
+        if(logReceipt)course_archive_receipt50CI::memberReceipt("static_image_pin",member,source,0,0,
+            pin->sourceBytes,pin->sourceSha256);
+        pin=nullptr;
+    }
+    return pin;
+}
 inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
     const auto text=field(value,"animatedMapInitialFrame");if(text.empty())return 0;
     std::uint32_t result=0;const auto parsed=std::from_chars(text.data(),text.data()+text.size(),result);
@@ -73,7 +89,8 @@ inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
 inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& mipIndex,
     bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0){
     shared::need(source.size()>=12&&source.size()<=8u*1024u*1024u,"Original MA/SA texture source extent");
-    const auto name=key(member);const auto* pin=sourceImage(name);
+    const auto name=key(member);const auto sourceSha=shared::sha256(source);
+    const auto* pin=matchedSourceImage(name,source,sourceSha);
     const source_texture50fc_fixture::detail::Entry* outputPin=nullptr;
     for(const auto& entry:exceptionalImages)if(key(entry.member)==name){
         shared::need(!outputPin,"Ambiguous original MA/SA decoded image pin");outputPin=&entry;
@@ -82,12 +99,13 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(outputPin)shared::need(std::string(outputPin->outputSha256)==entry.outputSha256,"MA/SA independent pixel pin disagreement");
         outputPin=&entry;
     }
-    // No pin: decoded and admitted with its runtime identity (counted by the loader). Pins still verify exactly.
-    const auto sourceSha=shared::sha256(source);
-    if(pin)shared::need(source.size()==pin->sourceBytes&&sourceSha==pin->sourceSha256,
-        "Original MA/SA static image source identity differs");
-    if(outputPin)shared::need(source.size()==outputPin->sourceBytes&&sourceSha==outputPin->sourceSha256,
-        "Original MA/SA exceptional image source identity differs");
+    // No pin: decoded and admitted with its runtime identity (counted by the loader). Pins still verify exactly
+    // when the bytes are the stock bytes; a pin whose bytes differ is a receipt (matchedSourceImage).
+    if(outputPin&&!(source.size()==outputPin->sourceBytes&&sourceSha==outputPin->sourceSha256)){
+        course_archive_receipt50CI::memberReceipt("decoded_image_pin",name,source,0,0,
+            outputPin->sourceBytes,outputPin->sourceSha256);
+        outputPin=nullptr;
+    }
     animated=name.ends_with(".ATM");
     shared::need(animated||name.ends_with(".PST"),"Unsupported original MA/SA image extension");
     shared::need(!animated||(source.size()>=24&&(!pin||pin->initialFrame<pin->frameCount)),

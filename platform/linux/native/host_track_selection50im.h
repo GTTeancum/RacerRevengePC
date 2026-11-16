@@ -8,7 +8,7 @@ enum class HostTrack50IM : std::uint8_t { TA, GC, GA, MA, SA, RA, MB, SC, TC, RC
 struct HostTrackAdmission50IM {
     bool gcIncompleteWorld = false; // Explicit acknowledgement for diagnostic/legacy GC paths.
     bool gcMode2 = false;           // Explicit RR_RACE_MODE=2; never auto-selected.
-    bool gaOriginalAiCandidate = false; // Explicit original-AI GA admission, including supported cold Course loads.
+    bool gaOriginalAiCandidate = false; // Retired: GA is admitted like MA/SA (kept only for positional initialisers).
     // Cold request capability only. The runtime must still construct/check its
     // actual ALL8, camera, trigger, audio, water/effect and GPU owners. This
     // does not imply profile unlocks or completed destination preparation.
@@ -42,8 +42,7 @@ inline constexpr bool hostTrackAdmitted50IM(HostTrack50IM track,
         (track == HostTrack50IM::SC && admission.scNativeWorldRequested && admission.gcMode2) ||
         (track == HostTrack50IM::MB && admission.mbNativeWorldRequested && admission.gcMode2) ||
         (track == HostTrack50IM::RA && admission.raNativeWorldRequested && admission.gcMode2) ||
-        ((track == HostTrack50IM::MA || track == HostTrack50IM::SA) && admission.gcMode2) ||
-        (track == HostTrack50IM::GC && (admission.gcNativeWorldRequested || admission.gcIncompleteWorld) && admission.gcMode2) ||
-        (track == HostTrack50IM::GA && admission.gaOriginalAiCandidate && admission.gcMode2);
+        ((track == HostTrack50IM::MA || track == HostTrack50IM::SA || track == HostTrack50IM::GA) && admission.gcMode2) ||
+        (track == HostTrack50IM::GC && (admission.gcNativeWorldRequested || admission.gcIncompleteWorld) && admission.gcMode2);
 }
 }

@@ -2925,6 +2925,29 @@ SessionExit50DU Context::run() {
   std::string error;const bool ready=scZeroSky.prepare(scColdSources,error);
   require50DU(ready,error.empty()?"SC zero-sky authoring rejected":error.c_str());
  }
+ // MA/SA/GA take the same data branch: the course world owner holds the archive
+ // it admitted and actualWorld is that archive's SCB. [Environment]
+ // NumberOfSkyCubes (default 1) decides; the cube, its tiles and the clear
+ // colour come from the data (sky_course_data50gw.inl), zone rows from
+ // CubeFileForZoneN (original_track_sky50kx prepareFromCourseData). The
+ // legacy export route (no course world owner) keeps the stock rows.
+ const rr::assets::ResArchive48C* courseWorldArchive=
+     isMaTrack&&maOriginalWorld?maOriginalWorld->archive():isSaTrack&&saOriginalWorld?saOriginalWorld->archive():
+     isGaTrack&&gaOriginalWorld?gaOriginalWorld->archive():nullptr;
+ bool courseZoneSkyRows=false;
+ if(courseWorldArchive){
+  const rr::assets::ParameterBlock48F* environment=nullptr;
+  for(const auto& b:actualWorld.parameters.blocks)if(b.name=="environment")environment=&b;
+  long cubes=1;
+  if(environment)for(const auto& f:environment->fields){
+   if(f.name=="numberofskycubes"){char* end=nullptr;cubes=std::strtol(f.value.c_str(),&end,10);
+    require50DU(!f.value.empty()&&end&&!*end,"course NumberOfSkyCubes unreadable");}
+   if(f.name.rfind("cubefileforzone",0)==0)courseZoneSkyRows=true;
+  }
+  // PORT STAND-IN (flagged): the zero-sky owner is built from SC's cold source
+  // only; a MA/SA/GA archive authoring zero cubes is refused, not misdrawn.
+  require50DU(cubes>0,"course archive authors zero sky cubes: zero-sky owner for this course not built");
+ }
  // Late environment storage participates in the parent's same MC payload ledger.
  const auto reserveMcEnvironment=[&](std::size_t bytes,const char* reason){
   require50DU(isMcTrack&&bytes<=mcRemainingPayloadBytes(),reason);
@@ -2962,6 +2985,39 @@ SessionExit50DU Context::run() {
  }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
   const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
+ }else if(courseWorldArchive){
+  const bool loaded=skyOwner->loadFromCourseData(*courseWorldArchive,actualWorld,skyDiagnostic);
+  require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
+  std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
+      <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
+  // Stock comparison receipt: every value the stock sky row pinned, against
+  // what the data path read (a stock archive must report match=1 on each).
+  {
+   const auto& row=sky50gw_fixture::detail::source(trackSource);
+   const rr::assets::ParameterBlock48F* environment=nullptr;const rr::assets::ParameterBlock48F* fog=nullptr;
+   for(const auto& b:actualWorld.parameters.blocks){if(b.name=="environment")environment=&b;if(b.name=="fog")fog=&b;}
+   const auto value=[](const rr::assets::ParameterBlock48F* b,const char* key)->std::string{
+    if(b)for(const auto& f:b->fields)if(f.name==key)return f.value;return {};};
+   std::string cube=value(environment,"cubefile1");if(cube.empty())cube=value(environment,"cubefile");
+   std::string member="skies\\"+cube,stockMember=row.cubMember;
+   const auto lower=[](std::string t){for(auto& c:t)if(c>='A'&&c<='Z')c=static_cast<char>(c+32);return t;};
+   std::vector<std::uint8_t> cub;rr::assets::DecodeError48C cubError;
+   const bool cubRead=rr::assets::extractResMember48C(*courseWorldArchive,member,cub,cubError);
+   const bool cubMatch=cubRead&&cub.size()==row.cubBytes&&pod_materials50ed_fixture::detail::sha256(cub)==row.cubSha;
+   const bool scbMatch=actualWorld.parameters.original_bytes.size()==row.sceneBytes&&
+       pod_materials50ed_fixture::detail::sha256(actualWorld.parameters.original_bytes)==row.sceneSha;
+   const auto fogText=value(fog,"colorrgb");
+   const float* clear=skyOwner->clearRgba();
+   std::array<float,4> stockClear{};bool stockClearRead=true;
+   try{sky50gw_fixture::detail::parseFogRgb(row.fogRgb,stockClear);}catch(...){stockClearRead=false;}
+   const bool clearMatch=clear&&stockClearRead&&clear[0]==stockClear[0]&&clear[1]==stockClear[1]&&
+       clear[2]==stockClear[2]&&clear[3]==stockClear[3];
+   std::cerr<<"course_sky_stock_compare track="<<trackSession->world->code<<" scb_match="<<scbMatch
+       <<" cube="<<member<<" stock_cube="<<stockMember<<" cube_match="<<(lower(member)==lower(stockMember))
+       <<" cub_match="<<cubMatch<<" fog="<<fogText<<" stock_fog="<<row.fogRgb<<" fog_match="<<(fogText==row.fogRgb)
+       <<" clear_match="<<clearMatch<<" tiles="<<skyOwner->spans()->size()<<" stock_tiles="<<sky50gw_fixture::tileCount
+       <<" zone_rows="<<courseZoneSkyRows<<"\n";
+  }
  }else if(scAuthoredSky){
   // Same cold archive and world the SC owner decoded; borrowed for this call only.
   const bool loaded=skyOwner->loadFromCourseData(scSkyData->archive,scSkyData->world,skyDiagnostic);
@@ -2971,9 +3027,12 @@ SessionExit50DU Context::run() {
  }else if(!isScTrack)require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  original_track_sky50KX::Owner sourceSkySelection;
- if(isMaSaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
+ // MA/SA always select per zone (rows default to cube 1); GA joins when its
+ // data authors CubeFileForZone rows.
+ if(isMaSaTrack||(isGaTrack&&courseWorldArchive&&courseZoneSkyRows)||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
   std::string skySelectionError;
-  const bool skySelected=scAuthoredSky?sourceSkySelection.prepareFromCourseData(scSkyData->world,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
+  const bool skySelected=scAuthoredSky?sourceSkySelection.prepareFromCourseData(scSkyData->world,skySelectionError):
+      courseWorldArchive?sourceSkySelection.prepareFromCourseData(actualWorld,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
       (isMbTrack?sourceSkySelection.prepareMbSource(*mbOriginalWorld,skySelectionError):
       sourceSkySelection.prepare(actualWorld,trackSource,skySelectionError));
   require50DU(skySelected,skySelectionError.empty()?"source zone-selected sky authoring rejected":skySelectionError.c_str());
@@ -3013,7 +3072,9 @@ SessionExit50DU Context::run() {
  rr::assets::OriginalUiMaterialTemplates50KG gameplayBinderTemplates;
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
  if(gameplayBinderEnabled){
-  require50DU(((isGaTrack&&gaAnimatedWorld)||(isGcTrack&&gcAnimatedWorld)||
+  // GA admits its ordinary session by its course world owner (animations are
+  // data: absent [Animations] = no animated owner).
+  require50DU(((isGaTrack&&gaOriginalWorld)||(isGcTrack&&gcAnimatedWorld)||
       (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(isSaTrack&&nativeSaSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||(isGbTrack&&nativeGbSelection)||(isMcTrack&&nativeMcSelection)||
       (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==raceRacerCount,
       "Binder requires an actual eight-racer authenticated ordinary session");

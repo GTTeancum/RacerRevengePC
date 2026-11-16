@@ -1,5 +1,7 @@
 #pragma once
 #include "ga_trigger_authoring_fixture.h"
+#include "course_trigger_sources50ct.h"
+#include "../../src/game/native_trigger_box_geometry50ma.h"
 #include "ga_animated_world_fixture.h"
 #include "gc_gate_audio50in_fixture.h"
 #include "../../src/game/trigger_entry50in.h"
@@ -33,7 +35,7 @@ struct Counters {
 };
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
- const ga_trigger_authoring::Owner* source_=nullptr;
+ const course_trigger_sources50CT::Owner* source_=nullptr;
  ga_animated_world::Owner* animation_=nullptr;
  gc_gate_audio50IN::Owner* sound_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
@@ -61,7 +63,7 @@ class Owner final {
    case ga_trigger_authoring::Action::LostAI:
     return !action.reset&&action.targetNodeIndex<originalAiNodeCount_&&((c&1u)||lease_->nodeC80);
    case ga_trigger_authoring::Action::Animation:
-    return animation_->ready()&&action.animationIndex<ga_animated_world::ownerCount;
+    return animation_&&animation_->ready()&&action.animationIndex<ga_animated_world::ownerCount;
    case ga_trigger_authoring::Action::PodSound:{
     const auto decision=g::triggerPodSoundAdmission50IN(true,
       {action.position,action.minDistance,action.maxDistance},lease_->listenerPositions,lease_->listenerCount);
@@ -90,7 +92,7 @@ class Owner final {
     counters_.lostAiWrites+=result.changedRacers;break;
    }
    case ga_trigger_authoring::Action::Animation:
-    if(animation_->activateSequence(action.animationIndex))++counters_.animationActivations;
+    if(animation_&&animation_->activateSequence(action.animationIndex))++counters_.animationActivations;
     else actionFailed_=group_.actionsFailed=true;
     break;
    case ga_trigger_authoring::Action::PodSound:{
@@ -113,15 +115,22 @@ class Owner final {
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- bool prepare(const ga_trigger_authoring::Owner& source,ga_animated_world::Owner& animation,
+ // Sources come from the course's own TOB (course_trigger_sources50ct.h).
+ // animation may be null exactly when the data authors no Animation action;
+ // sound is required exactly when it authors a PodSound action.
+ bool prepare(const course_trigger_sources50CT::Owner& source,ga_animated_world::Owner* animation,
      const std::array<RacerIdentities,racers>& identities,std::uint32_t aiNodeCount,
      gc_gate_audio50IN::Owner* sound,bool explicitlyMuted,
      std::uint32_t playerPrefixCount34=1u,std::size_t racerCount=racers)noexcept {
   // The trailing default retains the old GA HOST one-player roster policy
   // for old callers only. Source-connected sessions MUST pass real manager+34;
   // neither camera slot0 nor arena class58 determines the PLAYER prefix.
-  if(ready_||!source.ready()||!animation.ready()||aiNodeCount<=102||!racerCount||racerCount>racers||playerPrefixCount34>racerCount||
-     (!explicitlyMuted&&(!sound||!sound->available()||!sound->ready())))return false;
+  const auto live=source.liveCount();
+  const bool animated=source.authors(ga_trigger_authoring::Action::Animation);
+  const bool sounded=source.authors(ga_trigger_authoring::Action::PodSound);
+  if(ready_||!source.ready()||!live||(animated&&(!animation||!animation->ready()))||!aiNodeCount||!racerCount||racerCount>racers||playerPrefixCount34>racerCount||
+     (sounded&&!explicitlyMuted&&(!sound||!sound->available()||!sound->ready())))return false;
+  if(!group_.triggers.setCount(live))return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
@@ -130,8 +139,14 @@ public:
   }
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);
    if(authored.randomTriggerPercent!=100||!authored.actionCount||authored.actionCount>2)return false;
+   // Every action target must exist in the loaded data: LostAI inside the live
+   // AI spline, Animation inside the animated owners.
+   for(std::uint32_t k=0;k<authored.actionCount;++k){const auto& action=authored.actions[k];
+    if(action.kind==ga_trigger_authoring::Action::LostAI&&(action.reset||action.targetNodeIndex>=aiNodeCount))return false;
+    if(action.kind==ga_trigger_authoring::Action::Animation&&action.animationIndex>=ga_animated_world::ownerCount)return false;
+   }
   }
-  source_=&source;animation_=&animation;racers_=identities;racerCount_=racerCount;originalAiNodeCount_=aiNodeCount;playerPrefixCount34_=playerPrefixCount34;sound_=sound;muted_=explicitlyMuted;
+  source_=&source;animation_=animation;racers_=identities;racerCount_=racerCount;originalAiNodeCount_=aiNodeCount;playerPrefixCount34_=playerPrefixCount34;sound_=sound;muted_=explicitlyMuted;
   if(!group_.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)group_.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);auto& state=group_.triggers[i];
@@ -218,14 +233,19 @@ public:
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){
     const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
-    const auto& geometry=geometry_[c];const auto& root=geometry.resource->nodes[geometry.resource->root];
+    const auto& geometry=geometry_[c];bool overlap=false;
+    if(authored.shapeType==6){
+     // Box triggers: the same native shape6 exit kernel as MA's chain.
+     if(!g::nativeType2RootTriggerBoxOverlap50MA(*geometry.resource,geometry.world,authored.box,overlap))return fail(Status::Service);
+    }else{
+    const auto& root=geometry.resource->nodes[geometry.resource->root];
     g::TriggerSphereRootExitInput50IN input{};input.type2PreparedWorld=geometry.world;
     for(unsigned axis=0;axis<3;++axis){input.sphere.localCenter.v[axis]=authored.sphere.center.v[axis];input.rootCenter.v[axis]=root.center[axis];input.rootHalf.v[axis]=root.half[axis];}
     input.sphere.localCenter.v[3]=input.rootCenter.v[3]=input.rootHalf.v[3]=1.f;
     for(unsigned axis=0;axis<4;++axis)input.sphere.world.v[axis*5]=1.f;
     input.sphere.radius50=authored.sphere.radius;volatile float square=authored.sphere.radius*authored.sphere.radius;input.sphere.radiusSquared54=square;
-    bool overlap=false;
     if(g::overlapTriggerSphereType2Root50IN(input,overlap)!=g::TriggerSphereRootExitStatus50IN::Complete)return fail(Status::Service);
+    }
     observations[slot]={&group_.colliders[c],overlap};
    }
    g::TriggerEntryReceipt50IN receipt{};const auto result=service(t,observations.data(),state.collider.highWaterD0,receipt);

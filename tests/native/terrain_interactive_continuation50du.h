@@ -1,4 +1,5 @@
 #pragma once
+#include "course_trigger_sources50ct.h"
 // Borrowed declarations only. Complete providers below retain original nested
 // type identities and canonical extents; implementation imports stay in the .cpp.
 #include "terrain_interactive_continuation_types50du.h"
@@ -369,9 +370,9 @@ struct Context final {
     gaOriginalWorldType& gaOriginalWorld;
     using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
     gaTriggerActionsType& gaTriggerActions;
-    using gaTriggerAuthoringType = std::unique_ptr<ga_trigger_authoring::Owner>;
+    using gaTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     gaTriggerAuthoringType& gaTriggerAuthoring;
-    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_trigger_authoring::count>;
+    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     gaTriggerMembershipType& gaTriggerMembership;
     BorrowedCall<bool()> gatherRegisteredCall;
     using gbAiMetadataType = rr::game::AiTrackMetadataView50GB;
@@ -555,9 +556,9 @@ struct Context final {
     scOriginalWorldType& scOriginalWorld;
     using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
     maTriggerActionsType& maTriggerActions;
-    using maTriggerAuthoringType = std::unique_ptr<ma_trigger_authoring::Owner>;
+    using maTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     maTriggerAuthoringType& maTriggerAuthoring;
-    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ma_trigger_authoring::count>;
+    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     maTriggerMembershipType& maTriggerMembership;
     using mainContactFramesType = std::uint64_t;
     mainContactFramesType& mainContactFrames;
@@ -1017,9 +1018,9 @@ struct Context final {
     saOriginalWorldType& saOriginalWorld;
     using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
     saTriggerActionsType& saTriggerActions;
-    using saTriggerAuthoringType = std::unique_ptr<sa_trigger_authoring::Owner>;
+    using saTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     saTriggerAuthoringType& saTriggerAuthoring;
-    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sa_trigger_authoring::count>;
+    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
     saTriggerMembershipType& saTriggerMembership;
     BorrowedCall<void(bool)> sampleControllerCall;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;

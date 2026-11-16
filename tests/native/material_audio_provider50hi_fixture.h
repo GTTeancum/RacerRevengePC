@@ -219,7 +219,10 @@ private:
             // FLAG stand-in: the native voice layout below assumes at least the 8+8
             // base rows (fewer would underflow its extra-slot arithmetic).
             d::need(collisionRowCount_>=8&&driveRowCount_>=8&&activeSoundCount_<=maximumSoundCount,"50HI material rows outside the native sound layout (8..44)");
-            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc)d::need(catalog_.defaultMaterial==1,"50HI selected default material differs");
+            // The original reads DefaultMaterial from the AUB (the catalog reader
+            // bounds it to one material byte); the stock value 1 is a receipt.
+            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc)
+                course_archive_receipt50CI::countReceipt("material_audio","default_material",catalog_.defaultMaterial,1);
             // RA declares NumMaterials1. Material2 is outside271674..271804.
             if(track==Track::ra){
                 d::need(catalog_.orderedObjectMaterials.empty(),"RA material assignment traversal differs");

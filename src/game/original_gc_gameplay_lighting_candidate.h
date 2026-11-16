@@ -134,24 +134,10 @@ enum class CachePolicy : std::uint8_t {
     // Deliberate native policy. NEVER asserts source manager+A4 is null,
     // lookup14A860 missed, or shared UI lifetime became tracked again.
     inactiveCandidateNativePerPublicationRecompute,
-    // Explicit TA authored-zone scan policy; not original light-volume query.
-    nativeTaAuthoredZoneSpotSelection,
-    // Exact GA authoring with original Light9 defaults; same explicit native
-    // zone scan/top-two policy, not recovered retail light-volume ownership.
-    nativeGaAuthoredZoneSpotSelection,
-    // MA includes real emitting ObjectPoint lights alongside spotlights.
-    // SA retains non-emitting flare objects without inventing emitted lighting.
-    // Both use native authored-zone/top-two selection, not retail spatial parity.
-    nativeMaAuthoredZoneLightSelection,
-    nativeSaAuthoredZoneLightSelection,
-    nativeRaAuthoredZoneLightSelection,
-    nativeMbAuthoredZoneLightSelection,
-    nativeScAuthoredZoneLightSelection,
-    nativeTcAuthoredZoneLightSelection,
-    nativeRcAuthoredZoneLightSelection,
-    nativeTbAuthoredZoneLightSelection,
-    nativeGbAuthoredZoneLightSelection,
-    nativeMcAuthoredZoneLightSelection
+    // One native authored-zone/top-two selection policy for every course that
+    // reads its lights from its SCB (not retail light-volume ownership). The
+    // former per-course policy labels were identical and are retired.
+    nativeAuthoredZoneLightSelection
 };
 class Owner;
 // Immutable authored render metadata, owned beside the actual 4C0 rows.

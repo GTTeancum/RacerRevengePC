@@ -324,7 +324,6 @@ struct Owner::Storage {
     light::Vec4 authoredSunSpecular{};
     std::span<light::Vec4> sun44{};
     bool prepareTa(Diagnostic&);
-    bool prepareGa(Diagnostic&);
     bool prepareMaSa(Diagnostic&);
     bool selectAuthored(const LiveZoneMembership50EN&,const light::Vec3&,
         light::LightMatrices&,Diagnostic&) const noexcept;
@@ -649,73 +648,12 @@ bool Owner::Storage::prepareTa(Diagnostic& d) {
     }
     return true;
 }
-bool Owner::Storage::prepareGa(Diagnostic& d) {
-    const auto& params=world.parameters;
-    const auto* lights=block(params,"lights");
-    const auto* ambient=block(params,"light1");
-    const auto* sun=block(params,"light2");
-    const auto* environment=block(params,"environment");
-    if(!lights||!ambient||!sun||!environment||
-       !textField(*lights,"numberoflights","38")||
-       !textField(*ambient,"type","Ambient")||!textField(*sun,"type","Directional")||
-       field(*ambient,"initialzone")||field(*sun,"initialzone")||
-       !textField(*sun,"emitslight","T")||!textField(*sun,"placelightatinfinity","T")||
-       field(*environment,"ambientcolorflashminidletime"))
-        return fail(d,Status::sourceFields,0x277390);
-    light::Vec3 ambientRgb{},sunRgb{},sunPosition{},sunTarget{};
-    if(!triple(*ambient,"colorrgb",ambientRgb)||!triple(*sun,"colorrgb",sunRgb)||
-       !triple(*sun,"position",sunPosition)||!triple(*sun,"targetposition",sunTarget))
-        return fail(d,Status::sourceFields,0x277494);
-    for(unsigned c=0;c<3;++c)sunLook[c]=sub(sunTarget[c],sunPosition[c]);
-    if(!normalizeOnce(sunLook))return fail(d,Status::arithmetic,0x147200);
-    light::Vec4 ambientRow{{mul(ambientRgb[0],.5f),mul(ambientRgb[1],.5f),mul(ambientRgb[2],.5f),64.f}};
-    for(auto& row:ambient60)row=ambientRow;
-    for(auto& row:sun44)row={{mul(sunRgb[0],.5f),mul(sunRgb[1],.5f),mul(sunRgb[2],.5f),0.f}};
-    // Original148F90..148FFC also writes the same first ambient to global+50.
-    // Exact GA SCB has no ambient-flash enabling field; only source+50 is
-    // published to Binder, never the selected negative-light-adjusted row.
-    globalAmbient50=ambientRow;fixedGcGlobalAmbient=true;
-    auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
-        const auto* f=field(b,key);
-        return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
-    };
-    localLightCount=36;
-    for(std::uint32_t index=0;index<localLightCount;++index){
-        const auto ordinal=index+3u;
-        const auto name="light"+std::to_string(ordinal);const auto* b=block(params,name.c_str());
-        if(!b||!textField(*b,"type","Spotlight")||field(*b,"hasflasher"))
-            return fail(d,Status::sourceFields,0x277390);
-        auto& spot=localLights[index];spot.sourceOrdinal=ordinal;light::Vec3 rgb{};float inner=0.f,outer=0.f;
-        if(!triple(*b,"colorrgb",rgb)||!triple(*b,"attenuation",spot.attenuation)||
-           !scalar(*b,"innerconeangle",inner)||!scalar(*b,"outerconeangle",outer)||
-           inner<0.f||inner>=outer||outer>180.f)
-            return fail(d,Status::sourceFields,0x277390);
-        namespace poseSource=assets::original_light_pose_defaults_candidate;
-        poseSource::FreshPose pose;poseSource::Diagnostic poseDiagnostic;
-        if(!poseSource::readFreshPose(*b,static_cast<std::uint32_t>(world.zones.size()),pose,poseDiagnostic))
-            return fail(d,Status::sourceFields,poseDiagnostic.sourcePC);
-        if(ordinal==9u){
-            // Authenticate the actual missing-field branch. The helper retains
-            // reader look18/B0 zero and cached effective78 +X separately.
-            if(pose.positionAuthored||pose.zoneAuthored||
-               pose.lookSource!=poseSource::LookSource::constructorDefault||pose.lookWasNormalized)
-                return fail(d,Status::sourceFields,0x277390);
-        }else if(!pose.positionAuthored||!pose.zoneAuthored||
-                 pose.lookSource!=poseSource::LookSource::lookVector)
-            return fail(d,Status::sourceFields,0x277390);
-        for(unsigned c=0;c<3;++c)spot.position[c]=pose.positionA0[c];
-        spot.look=pose.effectiveLook78; // Already initialized; never normalize again.
-        spot.zone=pose.initialZone;
-        for(unsigned c=0;c<3;++c)spot.rgb[c]=mul(rgb[c],.5f);
-        for(float a:spot.attenuation)if(!std::isfinite(a)||a<0.f)return fail(d,Status::sourceFields,0x146f60);
-        constexpr float halfDegree=3.14159265358979323846f/360.f;
-        spot.innerCos=std::cos(mul(inner,halfDegree));spot.outerCos=std::cos(mul(outer,halfDegree));
-        if(!(spot.innerCos>spot.outerCos))return fail(d,Status::arithmetic,0x149fe4);
-    }
-    return true;
-}
+// The one numeric light reader (2783D0) for every course scene that reads its
+// lights from its SCB, GA included (GA's former stock-shaped prepareGa is no
+// longer called). Absent [Lights] = no lights (reader defaults), not a refusal.
 bool Owner::Storage::prepareMaSa(Diagnostic& d) {
-    if(scene!=Scene::ma&&scene!=Scene::sa&&scene!=Scene::ra&&scene!=Scene::mb&&scene!=Scene::sc&&scene!=Scene::tc&&scene!=Scene::rc&&scene!=Scene::tb&&scene!=Scene::gb)return fail(d,Status::unsupportedScene,0x278290);
+    if(scene!=Scene::ma&&scene!=Scene::sa&&scene!=Scene::ra&&scene!=Scene::mb&&scene!=Scene::sc&&scene!=Scene::tc&&scene!=Scene::rc&&scene!=Scene::tb&&scene!=Scene::gb&&scene!=Scene::ga)return fail(d,Status::unsupportedScene,0x278290);
+    const bool ga=scene==Scene::ga;
     const bool mb=scene==Scene::mb;
     const bool sc=scene==Scene::sc;
     const bool tc=scene==Scene::tc;
@@ -727,7 +665,9 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     const auto& params=world.parameters;
     const auto* lights=block(params,"lights");
     const auto* environment=block(params,"environment");
-    if(!lights||!environment||(!gb&&field(*environment,"ambientcolorflashminidletime")))
+    // PORT STAND-IN (flagged): the ambient colour flash is implemented for GB's
+    // authored values only; another course authoring it is refused.
+    if((!gb&&environment&&field(*environment,"ambientcolorflashminidletime"))||(gb&&!environment))
         return fail(d,Status::sourceFields,0x270e9c);
     auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
         const auto* f=field(b,key);
@@ -754,9 +694,9 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
         return false;
     };
     std::uint32_t numberOfLights=0;
-    if(!ordinal(*lights,"numberoflights",0u,numberOfLights))
+    if(lights&&!ordinal(*lights,"numberoflights",0u,numberOfLights))
         return fail(d,Status::sourceFields,0x2782e0);
-    course_archive_receipt50CI::countReceipt("lighting","lights",numberOfLights,(gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u));
+    course_archive_receipt50CI::countReceipt("lighting","lights",numberOfLights,(ga?38u:gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u));
     std::uint32_t ambientCount=0,directionalCount=0,pointCount=0,emittingPoints=0,spotlights=0;
     std::uint32_t omittedMbNonEmit=0,mbFlasherCount=0,omittedScNonEmit=0;
     localLightCount=0;
@@ -908,8 +848,8 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     }
     // Stock light-type counts are receipts; every light was read from the data
     // and stored within the 240-slot local-light store (bounds-checked above).
-    if(ambientCount!=(gb?1u:tb?10u:rc?15u:tc?1u:sc?30u:mb?16u:ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(gb?60u:tb?93u:(rc||tc)?0u:sc?165u:mb?337u:ra?15u:sa?166u:20u)||
-       emittingPoints!=(gb?60u:tb?92u:(rc||tc)?0u:sc?19u:mb?124u:ra?15u:sa?0u:14u)||spotlights!=((gb||tb||rc||tc)?0u:sc?115u:mb?30u:ra?165u:sa?74u:13u)||localLightCount!=(gb?60u:tb?93u:(rc||tc)?0u:sc?134u:mb?154u:ra?180u:sa?240u:33u)||
+    if(ambientCount!=(ga?1u:gb?1u:tb?10u:rc?15u:tc?1u:sc?30u:mb?16u:ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(ga?0u:gb?60u:tb?93u:(rc||tc)?0u:sc?165u:mb?337u:ra?15u:sa?166u:20u)||
+       emittingPoints!=(ga?0u:gb?60u:tb?92u:(rc||tc)?0u:sc?19u:mb?124u:ra?15u:sa?0u:14u)||spotlights!=(ga?36u:(gb||tb||rc||tc)?0u:sc?115u:mb?30u:ra?165u:sa?74u:13u)||localLightCount!=(ga?36u:gb?60u:tb?93u:(rc||tc)?0u:sc?134u:mb?154u:ra?180u:sa?240u:33u)||
        (mb&&(omittedMbNonEmit!=213u||mbFlasherCount!=144u))||
        (sc&&omittedScNonEmit!=146u)||(gb&&gbFlasherCount!=2u))
         std::cerr<<"course_count site=lighting light_types ambient="<<ambientCount<<" directional="<<directionalCount
@@ -921,7 +861,7 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     }
     //278370..2783A4 ->1498A0 DIRECT copy, after all light registrations.
     //These authored per-zone overrides must never be halved a second time.
-    for(std::size_t z=0;z<world.zones.size();++z){
+    for(std::size_t z=0;lights&&z<world.zones.size();++z){
         const auto key="directionallightcolorforzone"+std::to_string(z+1u);
         if(field(*lights,key.c_str())){
             light::Vec3 rgb{};
@@ -949,7 +889,9 @@ bool Owner::Storage::selectAuthoredZones(std::uint32_t primary,const LiveZoneMem
     next.diffuse[3]=ambient60[primary-1];next.diffuse[0]=sun44[primary-1];
     //MA/SA overrides change diffuse44, not the directional light's own4C.
     //Preserve the preexisting TA/GA native specular branch unchanged.
-    next.specular[0]=(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra||scene==Scene::mb||scene==Scene::sc||scene==Scene::tc||scene==Scene::rc||scene==Scene::tb||scene==Scene::gb||scene==Scene::mc)?authoredSunSpecular:sun44[0];
+    // GA joins the common reader; its stock data has no DirectionalLightColorForZone
+    // override, so authoredSunSpecular equals the former sun44[0] there.
+    next.specular[0]=(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra||scene==Scene::mb||scene==Scene::sc||scene==Scene::tc||scene==Scene::rc||scene==Scene::tb||scene==Scene::gb||scene==Scene::ga||scene==Scene::mc)?authoredSunSpecular:sun44[0];
     for(unsigned c=0;c<3;++c)next.directions[c][0]=-sunLook[c];
     //149680 exact high-level portal color blend, actual visibility-zone links.
     //500 is original14A698's radius, not a visual calibration constant.
@@ -1186,8 +1128,7 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
             next->globalAmbient50=rows.globalAmbient50;next->fixedGcGlobalAmbient=true;next->authoredSunSpecular=rows.authoredSunSpecular;
             next->sunLook=rows.sunLook;
         }
-        else if(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra||scene==Scene::mb||scene==Scene::sc||scene==Scene::tc||scene==Scene::rc||scene==Scene::tb||scene==Scene::gb){if(!next->prepareMaSa(d))return false;}
-        else if(scene==Scene::ga){if(!next->prepareGa(d))return false;}
+        else if(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra||scene==Scene::mb||scene==Scene::sc||scene==Scene::tc||scene==Scene::rc||scene==Scene::tb||scene==Scene::gb||scene==Scene::ga){if(!next->prepareMaSa(d))return false;}
         else if(scene==Scene::ta){if(!next->prepareTa(d))return false;}else{
         const auto* first=block(w.parameters,"light1");const auto* second=block(w.parameters,"light2");
         const auto* lights=block(w.parameters,"lights");
@@ -2099,19 +2040,8 @@ bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex
        lease.roots_[component]!=root||
        o.vehicles[lease.racer_].resetOwner.membership7F0.revision!=lease.membershipRevision_)
         return fail(d,Status::stalePublication,0x2413d0);
-    if(policy!=(o.scene==Scene::mc?CachePolicy::nativeMcAuthoredZoneLightSelection:
-        o.scene==Scene::gb?CachePolicy::nativeGbAuthoredZoneLightSelection:
-        o.scene==Scene::tb?CachePolicy::nativeTbAuthoredZoneLightSelection:
-        o.scene==Scene::rc?CachePolicy::nativeRcAuthoredZoneLightSelection:
-        o.scene==Scene::tc?CachePolicy::nativeTcAuthoredZoneLightSelection:
-        o.scene==Scene::sc?CachePolicy::nativeScAuthoredZoneLightSelection:
-        o.scene==Scene::mb?CachePolicy::nativeMbAuthoredZoneLightSelection:
-        o.scene==Scene::ra?CachePolicy::nativeRaAuthoredZoneLightSelection:
-        o.scene==Scene::ma?CachePolicy::nativeMaAuthoredZoneLightSelection:
-        o.scene==Scene::sa?CachePolicy::nativeSaAuthoredZoneLightSelection:
-        o.scene==Scene::ga?CachePolicy::nativeGaAuthoredZoneSpotSelection:
-        o.scene==Scene::ta?CachePolicy::nativeTaAuthoredZoneSpotSelection:
-        CachePolicy::inactiveCandidateNativePerPublicationRecompute))
+    if(policy!=(o.scene==Scene::gc?CachePolicy::inactiveCandidateNativePerPublicationRecompute:
+        CachePolicy::nativeAuthoredZoneLightSelection))
         return fail(d,Status::unsupportedPolicy,0x14a0e8);
     // INTENTIONALLY INACTIVE NATIVE POLICY: do not reproduce retail A4 hits.
     // It can differ from14A860's membership-key retained matrix. No source

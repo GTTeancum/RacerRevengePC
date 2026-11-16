@@ -1141,9 +1141,11 @@ SessionExit50DU Context::run() {
       sourceCameraCycleAudio.prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
           audioRoot,*materialMixer,*audioGroups,audioError)),
       audioError.empty()?"original camera cycle audio owner unavailable":audioError.c_str());
-  if(isGaTrack){
+  // A PodSound voice exists exactly when the trigger data authors a PodSound
+  // action; the voice file is the action's own Filename (stock GA: BIGDOOR).
+  if(const auto* podSound=gaTriggerAuthoring?gaTriggerAuthoring->firstPodSound():nullptr){
    gaGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
-   const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError);
+   const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError,podSound->filename);
    require50DU(prepared&&gaGateAudio->available(),audioError.empty()?"GA original BIGDOOR PCM/World4D8 voice unavailable":audioError.c_str());
   }
   if(gcTriggerActions){
@@ -1665,7 +1667,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"GA original animation cold update"),"GA original animation cold membership failed");
  }
- if(gaAnimatedWorld)for(std::size_t i=0;i<gaTriggerMembership.size();++i){
+ if(gaTriggerAuthoring)for(std::size_t i=0;i<gaTriggerAuthoring->liveCount();++i){
   auto& membership=*gaTriggerMembership[i];const auto& authored=gaTriggerAuthoring->source(i);
   const auto bounds=ga_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(gaTriggerCandidateFirst+i+1);
@@ -1685,7 +1687,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"SC actual trigger cold update"),"SC trigger cold membership failed");
  }
- if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerMembership.size();++i){
+ if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerAuthoring->liveCount();++i){
   auto& membership=*maTriggerMembership[i];const auto& authored=maTriggerAuthoring->source(i);
   const auto bounds=ma_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(maTriggerCandidateFirst+i+1);
@@ -1695,7 +1697,7 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"MA authored trigger cold update"),"MA trigger cold membership failed");
  }
- if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerMembership.size();++i){
+ if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerAuthoring->liveCount();++i){
   auto& membership=*saTriggerMembership[i];const auto& authored=saTriggerAuthoring->source(i);
   const auto bounds=sa_trigger_candidates::bounds(authored);
   const auto ref=static_cast<CollectionRef50BX>(saTriggerCandidateFirst+i+1);
@@ -2473,18 +2475,8 @@ SessionExit50DU Context::run() {
  // This count advances at actual graphics success, before later failure cuts.
  std::array<std::uint64_t,raceRacerCapacity> gcGraphicsSequence{};
  std::array<NativeGcSelectedLightsCandidate,raceRacerCapacity> gcDrawLights{};
- const auto nativeLightingPolicy=nativeMcSelection?gcLighting::CachePolicy::nativeMcAuthoredZoneLightSelection:nativeGbSelection?
-     gcLighting::CachePolicy::nativeGbAuthoredZoneLightSelection:nativeTbSelection?
-     gcLighting::CachePolicy::nativeTbAuthoredZoneLightSelection:nativeRcSelection?
-     gcLighting::CachePolicy::nativeRcAuthoredZoneLightSelection:nativeTcSelection?
-     gcLighting::CachePolicy::nativeTcAuthoredZoneLightSelection:nativeScSelection?
-     gcLighting::CachePolicy::nativeScAuthoredZoneLightSelection:nativeMbSelection?
-     gcLighting::CachePolicy::nativeMbAuthoredZoneLightSelection:nativeRaSelection?
-     gcLighting::CachePolicy::nativeRaAuthoredZoneLightSelection:nativeMaSelection?
-     gcLighting::CachePolicy::nativeMaAuthoredZoneLightSelection:nativeSaSelection?
-     gcLighting::CachePolicy::nativeSaAuthoredZoneLightSelection:nativeGaSelection?
-     gcLighting::CachePolicy::nativeGaAuthoredZoneSpotSelection:nativeTaSelection?
-     gcLighting::CachePolicy::nativeTaAuthoredZoneSpotSelection:
+ const auto nativeLightingPolicy=nativeSelectedLights&&!isGcTrack?
+     gcLighting::CachePolicy::nativeAuthoredZoneLightSelection:
      gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute;
  // Geometry preparation intentionally refreshes only its private scene copy.
  // Native light selection instead reads the canonical frame borrowed by the
@@ -2595,20 +2587,9 @@ SessionExit50DU Context::run() {
       nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
       gcLightOwner.prepare(bytes,raceRacerCount,gcLightDiagnostic),
       "authenticated track light/visibility owner preparation failed");
-  std::cerr<<(nativeMcSelection?"NATIVE MC SELECTED LIGHTS: actual28-zone/28-portal topology,28 ambient/one directional source, no timed flash; ":nativeGbSelection?
-      "NATIVE GB SELECTED LIGHTS: genuine source ambient/directional/timed light registration and original Light+A0 particle semantics; ":nativeTbSelection?
-      "NATIVE TB SELECTED LIGHTS: actual10-zone/11-portal source topology and authenticated retained-section light registration; ":nativeRcSelection?
-      "NATIVE RC SELECTED LIGHTS: actual15-zone/15-portal source topology,15 ambient and one directional light; ":nativeTcSelection?
-      "NATIVE TC SELECTED LIGHTS: actual25-zone/26-portal topology and authored ambient/directional lights; ":nativeScSelection?
-      "NATIVE SC SELECTED LIGHTS: actual30-zone/34-portal source topology and134 emitting lights; ":nativeMbSelection?
-      "NATIVE MB SELECTED LIGHTS: authenticated emitting source lights and actual racer/camera visibility; ":nativeRaSelection?
-      "NATIVE RA SELECTED LIGHTS: same-world authenticated cold aggregate and actual racer/camera visibility; ":nativeMaSelection?
-      "NATIVE MA SELECTED LIGHTS: source numeric ambient/directional/point/spot registration, actual camera/racer visibility; ":nativeSaSelection?
-      "NATIVE SA SELECTED LIGHTS: source numeric ambient reset ordering, directional overrides and74 spots, actual25-zone camera/racer visibility; ":nativeGaSelection?
-      "NATIVE GA SELECTED LIGHTS: authentic olive ambient/sun and all36 authored spotlights including original Light9 defaults; actual racer visibility; explicit native zone scan/top-two selection; ":nativeTaSelection?
-      "NATIVE TA SELECTED LIGHTS: authored zone/portal colors and 17 spotlights; actual racer visibility; explicit native zone scan/top-two selection; ":
-      "NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; ")
-      <<"native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.\n";
+  std::cerr<<"NATIVE SELECTED LIGHTS: track="<<trackSession->world->code
+      <<" authored zone/portal topology and lights read from the course SCB;"
+      " native per-publication selection and host world-normal Lambert.\n";
  }
  std::uint64_t submittedDrawFrames=0,windowSwaps=0,nativeCalls=0,discardedHostNs=0;
  auto runNative=[&](auto&&fn,const char*label){

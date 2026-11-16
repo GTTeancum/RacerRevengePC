@@ -199,10 +199,6 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
  // Resolve the process default once. Pending menu selection never mutates the
  // environment or rebinds a live world. Unknown/unbound metadata still fails.
  const char* initialTrackError=nullptr;
- const char* gaCandidateSetting=std::getenv("RR_GA_ORIGINAL_AI_CANDIDATE");
- require50DU(!gaCandidateSetting||std::string(gaCandidateSetting)=="0"||
-     std::string(gaCandidateSetting)=="1","RR_GA_ORIGINAL_AI_CANDIDATE must be 0 or 1");
- const bool gaCandidate=gaCandidateSetting&&std::string(gaCandidateSetting)=="1";
  const bool rootedHumanCourseSupported=originalMainApplication.enabled&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const auto* initialTrack=track_session_assets50IG::select(std::getenv("RR_TRACK"),initialTrackError);
@@ -243,10 +239,6 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
       originalMainApplication.enabled&&raProfileSetting&&std::string(raProfileSetting)=="mawhonic-ryloth");
  require50DU(!initialRa||(raNativeWorldRequested&&!startAtMenu),
      "RA requires original-disc Main/Course human entry or the explicit legacy ALL8 request");
- require50DU(!gaCandidate||initialGa||originalMainApplication.enabled,
-     "GA candidate admission on another startup track requires the original Course application");
- require50DU(!initialGa||(rootedHumanCourseSupported&&!startAtMenu),
-     "GA requires rooted original Main/Course human entry and RR_START_MENU=0");
  require50DU(track_session_assets50IG::codeEquals(initialTrack->world->code,"TA")||
      track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")||initialGa||initialMa||initialSa||initialRa||initialMb||initialSc||initialTc||initialRc||initialTb||initialGb||initialMc,
      "track is not in the explicit native admission list");
@@ -278,11 +270,11 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
  const char* gcAllAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool gcNativeWorldRequested=(sharedHumanCourseRequested||
      (gcAllAiSetting&&std::string(gcAllAiSetting)=="1"))&&!startAtMenu&&
-     gcDefaultOnRequested("RR_RACE")&&gcDefaultOnRequested("RR_NATIVE_GC_SELECTED_LIGHTS")&&
+     gcDefaultOnRequested("RR_RACE")&&gcDefaultOnRequested("RR_NATIVE_SELECTED_LIGHTS")&&
      gcDefaultOnRequested("RR_GC_NATIVE_GATE")&&gcDefaultOnRequested("RR_GC_NATIVE_WATER");
  const rr::platform::HostTrackAdmission50IM trackAdmission{
      incompleteWorldSetting&&std::string(incompleteWorldSetting)=="1",
-     selectedModeSetting&&std::string(selectedModeSetting)=="2",gaCandidate||rootedHumanCourseSupported,gcNativeWorldRequested,raNativeWorldRequested,mbNativeWorldRequested,scNativeWorldRequested,tcNativeWorldRequested,rcNativeWorldRequested,tbNativeWorldRequested,gbNativeWorldRequested,mcNativeWorldRequested};
+     selectedModeSetting&&std::string(selectedModeSetting)=="2",false,gcNativeWorldRequested,raNativeWorldRequested,mbNativeWorldRequested,scNativeWorldRequested,tcNativeWorldRequested,rcNativeWorldRequested,tbNativeWorldRequested,gbNativeWorldRequested,mcNativeWorldRequested};
  std::uint64_t sessionIndex=0;
  std::unique_ptr<original_course_targets50KX::ConsumedLaunch> consumedCourseLaunch;
  for(;;){
