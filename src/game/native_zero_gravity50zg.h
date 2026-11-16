@@ -113,6 +113,7 @@ struct ZeroGravityRacer50ZG {
     std::uint64_t steps=0,modeStep=0;
     // Flight summary (logs only).
     float minSpeed=0.f,maxAbsRoll=0.f,maxAbsPitch=0.f,minAhead=0.f,maxAhead=0.f;
+    std::uint64_t flightSteps=0,steerPinnedSteps=0; // |steer| >= 0.999 in Flight (logs only)
     bool linkMissingLogged=false;
 };
 struct ZeroGravityStepInput50ZG {
@@ -252,6 +253,7 @@ public:
         if(r.mode==ZeroGravityMode50ZG::Flight){
             r.maxAbsRoll=std::max(r.maxAbsRoll,std::fabs(r.rollRate));r.maxAbsPitch=std::max(r.maxAbsPitch,std::fabs(r.pitchRate));
             r.minAhead=r.minAhead==0.f?aheadDistance:std::min(r.minAhead,aheadDistance);r.maxAhead=std::max(r.maxAhead,aheadDistance);
+            ++r.flightSteps;if(std::isfinite(in.steer)&&std::fabs(in.steer)>=0.999f)++r.steerPinnedSteps;
         }
         return out;
     }
@@ -318,9 +320,11 @@ private:
         if(std::isfinite(groundDistance))std::cerr<<" ground_distance="<<groundDistance;
         if(r.mode==ZeroGravityMode50ZG::Flight)
             std::cerr<<" min_speed="<<r.minSpeed<<" max_roll_rate="<<r.maxAbsRoll<<" max_pitch_rate="<<r.maxAbsPitch
-                <<" lookahead_ft="<<r.minAhead<<".."<<r.maxAhead;
+                <<" lookahead_ft="<<r.minAhead<<".."<<r.maxAhead
+                <<" steer_pinned_pct="<<(r.flightSteps?100.0*static_cast<double>(r.steerPinnedSteps)/static_cast<double>(r.flightSteps):0.0);
         std::cerr<<'\n';
-        if(to==ZeroGravityMode50ZG::Flight){r.minSpeed=0.f;r.maxAbsRoll=0.f;r.maxAbsPitch=0.f;r.minAhead=0.f;r.maxAhead=0.f;}
+        if(to==ZeroGravityMode50ZG::Flight){r.minSpeed=0.f;r.maxAbsRoll=0.f;r.maxAbsPitch=0.f;r.minAhead=0.f;r.maxAhead=0.f;
+            r.flightSteps=0;r.steerPinnedSteps=0;}
         r.mode=to;r.modeStep=r.steps;r.linkMissingLogged=false;
     }
     static void transform(const BodyMatrix48G& m,const std::array<float,3>& p,float out[3])noexcept {
