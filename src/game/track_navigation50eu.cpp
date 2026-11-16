@@ -41,20 +41,20 @@ bool advancePlayerTrackNavigation50EU(const TrackNavigationView50EU& map,const T
     const TrackNavigationInput50EU& in,TrackNavigationProgress50EU& p,TrackNavigationReceipt50EU& r,
     TrackNavigationDiagnostic50EU& d) noexcept {
     if(!joined(map,ai))return navigation_detail50MB::fail(d,TrackNavigationError50EU::NotPrepared,0x1a0da0);
-    return navigation_detail50MB::advance<265,292>(readOnly(map),readOnly(ai),in,p,r,d);
+    return navigation_detail50MB::advance<courseNavigationCapacity50MB,courseNavigationCapacity50MB>(readOnly(map),readOnly(ai),in,p,r,d);
 }
 bool advancePlayerTrackNavigationEffects50GH(const TrackNavigationView50EU& map,const TrackNavigationView50EU& ai,
     const TrackNavigationInput50EU& in,const TrackNavigationMapEffects50GH& effects,
     TrackNavigationProgress50EU& p,TrackNavigationReceipt50EU& r,TrackNavigationDiagnostic50EU& d) noexcept {
     if(!joined(map,ai))return navigation_detail50MB::fail(d,TrackNavigationError50EU::NotPrepared,0x1a0da0);
-    return navigation_detail50MB::advanceEffects<265,292>(readOnly(map),readOnly(ai),in,effects,p,r,d);
+    return navigation_detail50MB::advanceEffects<courseNavigationCapacity50MB,courseNavigationCapacity50MB>(readOnly(map),readOnly(ai),in,effects,p,r,d);
 }
 bool undertrackBindings50EU(const TrackNavigationView50EU& view,const std::uint32_t* visibility,
     const std::uint32_t* collision,std::size_t count,UndertrackTableBindings50ET& out) noexcept {
     if(!view.runtimeValid())return false;
     const auto t=readOnly(view);
     return view.role()==NavigationRole50MB::Map?
-        navigation_detail50MB::bindings<265>(t,visibility,collision,count,out):
-        navigation_detail50MB::bindings<292>(t,visibility,collision,count,out);
+        navigation_detail50MB::bindings<courseNavigationCapacity50MB>(t,visibility,collision,count,out):
+        navigation_detail50MB::bindings<courseNavigationCapacity50MB>(t,visibility,collision,count,out);
 }
 }

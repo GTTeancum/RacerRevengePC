@@ -1,5 +1,6 @@
 #pragma once
 #include "ga_trigger_authoring_fixture.h"
+#include "course_trigger_sources50ct.h"
 #include <array>
 #include <cstdint>
 #include <filesystem>
@@ -8,17 +9,23 @@
 #include <utility>
 #include <vector>
 
-// Cold, authenticated MB source projection only. No action callback, collision
-// membership, reset completion or runtime admission is provided by this owner.
+// MB trigger source projection, read from the course's own TOB by the common
+// trigger reader (course_trigger_sources50ct.h -> sc_trigger_authoring50la.h).
+// No action callback, collision membership, reset completion or runtime
+// admission is provided by this owner. The stock values below are receipts.
 namespace mb_trigger_authoring {
 namespace a=rr::assets;namespace g=rr::game;
+// Stock receipts (and the dead static-model-params include's pins).
 inline constexpr std::size_t count=3,sphereCount=3,boxCount=0;
 inline constexpr std::size_t archiveBytes=4421779,decodedBytes=16392192,tobBytes=19909;
 inline constexpr std::uint32_t archiveEntries=487;
 inline constexpr const char* archiveSha="6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca";
 inline constexpr const char* tobSha="f25f10fff204f124e5525ff2c4a7c1e72f9ce17476e1404d1932f6ab6e8c776d";
+// Capacity: the common reader's store; MB's native group (NativeTriggerGroup50GA)
+// refuses a live set above its own capacity when the count is set.
+inline constexpr std::size_t capacity=course_trigger_sources50CT::capacity;
 struct Source {
- std::string name,targetNodeText;
+ std::string name;
  std::uint32_t zone=0,actionCount=1,shapeType=5,targetNodeIndex=0;
  g::CollisionSphere48J sphere{};
  bool startEnabled=true,oneTimeOnly=false,ignorePlayer=true,reset=false;
@@ -26,59 +33,55 @@ struct Source {
 };
 namespace detail {using namespace ga_trigger_authoring::detail;}
 class Owner final {
- std::array<Source,count> sources_{};
- std::vector<std::uint8_t> originalTob_;
+ course_trigger_sources50CT::Owner reader_;
+ std::array<Source,capacity> sources_{};
+ std::size_t live_=0;
  bool attempted_=false,ready_=false;
+ static void need(bool value,const std::string& reason){if(!value)throw std::runtime_error(reason);}
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
+ // aiNodeCount: the live AI spline's node count; zoneCount: the loaded world's.
  bool load(const std::filesystem::path& archivePath,std::uint32_t aiNodeCount,
            std::uint32_t zoneCount,std::string& error){
   if(attempted_){error="MB trigger owner requires a fresh stable lifetime";return false;}attempted_=true;
-  try{using namespace detail;namespace f=pod_materials50ed_fixture::detail;
-   f::Inputs input;input.capacity=archiveBytes;const auto bytes=input.read(archivePath,archiveBytes);
-   need(bytes.size()==archiveBytes&&f::sha256(bytes)==archiveSha,"MB trigger original archive identity");
-   a::ResArchive48C archive;a::DecodeError48C why{};std::vector<std::uint8_t> tob;
-   a::DecodeLimits48C limits{};limits.resource_file_bytes=archiveBytes;
-   limits.resource_decoded_bytes=decodedBytes;limits.resource_entries=archiveEntries;
-   need(a::decodeResource48C(bytes,archive,why,nullptr,limits)&&archive.entries.size()==archiveEntries&&archive.decoded.size()==decodedBytes&&
-       a::extractResMember48C(archive,"tracks\\mb.tob",tob,why,tobBytes),"MB trigger original TOB missing");
-   need(tob.size()==tobBytes&&f::sha256(tob)==tobSha,"MB trigger original TOB identity");
-   a::ParameterDocument48F p;need(a::decodeParameters48F(tob,p,why),"MB trigger original TOB rejected");
-   need(p.blocks.size()==135&&integer(field(block(p,"triggers"),"numberoftriggers"))==count,"MB original trigger count changed");
-   constexpr const char* names[count]={"DoorBranchRight","DoorBranchLeft","UpShaft"};
-   constexpr const char* targetText[count]={"255","42","148d"};
-   constexpr std::uint32_t targets[count]={255,42,148},zones[count]={7,7,11};
-   std::array<Source,count> next{};
-   for(std::size_t i=0;i<count;++i){auto& s=next[i];const auto name="trigger"+std::to_string(i+1);const auto& b=block(p,name);
-    need(b.fields.size()==9,"MB trigger exact field set changed");
-    s.name=field(b,"name");s.zone=integer(field(b,"zone"));s.actionCount=integer(field(b,"numberofactions"));
-    s.sphere.center=vector(field(b,"position"));s.sphere.radius=number(field(b,"radius"));
-    need(s.name==names[i]&&s.zone==zones[i]&&s.zone<=zoneCount&&s.actionCount==1&&s.sphere.radius>0.f,"MB original trigger tuple changed");
-    s.startEnabled=boolean(field(b,"startenabled"));s.oneTimeOnly=boolean(field(b,"onetimeonly"));
-    need(s.startEnabled&&!s.oneTimeOnly&&field(b,"ignoretrigger")=="PLAYER"&&number(field(b,"randomtriggerpercent"))==100.f,
-      "MB original activation/ignore/RNG policy changed");
-    const auto& action=block(p,name+"action1");
-    need(action.fields.size()==(i==2?3u:2u)&&field(action,"actiontype")=="LostAI","MB original LostAI action changed");
-    s.targetNodeText=field(action,"targetnodeindex");need(s.targetNodeText==targetText[i],"MB exact target text changed");
-    // Original1B5A88 ->158B30 ->158920 ->30AE70(base0) ignores the end
-    // pointer. Authenticated148d therefore becomes decimal148. Preserve the
-    // bytes above; never widen the generic strict integer helper for this case.
-    s.targetNodeIndex=i==2?148u:integer(s.targetNodeText);
-    const auto* reset=optional(action,"reset");
-    if(i==2){need(reset&&*reset=="1","MB UpShaft Reset1 changed");s.reset=true;}
-    else need(!reset,"MB omitted Reset default changed");
-    need(s.targetNodeIndex==targets[i]&&s.targetNodeIndex<aiNodeCount,"MB original LostAI target out of actual AI range");
+  try{
+   course_trigger_sources50CT::Support support;support.reset=true; // MB's chain implements the pose reset
+   if(!reader_.load(archivePath,course_trigger_sources50CT::stockMb,zoneCount,aiNodeCount,error,support))return false;
+   // The MB route has no animated-world owner. PORT STAND-IN (flagged): a
+   // non-stock TOB that authors animations is refused until the common
+   // animation reader (W3) exists.
+   need(!reader_.animationCount()||reader_.stockTob(),"MB course archive authors animations: needs the common animation reader (W3)");
+   const auto live=reader_.liveCount();
+   need(live<=capacity,"MB trigger extent exceeds the reader capacity");
+   std::array<Source,capacity> next{};
+   for(std::size_t i=0;i<live;++i){const auto& in=reader_.source(i);auto& s=next[i];
+    const auto label="MB trigger"+std::to_string(i+1)+": ";
+    // PORT STAND-IN (flagged): MB's native action owner implements one LostAI
+    // action on a sphere trigger that starts enabled and repeats; any other
+    // authored shape/activation/action is refused, not ignored.
+    need(in.shapeType==5,label+"box trigger is not supported on the MB native chain");
+    need(in.actionCount==1&&in.actions[0].kind==course_trigger_sources50CT::Action::LostAI,
+         label+"action other than one LostAI is not supported on the MB native chain");
+    need(in.startEnabled&&!in.oneTimeOnly,label+"StartEnabled FALSE / OneTimeOnly TRUE is not supported on the MB native chain");
+    need(in.sphere.radius>0.f,label+"sphere radius rejected");
+    s.name=in.name;s.zone=in.zone;s.actionCount=1;s.shapeType=5;s.sphere=in.sphere;
+    s.targetNodeIndex=in.actions[0].targetNodeIndex;s.reset=in.actions[0].reset;
+    s.startEnabled=true;s.oneTimeOnly=false;s.ignorePlayer=in.ignorePlayer;
+    s.randomTriggerPercent=in.randomTriggerPercent;
+    need(s.targetNodeIndex<aiNodeCount,label+"LostAI target outside the live AI spline");
    }
-   sources_=std::move(next);originalTob_=std::move(tob);ready_=true;error.clear();return true;
+   sources_=std::move(next);live_=live;ready_=true;error.clear();return true;
   }catch(const std::exception& e){error=e.what();return false;}
  }
  bool ready()const noexcept{return ready_;}
+ std::size_t liveCount()const noexcept{return ready_?live_:0;}
+ // Bounds-checked against the live prefix, never the capacity tail.
  const Source& source(std::size_t i)const {
-  if(!ready_)throw std::runtime_error("MB trigger source owner not ready");return sources_.at(i);
+  if(!ready_||i>=live_)throw std::runtime_error("MB trigger source outside the live prefix");return sources_[i];
  }
  const std::vector<std::uint8_t>& originalTob()const {
-  if(!ready_)throw std::runtime_error("MB original TOB owner not ready");return originalTob_;
+  if(!ready_)throw std::runtime_error("MB original TOB owner not ready");return reader_.originalTob();
  }
 };
 } // namespace mb_trigger_authoring

@@ -119,7 +119,7 @@ void OwnersContext::run() {
   // contacts, Gate fired/audio state and action counters never roll back.
   if(isRaTrack)require50DU(raWorld->registerRuntimeQueryWorldOwners(racerBank,raDiagnostic),
       raDiagnostic.failure?raDiagnostic.failure:"RA world registration rejected");
-  if(isMbTrack&&bankWorldMemberships)for(std::size_t i=0;i<3;++i){
+  if(isMbTrack&&bankWorldMemberships)for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){
    auto* membership=mbCollisionWorld->triggerMembership(i);
    require50DU(membership,"MB actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());

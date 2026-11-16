@@ -3,6 +3,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 namespace rr::assets { namespace {
 void need(bool x,const char*m){if(!x)throw std::runtime_error(m);}
@@ -73,41 +74,54 @@ bool hashMatches50HI(const std::uint8_t* data, std::size_t size,
     return true;
 }
 enum class CatalogShape50HI { legacy, authenticatedMb, authenticatedTc, authenticatedTb, authenticatedMc };
+// One reader for every course AUB (the original 279B60/279E50 read whatever
+// AUB the course archive holds). The per-course stock shapes below are
+// RECEIPTS (logged when the data differs), never admission gates; the
+// admission bounds are the native stores (maxMaterialAudioRows50HI /
+// maxMaterialDriveRows50HI rows, one material byte).
+void receipt50HI(CatalogShape50HI shape,const char* what,std::size_t actual,std::size_t stock){
+    if(actual==stock)return;
+    const char* code=shape==CatalogShape50HI::authenticatedMb?"MB":shape==CatalogShape50HI::authenticatedTc?"TC":
+        shape==CatalogShape50HI::authenticatedTb?"TB":shape==CatalogShape50HI::authenticatedMc?"MC":"legacy";
+    std::cerr<<"course_count site=material_audio_catalog_"<<code<<" "<<what<<"="<<actual<<" stock="<<stock<<"\n";
+}
 bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error,CatalogShape50HI shape){
     try{
+        // Stock AUB identities: receipts (the provider logs the member receipt).
         const bool mc=shape==CatalogShape50HI::authenticatedMc;
-        if(mc)need(aub.size()==50722u&&hashMatches50HI(aub.data(),aub.size(),
-            "bbb238196c131979092c7a5cc5066fdfc131156ecb6ec632786279786f779554"),
-            "50HI exact MC AUB identity differs");
         const bool tb=shape==CatalogShape50HI::authenticatedTb;
-        if(tb)need(aub.size()==50826u&&hashMatches50HI(aub.data(),aub.size(),
-            "00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19"),
-            "50HI exact TB AUB identity differs");
         const bool mb=shape==CatalogShape50HI::authenticatedMb;
         const bool tc=shape==CatalogShape50HI::authenticatedTc;
-        if(tc)need(aub.size()==44646u&&hashMatches50HI(aub.data(),aub.size(),
-            "a4e331f8ac8a4849e717f6a37588304b1642129b8b690b39d7b818449eab838d"),
-            "50HI exact TC AUB identity differs");
-        if(mb)need(aub.size()==57210u&&hashMatches50HI(aub.data(),aub.size(),
-            "669a20fc6275a7463a1a4a8f529b41ef45ce971f8f4d49b8631f5279699a0d89"),
-            "50HI exact MB AUB identity differs");
+        const bool stockAub=(mc&&aub.size()==50722u&&hashMatches50HI(aub.data(),aub.size(),
+            "bbb238196c131979092c7a5cc5066fdfc131156ecb6ec632786279786f779554"))||
+            (tb&&aub.size()==50826u&&hashMatches50HI(aub.data(),aub.size(),
+            "00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19"))||
+            (tc&&aub.size()==44646u&&hashMatches50HI(aub.data(),aub.size(),
+            "a4e331f8ac8a4849e717f6a37588304b1642129b8b690b39d7b818449eab838d"))||
+            (mb&&aub.size()==57210u&&hashMatches50HI(aub.data(),aub.size(),
+            "669a20fc6275a7463a1a4a8f529b41ef45ce971f8f4d49b8631f5279699a0d89"));
+        if((mc||tb||tc||mb)&&!stockAub)receipt50HI(shape,"stock_aub",0,1);
         ParameterDocument48F p;DecodeError48C d;WorldLimits48F limits{};limits.retainDuplicateLabels=true;need(decodeParameters48F(aub,p,d,nullptr,limits),"50HI AUB parameter decode failed");
         const auto&s=block(p,"sounds");const int rows=number(field(s,"nummaterialcollisionsounds"));
         const int driveRows=number(field(s,"nummaterialdriveonsounds"));
-        need(mc?(rows==12&&driveRows==8):tb?(rows==24&&driveRows==20):tc?(rows==16&&driveRows==12):mb?(rows==20&&driveRows==12):
-            (((rows==8||rows==12||rows==20)&&driveRows==rows)||
-             ((rows==16||rows==32)&&driveRows==12)),"50HI unsupported independent material row counts");
+        // Bounds: the native row stores. Stock shapes are receipts.
+        need(rows>=1&&static_cast<std::size_t>(rows)<=rr::game::maxMaterialAudioRows50HI&&
+            driveRows>=1&&static_cast<std::size_t>(driveRows)<=rr::game::maxMaterialDriveRows50HI,
+            "50HI material row counts outside the native sound stores");
+        if(mc){receipt50HI(shape,"collision_rows",rows,12);receipt50HI(shape,"drive_rows",driveRows,8);}
+        if(tb){receipt50HI(shape,"collision_rows",rows,24);receipt50HI(shape,"drive_rows",driveRows,20);}
+        if(tc){receipt50HI(shape,"collision_rows",rows,16);receipt50HI(shape,"drive_rows",driveRows,12);}
+        if(mb){receipt50HI(shape,"collision_rows",rows,20);receipt50HI(shape,"drive_rows",driveRows,12);}
         MaterialAudioCatalog50HI next;std::vector<AudioRequest50HC> unique;
         next.parameters.rowCount=static_cast<std::uint32_t>(rows);
         next.parameters.driveRowCount=static_cast<std::uint32_t>(driveRows);
-        const int materials=number(field(s,"nummaterials"));need((mc||tb||tc)?materials==5:mb?materials==3:(materials>=1&&materials<=4),"50HI unsupported material assignment count");
+        const int materials=number(field(s,"nummaterials"));need(materials>=0&&materials<=255,"50HI material assignment count outside one material byte");
+        if(mc||tb||tc)receipt50HI(shape,"materials",materials,5);
+        if(mb)receipt50HI(shape,"materials",materials,3);
         next.materialCount=static_cast<std::uint32_t>(materials);
         const auto* defaultText=optionalField(s,"defaultmaterial");const int fallback=defaultText?number(*defaultText):0;
         need(fallback>=0&&fallback<=255,"50HI invalid default material byte");next.defaultMaterial=static_cast<std::uint32_t>(fallback);
-        if(mb)need(fallback==1,"50HI MB default material differs");
-        if(tc)need(fallback==1,"50HI TC default material differs");
-        if(mc)need(fallback==1,"50HI MC default material differs");
-        if(tb)need(fallback==1,"50HI TB default material differs");
+        if(mb||tc||mc||tb)receipt50HI(shape,"default_material",fallback,1);
         //271674..271804: increasing material order; missing list means0.
         //2717E4 is STRICT less-than. Preserve this source off-by-one behavior.
         for(int material=1;material<=materials;++material){
@@ -125,9 +139,12 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
             //292CB0 flags81 owners from these same four immutable VAG names.
             // AudioBank decoding ignores request.loop; each D44/host row keeps
             //its own playback flag. Never broaden a legacy duplicate policy.
-            const bool tbWood=tb&&!r.loop&&loop&&(name=="sfx/race/woodhit1.vag"||
-                name=="sfx/race/woodhit2.vag"||name=="sfx/race/woodhit3.vag"||name=="sfx/race/woodhit4.vag");
-            need(r.loop==loop||tbWood,"50HI conflicting duplicate clip flags");return;
+            // One PCM shared by a one-shot collision row and a looping drive
+            // row is two owners of one clip (stock TB's WOODHIT1..4); the
+            // first request's loop flag never governs decoding. Any other
+            // flag conflict is refused.
+            const bool rowLocalAlias=!r.loop&&loop;
+            need(r.loop==loop||rowLocalAlias,"50HI conflicting duplicate clip flags");return;
         }unique.push_back({name,loop,false,false});};
         //279B60 and279E50 allocate and traverse their own authored count.
         //157D00/157DD0 returns on a missing section WITHOUT replacing the
@@ -154,43 +171,20 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
             if(i<static_cast<unsigned>(rows))add(next.collision[i],false);
             if(i<static_cast<unsigned>(driveRows))add(next.drive[i],true);
         }
-        if(mb){
-            need(next.orderedObjectMaterials.size()==29u&&unique.size()==25u,
-                "50HI MB material source traversal differs");
-            for(std::uint32_t i=0;i<20u;++i)need(next.collisionSectionKeys[i]==i+1u,
-                "50HI MB collision section identity differs");
-            for(std::uint32_t i=0;i<12u;++i)need(next.driveSectionKeys[i]==i+1u,
-                "50HI MB drive section identity differs");
-        }
-        if(tc){
-            need(next.orderedObjectMaterials.size()==8u&&unique.size()==21u,
-                "50HI TC material source traversal differs");
-            for(std::uint32_t i=0;i<8u;++i)need(next.orderedObjectMaterials[i].material==2u&&
-                next.orderedObjectMaterials[i].object=="tc_colbeacon0"+std::to_string(i+1u),
-                "50HI TC strict-less-than assignment order differs");
-            for(std::uint32_t i=0;i<16u;++i)need(next.collisionSectionKeys[i]==i+1u,
-                "50HI TC collision section identity differs");
-            for(std::uint32_t i=0;i<12u;++i)need(next.driveSectionKeys[i]==i+1u,
-                "50HI TC drive section identity differs");
-        }
-        if(tb){
-            need(next.orderedObjectMaterials.size()==54u&&unique.size()==33u,
-                "50HI TB material source traversal differs");
-            for(std::uint32_t i=0;i<24u;++i)need(next.collisionSectionKeys[i]==i+1u,
-                "50HI TB collision section identity differs");
-            for(std::uint32_t i=0;i<20u;++i)need(next.driveSectionKeys[i]==i+1u,
-                "50HI TB drive section identity differs");
-            for(std::uint32_t i=0;i<4u;++i)need(next.collision[16u+i]==next.drive[16u+i]&&
-                next.collision[16u+i]=="sfx/race/woodhit"+std::to_string(i+1u)+".vag",
-                "50HI TB row-local loop alias differs");
-        }
-        if(mc){
-            need(next.orderedObjectMaterials.size()==3u&&unique.size()==15u,"50HI MC source traversal differs");
-            constexpr const char* names[]{"colshieldx","colforces","colc_beacon"};
-            for(std::uint32_t i=0;i<3;++i)need(next.orderedObjectMaterials[i].material==2&&next.orderedObjectMaterials[i].object==names[i],"50HI MC strict-less-than source assignment differs");
-            for(std::uint32_t i=0;i<12;++i)need(next.collisionSectionKeys[i]==i+1,"50HI MC collision source ordinal differs");
-            for(std::uint32_t i=0;i<8;++i)need(next.driveSectionKeys[i]==i+1,"50HI MC drive source ordinal differs");
-        }
+        // Stock traversal shapes: receipts. The section keys above were
+        // resolved from the AUB itself (157D00 keeps the prior section).
+        const auto sectionsInOrder=[&](){std::size_t n=0;
+            for(std::uint32_t i=0;i<static_cast<std::uint32_t>(rows);++i)if(next.collisionSectionKeys[i]!=i+1u)++n;
+            for(std::uint32_t i=0;i<static_cast<std::uint32_t>(driveRows);++i)if(next.driveSectionKeys[i]!=i+1u)++n;
+            return n;};
+        if(mb){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),29);receipt50HI(shape,"unique_clips",unique.size(),25);
+            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
+        if(tc){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),8);receipt50HI(shape,"unique_clips",unique.size(),21);
+            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
+        if(tb){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),54);receipt50HI(shape,"unique_clips",unique.size(),33);
+            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
+        if(mc){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),3);receipt50HI(shape,"unique_clips",unique.size(),15);
+            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
         out=std::move(next);requests=std::move(unique);error.clear();return true;
     }catch(const std::exception&e){error=e.what();return false;}
 }

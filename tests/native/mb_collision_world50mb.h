@@ -3,6 +3,7 @@
 #include "track_navigation_view50mb.h"
 #include "mb_trigger_authoring_fixture.h"
 #include "native_trigger_group50ga.h"
+#include "course_archive_receipt50ci.h"
 #include <memory>
 #include <array>
 #include <cstring>
@@ -24,30 +25,36 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  std::vector<track_runtime_storage50IG::Binding> bindings_;
  mb_trigger_authoring::Owner source_;
  g::NativeTriggerGroup50GA triggers_{};
- std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,3> triggerMemberships_;
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,mb_trigger_authoring::capacity> triggerMemberships_;
  track_runtime_storage50IG::Owner storage_;
  const mb_source_trigger50MB::Owner* actionOwner_=nullptr;
  const std::thread::id ownerThread_=std::this_thread::get_id();
+ std::uint32_t aiNodeCount_=0;std::size_t ownerCount_=0; // live counts (AI spline, placed COL)
  bool attempted_=false,groundReady_=false,storageAttempted_=false,ready_=false;
  static constexpr std::uint32_t triggerIdentity=0x36000000u;
 public:
  ~Owner();
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
+ // aiNodeCount: the gates-ready AI spline's live node count (LostAI target bound).
  bool prepareGround(const authored_runtime_ground50cp_fixture::Request& request,
-     const g::TrackNavigationView50EU& map,const track_static_candidates50IG::Bindings& names,
+     const g::TrackNavigationView50EU& map,std::uint32_t aiNodeCount,const track_static_candidates50IG::Bindings& names,
      std::string& error) {
   if(std::this_thread::get_id()!=ownerThread_){error="MB collision owner thread mismatch";return false;}
   if(attempted_){error="MB collision owner requires a fresh stable lifetime";return false;}
   attempted_=true;
   try {
-   if(!map.gatesPrepared()||map.role()!=g::NavigationRole50MB::Map||map.count()!=265||
-      !request.archiveSha256||std::strcmp(request.archiveSha256,mb_trigger_authoring::archiveSha)||
-      request.archiveBytes!=mb_trigger_authoring::archiveBytes||!request.worldMember||
+   // Common course rule: the archive identity is authenticated by the ground
+   // reader against the digest of the bytes actually read (the caller passes
+   // that digest; the stock SHA is a receipt there). Slot member names, grid
+   // rank and PHY come from the session row.
+   if(!map.gatesPrepared()||map.role()!=g::NavigationRole50MB::Map||!map.count()||!aiNodeCount||
+      !request.archiveSha256||!request.archiveBytes||!request.worldMember||
       std::strcmp(request.worldMember,"tracks\\mb.scb")||!request.mapSpline||
       std::strcmp(request.mapSpline,"tracks\\mmb.spl")||request.gridRank!=4||
       !request.originalPodPhysics)
-    throw std::runtime_error("MB original source/gate/PHY identity mismatch");
+    throw std::runtime_error("MB source/gate/PHY request mismatch");
+   aiNodeCount_=aiNodeCount;
    // This is the existing neutral diagnostic grid rank, not a race ranking.
    // Only the legacy reader's extent changes; its center-pose arithmetic is
    // reused unchanged with the actual authenticated first-next predecessor.
@@ -65,17 +72,23 @@ public:
       std::memcpy(grid.previous,graph.nodes()[previous].position,sizeof(grid.previous));
       grid.rank=request.gridRank;grid.nextNode=graph.nodes()[0].next[0];
      });
-   if(ground_.world.zones.size()!=16||ground_.world.portals.size()!=17||ground_.owners.size()!=128)
-    throw std::runtime_error("MB actual collision/topology extent changed");
-   if(!source_.load(request.archive,292,16,error))return false;
+   // Stock extents (16 zones / 17 portals / 128 placed COL) are receipts.
+   course_archive_receipt50CI::countReceipt("mb_collision_world","zones",ground_.world.zones.size(),16);
+   course_archive_receipt50CI::countReceipt("mb_collision_world","portals",ground_.world.portals.size(),17);
+   course_archive_receipt50CI::countReceipt("mb_collision_world","placed_col",ground_.owners.size(),128);
+   if(ground_.world.zones.empty()||ground_.owners.empty())throw std::runtime_error("MB collision world has no zones or no placed COL");
+   ownerCount_=ground_.owners.size();
+   if(!source_.load(request.archive,aiNodeCount,static_cast<std::uint32_t>(ground_.world.zones.size()),error))return false;
+   const auto live=source_.liveCount();
    track_static_candidates50IG::prepare(ground_,names,candidates_,radii_,bindings_);
-   if(!triggers_.triggers.setCount(3))throw std::runtime_error("MB trigger count unavailable");
-   candidates_.resize(131);bindings_.resize(131);
-   for(std::size_t i=0;i<128;++i)bindings_[i].candidate=&candidates_[i];
-   for(std::size_t i=0;i<3;++i){const auto& authored=source_.source(i);auto& state=triggers_.triggers[i];
+   // Refuse by capacity: the native trigger group holds at most its own count.
+   if(!triggers_.triggers.setCount(live))throw std::runtime_error("MB live trigger set exceeds the native trigger group capacity");
+   candidates_.resize(ownerCount_+live);bindings_.resize(ownerCount_+live);
+   for(std::size_t i=0;i<ownerCount_;++i)bindings_[i].candidate=&candidates_[i];
+   for(std::size_t i=0;i<live;++i){const auto& authored=source_.source(i);auto& state=triggers_.triggers[i];
     state.flags29=3;state.flags1B8=3;state.randomTriggerPercent90=100;state.callbackCount98=1;
     state.collider.identity=triggerIdentity+static_cast<std::uint32_t>(i);
-    auto& target=candidates_[128+i];target.shapeType=authored.shapeType;
+    auto& target=candidates_[ownerCount_+i];target.shapeType=authored.shapeType;
     target.nativeTriggers=&triggers_;target.nativeTriggerIndex=i;
     auto& c=target.candidate.collision;c.shapeType=authored.shapeType;
     c.geometry.id=state.collider.identity;c.filter.identity=c.geometry.id;
@@ -87,7 +100,7 @@ public:
     c.hasResponseCallbackE8=true;c.sphere=authored.sphere;
     c.copied40={0.f,0.f,0.f,1.f};c.copied50=c.copied40;
     for(unsigned n=0;n<16;n+=5)c.geometry.worldMatrix.v[n]=1.f;
-    bindings_[128+i]={std::numeric_limits<std::size_t>::max(),&target,false,authored.zone,0,g::ZoneMethod50CL::First,true};
+    bindings_[ownerCount_+i]={std::numeric_limits<std::size_t>::max(),&target,false,authored.zone,0,g::ZoneMethod50CL::First,true};
    }
    // Fallible action authority is bound later by the genuine source owner.
    // No legacy infallible action callback is installed or made ready here.
@@ -98,21 +111,21 @@ public:
      const track_runtime_storage50IG::Limits& limits,track_runtime_storage50IG::Diagnostic& d) noexcept {
   if(std::this_thread::get_id()!=ownerThread_||!groundReady_||storageAttempted_)return false;storageAttempted_=true;
   if(!storage_.prepare(std::move(application),ground_,bindings_.data(),bindings_.size(),limits,d))return false;
-  try {for(auto& m:triggerMemberships_)m=std::make_unique<track_runtime_storage50IG::Membership>(storage_.get()->count.membership);}
+  try {for(std::size_t i=0;i<source_.liveCount();++i)triggerMemberships_[i]=std::make_unique<track_runtime_storage50IG::Membership>(storage_.get()->count.membership);}
   catch(...){return false;}
   ready_=true;return true;
  }
  bool attachTriggers() noexcept {
   if(!ready()||actionOwner_)return false;
   auto& storage=*storage_.get();
-  for(std::size_t i=0;i<3;++i){auto& membership=*triggerMemberships_[i];const auto& source=source_.source(i);
+  for(std::size_t i=0;i<source_.liveCount();++i){auto& membership=*triggerMemberships_[i];const auto& source=source_.source(i);
    if(membership.state.attached||membership.state.object)return false;
    g::LiveZoneBounds50EN bounds{};bounds.bounds.shapeTag=source.shapeType;
    for(unsigned k=0;k<4;++k)bounds.bounds.shapeWorld.v[k*5]=1.f;
    for(unsigned k=0;k<3;++k){bounds.bounds.localCenter.v[k]=source.sphere.center.v[k];bounds.bounds.localHalf.v[k]=source.sphere.radius;bounds.bounds.cachedCenter.v[k]=source.sphere.center.v[k];}
    bounds.bounds.localCenter.v[3]=bounds.bounds.localHalf.v[3]=bounds.bounds.cachedCenter.v[3]=1.f;bounds.bounds.cachedRadius=source.sphere.radius;
    const auto attached=g::attachLiveZoneMembership50EN(storage.lifecycle,storage.world,membership.state,
-    membership.storage(),static_cast<g::CollectionRef50BX>(129+i),source.zone,g::ZoneMethod50CL::First,0.f,bounds,storage.membershipWork);
+    membership.storage(),static_cast<g::CollectionRef50BX>(ownerCount_+1+i),source.zone,g::ZoneMethod50CL::First,0.f,bounds,storage.membershipWork);
    if(attached.status!=g::LiveZoneStatus50EN::Complete)return false;
    const auto updated=g::updateLiveZoneMembership50EN(storage.lifecycle,storage.world,membership.state,bounds,storage.membershipWork);
    if(updated.status!=g::LiveZoneStatus50EN::Complete)return false;
@@ -122,8 +135,10 @@ public:
  // Actual mutable membership spans are enrolled in the existing serial Bank,
  // just like MA/SA trigger memberships. No copied membership is published.
  track_runtime_storage50IG::Membership* triggerMembership(std::size_t i)noexcept {
-  return ready()&&i<3?triggerMemberships_[i].get():nullptr;
+  return ready()&&i<source_.liveCount()?triggerMemberships_[i].get():nullptr;
  }
+ // Live trigger count authored by the course TOB (0 = no trigger owners).
+ std::size_t triggerCount()const noexcept{return source_.ready()?source_.liveCount():0;}
  bool ready()const noexcept{return ready_&&std::this_thread::get_id()==ownerThread_;}
  const auto& originalTob()const noexcept{return source_.originalTob();}
  const authored_runtime_ground50cp_fixture::ColdScene& ground()const noexcept{return ground_;}

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -16,26 +17,33 @@ namespace a=rr::assets;
 // ONE trigger reader for every course that reads its triggers from its own TOB
 // (SC, MA, SA, GA): the original's trigger reader walks [Triggers]
 // NumberOfTriggers and the TriggerN / TriggerNActionK blocks of whatever TOB
-// the course archive holds. Capacity, not a stock count: the native trigger
-// group's storage. The live count is the TOB's own NumberOfTriggers (absent
-// block or 0 = no triggers).
-inline constexpr std::size_t count=rr::game::nativeTriggerCapacity50GA;
-// Native action slots per trigger (validNativeTriggerGroup50GA admits 1..2).
-inline constexpr std::size_t maxActions=2;
+// the course archive holds. Capacity, not a stock count: the reader's own
+// store holds the largest stock trigger set (TC, 22 triggers; MC 21, GB 18,
+// TB 16) and the most actions any stock trigger authors (GB trigger 18, 5).
+// The live count is the TOB's own NumberOfTriggers (absent block or 0 = no
+// triggers). Each native trigger group then bounds the live set by ITS own
+// capacity (GA's 13, native_trigger_group50ga.h) and refuses a larger one.
+// This is the ONE place the reader's capacities are defined.
+inline constexpr std::size_t count=22;
+inline constexpr std::size_t maxActions=5;
 inline constexpr std::size_t stockCount=9; // SC's stock count (receipt only)
 // Authoring values only. No geometry kernel, transform, collider, C80 lease,
 // action callback, native Entity ID or source-manager PLAYER resolution.
 struct Vector3 {std::array<float,3> values{};};
 enum class Shape {sphere,box};
-enum class ActionKind {LostAI,Animation,PodSound};
+enum class ActionKind {LostAI,Animation,PodSound,Sound,Particles};
 struct Action {
  ActionKind kind=ActionKind::LostAI;
  std::uint32_t targetAiNodeIndex=0;  // LostAI
  std::optional<bool> authoredReset;  // LostAI
  std::uint32_t animationNumber=0;    // Animation (1-based, as authored)
- std::string filename;               // PodSound
+ std::string filename;               // PodSound, Sound
  Vector3 position;                   // PodSound
  float minDistance=0,maxDistance=0;  // PodSound
+ bool positional=false,isGlobalSound=false; // Sound
+ std::uint32_t emitterNumber=0,instanceNumber=0; // Particles (1-based, as authored)
+ bool turnOn=true;                   // Particles
+ std::optional<bool> authoredOneTimeOnly; // any kind (retained; per-action once flag)
  const a::ParameterBlock48F* original=nullptr;
 };
 struct Source {
@@ -80,6 +88,21 @@ class Owner final {
   std::uint32_t value=0;const auto r=std::from_chars(text.data(),text.data()+text.size(),value);
   need(r.ec==std::errc{}&&r.ptr==text.data()+text.size(),"trigger integer text");return value;
  }
+ // The original's TOB integer reader (158B30 -> 158920 -> 30AE70, strtol
+ // base 0) consumes the integer prefix and ignores the end pointer: MB's
+ // stock TargetNodeIndex "148d" reads 148 and MC's RandomTriggerPercent
+ // "99.996002" reads 99. Used for exactly those fields here; the other
+ // integer fields keep the strict parse (stock text is plain digits).
+ static std::int32_t integer158B30(const std::string& text){
+  const long value=std::strtol(text.c_str(),nullptr,0);
+  return static_cast<std::int32_t>(value);
+ }
+ // Reset: TRUE/FALSE/T/F, or an integer (MB's stock UpShaft authors Reset 1,
+ // read as a reset by the MB route's 1B5A88 trace).
+ static bool resetValue(const std::string& text){
+  if(text=="TRUE"||text=="FALSE"||text=="T"||text=="F")return text=="TRUE"||text=="T";
+  return integer158B30(text)!=0;
+ }
  static float number(const std::string& text){
   float value=0;need(a::parseTrackNumber50AD(text.data(),text.size(),value)&&std::isfinite(value),"trigger source decimal");return value;
  }
@@ -94,7 +117,8 @@ class Owner final {
   }return result;
  }
  static const char* kindName(ActionKind k)noexcept{
-  return k==ActionKind::LostAI?"LostAI":k==ActionKind::Animation?"Animation":"PodSound";
+  return k==ActionKind::LostAI?"LostAI":k==ActionKind::Animation?"Animation":k==ActionKind::PodSound?"PodSound":
+   k==ActionKind::Sound?"Sound":"Particles";
  }
 public:
  struct Diagnostic {const char* failure=nullptr;std::size_t trigger=0;};
@@ -121,7 +145,7 @@ public:
     need(out.sourceZoneOrdinal>=1&&out.sourceZoneOrdinal<=zoneCount,"trigger zone outside the world");
     if(const auto* v=optional(b,"startenabled")){out.startEnabled=boolean(*v);out.startEnabledAuthored=true;}
     out.oneTimeOnly=boolean(field(b,"onetimeonly"));
-    if(const auto* v=optional(b,"randomtriggerpercent")){out.randomTriggerPercent=number(*v);out.randomTriggerPercentAuthored=true;}
+    if(const auto* v=optional(b,"randomtriggerpercent")){out.randomTriggerPercent=static_cast<float>(integer158B30(*v));out.randomTriggerPercentAuthored=true;}
     if(const auto* ignore=optional(b,"ignoretrigger"))out.ignoreTrigger=*ignore;
     need(!optional(b,"parent")&&!optional(b,"attachtosoultree"),"trigger attachment is not supported natively");
     out.position=vector(field(b,"position"));
@@ -142,10 +166,13 @@ public:
      const auto& action=block(p,label+"action"+std::to_string(k+1));auto& act=out.actions[k];act.original=&action;
      const auto& type=field(action,"actiontype");
      if(k)kinds+='+';
+     if(const auto* once=optional(action,"onetimeonly"))act.authoredOneTimeOnly=boolean(*once);
      if(type=="LostAI"){
-      act.kind=ActionKind::LostAI;act.targetAiNodeIndex=integer(field(action,"targetnodeindex"));
+      const auto target=integer158B30(field(action,"targetnodeindex"));
+      need(target>=0,"LostAI target below node 0");
+      act.kind=ActionKind::LostAI;act.targetAiNodeIndex=static_cast<std::uint32_t>(target);
       need(act.targetAiNodeIndex<aiNodeBound,"LostAI target outside the AI spline");
-      if(const auto* reset=optional(action,"reset"))act.authoredReset=boolean(*reset);
+      if(const auto* reset=optional(action,"reset"))act.authoredReset=resetValue(*reset);
      }else if(type=="Animation"){
       act.kind=ActionKind::Animation;act.animationNumber=integer(field(action,"animationnumber"));
       need(act.animationNumber>=1,"Animation action number");
@@ -158,7 +185,18 @@ public:
       act.minDistance=number(field(action,"mindistance"));act.maxDistance=number(field(action,"maxdistance"));
       need(!act.filename.empty()&&act.minDistance>=0&&act.maxDistance>=act.minDistance,"PodSound action fields");
       need(!optional(action,"specificobject"),"PodSound action SpecificObject is not supported natively");
-     }else need(false,"trigger action type other than LostAI/Animation/PodSound is not supported natively");
+     }else if(type=="Sound"){
+      // Ordinary (non-pod) trigger sound: FileName, Positional, IsGlobalSound.
+      act.kind=ActionKind::Sound;act.filename=field(action,"filename");
+      act.positional=boolean(field(action,"positional"));act.isGlobalSound=boolean(field(action,"isglobalsound"));
+      need(!act.filename.empty(),"Sound action FileName");
+      need(!optional(action,"specificobject"),"Sound action SpecificObject is not supported natively");
+     }else if(type=="Particles"){
+      // Emitter switch: EmitterNumber / InstanceNumber (1-based), TurnOn.
+      act.kind=ActionKind::Particles;act.emitterNumber=integer(field(action,"emitternumber"));
+      act.instanceNumber=integer(field(action,"instancenumber"));act.turnOn=boolean(field(action,"turnon"));
+      need(act.emitterNumber>=1&&act.instanceNumber>=1,"Particles action emitter/instance number");
+     }else need(false,"trigger action type other than LostAI/Animation/PodSound/Sound/Particles is not supported natively");
      kinds+=kindName(act.kind);
     }
     // Action-1 mirror kept for the LostAI-only consumers.

@@ -3056,10 +3056,11 @@ void Context::run() {
     // TC has an actual48-tile sky request and retains the matching matrix.
     // Only a course authoring zero sky cubes omits both indices and matrix.
     renderFrame.skyWorldViewProjection=scZeroSky.ready()?nullptr:skyView.worldViewProjection;
-    // GA selects per zone exactly when its data authored CubeFileForZone rows
-    // (continuation prepared the selection owner; select() is false otherwise).
+    // GA, TA and GC select per zone exactly when their data authored
+    // CubeFileForZone rows (continuation prepared the selection owner;
+    // select() is false otherwise).
     bool gaZoneSkyProbe=false;
-    const bool gaZoneSky=isGaTrack&&sourceSkySelection.select(0u,gaZoneSkyProbe);
+    const bool gaZoneSky=sourceSkySelection.select(0u,gaZoneSkyProbe);
     if(isMaSaTrack||gaZoneSky||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&

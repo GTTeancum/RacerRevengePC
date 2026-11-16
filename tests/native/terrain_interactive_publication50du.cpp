@@ -1154,10 +1154,18 @@ void Context::run() {
    for(bool actual:matched)require50DU(actual,"GC generator has no actual renderer spans");
    nativeFireSpanDrawn.resize(nativeFireSpanIds.size());
   }
-  if(isMbTrack){
+  // ATM owner exactly when the course world's materials name an ATM texture
+  // (SC's presence rule; absent = no owner). A world that authors ATM textures
+  // keeps the stock-shaped owner: PORT STAND-IN (flagged): the ATM owner reads the stock ATM set only; the data ATM reader is not built,
+  // so a non-stock ATM set is refused by that owner (its message is logged).
+  const auto atmRefused=[](const char* code,const std::string& message){
+   std::cerr<<"course_atm site="<<code<<" refused: "<<message<<" (PORT STAND-IN (flagged): the ATM owner reads the stock ATM set only; the data ATM reader is not built)\n";
+  };
+  if(isMbTrack&&worldAuthorsAnimatedTextures50DU(mbOriginalWorld.get())){
    mb_atm_animation_fixture::Diagnostic animationDiagnostic;
-   require50DU(mbAtm.loadSource(trackSession->archive,trackSource,*mbOriginalWorld,animationDiagnostic),
-       animationDiagnostic.message.empty()?"MB actual animated textures rejected":animationDiagnostic.message.c_str());
+   const bool atmLoaded=mbAtm.loadSource(trackSession->archive,trackSource,*mbOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("MB",animationDiagnostic.message);
+   require50DU(atmLoaded,animationDiagnostic.message.empty()?"MB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isScTrack&&scColdSources&&scColdSources->authorsAnimatedTextures()){
    sc_atm_animation_fixture::Diagnostic animationDiagnostic;
@@ -1221,9 +1229,12 @@ void Context::run() {
    const bool crystalReady=rcCrystal->prepare(rcOriginalWorld,rcLightOwner,gameplayBinderTemplates,
        originalMainApplication.materialRuntime,sizeof(rc_crystal50RC::Owner),error);
    require50DU(crystalReady,error.empty()?"RC crystal bridge rejected":error.c_str());
+   if(worldAuthorsAnimatedTextures50DU(rcOriginalWorld.get())){
    rc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=rcAtm.loadSource(trackSource,rcOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("RC",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"RC actual animated textures rejected":animationDiagnostic.message.c_str());
+   }
    rcParticleWindow=std::make_shared<rc_particle_visual50RC::Window>();
    rc_particle_visual50RC::Diagnostic particleDiagnostic;
    const bool particleReady=rcParticleWindow->prepare(rcOriginalWorld,rcParticleAttachments,rcTrackParticles,
@@ -1231,24 +1242,28 @@ void Context::run() {
        rcParticleWindowPayloadReservation,particleDiagnostic);
    require50DU(particleReady,particleDiagnostic.message.empty()?"RC canonical particle Window rejected":particleDiagnostic.message.c_str());
   }
-  if(isGbTrack){
+  if(isGbTrack&&worldAuthorsAnimatedTextures50DU(gbOriginalWorld.get())){
    gb_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=gbAtm.loadSource(trackSource,gbOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("GB",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"GB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(isMcTrack){
+  if(isMcTrack&&worldAuthorsAnimatedTextures50DU(mcOriginalWorld.get())){
    mc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=mcAtm.loadSource(trackSource,mcOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("MC",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"MC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(isTbTrack){
+  if(isTbTrack&&worldAuthorsAnimatedTextures50DU(tbOriginalWorld.get())){
    tb_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=tbAtm.loadSource(trackSource,tbOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("TB",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"TB actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(isTcTrack){
+  if(isTcTrack&&worldAuthorsAnimatedTextures50DU(tcOriginalWorld.get())){
    tc_atm_animation_fixture::Diagnostic animationDiagnostic;
    const bool atmLoaded=tcAtm.loadSource(trackSource,*tcOriginalWorld,animationDiagnostic);
+   if(!atmLoaded)atmRefused("TC",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"TC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(gcAnimatedWorld){
@@ -1428,8 +1443,10 @@ void Context::run() {
        (worldAuthorsAnimatedTextures50DU(saOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
     if(isMaTrack&&((maTriggerActions&&!maTriggerActions->ready())||
        (worldAuthorsAnimatedTextures50DU(maOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
+    // MB (SC's rule): the ATM owner is required exactly when the world's
+    // materials name an ATM texture.
     if(isMbTrack&&(!mbOriginalWorld||!mbOriginalWorld->loaded()||
-       !mbAtm.loaded()||!mbAtm.ownsResources()))return false;
+       (worldAuthorsAnimatedTextures50DU(mbOriginalWorld.get())?(!mbAtm.loaded()||!mbAtm.ownsResources()):mbAtm.loaded())))return false;
     if(rcOriginalDisc&&(!humanOriginalHud||!rcColdSources||!rcColdSources->ready()||
        !rcCollisionWorld||!rcWorldBorrow||rcCollisionWorld->coldSource()!=rcColdSources.get()||
        rcWorldBorrow->world()!=&liveWorld||!rcNavigationBorrow.valid()||
@@ -1628,12 +1645,13 @@ void Context::run() {
   }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
-  // One shared ceiling for the MA/SA/GA course worlds (was keyed on the course:
-  // MA/SA 32/16/16 MiB, GA 16/8/8 MiB). The renderer validates the mesh it
-  // actually builds against it; it allocates the mesh's own size.
+  // One shared ceiling for every course world (was keyed on the course: MA/SA
+  // 32/16/16 MiB, GA 16/8/8 MiB, the others 8 or 4 / 2 / 4 or 2 MiB). The
+  // renderer validates the mesh it actually builds against it; it allocates
+  // the mesh's own size, so a stock course allocates exactly what it did.
   constexpr std::uint32_t courseWorldVertexCeiling=32u*1024u*1024u,courseWorldIndexCeiling=16u*1024u*1024u,
       courseWorldNormalCeiling=16u*1024u*1024u;
-  const bool courseWorldCeiling=isMaSaTrack||isGaTrack;
+  constexpr bool courseWorldCeiling=true;
   renderRequest.track.maximumNormalBytes=courseWorldCeiling?courseWorldNormalCeiling:
       trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates&&!isRcTrack){
@@ -1858,7 +1876,8 @@ void Context::run() {
   auto skyTextureRequest=textureRequest;
   skyTextureRequest.samplers=skySamplers.data();
   skyTextureRequest.samplerCount=static_cast<std::uint32_t>(skySamplers.size());
-  skyTextureRequest.maximumGpuBytes=(isGbTrack?90u:48u)*128u*128u*4u;
+  // The sky bank's own texture count (one rule; GB's legacy loader holds 90).
+  skyTextureRequest.maximumGpuBytes=static_cast<std::uint32_t>(skyBank->textureCount())*128u*128u*4u;
   require50DU(skyGpuTextures.create(skyTextureRequest,*skyBank,textureDiagnostic),
       "actual selected-track sky texture upload failed");
   skyBindings.reserve(skySpans->size());

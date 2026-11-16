@@ -35,9 +35,19 @@ public:
     const mb_collision_world50MB::Owner* ownerIdentity() const noexcept {return owner_.get();}
     std::uint64_t generation() const noexcept {return valid()?generation_:0;}
 };
+// ONE navigation store for every course read through the 50MB spline family
+// (MB, GB, MC, TB, TC). Capacity, not a stock count: the largest stock spline
+// (TC's AI spline, 293 nodes) fits. The live count is the course's own
+// NumNodes (1..capacity); a spline above the capacity is refused by the reader
+// (2A1260 node-index limit), never by identity. Portal capacity bounds the
+// SCB's authored portals copied for the topology check (zones are <=256 by
+// the live-world rule). This is the ONE place both capacities are defined;
+// they never replace the legacy 256-node bound (maxUndertrackNodes50ET).
+inline constexpr std::size_t courseNavigationCapacity50MB=293;
+inline constexpr std::size_t courseNavigationPortalCapacity50MB=256;
 namespace navigation_storage_detail50MB {
-// These exact asset extents never replace any legacy256 bound. Internal cold
-// records do not issue views; only the authenticated Owner is a view issuer.
+// Internal cold records do not issue views; only the authenticated Owner is a
+// view issuer.
 template<std::size_t N> struct Graph {
     UndertrackNode50ET nodes[N]{};std::uint32_t count=0;
 };
@@ -56,15 +66,16 @@ template<std::size_t N> struct Metadata {
     std::uint32_t count=0;bool bound=false;
 };
 struct Storage {
-    Navigation<265> map;Navigation<292> ai;
-    Metadata<265> mapMetadata;Metadata<292> aiMetadata;
-    LiveZonePortalInput50EN authoredPortals[17]{};
+    Navigation<courseNavigationCapacity50MB> map;Navigation<courseNavigationCapacity50MB> ai;
+    Metadata<courseNavigationCapacity50MB> mapMetadata;Metadata<courseNavigationCapacity50MB> aiMetadata;
+    LiveZonePortalInput50EN authoredPortals[courseNavigationPortalCapacity50MB]{};
+    std::uint32_t authoredZoneCount=0,authoredPortalCount=0; // live counts from the SCB
     bool gatesReady=false;
 private:
     Storage()=default;friend class ::mb_navigation50MB::Owner;
 };
 struct Indices {
-    std::uint8_t map[265]{},ai[292]{};
+    std::uint8_t map[courseNavigationCapacity50MB]{},ai[courseNavigationCapacity50MB]{};
     MbCollisionWorldLease world;
 private:
     Indices()=default;friend class ::mb_navigation50MB::Owner;
@@ -84,7 +95,7 @@ public:
     bool valid() const noexcept {return storage_&&storage_->gatesReady;}
     bool runtimeValid() const noexcept {return valid()&&indices_&&indices_->world.valid();}
     NavigationRole50MB role() const noexcept {return role_;}
-    std::size_t capacity() const noexcept {return valid()?(role_==NavigationRole50MB::Map?265u:292u):0u;}
+    std::size_t capacity() const noexcept {return valid()?courseNavigationCapacity50MB:0u;}
     std::uint32_t count() const noexcept {return valid()?(role_==NavigationRole50MB::Map?storage_->map.track.count:storage_->ai.track.count):0u;}
     const UndertrackNode50ET* nodes() const noexcept {return valid()?(role_==NavigationRole50MB::Map?storage_->map.track.nodes:storage_->ai.track.nodes):nullptr;}
 };
@@ -106,7 +117,7 @@ public:
     const std::uint8_t* nodeIndex78() const noexcept {return indicesPrepared()?(role_==NavigationRole50MB::Map?indices_->map:indices_->ai):nullptr;}
     bool gatesPrepared() const noexcept {return storage_&&storage_->gatesReady;}
     bool indicesPrepared() const noexcept {return gatesPrepared()&&indices_&&indices_->world.valid();}
-    bool runtimeValid() const noexcept {return indicesPrepared()&&count()==capacity();}
+    bool runtimeValid() const noexcept {return indicesPrepared()&&count()&&count()<=capacity();}
     NavigationRole50MB role() const noexcept {return role_;}
     std::uint64_t generation() const noexcept {return indicesPrepared()?indices_->world.generation():0;}
     bool sameOwner(const TrackNavigationView50EU& other) const noexcept {

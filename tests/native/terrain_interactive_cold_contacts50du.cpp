@@ -90,7 +90,7 @@ void ContactsContext::run() {
    if(audioEnabled)std::cerr<<"GC BIGDOOR borrows the accepted native camera listener in XZ; original listener-object cadence parity remains unclaimed.\n";
   }
   if(isMbTrack){
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&mbAiView.runtimeValid()&&mbAiView.count()==292&&
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&mbAiView.runtimeValid()&&mbAiView.count()&&
        mbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
        "MB requires actual human and seven AI owners");
    std::array<std::array<std::uint32_t,2>,8> identities{};

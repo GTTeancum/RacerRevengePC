@@ -665,10 +665,13 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     const auto& params=world.parameters;
     const auto* lights=block(params,"lights");
     const auto* environment=block(params,"environment");
-    // PORT STAND-IN (flagged): the ambient colour flash is implemented for GB's
-    // authored values only; another course authoring it is refused.
-    if((!gb&&environment&&field(*environment,"ambientcolorflashminidletime"))||(gb&&!environment))
-        return fail(d,Status::sourceFields,0x270e9c);
+    // The ambient colour flash exists exactly when [Environment] authors it.
+    // PORT STAND-IN (flagged): the timed flash (original_gb_light_flash50GB)
+    // is implemented for GB's stock timings only and only in the GB scene; a
+    // course authoring other values, or another scene authoring a flash, is
+    // refused, never ignored.
+    const bool flashAuthored=environment&&field(*environment,"ambientcolorflashminidletime");
+    if(flashAuthored&&!gb)return fail(d,Status::sourceFields,0x270e9c);
     auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
         const auto* f=field(b,key);
         return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
@@ -701,7 +704,7 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     std::uint32_t omittedMbNonEmit=0,mbFlasherCount=0,omittedScNonEmit=0;
     localLightCount=0;
     std::size_t gbFlasherCount=0;
-    if(gb){
+    if(gb&&flashAuthored){
         float minIdle=0,idle=0,minDuration=0,duration=0;light::Vec3 flash{};
         if(!scalar(*environment,"ambientcolorflashminidletime",minIdle)||minIdle!=15.f||
            !scalar(*environment,"ambientcolorflashidletime",idle)||idle!=25.f||
@@ -760,7 +763,7 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
             if(++directionalCount!=1u||!emits||!infinity||zone!=1u)
                 return fail(d,Status::sourceFields,0x1490c0);
             sunLook=pose.effectiveLook78;
-            if(gb)gbTimed->particleSunPositionA0=pose.positionA0;
+            if(gbTimed)gbTimed->particleSunPositionA0=pose.positionA0;
             authoredSunSpecular={{rgb[0],rgb[1],rgb[2],0.f}};
             //1490E0 propagates the initial directional color only for zone0.
             for(auto& row:sun44)row=authoredSunSpecular;
@@ -774,6 +777,8 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
         // Authenticated GB has44 explicit F rows; presence alone does not enable a flasher.
         if(const auto* flasher=field(*b,"hasflasher");flasher&&(!gb||flasher->value!="F")){
             if(gb){
+                // A flasher needs the timed-light owner (authored flash).
+                if(!gbTimed)return fail(d,Status::sourceFields,0x277390);
                 if(spotlight||!emits||flasher->value!="T"||gbFlasherCount>=2u||
                    sourceOrdinal!=(gbFlasherCount==0u?7u:34u))return fail(d,Status::sourceFields,0x277390);
                 float period=0,filter=0;const auto* pattern=field(*b,"flashpattern");
@@ -854,7 +859,7 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
        (sc&&omittedScNonEmit!=146u)||(gb&&gbFlasherCount!=2u))
         std::cerr<<"course_count site=lighting light_types ambient="<<ambientCount<<" directional="<<directionalCount
                  <<" points="<<pointCount<<" emitting="<<emittingPoints<<" spots="<<spotlights<<" local="<<localLightCount<<" stock=0\n";
-    if(gb){
+    if(gbTimed){
         if(ambient60.size()<13u)return fail(d,Status::bounds,0x149000);
         gbTimed->savedGlobal=globalAmbient50;
         std::copy_n(ambient60.begin(),13u,gbTimed->savedZones.begin());
@@ -2400,8 +2405,10 @@ std::size_t Owner::gbTimedLightStorageReservationBytes()noexcept {
     return sizeof(std::unique_ptr<Storage::GbTimedLights>)+alignof(Storage)+sizeof(Storage::GbTimedLights);
 }
 bool Owner::serviceGbTimedLights(float delta,std::uint32_t& sharedRng,bool paused,Diagnostic& d)noexcept {
-    d={};if(!storage_||invalidated_||storage_->scene!=Scene::gb||!storage_->gbTimed)
+    d={};if(!storage_||invalidated_||storage_->scene!=Scene::gb)
         return fail(d,Status::unprepared,0x2754e0);
+    // No authored ambient flash and no flashers: nothing timed to service.
+    if(!storage_->gbTimed)return true;
     auto& o=*storage_;
     if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())
         return fail(d,Status::activeDraw,0x2754e0);
