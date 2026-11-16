@@ -82,7 +82,9 @@ public:
    const auto live=source_.liveCount();
    track_static_candidates50IG::prepare(ground_,names,candidates_,radii_,bindings_);
    // Refuse by capacity: the native trigger group holds at most its own count.
-   if(!triggers_.triggers.setCount(live))throw std::runtime_error("MB live trigger set exceeds the native trigger group capacity");
+   // Zero authored triggers = no trigger state selected (the group keeps only
+   // the racer colliders, bound later; source_trigger_entry50mb.h).
+   if(live&&!triggers_.triggers.setCount(live))throw std::runtime_error("MB live trigger set exceeds the native trigger group capacity");
    candidates_.resize(ownerCount_+live);bindings_.resize(ownerCount_+live);
    for(std::size_t i=0;i<ownerCount_;++i)bindings_[i].candidate=&candidates_[i];
    for(std::size_t i=0;i<live;++i){const auto& authored=source_.source(i);auto& state=triggers_.triggers[i];

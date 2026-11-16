@@ -46,12 +46,30 @@ struct SourceTriggerContactReceipt50MB {
     bool serviceRan=false;
     SourceTriggerActionResult50MB action{};
 };
+// A course TOB that authors no triggers (absent [Triggers] or 0) has no
+// trigger state selected: every slot stays cold-empty (no identity, callback
+// or contact). The group still carries the racers' real colliders, so the
+// source query owner stays bound and queries run; nothing can dispatch.
+inline bool emptySourceTriggerSet50MB(const NativeTriggerGroup50GA& group) noexcept {
+    for(const auto& s:group.triggers)
+        if(s.collider.identity||s.collider.highWaterD0||s.callbackCount98)return false;
+    return true;
+}
+inline bool validEmptySourceTriggerStorage50MB(const NativeTriggerGroup50GA& group) noexcept {
+    if(!group.ready||group.actionsFailed||!emptySourceTriggerSet50MB(group))return false;
+    for(std::size_t i=0;i<group.colliders.size();++i){
+        if(!trigger_entry50IN_detail::valid(group.colliders[i]))return false;
+        for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
+    }
+    return true;
+}
 inline bool validSourceTriggerGroup50MB(const NativeTriggerGroup50GA& group,
     const SourceTriggerActionHooks50MB& hooks) noexcept {
     // No fake legacy callbacks, mixed modes, random-input stand-ins or missing
     // source provider. Authored MB has actual percent100, as checked by50GA.
     return hooks.context&&hooks.preflight&&hooks.resume&&!group.actions.context&&
-        !group.actions.preflight&&!group.actions.apply&&validNativeTriggerStorage50GA(group);
+        !group.actions.preflight&&!group.actions.apply&&
+        (validNativeTriggerStorage50GA(group)||validEmptySourceTriggerStorage50MB(group));
 }
 // Discard only a completed observation before a different candidate. Never
 // discard an unfinished action or either reciprocal-add prefix.
