@@ -2048,10 +2048,17 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
         request.trackAnimations = nullptr;
         // Track CPU bytes are borrowed only for this cold synchronous call.
         // No retained pointer, including after a failed cleanup, is needed.
-        request.track.mesh = nullptr;
-        request.track.spans = nullptr;
-        request.track.sourceNormals = nullptr;
-        request.track.sourceProjectionUvs = nullptr;
+        // They stay readable until this call returns (every exit): the
+        // original shadow receivers (createOriginalShadows, the last cold
+        // step) read the static spans' world instances and vertices. Clearing
+        // them up front left every non-RA course with no receiver ground.
+        struct TrackBorrow {
+            VehicleWindowTrack50DS& track;
+            ~TrackBorrow() {
+                track.mesh = nullptr; track.spans = nullptr;
+                track.sourceNormals = nullptr; track.sourceProjectionUvs = nullptr;
+            }
+        } trackBorrow{request.track};
         request.dynamicWorld.mesh = nullptr;
         request.dynamicWorld.spans = nullptr;
         request.dynamicWorld.sourceNormals = nullptr;
