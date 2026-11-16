@@ -633,6 +633,19 @@ bool Owner::abortSourceTrackNative(std::uint32_t& pc)noexcept {
     if(!abortSourcePostParticleModelsNative(pc))return false;
     if(!abortSourceParticleConfigNative(pc)||!abortSourceParticleStageNative(pc)||!abortSourceFogTransferNative(pc))return false;
     if(sourceTrackStep_==SourceTrackStep::nativeClosed)return true;
+    // The source track route (1A6D48 mount onward) was never entered: the race
+    // loaded its track on the native route (completeConsumedRaWorldNativePrefix
+    // 1A9EE0), whose topology, method arrays and resources are retired by the
+    // native close that follows (closeOwnedNativeResources). The source-route
+    // preflights below assume no native topology exists, so they do not apply
+    // and there is nothing of the source route to withdraw.
+    if(sourceTrackStep_==SourceTrackStep::unreached&&!sourceTrackFile_&&!sourceWorldConfig_&&
+       !sourceWorldObjectConfig_&&!sourceLoadRace_&&!sourceLoadApplication_){
+        static bool reported=false;
+        if(!reported){reported=true;std::fprintf(stderr,"source_track_withdrawal route=native source_step=unreached nothing_to_withdraw=1 world_counted=%d topology_attempted=%d topology_closed=%d\n",
+            int(worldColdConstructed_),int(topologyAttempted_),int(topologyClosed_));}
+        return true;
+    }
     if(!preflightSourceWorldTopologyNative()||!preflightSourceWorldMaterialAssignmentsNative()||!preflightSourceWorldAudioNative()||!preflightSourceWorldStaticModelParamsNative()||!preflightSourceWorldBuoysNative()||!preflightSourceWorldParticleCountNative()||!preflightSourceWorldSunFlareNative()||!preflightSourceWorldCsCamerasNative()||!preflightSourceWorldBoundaryNative()||
        !abortSourceWorldTopologyNative(pc)||!abortSourceWorldMaterialAssignmentsNative(pc)||!abortSourceWorldMaterialSoundsNative(pc)||!abortSourceWorldSoulTreeSoundsNative(pc)||!abortSourceWorldAmbientNative(pc)||!abortSourceWorldStaticModelParamsNative(pc)||!abortSourceWorldBuoysNative(pc)||!abortSourceWorldParticleDescriptorsNative(pc)||!abortSourceWorldSunFlareNative(pc)||!abortSourceWorldCsCamerasNative(pc)||!abortSourceWorldTriggerNative(pc)||
        !abortSourceWorldToyNative(pc)||

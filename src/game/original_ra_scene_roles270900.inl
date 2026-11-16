@@ -412,16 +412,29 @@ bool Owner::releaseRaFlarePrimary(const ::ra_pod_scene50LA::Owner* owner,
 bool Owner::releaseRaFlareIdentity(const ::ra_pod_scene50LA::Owner* owner,
     const OriginalWreckComponent50LA& entity,std::uint32_t identity,std::uint32_t& pc)noexcept {
     pc=0x14b9b0;
-    if(!raFlareIdentityCurrent(owner,entity,identity,nullptr,0u))return false;
+    // Refusal diagnostic (logs only): names the gate and the identity order.
+    const auto refuse=[&](const char* gate)noexcept{
+        const auto& st=*storage_;
+        std::fprintf(stderr,"ra_flare_identity_release_refused gate=%s identity=%u identity_count=%zu flares=%zu racers=%zu static_models=%zu\n",
+            gate,unsigned(identity),st.identityCount(),st.raFlareCount,std::size_t(st.racerCount),st.staticModels.size());
+        return false;};
+    if(!raFlareIdentityCurrent(owner,entity,identity,nullptr,0u))return refuse("identity_current");
     auto& s=*storage_;
     //Only the actual final identity may disappear: no older IDs are renumbered.
-    if(!s.raFlareCount||identity!=s.identityCount()||s.raFlareAt(s.raFlareCount-1u).entity!=&entity)return false;
+    if(!s.raFlareCount||identity!=s.identityCount()||s.raFlareAt(s.raFlareCount-1u).entity!=&entity)return refuse("not_last");
     //This cohort admits only primary visibility membership. Reject a remaining
     //live secondary token rather than erasing/replaying any existing registry.
     for(const auto& registry:s.registries){
-        if(registry.perBlock!=1024u||registry.blockCount>1u||registry.lastUsed>1024u)return false;
+        // A registry never constructed (the storage array is sized for the
+        // largest zone count; RA uses 2 x 10) holds no token: nothing to scan.
+        if(!registry.perBlock&&!registry.blockCount&&!registry.lastUsed&&!registry.freeHead)continue;
+        if(registry.perBlock!=1024u||registry.blockCount>1u||registry.lastUsed>1024u){
+            std::fprintf(stderr,"ra_flare_identity_registry per_block=%u blocks=%u last_used=%u\n",
+                registry.perBlock,registry.blockCount,registry.lastUsed);
+            return refuse("registry_shape");
+        }
         const auto used=registry.blockCount?registry.lastUsed:0u;
-        for(std::uint32_t i=0;i<used;++i)if(!(registry.words[i]&2u)&&registry.words[i]==(identity<<2u))return false;
+        for(std::uint32_t i=0;i<used;++i)if(!(registry.words[i]&2u)&&registry.words[i]==(identity<<2u))return refuse("live_token");
     }
     s.registrations.ra.pop_back();s.raFlareAt(--s.raFlareCount)={};
     auto& life=s.visibility.lifecycle;

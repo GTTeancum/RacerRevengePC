@@ -14,7 +14,17 @@ bool Owner::constructSourceTopologyContainer141300(Entity& e,bool& counted,bool&
 }
 namespace ra_cold_aggregate50LA {
 bool Owner::preflightSourceWorldTopologyNative()const noexcept {
-    if(nativeScbThread_!=std::this_thread::get_id()||!preflightSourceWorldSearchNodesNative()||!preflightSourceWorldPortalGraphNative()||!preflightSourceWorldMethodArraysNative()||!preflightSourceDefaultObserverNative()||!preflightSourceLightPopulationNative()||!preflightSourceVisibilityEnvironmentNative()||!preflightSourcePostParticleModelsNative())return false;
+    // Refusal diagnostic (logs only): names the first sub-check that refuses.
+    const auto named=[](bool ok,const char* gate)noexcept{static int reported=0;
+        if(!ok&&reported<4){++reported;std::fprintf(stderr,"source_topology_preflight_refused gate=%s\n",gate);}return ok;};
+    if(nativeScbThread_!=std::this_thread::get_id()||!named(preflightSourceWorldSearchNodesNative(),"search_nodes")||
+       !named(preflightSourceWorldPortalGraphNative(),"portal_graph")||!named(preflightSourceWorldMethodArraysNative(),"method_arrays")||
+       !named(preflightSourceDefaultObserverNative(),"default_observer")||!named(preflightSourceLightPopulationNative(),"light_population")||
+       !named(preflightSourceVisibilityEnvironmentNative(),"visibility_environment")||!named(preflightSourcePostParticleModelsNative(),"post_particle_models"))return false;
+    static int phaseReported=0;
+    if(sourceTopologyPhase_!=SourceTopologyPhase::unreached&&sourceTopologyPhase_!=SourceTopologyPhase::nativeClosed&&phaseReported++<2)
+        std::fprintf(stderr,"source_topology_preflight phase=%u mode=%d native_attempted=%d\n",
+            unsigned(sourceTopologyPhase_),int(sourceTopologyMode_),int(topologyAttempted_));
     if(sourceTopologyPhase_==SourceTopologyPhase::unreached)
         return !sourceTopologyContainer_&&!sourceTopologyLightManager_&&!sourceTopologyMode_;
     if(sourceTopologyPhase_==SourceTopologyPhase::nativeClosed)

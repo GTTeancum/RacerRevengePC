@@ -2867,6 +2867,10 @@ bool Owner::retireNativeLocalPrimary(std::size_t index,const ::ra_cold_aggregate
 }
 }
 
+namespace {
+[[noreturn]] void dieFlare(const char* gate,std::size_t index)noexcept{
+    std::fprintf(stderr,"ra_local_flare_retire_failed gate=%s point=%zu\n",gate,index);std::fflush(stderr);std::terminate();}
+}
 namespace ra_pod_scene50LA {
 bool Owner::nativeLocalFlareCurrentAt(std::size_t index)const noexcept {
     if(index>=nativePoints_.size()){nativeLocalFlareFailLine50LA=__LINE__;nativeLocalFlareFailIndex50LA=index;return false;}
@@ -2981,25 +2985,25 @@ bool Owner::retireNativeLocalFlare(std::size_t index)noexcept {
     if(f.strip90){auto& strip=*f.strip90;auto& e=strip.entity_;
         if(f.stripAttached){f.entity.firstChild18=nullptr;f.entity.descendants24=0;
             e.parent1C=nullptr;e.mask20=0;f.stripAttached=false;}
-        if(!authority.retire(e))std::terminate();--e.reference00;
+        if(!authority.retire(e))dieFlare("strip_entity_retire",index);--e.reference00;
         strip.attributes_.release23BCF0();strip.groups38_.reset();strip.primitive30_.reset();
         --sceneApplication_->objectCount423F60();f.strip90.reset();
     }
     std::uint32_t pc=0;
     if(f.observerOwner){auto& o=*f.observerOwner;
-        if(o.primaryRegistered&&!lighting_->releaseRaFlarePrimary(this,f.entity,f.visibilityIdentity,pc))std::terminate();
+        if(o.primaryRegistered&&!lighting_->releaseRaFlarePrimary(this,f.entity,f.visibilityIdentity,pc))dieFlare("flare_primary_release",index);
         //No source280BF0 secondary link is admitted on exact Light3/radius0.
         //An allocated-before-primary abort skips retail null08 dereference.
-        if(o.sharedConstructed&&!sceneApplication_->garageObserverShared_.release280920(&o))std::terminate();
+        if(o.sharedConstructed&&!sceneApplication_->garageObserverShared_.release280920(&o))dieFlare("observer_shared_release",index);
         f.observerOwner.reset();f.observer94=nullptr; //14B9EC after280920.
     }
-    if(f.visibilityIdentity&&!lighting_->releaseRaFlareIdentity(this,f.entity,f.visibilityIdentity,pc))std::terminate();
+    if(f.visibilityIdentity&&!lighting_->releaseRaFlareIdentity(this,f.entity,f.visibilityIdentity,pc))dieFlare("flare_identity_release",index);
     f.visibilityIdentity=0;
     if(f.lightAttached){nativeLocalLight_->entity.firstChild18=nullptr;nativeLocalLight_->entity.descendants24=0;
         if(nativeLocalLight_->attached)nativeLightList3A8_->entity.descendants24=2u|nativePointDescendants();
         f.entity.parent1C=nullptr;f.lightAttached=false;}
     if(f.lightPublished)retiredLocalFlareIdentity_=&f.entity; //146980 does not clearC4; never dereference afterfree.
-    if(!authority.retire(f.entity))std::terminate();--f.entity.reference00;
+    if(!authority.retire(f.entity))dieFlare("flare_entity_retire",index);--f.entity.reference00;
     --sceneApplication_->objectCount423F60();nativeLocalFlare_.reset();return true;
 }
 }
