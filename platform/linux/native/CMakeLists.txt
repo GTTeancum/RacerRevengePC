@@ -128,6 +128,8 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/original_standard_program_table50la.cpp"
   "${RR_ROOT}/src/assets/original_standard_material_source50la.cpp"
   "${RR_ROOT}/src/assets/original_standard_material_object50la.cpp"
+  "${RR_ROOT}/src/assets/dlc_package50dl.cpp"
+  "${RR_ROOT}/src/assets/dlc_files50dl.cpp"
   "${RR_ROOT}/src/assets/original_standard_material_table50la.cpp"
   "${RR_ROOT}/src/assets/original_standard_screen_material_reference50la.cpp"
   "${RR_ROOT}/src/assets/original_standard_texture_table50la.cpp"

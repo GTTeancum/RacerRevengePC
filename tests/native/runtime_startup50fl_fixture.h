@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "runtime_asset_paths50lb.h"
 #include "pod_materials50ed_fixture.h"
 #include "original_player_identity50ik_fixture.h"
@@ -40,7 +41,7 @@ inline BodyMatrix48G matrix(float angle=0,float tx=0,float ty=0,float tz=0){
 }
 inline BodyMatrix48G identity(){BodyMatrix48G m{};for(unsigned i=0;i<16;i+=5)m.v[i]=1;return m;}
 inline std::vector<std::uint8_t> readBytes(const std::filesystem::path& requested){
-    const auto path=runtime_asset_paths50LB::resolve(requested);
+    const auto path=rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve(requested));
     std::ifstream file(path,std::ios::binary|std::ios::ate);
     if(!file)throw std::runtime_error("native startup asset missing: "+path.string());
     const auto size=file.tellg();require(size>=0,"native startup asset size");

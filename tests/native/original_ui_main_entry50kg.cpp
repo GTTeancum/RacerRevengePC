@@ -1,5 +1,6 @@
 // Non-template native frontend implementation. Keep ownership and layout in
 // the shared declaration header; each body below has one program definition.
+#include "../../src/assets/dlc_files50dl.h"
 #include "original_ui_main_entry50kg.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "../../src/game/original_loading_manager33050la.h"
@@ -2411,7 +2412,7 @@ std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
     require(identity,"original UI archive catalog identity missing");
     // The compiled authenticated archive catalog is the only path authority.
     // No private workspace path, recursive search, basename fallback or cache.
-    const auto path=root/std::filesystem::path(identity->discPath);
+    const auto path=rr::assets::dlc50DL::host(root/std::filesystem::path(identity->discPath));
     std::ifstream input(path,std::ios::binary|std::ios::ate);
     if(!input)throw std::runtime_error("cannot open original UI archive: "+path.string());
     const std::streamoff bytes=input.tellg();

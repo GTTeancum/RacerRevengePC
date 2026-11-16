@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 // Cold original-pod collision ownership. COL XYZ, tree order, local matrices,
 // and type0 faces come from the selected RES, never from the display mesh.
 // Endpoint W words do NOT exist in COL. A caller must explicitly supply every
@@ -70,7 +71,7 @@ public:
         if(storage_||!endpoint.words||binding.archivePath.empty()||
            binding.memberPrefix.empty()||std::fegetround()!=FE_TONEAREST)
             return fail(error,"invalid fresh original-pod collision binding");
-        std::ifstream file(binding.archivePath,std::ios::binary);
+        std::ifstream file(rr::assets::dlc50DL::host(binding.archivePath),std::ios::binary);
         if(!file)return fail(error,"original pod collision archive unavailable");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
         return prepare(binding,bytes,endpoint,error);

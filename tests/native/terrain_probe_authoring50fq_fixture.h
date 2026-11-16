@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "runtime_asset_paths50lb.h"
 // Cold source-derived original-pod vehicle+348 authoring. No captured RAM, guest
 // execution, ground-height substitute, or hot loading. Runtime namespace and
@@ -149,7 +150,7 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
         receipt.podBoxMBytes=collisionOwner->receipt().memberBytes[0];
     }else{
         if(!archivePath||!mainMember)return detail::fail(error,"probe collision archive/member is unbound");
-        std::ifstream file(runtime_asset_paths50LB::resolve(archivePath),std::ios::binary);if(!file)return detail::fail(error,"actual pod archive unavailable");
+        std::ifstream file(rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve(archivePath)),std::ios::binary);if(!file)return detail::fail(error,"actual pod archive unavailable");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM;
         assets::ResArchive48C archive;assets::DecodeError48C decode;
         if(!assets::decodeResource48C(bytes,archive,decode)||!assets::extractResMember48C(archive,mainMember,podM,decode)||podM.size()<92)

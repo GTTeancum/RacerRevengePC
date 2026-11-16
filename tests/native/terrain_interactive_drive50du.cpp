@@ -6,6 +6,7 @@
 #include "terrain_interactive_session50du.h"
 #include "json.hpp"
 #include "runtime_asset_paths50lb.h"
+#include "../../src/assets/dlc_files50dl.h"
 #include "track_session_assets50ig_fixture.h"
 #include "checkpoint_recovery50fi_fixture.h"
 #include "lap_drive50gj_fixture.h"
@@ -123,6 +124,9 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
    require50DU(configure("RR_RACE_MODE","2"),"default native Course mode failed");
   if(!std::getenv("RR_START_MENU"))
    require50DU(configure("RR_START_MENU","0"),"default native Course entry failed");
+  // PC enhancement (NOT ORIGINAL): check DLC packages once, before the first
+  // original file is opened. No DLC folder = no overlay, stock paths unchanged.
+  rr::assets::dlc50DL::startup();
  }
  const bool headlessLive=argc==4&&std::string(argv[2])=="--headless-live";
  if(argc!=2&&!headlessLive&&!discEntry){

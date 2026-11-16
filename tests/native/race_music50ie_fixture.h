@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 // Native cold preload/shared-mixer transport for category6 and collision music.
 // Default admits six originals; explicit50IW adds six. Practice-only admits44/45 instead. It does not widen
 //50HC's generic mono admission, run the original IOP streamer, or invent music.
@@ -370,7 +371,7 @@ public:
                 if(includeTaIntro&&i>= (includeContactMusic?totalClipCount:clipCount)&&i<taIntroClipIndex)continue;
                 const auto& definition=catalog[i];auto& clip=bank_.clips[i];
                 clip.request={definition.name,false,true,true};
-                const auto path=detail::selectedPath(audioRoot,definition.path);
+                const auto path=rr::assets::dlc50DL::host(detail::selectedPath(audioRoot,definition.path));
                 clip.sourcePath=path.string();
                 if(!std::filesystem::exists(path)){
                     clip.state=rr::assets::AudioAssetState50HC::missing;

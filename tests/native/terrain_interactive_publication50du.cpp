@@ -1,4 +1,5 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
+#include "../../src/assets/dlc_files50dl.h"
 #include "native_last_failure50pd.h"
 #include "course_cut_identity50ci.h"
 #include "native_course_archive_release50pd.h"
@@ -2072,7 +2073,7 @@ void Context::run() {
    if(isMcTrack){
     requireMbRuntimeNavigation50MB();
     const auto pods=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS");
-    const auto camBytes=std::filesystem::file_size(pods/playerPodId/(playerPodId+".CAM"));
+    const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(pods/playerPodId/(playerPodId+".CAM")));
     reserveMcEnvironment(static_cast<std::size_t>(camBytes),"MC retained CAM exceeds remaining payload");
     reserveMcEnvironment(4u*186642u,"MC TOB authentication scratch exceeds remaining payload");
     std::string error;
@@ -2087,7 +2088,7 @@ void Context::run() {
     require50DU(gbSourceCameraAssets&&gbColdSources&&gbColdSources->ready(),"GB scoped camera source unavailable");
     const auto path=runtime_asset_paths50LB::resolve(
         std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
-    const auto camBytes=std::filesystem::file_size(path);
+    const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(path));
     require50DU(camBytes&&camBytes<=gbRemainingPayloadBytes(),"GB selected CAM exceeds remaining payload");
     reserveGbAdditionalPayload(static_cast<std::size_t>(camBytes),"GB retained CAM exceeds remaining payload");
     reserveGbAdditionalPayload(4u*20617u,"GB retained TOB authentication scratch exceeds remaining payload");
@@ -2101,7 +2102,7 @@ void Context::run() {
     require50DU(tbSourceCameraAssets&&tbColdSources&&tbColdSources->ready(),"TB scoped camera source unavailable");
     const auto path=runtime_asset_paths50LB::resolve(
         std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
-    const auto camBytes=std::filesystem::file_size(path);
+    const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(path));
     require50DU(camBytes&&camBytes<=tbRemainingPayloadBytes(),"TB selected CAM exceeds remaining payload");
     reserveTbAdditionalPayload(static_cast<std::size_t>(camBytes),"TB retained CAM exceeds remaining payload");
     reserveTbAdditionalPayload(4u*106139u,"TB retained TOB authentication scratch exceeds remaining payload");

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 #include "native_gc_water_racer50kg_fixture.h"
 #include "../../src/game/original_gc_generator_fire50kg.h"
 #include "../../src/game/original_gc_pod_sparks50kg.h"
@@ -44,7 +45,7 @@ public:
              "GC native water requires actual fresh330/334 ownership");
         auto archive=[&](const char* path,rr::assets::ResArchive48C& out,bool gc){
             need(path&&*path,"particle original archive path missing");
-            std::ifstream f(path,std::ios::binary);need(bool(f),"particle original archive missing");
+            std::ifstream f(rr::assets::dlc50DL::host(path),std::ios::binary);need(bool(f),"particle original archive missing");
             std::vector<std::uint8_t> raw{std::istreambuf_iterator<char>(f),{}};
             if(gc)need(pod_materials50ed_fixture::detail::sha256(raw)==
                 "69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9",

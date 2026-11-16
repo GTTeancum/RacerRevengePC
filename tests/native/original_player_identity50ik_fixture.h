@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/assets/dlc_files50dl.h"
 // Pod identities for every pod, player and AI: ONE place defines the rule.
 // Constructor21079C/21081C/210820 binds racer60 to Pod%02d; the human's host
 // slot never determines its resource/audio ID.
@@ -318,7 +319,7 @@ inline void derive(Row& row) {
     namespace d=pod_materials50ed_fixture::detail;
     const Identity stock=row.identity; // a copy: row is replaced below
     const auto lim=limits();
-    const auto path=archivePath(runtime_asset_paths50LB::resolve("work/native/project/disc"),stock);
+    const auto path=rr::assets::dlc50DL::host(archivePath(runtime_asset_paths50LB::resolve("work/native/project/disc"),stock));
     std::error_code error;const auto size=std::filesystem::file_size(path,error);
     if(error)throw std::runtime_error("archive unreadable");
     if(!size||size>lim.resource_file_bytes)throw std::runtime_error("archive outside the shared pod capacity");
