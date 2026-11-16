@@ -3000,8 +3000,13 @@ SessionExit50DU Context::run() {
       <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
   // Stock comparison receipt: every value the stock sky row pinned, against
   // what the data path read (a stock archive must report match=1 on each).
-  {
-   const auto& row=sky50gw_fixture::detail::source(trackSource);
+  // Receipt only: a course whose stock sky was never pinned (GB, TC, ...)
+  // has no stock row; that is logged, never a refusal.
+  const sky50gw_fixture::detail::Source* stockSkyRow=nullptr;
+  try{stockSkyRow=&sky50gw_fixture::detail::source(trackSource);}catch(const std::exception&){stockSkyRow=nullptr;}
+  if(!stockSkyRow)std::cerr<<"course_sky_stock_compare track="<<trackSession->world->code<<" stock_row=none\n";
+  else{
+   const auto& row=*stockSkyRow;
    const rr::assets::ParameterBlock48F* environment=nullptr;const rr::assets::ParameterBlock48F* fog=nullptr;
    for(const auto& b:actualWorld.parameters.blocks){if(b.name=="environment")environment=&b;if(b.name=="fog")fog=&b;}
    const auto value=[](const rr::assets::ParameterBlock48F* b,const char* key)->std::string{
