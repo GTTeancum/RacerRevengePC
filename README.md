@@ -31,6 +31,7 @@ Start with the [interactive build guide](docs/interactive-build50dv.md). Linux r
 - W / S: left-engine throttle / brake
 - Up / Down: right-engine throttle / brake; unequal input steers
 - Space: boost; Left Shift: powerslide; R: repair
+- A / D (or right stick left/right, default control layout): lean left / right while in zero gravity
 - Backspace: checkpoint return, or race restart; F5: restart
 - Escape: pause/resume; Up/Down or W/S: menu navigation; Enter or Space: select
 

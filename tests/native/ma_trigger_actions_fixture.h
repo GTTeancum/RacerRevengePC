@@ -1,5 +1,6 @@
 #pragma once
 #include "ma_trigger_authoring_fixture.h"
+#include "course_trigger_sources50ct.h"
 #include "../../src/game/native_trigger_group50ga.h"
 #include "../../src/game/trigger_actions50in.h"
 #include "../../src/game/trigger_sphere50in.h"
@@ -18,7 +19,7 @@ struct ActionLease {
 struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0;};
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
- const ma_trigger_authoring::Owner* source_=nullptr;
+ const course_trigger_sources50CT::Owner* source_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
  g::NativeTriggerGroup50GA group_{};
@@ -59,10 +60,13 @@ class Owner final {
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- bool prepare(const ma_trigger_authoring::Owner& source,const std::array<RacerIdentities,racers>& identities,
+ bool prepare(const course_trigger_sources50CT::Owner& source,const std::array<RacerIdentities,racers>& identities,
      std::uint32_t aiNodeCount,std::uint32_t playerPrefixCount34,std::size_t racerCount=racers)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(!source.ready()||aiNodeCount<=196)return false;
+  // Every LostAI target must lie inside the live AI spline (checked per
+  // trigger below), not a stock node-count floor.
+  const auto live=source.liveCount();
+  if(!source.ready()||!live||!aiNodeCount)return false;
   // Source PLAYER resolver1B5340 visits actual roster[0,manager+34).
   // The caller must bind that manager field. AI class58 and camera index do
   // not determine this prefix;0 is admitted only as an explicit source value.
@@ -70,19 +74,25 @@ public:
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+ma_trigger_authoring::count))return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+course_trigger_sources50CT::capacity))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
-  if(!group_.triggers.setCount(ma_trigger_authoring::count))return false;
+  if(!group_.triggers.setCount(live))return false;
   source_=&source;racers_=identities;racerCount_=racerCount;originalAiNodeCount_=aiNodeCount;playerPrefixCount34_=playerPrefixCount34;
   if(!group_.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)group_.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);auto& state=group_.triggers[i];
-   if(!authored.startEnabled||authored.oneTimeOnly||!authored.ignorePlayer||authored.reset||authored.actionCount!=1||authored.randomTriggerPercent!=100)return false;
+   // PORT STAND-IN (flagged): this native action owner implements one LostAI
+   // action, StartEnabled TRUE and OneTimeOnly FALSE (flags 3/3); other
+   // authored values are refused here, never ignored.
+   if(!authored.startEnabled||authored.oneTimeOnly||authored.reset||authored.actionCount!=1||
+      authored.actions[0].kind!=course_trigger_sources50CT::Action::LostAI||authored.randomTriggerPercent!=100||
+      authored.targetNodeIndex>=aiNodeCount)return false;
    state.flags29=3;state.flags1B8=3;state.randomTriggerPercent90=100;state.callbackCount98=1;
    state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
-   group_.ignoreColliderCount[i]=playerPrefixCount34_;
-   for(std::size_t j=0;j<playerPrefixCount34_;++j)group_.ignoreColliders[i][j]=identities[j].main690;
+   // PLAYER-ignore from each trigger's own IgnoreTrigger (stock MA: all 13).
+   group_.ignoreColliderCount[i]=authored.ignorePlayer?playerPrefixCount34_:0u;
+   for(std::size_t j=0;j<group_.ignoreColliderCount[i];++j)group_.ignoreColliders[i][j]=identities[j].main690;
   }
   ready_=true;group_.actions=hooks();group_.ready=true;
   if(!g::validNativeTriggerGroup50GA(group_)){ready_=false;group_.ready=false;return false;}return true;
@@ -93,7 +103,7 @@ public:
   const auto c=colliderIndex(collider);
   if(trigger>=group_.triggers.size()||c==group_.colliders.size()||lease_||lease.racerMain690!=racers_[c/2].main690)return fail(Status::Input);
   // Exact ignored identity exits BEFORE touched/fired/RNG/membership writes.
-  for(std::size_t i=0;i<playerPrefixCount34_;++i)if(collider==racers_[i].main690)return Status::IgnoredPlayer;
+  for(std::size_t i=0;i<group_.ignoreColliderCount[trigger];++i)if(collider==group_.ignoreColliders[trigger][i])return Status::IgnoredPlayer;
   lease_=&lease;receipt=g::dispatchNativeTriggerContact50GA(group_,trigger,collider);lease_=nullptr;
   if(receipt.status!=g::TriggerEntryStatus50IN::Complete||receipt.randomConsumed)return fail(Status::Entry);
   return actionFailed_?fail(Status::Action):Status::Complete;

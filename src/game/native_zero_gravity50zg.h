@@ -72,10 +72,17 @@ inline constexpr float zeroGFinishedTurnResponse50ZG=1500.f;
 inline constexpr float zeroGTiltMinimumSpeed50ZG=200.f;
 inline constexpr float zeroGTiltRampPerSecond50ZG=3.2f;
 inline constexpr float zeroGTiltReleaseHalvingBelow50ZG=0.1f;
-// THE ONE tilt-input mapping point. Which Revenge button tilts is pending the
-// user's decision, so no button is read: the target is 0 (steering alone
-// rolls, as on the N64). Map the button here later.
-inline constexpr float zeroGTiltInputTarget50ZG(bool /*human*/)noexcept{return 0.f;}
+// THE ONE tilt-input mapping point (user decision 2026-11-16). PC ENHANCEMENT,
+// NOT ORIGINAL: Revenge has no tilt control. The player's lean channel is the
+// right stick X of the default control preset (packet byte 4; the original
+// reader 1A1A20 conditions it into channel 2, which no race consumer of preset
+// 0 reads) and, on the keyboard, A (left) / D (right) written to that same
+// byte. lean > 0 = right. Digital like the N64 tilt buttons: |lean| >= 0.5
+// selects -1/+1. Sign: leaning right rolls the same way as steering right
+// (roll += -2 x turn, so right = tilt -1). AI never leans. Only read in flight.
+inline constexpr float zeroGLeanThreshold50ZG=0.5f;
+inline constexpr float zeroGTiltInputTarget50ZG(bool human,float lean)noexcept{
+    return !human||!(lean==lean)?0.f:lean>=zeroGLeanThreshold50ZG?-1.f:lean<=-zeroGLeanThreshold50ZG?1.f:0.f;}
 inline constexpr float zeroGBakeRayLength50ZG=10000.f;       // N64 down ray reach
 inline constexpr std::uint32_t zeroGSamplesPerLink50ZG=10;   // swrSpline_BakeSampleTrackMesh density
 inline constexpr float zeroGLineHeightLimit50ZG=5000.f;
@@ -114,6 +121,7 @@ struct ZeroGravityStepInput50ZG {
     float position[3]{};           // main190 world translation
     float steer=0.f;               // the racer's own steering channel (raw values[0])
     float pitchStick=0.f;          // human: bound stick Y (aeroAux50); AI: ignored
+    float lean=0.f;                // human: zero-g lean channel (-1..1, + = right); 0 when unbound
     float speed=0.f;               // cached speed (+34), gates the tilt
     bool finished=false;           // vehicle +CD8 bit0
     float dt=0.f;
@@ -149,6 +157,11 @@ public:
         }catch(...){resetCourse();std::cerr<<"zero_gravity_load failed; course stays original\n";}
     }
     bool active()const noexcept {return loaded_;}
+    // The player's lean channel is bound only in the default control preset
+    // (set once per race session by the input binding; host state, no guest memory).
+    void setHumanLeanBound(bool bound)noexcept {humanLeanBound_=bound;}
+    bool humanLeanBound()const noexcept {return humanLeanBound_;}
+    float tilt(std::size_t slot)const noexcept {return slot<zeroGravitySlots50ZG?racers_[slot].tilt:0.f;}
     ZeroGravityMode50ZG mode(std::size_t slot)const noexcept {
         return slot<zeroGravitySlots50ZG?racers_[slot].mode:ZeroGravityMode50ZG::Normal;}
     std::uint32_t lineOwner(std::size_t slot)const noexcept {
@@ -208,12 +221,12 @@ public:
             r.pitchRate+=std::clamp(r.pitchTarget-r.pitchRate,-slew,slew);
             // Roll (0x8006B0F0..1B8): r += (-2 turnRateTarget + 1000 tilt) dt,
             // clamp 180, then x0.98 per N64 frame. turnRateTarget = steer x
-            // maxTurnRate x pace. Tilt from the one mapping point (stubbed 0).
+            // maxTurnRate x pace. Tilt from the one mapping point (lean input).
             const float turnTarget=std::clamp(std::isfinite(in.steer)?in.steer:0.f,-1.f,1.f)*maxTurnRate;
             {   // Tilt state (N64): target from the one mapping point, 0 below
                 // speed 200; ramp 3.2/s; released and small: halves per frame.
                 const float speed=std::isfinite(in.speed)?in.speed:0.f;
-                const float target=speed<zeroGTiltMinimumSpeed50ZG?0.f:std::clamp(zeroGTiltInputTarget50ZG(in.human),-1.f,1.f);
+                const float target=speed<zeroGTiltMinimumSpeed50ZG?0.f:std::clamp(zeroGTiltInputTarget50ZG(in.human,in.lean),-1.f,1.f);
                 if(target==0.f&&std::fabs(r.tilt)<zeroGTiltReleaseHalvingBelow50ZG)r.tilt*=std::pow(0.5f,frames);
                 else{const float ramp=zeroGTiltRampPerSecond50ZG*in.dt;r.tilt+=std::clamp(target-r.tilt,-ramp,ramp);}
                 if(!std::isfinite(r.tilt))r.tilt=0.f;
@@ -446,7 +459,7 @@ private:
     }
     void resetCourse()noexcept {loaded_=false;for(auto& g:graphs_)g=ZeroGravityLineGraph50ZG{};resetRacers();}
 
-    bool loaded_=false;
+    bool loaded_=false,humanLeanBound_=false;
     std::array<ZeroGravityLineGraph50ZG,2> graphs_{};
     std::array<ZeroGravityRacer50ZG,zeroGravitySlots50ZG> racers_{},pending_{};
     std::array<bool,zeroGravitySlots50ZG> pendingValid_{};

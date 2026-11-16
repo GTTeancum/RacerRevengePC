@@ -10,6 +10,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -122,42 +123,68 @@ public:
                     diagnostic.member=i;diagnostic.status=Status::sourceChanged;return nullptr;
                 }
             }
-            // Fixed offsets are from these exact hash-pinned original members,
-            // not a general permissive INI parser or embedded asset payload.
+            // The course's own intro data, read by key (292650/2941F0 read
+            // [ResponseEmitter] NumEvents and [EventN]; 158B30 reads [LineN]
+            // CameraNumber). The stock row's byte offsets, camera values and
+            // metadata indices are RECEIPTS (one line when the data differs).
             const auto& ini=next->bytes_[0];const auto& script=next->bytes_[1];
-            for(std::size_t i=0;i<spec->eventCount;++i){
+            std::uint32_t numEvents=0,numLines=0;
+            diagnostic.member=0;
+            if(!iniNumber(ini,"ResponseEmitter","NumEvents",numEvents)||numEvents<1||
+               numEvents>originalRaceIntroEventsMax50LA){
+                diagnostic.status=Status::layout;return nullptr;
+            }
+            // NumberOfLines absent = one line per event (bounded by the same store).
+            if(!iniNumber(script,"General","NumberOfLines",numLines))numLines=numEvents;
+            bool stockShape=numEvents==spec->eventCount;
+            for(std::size_t i=0;i<numEvents;++i){
                 diagnostic.eventId=static_cast<unsigned>(i+1);diagnostic.member=0;
-                const auto f=spec->filenameOffsets[i];const auto camera=spec->cameraOffsets[i];
-                const auto length=spec->filenameLength;const auto cameraBytes=spec->cameraValues[i];
-                if(f+length+2u>ini.size()||ini[f+length]!='\r'||ini[f+length+1]!='\n'||
-                   ini[spec->streamOffsets[i]]!='1'||ini[spec->stereoOffsets[i]]!='0'||ini[spec->loopOffsets[i]]!='0'||
-                   camera+cameraBytes.size()+2u>script.size()||
-                   std::string_view(reinterpret_cast<const char*>(script.data()+camera),cameraBytes.size())!=cameraBytes||
-                   script[camera+cameraBytes.size()]!='\r'||script[camera+cameraBytes.size()+1]!='\n'){
+                const std::string eventName="Event"+std::to_string(i+1),lineName="Line"+std::to_string(i+1);
+                std::size_t f=0,length=0,camera=0,cameraLength=0;
+                std::string_view stream,stereo,loop;
+                if(!iniValue(ini,eventName,"FileName",f,length)||!length||
+                   !iniView(ini,eventName,"IsStream",stream)||!iniView(ini,eventName,"IsStereo",stereo)||
+                   !iniView(ini,eventName,"IsLoop",loop)){
                     diagnostic.status=Status::layout;return nullptr;
                 }
-                auto& event=next->events_[i];
-                event.eventId=static_cast<std::uint8_t>(i+1);
-                event.cameraNumber=static_cast<std::uint8_t>(script[camera]-'0');
-                //158B30->158920->30AE70(base0) stops on the first comma:
-                //RA's exact "1,2,3,4" / "5,6,7" become1/5, not a list.
-                //Span is ABSENT in every admitted authenticated Line section.
-                // 177750's source default is0; no source bytes2..7 are invented.
-                event.span=0;
-                event.filename={reinterpret_cast<const char*>(ini.data()+f),length};
-                event.isStream=ini[spec->streamOffsets[i]]=='1';
-                event.isStereo=ini[spec->stereoOffsets[i]]=='1';
-                event.isLoop=ini[spec->loopOffsets[i]]=='1';
-                // 292764..29279C: stream?2:1, OR stereo0x40 and loop0x80.
-                // Actual TA flags are2, not the superseded earlier0x41 decode.
-                event.factoryFlags=(event.isStream?2u:1u)|(event.isStereo?0x40u:0u)|(event.isLoop?0x80u:0u);
-                event.filenameByteOffset=f;event.cameraNumberByteOffset=camera;
-                event.metadata=next->metadata_->findForStreamRequest(event.isStream,event.filename);
-                if(!event.metadata||event.metadata!=next->metadata_->row(spec->metadataIndices[i])||
-                   event.metadata->sourceIndex!=spec->metadataIndices[i]||
-                   event.metadata->songNumber!=spec->metadataIndices[i]+1u){
-                    diagnostic.status=Status::metadataIdentity;return nullptr;
+                auto& e=next->events_[i];
+                e.eventId=static_cast<std::uint8_t>(i+1);
+                // A line without CameraNumber (or beyond NumberOfLines) names no
+                // cut: camera 0, which every consumer skips (1779CC).
+                e.cameraNumber=0;
+                diagnostic.member=1;
+                if(i<numLines&&iniValue(script,lineName,"CameraNumber",camera,cameraLength)&&cameraLength){
+                    //158B30->158920->30AE70(base0) stops on the first comma:
+                    //RA's "1,2,3,4" / "5,6,7" become1/5, not a list.
+                    unsigned value=0;std::size_t k=camera;
+                    for(;k<camera+cameraLength&&script[k]>='0'&&script[k]<='9';++k){
+                        value=value*10u+unsigned(script[k]-'0');
+                        if(value>255u){diagnostic.status=Status::layout;return nullptr;}
+                    }
+                    if(k==camera){diagnostic.status=Status::layout;return nullptr;}
+                    e.cameraNumber=static_cast<std::uint8_t>(value);
                 }
+                diagnostic.member=0;
+                // Span is ABSENT in every authenticated Line section; 177750's
+                // source default is0. No source bytes are invented.
+                e.span=0;
+                e.filename={reinterpret_cast<const char*>(ini.data()+f),length};
+                e.isStream=stream=="1";e.isStereo=stereo=="1";e.isLoop=loop=="1";
+                // 292764..29279C: stream?2:1, OR stereo0x40 and loop0x80.
+                e.factoryFlags=(e.isStream?2u:1u)|(e.isStereo?0x40u:0u)|(e.isLoop?0x80u:0u);
+                e.filenameByteOffset=f;e.cameraNumberByteOffset=camera;
+                e.metadata=next->metadata_->findForStreamRequest(e.isStream,e.filename);
+                if(!e.metadata){diagnostic.status=Status::metadataIdentity;return nullptr;}
+                if(i>=spec->eventCount||f!=spec->filenameOffsets[i]||camera!=spec->cameraOffsets[i]||
+                   std::string_view(reinterpret_cast<const char*>(script.data()+camera),cameraLength)!=spec->cameraValues[i]||
+                   e.metadata->sourceIndex!=spec->metadataIndices[i])stockShape=false;
+            }
+            next->eventCount_=static_cast<unsigned>(numEvents);
+            if(!stockShape){
+                std::fprintf(stderr,"course_intro_rows track=%.*s events=%u stock_events=%u cameras=",
+                    int(spec->track.size()),spec->track.data(),unsigned(numEvents),spec->eventCount);
+                for(std::size_t i=0;i<numEvents;++i)std::fprintf(stderr,"%s%u",i?",":"",unsigned(next->events_[i].cameraNumber));
+                std::fprintf(stderr,"\n");
             }
             diagnostic={Status::complete,0,static_cast<std::size_t>(-1)};
             return std::unique_ptr<const OriginalTaIntroAuthoringCandidate>(next.release());
@@ -168,7 +195,7 @@ public:
     const Event* event(unsigned eventId) const noexcept {
         return eventId>=1&&eventId<=eventCount()?&events_[eventId-1]:nullptr;
     }
-    unsigned eventCount()const noexcept{return specification_?specification_->eventCount:0;}
+    unsigned eventCount()const noexcept{return specification_?eventCount_:0;}
     std::string_view trackId()const noexcept{return specification_?specification_->track:std::string_view{};}
     const std::shared_ptr<const Metadata>& metadataOwner() const noexcept {return metadata_;}
     const std::shared_ptr<const Provider>& providerOwner() const noexcept {return provider_;}
@@ -198,6 +225,58 @@ private:
         std::array<std::string_view,originalRaceIntroEventsMax50LA> cameraValues;
     };
     const Specification* specification_=nullptr;
+    unsigned eventCount_=0;
+    // Minimal INI lookup over the copied member bytes: "[Section]" then
+    // "Key = value" lines (case-insensitive names, value trimmed, ends at CR/LF
+    // or ';'). Returns the value's byte offset/length inside the member.
+    static bool iequal(std::string_view a,std::string_view b)noexcept{
+        if(a.size()!=b.size())return false;
+        for(std::size_t i=0;i<a.size();++i){
+            char x=a[i],y=b[i];if(x>='A'&&x<='Z')x=char(x+32);if(y>='A'&&y<='Z')y=char(y+32);
+            if(x!=y)return false;
+        }
+        return true;
+    }
+    static std::string_view trim(std::string_view v)noexcept{
+        while(!v.empty()&&(v.front()==' '||v.front()=='\t'))v.remove_prefix(1);
+        while(!v.empty()&&(v.back()==' '||v.back()=='\t'))v.remove_suffix(1);
+        return v;
+    }
+    static bool iniValue(const std::vector<std::uint8_t>& bytes,std::string_view section,std::string_view key,
+        std::size_t& offset,std::size_t& length)noexcept{
+        const std::string_view text(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        bool inSection=false;std::size_t pos=0;
+        while(pos<text.size()){
+            std::size_t end=text.find_first_of("\r\n",pos);if(end==std::string_view::npos)end=text.size();
+            const auto row=trim(text.substr(pos,end-pos));
+            if(!row.empty()&&row.front()=='['){
+                const auto close=row.find(']');
+                inSection=close!=std::string_view::npos&&iequal(trim(row.substr(1,close-1)),section);
+            }else if(inSection){
+                const auto eq=row.find('=');
+                if(eq!=std::string_view::npos&&iequal(trim(row.substr(0,eq)),key)){
+                    auto value=row.substr(eq+1);const auto semi=value.find(';');
+                    if(semi!=std::string_view::npos)value=value.substr(0,semi);
+                    value=trim(value);
+                    offset=static_cast<std::size_t>(value.data()-text.data());length=value.size();return true;
+                }
+            }
+            pos=end;while(pos<text.size()&&(text[pos]=='\r'||text[pos]=='\n'))++pos;
+        }
+        return false;
+    }
+    static bool iniView(const std::vector<std::uint8_t>& bytes,std::string_view section,std::string_view key,
+        std::string_view& out)noexcept{
+        std::size_t o=0,l=0;if(!iniValue(bytes,section,key,o,l))return false;
+        out={reinterpret_cast<const char*>(bytes.data()+o),l};return true;
+    }
+    static bool iniNumber(const std::vector<std::uint8_t>& bytes,std::string_view section,std::string_view key,
+        std::uint32_t& out)noexcept{
+        std::string_view v;if(!iniView(bytes,section,key,v)||v.empty())return false;
+        std::uint32_t n=0;
+        for(char c:v){if(c<'0'||c>'9'||n>100000u)return false;n=n*10u+std::uint32_t(c-'0');}
+        out=n;return true;
+    }
     // Common course rule: a non-stock course archive admitted at course select
     // (its cut row derived from its own data, original_track_cut_identity50la.h)
     // gets its mount label, member count and intro member sizes/positions/

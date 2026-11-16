@@ -202,7 +202,9 @@ void ContactsContext::run() {
    });
   }
   if(maTriggerActions){
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count==213&&
+   // LostAI targets are checked per trigger against the live AI spline when
+   // the actions bind below (no stock node-count equality).
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
         (maOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
        "MA triggers require actual human/AI manager ownership and their original AI spline");
@@ -219,7 +221,7 @@ void ContactsContext::run() {
    });
   }
   if(saTriggerActions){
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count==121&&
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
         (saOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
        "SA triggers require actual human/AI manager ownership and their original AI spline");
@@ -235,24 +237,24 @@ void ContactsContext::run() {
         "SA trigger cold actual COL poses unavailable");
    });
   }
-  if(gaAnimatedWorld){
+  if(gaTriggerActions){
    require50DU(humanCourseEnabled&&originalAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount&&navigationAI->track.count==107,
+       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount&&navigationAI->track.count,
        "GA triggers require real Player0, seven original AI and canonical107-node navigation");
    std::array<ga_trigger_actions::RacerIdentities,ga_trigger_actions::racers> triggerIdentities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     triggerIdentities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,*gaAnimatedWorld,triggerIdentities,
+   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,gaAnimatedWorld.get(),triggerIdentities,
        navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),"GA actual trigger/action destinations unavailable");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
         gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "GA trigger lifecycle cold actual COL poses unavailable");
    });
-   std::cerr<<"GA NATIVE TRIGGERS:10 authored spheres, method1 zones,16 actual racer COL identities; "
+   std::cerr<<"GA NATIVE TRIGGERS:"<<gaTriggerAuthoring->liveCount()<<" authored spheres, method1 zones,16 actual racer COL identities; "
        "unchanged GC endpoint/swept-surface geometry policy, original action/lifecycle semantics; reverse108E90 parity unresolved.\n";
-   if(audioEnabled)std::cerr<<"GA BIGDOOR uses the existing shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
+   if(audioEnabled&&gaGateAudio)std::cerr<<"GA BIGDOOR uses the existing shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
   }
   if(nativeSelectedLights&&!isRaTrack)for(std::size_t racer=0;racer<racerBank.count();++racer)
    racerBank.visit(racer,[&](){

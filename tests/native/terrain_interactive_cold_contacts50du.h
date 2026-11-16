@@ -1,4 +1,5 @@
 #pragma once
+#include "course_trigger_sources50ct.h"
 #include "terrain_interactive_cold_types50du.h"
 #include "native_borrowed_call50du.h"
 #include "sc_trigger_authoring_fixture.h"
@@ -32,7 +33,7 @@ struct ContactsContext final {
     gaGateAudioType& gaGateAudio;
     using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
     gaTriggerActionsType& gaTriggerActions;
-    using gaTriggerAuthoringType = std::unique_ptr<ga_trigger_authoring::Owner>;
+    using gaTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     gaTriggerAuthoringType& gaTriggerAuthoring;
     using gbCollisionWorldType = std::shared_ptr<gb_collision_world50GB::Owner>;
     gbCollisionWorldType& gbCollisionWorld;
@@ -76,7 +77,7 @@ struct ContactsContext final {
     maOriginalDiscType& maOriginalDisc;
     using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
     maTriggerActionsType& maTriggerActions;
-    using maTriggerAuthoringType = std::unique_ptr<ma_trigger_authoring::Owner>;
+    using maTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     maTriggerAuthoringType& maTriggerAuthoring;
     using mainMembershipType = rr::game::LiveZoneMembership50EN;
     mainMembershipType& mainMembership;
@@ -163,7 +164,7 @@ struct ContactsContext final {
     saOriginalDiscType& saOriginalDisc;
     using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
     saTriggerActionsType& saTriggerActions;
-    using saTriggerAuthoringType = std::unique_ptr<sa_trigger_authoring::Owner>;
+    using saTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
     saTriggerAuthoringType& saTriggerAuthoring;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;

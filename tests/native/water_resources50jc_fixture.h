@@ -128,10 +128,12 @@ inline bool prepareAuthored(const MemberReader& readMember,
     }
     std::vector<std::uint8_t> noiseBytes;
     if(!readMember(rr::assets::gcWaterNoiseMember50JC,noiseBytes,staged->noiseMember,error))return false;
-    // The single shipped baseDisplacement.tga (GC and MC copies are byte-identical).
-    if(staged->noiseMember.sha256!=rr::assets::gcWaterNoiseSha25650JC){
-        error="original water noise member hash differs";return false;
-    }
+    // The shipped baseDisplacement.tga (GC and MC copies are byte-identical) is a
+    // RECEIPT: the original reads whatever noise member the course archive holds
+    // (24DA30, by name). Its decode below bounds it (readWaterNoiseTexture50JC).
+    if(staged->noiseMember.sha256!=rr::assets::gcWaterNoiseSha25650JC)
+        std::fprintf(stderr,"course_member_identity site=water_noise member=%s bytes=%zu stock=0\n",
+            rr::assets::gcWaterNoiseMember50JC,noiseBytes.size());
     rr::assets::DecodeError48C decode;
     if(!rr::assets::readWaterNoiseTexture50JC(noiseBytes,staged->noise,decode)){
         error="original noise texture admission rejected: "+decode.code;return false;

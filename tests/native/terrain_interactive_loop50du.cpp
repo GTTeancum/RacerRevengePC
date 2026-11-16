@@ -539,6 +539,16 @@ void Context::run() {
       if(!on&&hostInput.keys.down[key])hostInput.keys.released[key]=1;
       hostInput.keys.down[key]=on?1:0;
      }
+     // RR_TEST_LEAN=a|d: hold A (or D), the zero-g lean keys, 2 s of every
+     // 4 s (offset 1 s from the pitch hold), so the lean sense shows in logs.
+     static const std::size_t lean50DU=[]{const char* v=std::getenv("RR_TEST_LEAN");
+         return !v?std::size_t(0):std::string(v)=="a"?std::size_t(4):std::string(v)=="d"?std::size_t(7):std::size_t(0);}();
+     if(lean50DU){
+      const bool on=(((monotonicNow50DU()/1000000000ull)+1ull)%4ull)<2ull;
+      if(on&&!hostInput.keys.down[lean50DU])hostInput.keys.pressed[lean50DU]=1;
+      if(!on&&hostInput.keys.down[lean50DU])hostInput.keys.released[lean50DU]=1;
+      hostInput.keys.down[lean50DU]=on?1:0;
+     }
      // RR_TEST_REPAIR=1: hold the player's repair key (R) 2 s of every 6 s,
      // as a player keeping a scraped pod alive (the bot cannot read damage).
      static const bool repair50DU=[]{const char* v=std::getenv("RR_TEST_REPAIR");return v&&std::string(v)=="1";}();
@@ -653,7 +663,7 @@ void Context::run() {
    //confirmation; canonical Results must not take its same Enter/Dpad first.
    //This native presentation policy is NOT a source finish/20C observation.
    const bool nativeResultsOwnsInput=resultsUi.confirming()||
-       ((humanCourseEnabled||allAiEnabled||!isGaTrack)&&humanResultsReady);
+       (humanResultsReady);
    const bool nativeModalOwnsInput=sessionMenu.open()||nativeResultsOwnsInput||
        sourcePauseParentAttached||originalMainApplication.animationPaused()||nativeMenuCommand;
    rr::game::OriginalResults104Diagnostic50LA resultsInputDiagnostic;
@@ -1045,13 +1055,9 @@ void Context::run() {
    }
    // Native ALL8 restart is a full teardown/rebuild. Checkpoint restoration
    // remains unavailable for the genuine AI bank and source camera lifecycle.
-   if((isGaTrack||originalCameraEnabled)&&hostInput.checkpointRequested){
+   if(originalCameraEnabled&&hostInput.checkpointRequested){
     std::cerr<<"Native whole-race checkpoint restore unavailable; use F5 or Restart Race.\n";
     hostInput.checkpointRequested=false;
-   }
-   if(isGaTrack&&!originalCameraEnabled&&hostInput.restartRequested){
-    std::cerr<<"GA restart requires the owned original camera/ALL8 route.\n";
-    hostInput.restartRequested=false;
    }
    if(hostInput.restartRequested){
     composePacket(false,input);sampleController();
@@ -1064,7 +1070,7 @@ void Context::run() {
     break;
    }
    const auto resultsRevision=resultsUi.revision();
-   const bool resultsAvailable=(humanCourseEnabled||allAiEnabled||!isGaTrack)&&humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
+   const bool resultsAvailable=humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
        s.phase==VehicleFramePhase49W::Ready&&input.focused&&!input.minimized&&!input.eventBudgetExhausted;
    const bool resultsBack=resultsAvailable&&resultsUi.confirming()&&input.pressed[41]&&
        !hostInput.menuRequested&&!hostInput.pauseRequested;
@@ -1092,7 +1098,7 @@ void Context::run() {
      break;
     }
    }
-   if(!allAiEnabled&&(humanCourseEnabled||!isGaTrack)&&humanResultsReady&&!sessionMenu.open()){
+   if(!allAiEnabled&&humanResultsReady&&!sessionMenu.open()){
     // These keys belong to Results navigation. Native finish controls retain
     // sole ownership; UI arrows/Space never count as attempted manual driving.
     platform::releaseSelectedKeyboard50KY(input,humanControlInput);
@@ -2717,8 +2723,8 @@ void Context::run() {
      hud.raceCountdown=withRace([&](auto& actualRace){return race_session50HM::countdownNumber(actualRace);});
      hud.raceGo=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<1.0;
      hud.raceFinished=race.racers[0].finished;hud.raceRetirementCD4=race.racers[0].retirementCD4;
-     hud.raceResultsReady=humanResultsReady&&(humanCourseEnabled||allAiEnabled||!isGaTrack);
-     if(humanResultsReady&&(humanCourseEnabled||allAiEnabled||!isGaTrack)){
+     hud.raceResultsReady=humanResultsReady;
+     if(humanResultsReady){
       require50DU(race.resultsClosed&&(race.racers[0].finished||
           (humanCourseEnabled&&race.racers[0].retirementCD4)),
           "results overlay requires the genuine selected-racer finish or retirement");
@@ -3050,7 +3056,11 @@ void Context::run() {
     // TC has an actual48-tile sky request and retains the matching matrix.
     // Only a course authoring zero sky cubes omits both indices and matrix.
     renderFrame.skyWorldViewProjection=scZeroSky.ready()?nullptr:skyView.worldViewProjection;
-    if(isMaSaTrack||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
+    // GA selects per zone exactly when its data authored CubeFileForZone rows
+    // (continuation prepared the selection owner; select() is false otherwise).
+    bool gaZoneSkyProbe=false;
+    const bool gaZoneSky=isGaTrack&&sourceSkySelection.select(0u,gaZoneSkyProbe);
+    if(isMaSaTrack||gaZoneSky||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&
          (scZeroSky.ready()?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):

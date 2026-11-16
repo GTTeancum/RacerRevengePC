@@ -4,6 +4,7 @@
 #include "terrain_interactive_world50du.h"
 #include "terrain_interactive_loop_types50du.h"
 #include "runtime_allocation_counter50fl.h"
+#include "../../src/game/native_zero_gravity50zg.h"
 #include "type2_fixture_io50i.h" // Sole non-inline reader implementation provider.
 #include "runtime_startup50fl_fixture.h"
 #include "runtime_asset_paths50lb.h"
@@ -193,16 +194,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!(isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)||(!checkpointInput&&!startAtMenu),
      "MA/SA/RA require a fresh ordinary cold race; host startup menu/checkpoint unsupported");
  require50DU(!courseRaceCold||!startAtMenu,"original Course race entry requires RR_START_MENU=0");
- // Only a real rooted Main/Course selection or its whole-world restart owns
- // this recovered GA human route. Original profile/unlock gates remain separate.
- require50DU(!isGaTrack||(gaOriginalDisc&&courseRaceCold&&trackAdmission.gaOriginalAiCandidate&&
-     !checkpointInput&&!startAtMenu),
-     "GA requires original-disc Main/Course human ownership; checkpoint/start menu unsupported");
- require50DU(!(gcOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc)||
+ // GA follows the common direct-disc Course rule (its former GA-only host
+ // admission and WatchtowerRun gate were port stand-ins, retired).
+ require50DU(!(gaOriginalDisc||gcOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc)||
      (courseRaceCold&&!checkpointInput&&!startAtMenu),
-     "TA/MA/SA direct-disc human route requires actual Main/Course ownership");
- if(isGaTrack)std::cerr<<"GA HUMAN: one actual Player and seven original AI; original world, "
-     "dynamic motions and native trigger geometry. Full retail trigger parity remains unclaimed.\n";
+     "direct-disc human route requires actual Main/Course ownership");
  // Retained HOST trigger source is dormant; native Gate has independent ownership.
  const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
  require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0",
@@ -232,68 +228,32 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
- // Explicit INACTIVE-by-default native rendering policy. The original UI
- // manager lifetime is never reset or declared cache-absent by this option.
- const char* gcLightingSetting=std::getenv("RR_NATIVE_GC_SELECTED_LIGHTS");
- require50DU(!gcLightingSetting||std::string(gcLightingSetting)=="0"||
-     std::string(gcLightingSetting)=="1","RR_NATIVE_GC_SELECTED_LIGHTS must be 0 or 1");
- const char* taLightingSetting=std::getenv("RR_NATIVE_TA_SELECTED_LIGHTS");
- require50DU(!taLightingSetting||std::string(taLightingSetting)=="0"||
-     std::string(taLightingSetting)=="1","RR_NATIVE_TA_SELECTED_LIGHTS must be 0 or 1");
- const char* gaLightingSetting=std::getenv("RR_NATIVE_GA_SELECTED_LIGHTS");
- require50DU(!gaLightingSetting||std::string(gaLightingSetting)=="0"||
-     std::string(gaLightingSetting)=="1","RR_NATIVE_GA_SELECTED_LIGHTS must be 0 or 1");
- const char* maLightingSetting=std::getenv("RR_NATIVE_MA_SELECTED_LIGHTS");
- require50DU(!maLightingSetting||std::string(maLightingSetting)=="0"||
-     std::string(maLightingSetting)=="1","RR_NATIVE_MA_SELECTED_LIGHTS must be 0 or 1");
- const char* saLightingSetting=std::getenv("RR_NATIVE_SA_SELECTED_LIGHTS");
- require50DU(!saLightingSetting||std::string(saLightingSetting)=="0"||
-     std::string(saLightingSetting)=="1","RR_NATIVE_SA_SELECTED_LIGHTS must be 0 or 1");
- const char* mbLightingSetting=std::getenv("RR_NATIVE_MB_SELECTED_LIGHTS");
- require50DU(!mbLightingSetting||std::string(mbLightingSetting)=="0"||
-     std::string(mbLightingSetting)=="1","RR_NATIVE_MB_SELECTED_LIGHTS must be 0 or 1");
- const char* scLightingSetting=std::getenv("RR_NATIVE_SC_SELECTED_LIGHTS");
- require50DU(!scLightingSetting||std::string(scLightingSetting)=="0"||
-     std::string(scLightingSetting)=="1","RR_NATIVE_SC_SELECTED_LIGHTS must be 0 or 1");
- const char* tcLightingSetting=std::getenv("RR_NATIVE_TC_SELECTED_LIGHTS");
- require50DU(!tcLightingSetting||std::string(tcLightingSetting)=="0"||
-     std::string(tcLightingSetting)=="1","RR_NATIVE_TC_SELECTED_LIGHTS must be 0 or 1");
- const char* rcLightingSetting=std::getenv("RR_NATIVE_RC_SELECTED_LIGHTS");
- require50DU(!rcLightingSetting||std::string(rcLightingSetting)=="0"||
-     std::string(rcLightingSetting)=="1","RR_NATIVE_RC_SELECTED_LIGHTS must be 0 or 1");
- const char* tbLightingSetting=std::getenv("RR_NATIVE_TB_SELECTED_LIGHTS");
- require50DU(!tbLightingSetting||std::string(tbLightingSetting)=="0"||
-     std::string(tbLightingSetting)=="1","RR_NATIVE_TB_SELECTED_LIGHTS must be 0 or 1");
- const char* raLightingSetting=std::getenv("RR_NATIVE_RA_SELECTED_LIGHTS");
- require50DU(!raLightingSetting||std::string(raLightingSetting)=="0"||
-     std::string(raLightingSetting)=="1","RR_NATIVE_RA_SELECTED_LIGHTS must be 0 or 1");
- // Authored level illumination is the native fresh-race default. Explicit 0
- // remains a diagnostic opt-out; Main/checkpoint paths retain their own policy.
+ // One authored level-illumination rule for every course: on for a fresh race,
+ // RR_NATIVE_SELECTED_LIGHTS=0 is the single diagnostic opt-out (the former
+ // per-course RR_NATIVE_xx_SELECTED_LIGHTS switches were retired).
+ const char* selectedLightingSetting=std::getenv("RR_NATIVE_SELECTED_LIGHTS");
+ require50DU(!selectedLightingSetting||std::string(selectedLightingSetting)=="0"||
+     std::string(selectedLightingSetting)=="1","RR_NATIVE_SELECTED_LIGHTS must be 0 or 1");
  const bool freshLevelLighting=raceEnabled&&!checkpointInput&&(!originalUiActive||courseRaceCold);
- const bool nativeGcSelection=gcLightingSetting?std::string(gcLightingSetting)=="1":
-     freshLevelLighting&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
- const bool nativeTaSelection=taLightingSetting?std::string(taLightingSetting)=="1":
-     freshLevelLighting&&track_session_assets50IG::codeEquals(trackSession->world->code,"TA");
- const bool nativeGaSelection=gaLightingSetting?std::string(gaLightingSetting)=="1":
-     freshLevelLighting&&isGaTrack;
- const bool nativeMaSelection=maLightingSetting?std::string(maLightingSetting)=="1":freshLevelLighting&&isMaTrack;
- const bool nativeSaSelection=saLightingSetting?std::string(saLightingSetting)=="1":freshLevelLighting&&isSaTrack;
- const bool nativeMbSelection=mbLightingSetting?std::string(mbLightingSetting)=="1":freshLevelLighting&&isMbTrack;
- const bool nativeScSelection=scLightingSetting?std::string(scLightingSetting)=="1":freshLevelLighting&&isScTrack;
- const bool nativeTcSelection=tcLightingSetting?std::string(tcLightingSetting)=="1":freshLevelLighting&&isTcTrack;
- const bool nativeRcSelection=rcLightingSetting?std::string(rcLightingSetting)=="1":freshLevelLighting&&isRcTrack;
- const bool nativeGbSelection=freshLevelLighting&&isGbTrack;
- const bool nativeMcSelection=freshLevelLighting&&isMcTrack;
- const bool nativeTbSelection=tbLightingSetting?std::string(tbLightingSetting)=="1":freshLevelLighting&&isTbTrack;
- const bool nativeRaSelection=raLightingSetting?std::string(raLightingSetting)=="1":freshLevelLighting&&isRaTrack;
- require50DU(unsigned(nativeGcSelection)+unsigned(nativeTaSelection)+unsigned(nativeGaSelection)+
-     unsigned(nativeMaSelection)+unsigned(nativeSaSelection)+unsigned(nativeRaSelection)+unsigned(nativeMbSelection)+unsigned(nativeScSelection)+unsigned(nativeTcSelection)+unsigned(nativeRcSelection)+unsigned(nativeTbSelection)+unsigned(nativeGbSelection)+unsigned(nativeMcSelection)<=1u,
-     "choose exactly one native track-light policy");
- const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection||nativeGaSelection||nativeMaSelection||nativeSaSelection||nativeRaSelection||nativeMbSelection||nativeScSelection||nativeTcSelection||nativeRcSelection||nativeTbSelection||nativeGbSelection||nativeMcSelection;
- require50DU(!nativeSelectedLights||(raceEnabled&&!checkpointInput&&
-     (!originalUiActive||courseRaceCold)&&track_session_assets50IG::codeEquals(
-        trackSession->world->code,nativeMcSelection?"MC":nativeGbSelection?"GB":nativeTbSelection?"TB":nativeRcSelection?"RC":nativeTcSelection?"TC":nativeScSelection?"SC":nativeMbSelection?"MB":nativeRaSelection?"RA":nativeMaSelection?"MA":nativeSaSelection?"SA":nativeGaSelection?"GA":nativeTaSelection?"TA":"GC")),
-     "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
+ const bool nativeSelectedLights=selectedLightingSetting?std::string(selectedLightingSetting)=="1":freshLevelLighting;
+ require50DU(!nativeSelectedLights||freshLevelLighting,
+     "native selected lights require a fresh authenticated race; checkpoint/Main unsupported");
+ // PORT STAND-IN (flagged): the lighting owner still keeps one storage layout
+ // per course scene (topology capacities), so the scene is named by the loaded
+ // course here. These are aliases of the one rule above, not separate switches.
+ const bool nativeGcSelection=nativeSelectedLights&&isGcTrack;
+ const bool nativeTaSelection=nativeSelectedLights&&isTaTrack;
+ const bool nativeGaSelection=nativeSelectedLights&&isGaTrack;
+ const bool nativeMaSelection=nativeSelectedLights&&isMaTrack;
+ const bool nativeSaSelection=nativeSelectedLights&&isSaTrack;
+ const bool nativeMbSelection=nativeSelectedLights&&isMbTrack;
+ const bool nativeScSelection=nativeSelectedLights&&isScTrack;
+ const bool nativeTcSelection=nativeSelectedLights&&isTcTrack;
+ const bool nativeRcSelection=nativeSelectedLights&&isRcTrack;
+ const bool nativeGbSelection=nativeSelectedLights&&isGbTrack;
+ const bool nativeMcSelection=nativeSelectedLights&&isMcTrack;
+ const bool nativeTbSelection=nativeSelectedLights&&isTbTrack;
+ const bool nativeRaSelection=nativeSelectedLights&&isRaTrack;
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
  require50DU(!originalUiStarted||allAiEnabled||directOriginalHuman,
@@ -315,6 +275,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  rr::platform::SelectedControlInput50KY humanControlInput{};
  require50DU(allAiEnabled||rr::platform::bindSelectedControlInput50KY(controlPresets,
      playerActionIndexFFC,playerSource5C,humanControlInput),"selected human preset/configuration is outside the exposed original rows");
+ // PC enhancement (native_zero_gravity50zg.h): the player's zero-g lean is
+ // bound in the default control preset only (right stick X; keyboard A/D).
+ rr::game::zeroGravity50ZG.setHumanLeanBound(!allAiEnabled&&humanControlInput.zeroGLean);
+ std::cerr<<"zero_g_lean bound="<<(!allAiEnabled&&humanControlInput.zeroGLean?1:0)
+     <<" preset="<<humanControlInput.preset<<'\n';
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
  // Product Course owns one real Player and seven original AI. This is a
  // separate native roster, never the legacy one-AI diagnostic slice.
@@ -334,10 +299,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto originalAiOwnsSlot=[&](std::size_t slot) noexcept {
   return originalAiEnabled&&(allAiEnabled||(humanCourseEnabled?slot!=0:slot==originalAiSlot));
  };
- const bool watchtowerOriginalAi=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
- require50DU(!watchtowerOriginalAi||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&
-     !startAtMenu),
-     "GA WatchtowerRun requires a fresh genuine Player0 and seven original AI");
  require50DU(!isMaSaTrack||(raceEnabled&&!checkpointInput&&!startAtMenu&&
      ((directOriginalHuman&&humanCourseEnabled&&!allAiEnabled)||(!directOriginalHuman&&allAiEnabled))),
      "MA/SA require either actual Main/Course Player0 plus seven AI or their retained ALL8 route");
@@ -716,7 +677,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto& windowRequest=hostRequest.window;
   windowRequest.title=raceEnabled?"Star Wars: Racer Revenge":
       "Star Wars: Racer Revenge";
-  if(isGaTrack)windowRequest.title="Star Wars: Racer Revenge";
   if(originalUiActive)windowRequest.title="Star Wars: Racer Revenge";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
 #if defined(_WIN32)

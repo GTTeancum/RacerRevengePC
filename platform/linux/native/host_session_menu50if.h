@@ -471,7 +471,8 @@ public:
                     layout==1?"CIRCLE / B     THROTTLE":"CROSS / A      THROTTLE";
                 out.rows[1]=humanTwinEngine_?"RIGHT STICK Y  RIGHT THROTTLE / BRAKE":
                     layout==1?"TRIANGLE / Y   BRAKE":layout==2?"CIRCLE / B     BRAKE":"SQUARE / X     BRAKE";
-                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":"LEFT STICK X   STEERING";
+                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":humanPreset_==0u?
+                    "LEFT X STEER  RIGHT X ZERO-G LEAN":"LEFT STICK X   STEERING";
                 out.rows[3]=(layout==1||layout==3)?"R1 / RIGHT SHOULDER  BOOST":"R2 / RIGHT TRIGGER   BOOST";
                 out.rows[4]=layout==1?"L1 / LEFT SHOULDER   REPAIR":layout==3?
                     "R2 / RIGHT TRIGGER   REPAIR":"L2 / LEFT TRIGGER    REPAIR";
@@ -480,7 +481,8 @@ public:
             }else{
                 out.rows[0]=humanTwinEngine_?"W / S      LEFT THROTTLE / BRAKE":"W / S      THROTTLE / BRAKE";
                 out.rows[1]=humanTwinEngine_?"UP / DOWN  RIGHT THROTTLE / BRAKE":"LEFT / RIGHT  STEERING";
-                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":"UP / DOWN  ORIGINAL LEFT STICK Y";
+                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":humanPreset_==0u?
+                    "UP/DOWN PITCH  A/D ZERO-G LEAN":"UP / DOWN  ORIGINAL LEFT STICK Y";
                 out.rows[3]="SPACE      BOOST";out.rows[4]="R          HOLD TO REPAIR";
                 out.rows[5]="LEFT SHIFT POWERSLIDE";
             }
