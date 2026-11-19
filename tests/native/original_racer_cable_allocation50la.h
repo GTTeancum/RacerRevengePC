@@ -37,10 +37,11 @@ inline g::OriginalPodCableAllocationResult50LA Cables::beginLateStripPrefix(
             }
         }
         racer.color260_=color; //Reached original PHY color producer, not a default ready flag.
-        const auto& id=sourceRig_->podId;
-        if(id.size()!=5||id.compare(0,3,"POD")||id[3]<'0'||id[3]>'9'||id[4]<'0'||id[4]>'9')
+        // racer60 of this rig's row: the stock Pod%02d digits (as before) or
+        // the add-on row's number (PORT EXTENSION, NOT ORIGINAL).
+        std::uint32_t racer60=0;
+        if(!rr::game::original_racer_selection50IJ::racer60OfPodId(sourceRig_->podId,racer60))
             return {S::owner,0x213ea8u};
-        const auto racer60=std::uint32_t((id[3]-'0')*10+id[4]-'0');
         const auto& binding=racer.binding_;std::size_t length=0;
         while(length<binding.materialDirectoryCapacity&&binding.actualMaterialDirectory36B970[length])++length;
         if(length==binding.materialDirectoryCapacity||length>240u)return {S::material,0x299be0u};

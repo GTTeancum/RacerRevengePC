@@ -20,7 +20,10 @@ inline native_racer50HW::J directDiscRoster(std::uint32_t racer60) {
     namespace selection=rr::game::original_racer_selection50IJ;
     namespace identities=original_player_identity50IK;
     using native_racer50HW::rig_detail::need;
-    const auto* selected=selection::findByRacer60(racer60);
+    // findAny: a stock row or a free-play add-on row (DLC registry, PORT
+    // EXTENSION). An add-on player takes slot0 the way a supplemental stock
+    // pod does; the seven opponents stay the stock field.
+    const auto* selected=selection::findAnyByRacer60(racer60);
     need(selected&&selected->humanJoinImplemented&&identities::find(racer60),
         "Original disc selected racer has no native cold owner");
     native_racer50HW::J roster={{"schema","RR_ORIGINAL_DISC_ROSTER_V1"},{"player_index",0},
@@ -31,7 +34,7 @@ inline native_racer50HW::J directDiscRoster(std::uint32_t racer60) {
             {"resource_sha256",identity->archiveSha256},{"phy_sha256",identity->phySha256}};};
     bool present=false;
     for(const auto& entry:selection::entries){roster["racers"].push_back(row(entry));present|=entry.racer60==racer60;}
-    if(!present)roster["racers"][0]=row(*selection::findByRacer60(racer60));
+    if(!present)roster["racers"][0]=row(*selected);
     return roster;
 }
 // Authenticate the selected original's own cold inputs. Mutable rig, collision,

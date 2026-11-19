@@ -1,5 +1,6 @@
 #pragma once
 #include "../../src/assets/dlc_files50dl.h"
+#include "../../src/assets/dlc_registry50dl.h"
 // Pod identities for every pod, player and AI: ONE place defines the rule.
 // Constructor21079C/21081C/210820 binds racer60 to Pod%02d; the human's host
 // slot never determines its resource/audio ID.
@@ -216,10 +217,51 @@ inline constexpr const Identity* stockFind(std::uint32_t racer60) noexcept {
     for(const auto& entry:originals)if(entry.racer60==racer60)return &entry;
     return nullptr;
 }
+// ---- One rule for a pod's files and member names, stock and add-on rows.
+// A stock row keeps the original Pod%02d spelling and the disc paths exactly
+// as before; an add-on row (PORT EXTENSION, NOT ORIGINAL: DLC registry, racer
+// 32..99) names its package files (dlc:/ paths, opened through host()) and
+// spells its stem where the original formats Pod%02d.
+inline const rr::assets::dlc50DL::AddonPod* addonPodOf(std::uint32_t racer60) noexcept {
+    return rr::assets::dlc50DL::addonNumberRange(racer60)?rr::assets::dlc50DL::addonPod(racer60):nullptr;
+}
+inline const rr::assets::dlc50DL::AddonPod* addonPodOf(std::string_view podId) noexcept {
+    if(rr::game::original_racer_selection50IJ::stockPodId(podId))return nullptr;
+    try{return rr::assets::dlc50DL::addonPodByPodId(std::string(podId));}catch(...){return nullptr;}
+}
+// A pod id the common pod load admits: the stock spelling or an add-on row.
+inline bool admittedPodId(std::string_view podId) noexcept {
+    return rr::game::original_racer_selection50IJ::stockPodId(podId)||addonPodOf(podId)!=nullptr;
+}
+// <podsRoot>/<id>/<id>.RES for a stock pod; the add-on row's package archive.
+inline std::filesystem::path podArchive(const std::filesystem::path& podsRoot,const std::string& podId) {
+    if(const auto* pod=addonPodOf(podId))return rr::assets::dlc50DL::host(pod->archive);
+    return podsRoot/podId/(podId+".RES");
+}
+// <podsRoot>/<id>/<id>.CAM for a stock pod; the add-on row's package camera.
+inline std::filesystem::path podCamera(const std::filesystem::path& podsRoot,const std::string& podId) {
+    if(const auto* pod=addonPodOf(podId))return rr::assets::dlc50DL::host(pod->camera);
+    return podsRoot/podId/(podId+".CAM");
+}
+// [Pod Setup] Prefix the PHY carries: the two digits of a stock pod, the stem
+// of an add-on pod (dlc-contract-2: Prefix must equal the stem).
+inline std::string phyPrefix(const std::string& podId) {
+    if(const auto* pod=addonPodOf(podId))return pod->stem;
+    return podId.size()>=3?podId.substr(3):std::string{};
+}
+// Pod folder member prefix "Pods\Pod04\" (stock, as before) or "Pods\<stem>\".
+inline std::string podFolderMember(const std::string& podId) {
+    if(const auto* pod=addonPodOf(podId))return "Pods\\"+pod->stem+"\\";
+    return "Pods\\Pod"+(podId.size()>=3?podId.substr(3):std::string{})+"\\";
+}
 inline std::filesystem::path archivePath(const std::filesystem::path& discRoot,const Identity& identity) {
+    if(const auto* pod=addonPodOf(identity.racer60))return rr::assets::dlc50DL::host(pod->archive);
     return discRoot/"PODS"/identity.podId/(std::string(identity.podId)+".RES");
 }
+// An add-on row has no named announcer INI (generic lines only): empty path,
+// announcerBytes 0. Readers skip the named bank for such a row.
 inline std::filesystem::path announcerPath(const std::filesystem::path& discRoot,const Identity& identity) {
+    if(addonPodOf(identity.racer60))return {};
     return discRoot/"AUDIO/SPEECH/DAX/INRACE"/(std::string(identity.podId)+"ANN.INI");
 }
 // Stock receipt: what each shipped sounds.ini [Indices] says. Eleven
@@ -252,13 +294,17 @@ namespace admission {
 // decode: 512 entries, 16 MiB decoded, 256-byte names; INI/PHY members are
 // extracted with an 8 KiB cap by every pod reader). The file itself may not
 // exceed the decoded cap. Every pod reader bounds its own writes to these.
+// The values live in rr::assets::dlc50DL::RegistryLimits (one owner for the
+// stock and add-on pod-archive capacity): 16 MiB file and decoded, 512
+// entries, 256-byte names, 8 KiB text members.
 inline rr::assets::DecodeLimits48C limits() noexcept {
+    using L=rr::assets::dlc50DL::RegistryLimits;
     rr::assets::DecodeLimits48C l;
-    l.resource_file_bytes=16u*1024u*1024u;l.resource_decoded_bytes=16u*1024u*1024u;
-    l.resource_entries=512;l.resource_name_bytes=256;
+    l.resource_file_bytes=L::podArchiveBytes;l.resource_decoded_bytes=L::podDecodedBytes;
+    l.resource_entries=L::podEntries;l.resource_name_bytes=L::podNameBytes;
     return l;
 }
-inline constexpr std::size_t maximumTextMemberBytes=8192;
+inline constexpr std::size_t maximumTextMemberBytes=rr::assets::dlc50DL::RegistryLimits::textMemberBytes;
 inline constexpr const char* speechKeys[9]={
     "numberoflowdamagesounds","numberofwallhitsounds","numberofpassedsounds",
     "numberofattackedsounds","numberofpassingsounds","numberofattackingsounds",
@@ -309,6 +355,35 @@ inline std::array<std::uint8_t,9> speechFrom(const std::vector<std::uint8_t>& in
     for(std::size_t i=0;i<9;++i)if(!seen[i])throw std::runtime_error(std::string("sounds.ini lacks ")+speechKeys[i]);
     return out;
 }
+// The members the pod load reads by name (132820), found by the pod's member
+// stem ("pod04", or an add-on stem): speech counts and digests of its PHY and
+// speech INIs. Throws when the archive cannot be decoded within the shared
+// capacity or lacks one of them.
+inline void readMembers(const std::vector<std::uint8_t>& bytes,const std::string& pod,
+    rr::assets::ResArchive48C& archive,Row& next) {
+    namespace d=pod_materials50ed_fixture::detail;
+    const auto lim=limits();
+    rr::assets::DecodeError48C why;
+    if(!rr::assets::decodeResource48C(bytes,archive,why,nullptr,lim))throw std::runtime_error("archive decode "+why.code);
+    const auto member=[&](const std::string& wanted){
+        const auto key=folded(wanted);const rr::assets::ResourceEntry48C* found=nullptr;
+        for(const auto& e:archive.entries)if(folded(e.name)==key){
+            if(found)throw std::runtime_error("ambiguous member "+wanted);found=&e;}
+        if(!found)throw std::runtime_error("archive lacks "+wanted);
+        std::vector<std::uint8_t> out;
+        if(!rr::assets::extractResMember48C(archive,found->name,out,why,maximumTextMemberBytes))
+            throw std::runtime_error("member outside the 8 KiB text capacity "+wanted);
+        return out;
+    };
+    const auto speech="audio\\speech\\"+pod+"\\";
+    const auto sounds=member(speech+"sounds.ini");
+    next.speech=speechFrom(sounds);
+    next.sounds=d::sha256(sounds);
+    next.phy=d::sha256(member("pods\\"+pod+"\\"+pod+".phy"));
+    next.curses=d::sha256(member(speech+"curses.ini"));
+    next.taunts=d::sha256(member(speech+"taunts.ini"));
+    next.special=d::sha256(member(speech+"special.ini"));
+}
 // Reads the pod archive on the disc and fills the row. Stock bytes keep the
 // stock row; any other archive gets a row derived from its own data: size
 // and digest of the file, digests of its PHY and speech INIs found by name,
@@ -332,28 +407,10 @@ inline void derive(Row& row) {
         std::cerr<<"pod_archive_identity pod="<<stock.podId<<" bytes="<<bytes.size()<<" stock=1\n";
         return;
     }
-    rr::assets::ResArchive48C archive;rr::assets::DecodeError48C why;
-    if(!rr::assets::decodeResource48C(bytes,archive,why,nullptr,lim))throw std::runtime_error("archive decode "+why.code);
-    const auto member=[&](const std::string& wanted){
-        const auto key=folded(wanted);const rr::assets::ResourceEntry48C* found=nullptr;
-        for(const auto& e:archive.entries)if(folded(e.name)==key){
-            if(found)throw std::runtime_error("ambiguous member "+wanted);found=&e;}
-        if(!found)throw std::runtime_error("archive lacks "+wanted);
-        std::vector<std::uint8_t> out;
-        if(!rr::assets::extractResMember48C(archive,found->name,out,why,maximumTextMemberBytes))
-            throw std::runtime_error("member outside the 8 KiB text capacity "+wanted);
-        return out;
-    };
-    const auto pod=folded(stock.podId);
-    const auto speech="audio\\speech\\"+pod+"\\";
-    const auto sounds=member(speech+"sounds.ini");
+    rr::assets::ResArchive48C archive;
     Row next;next.identity=stock;next.stock=false;
-    next.speech=speechFrom(sounds);
-    next.archive=digest;next.sounds=d::sha256(sounds);
-    next.phy=d::sha256(member("pods\\"+pod+"\\"+pod+".phy"));
-    next.curses=d::sha256(member(speech+"curses.ini"));
-    next.taunts=d::sha256(member(speech+"taunts.ini"));
-    next.special=d::sha256(member(speech+"special.ini"));
+    readMembers(bytes,folded(stock.podId),archive,next);
+    next.archive=digest;
     row=std::move(next);
     auto& id=row.identity;
     id.archiveBytes=bytes.size();id.archiveSha256=row.archive.c_str();id.phySha256=row.phy.c_str();
@@ -380,29 +437,91 @@ inline std::size_t slotOf(std::uint32_t racer60) noexcept {
     for(std::size_t i=0;i<originals.size();++i)if(originals[i].racer60==racer60)return i;
     return originals.size();
 }
+// PORT EXTENSION, NOT ORIGINAL: an add-on pod's identity (DLC registry row,
+// racer 32..99), built from its own data the way derive() builds one for a
+// non-stock disc archive: the package archive's bytes and digest (it must be
+// the file the registry admitted), PHY and speech INIs found by its stem,
+// speech counts from its sounds.ini. No named announcer (generic lines only).
+// Host memory only; one row per registry number, built once.
+inline void deriveAddon(Row& row,const rr::assets::dlc50DL::AddonPod& pod) {
+    namespace d=pod_materials50ed_fixture::detail;
+    const auto lim=limits();
+    const auto path=rr::assets::dlc50DL::host(pod.archive);
+    std::error_code error;const auto size=std::filesystem::file_size(path,error);
+    if(error)throw std::runtime_error("archive unreadable");
+    if(!size||size>lim.resource_file_bytes)throw std::runtime_error("archive outside the shared pod capacity");
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+    {std::ifstream in(path,std::ios::binary);
+     in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
+     if(!in||in.peek()!=std::char_traits<char>::eof())throw std::runtime_error("archive read/extent");}
+    const auto digest=d::sha256(bytes);
+    if((pod.archiveBytes&&bytes.size()!=pod.archiveBytes)||(!pod.archiveSha256.empty()&&digest!=pod.archiveSha256))
+        throw std::runtime_error("archive differs from the admitted package file");
+    rr::assets::ResArchive48C archive;
+    Row next;next.stock=false;
+    readMembers(bytes,pod.stem,archive,next);
+    next.archive=digest;
+    row=std::move(next);
+    auto& id=row.identity;
+    id.racer60=pod.number;id.podId=pod.podId.c_str(); // frozen registry storage
+    id.archiveBytes=bytes.size();id.archiveSha256=row.archive.c_str();id.phySha256=row.phy.c_str();
+    id.cursesSha256=row.curses.c_str();id.tauntsSha256=row.taunts.c_str();id.specialSha256=row.special.c_str();
+    id.announcerBytes=0;id.announcerEvents=0;id.announcerSha256="";
+    std::cerr<<"pod_archive_identity pod="<<id.podId<<" bytes="<<id.archiveBytes<<" stock=0 addon=1 key="<<pod.key
+             <<" members="<<archive.entries.size()<<" speech=";
+    for(std::size_t i=0;i<9;++i)std::cerr<<(i?",":"")<<unsigned(row.speech[i]);
+    std::cerr<<" announcer=generic\n";
+}
+// nullptr for any number that is not an admitted add-on pod, or one whose
+// package archive was refused (logged once).
+inline const Row* addon(std::uint32_t racer60) noexcept {
+    namespace reg=rr::assets::dlc50DL;
+    if(!reg::addonNumberRange(racer60))return nullptr;
+    const auto* pod=reg::addonPod(racer60);
+    if(!pod)return nullptr;
+    struct Slot {std::once_flag once;Row row;bool ready=false;};
+    static std::array<Slot,reg::RegistryLimits::pods> rows;
+    auto& slot=rows[racer60-reg::RegistryLimits::firstNumber]; // bounds: addonNumberRange above
+    try{std::call_once(slot.once,[&]{
+        try{deriveAddon(slot.row,*pod);slot.ready=true;}
+        catch(const std::exception& e){
+            slot.row=Row{};
+            try{std::cerr<<"pod_archive_identity pod="<<pod->podId<<" addon=1 key="<<pod->key<<" refused="<<e.what()<<'\n';}catch(...){}
+        }catch(...){slot.row=Row{};}
+    });}catch(...){return nullptr;}
+    return slot.ready?&slot.row:nullptr;
+}
 } // namespace admission
 
 // Every consumer: the identity of the pod archive on the disc. A stock
 // archive (or one that cannot be admitted) returns the stock row itself.
+// An add-on racer number returns its package row (admission::addon).
 inline const Identity* find(std::uint32_t racer60) noexcept {
     const auto slot=admission::slotOf(racer60);
-    if(slot==originals.size())return nullptr;
+    if(slot==originals.size()){const auto* a=admission::addon(racer60);return a?&a->identity:nullptr;}
     const auto& r=admission::row(slot);
     return r.stock?&originals[slot]:&r.identity;
 }
 inline const Identity* find(std::string_view podId) noexcept {
     for(const auto& entry:originals)if(entry.podId==podId)return find(entry.racer60);
+    if(const auto* pod=addonPodOf(podId))return find(pod->number);
     return nullptr;
 }
 inline std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
     const auto slot=admission::slotOf(identity.racer60);
-    if(slot==originals.size())return stockSpeechCounts(identity);
+    if(slot==originals.size()){
+        if(const auto* a=admission::addon(identity.racer60))return a->speech;
+        return stockSpeechCounts(identity);
+    }
     const auto& r=admission::row(slot);
     return r.stock?stockSpeechCounts(originals[slot]):r.speech;
 }
 inline const char* speechCountsSha256(const Identity& identity) noexcept {
     const auto slot=admission::slotOf(identity.racer60);
-    if(slot==originals.size())return stockSpeechCountsSha256(identity);
+    if(slot==originals.size()){
+        if(const auto* a=admission::addon(identity.racer60))return a->sounds.c_str();
+        return stockSpeechCountsSha256(identity);
+    }
     const auto& r=admission::row(slot);
     return r.stock?stockSpeechCountsSha256(originals[slot]):r.sounds.c_str();
 }

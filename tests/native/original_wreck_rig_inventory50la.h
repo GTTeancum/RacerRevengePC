@@ -12,7 +12,7 @@ inline rr::game::OriginalWreckInventoryResult50LA inventoryRetainedRig(
     const rr::game::OriginalWreckConstructorVectors50LA& applicationVectors,
     rr::game::OriginalWreckAssetInventory50LA& inventory,std::string& error) {
     using S=rr::game::OriginalWreckInventoryStatus50LA;
-    const auto* selected=rr::game::original_racer_selection50IJ::findByPodId(rig.podId);
+    const auto* selected=rr::game::original_racer_selection50IJ::findAnyByPodId(rig.podId);
     const auto* pin=selected?original_player_identity50IK::find(selected->racer60):nullptr;
     if(!pin||retainedRes.size()!=pin->archiveBytes||
        pod_materials50ed_fixture::detail::sha256(retainedRes)!=pin->archiveSha256||

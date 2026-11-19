@@ -1,5 +1,6 @@
 #pragma once
 #include "../assets/dlc_files50dl.h"
+#include "../assets/dlc_registry50dl.h"
 #include "original_wreck_constructor_vectors50la.h"
 // Cold native geometry/query assets for one actual authored piece. Legacy
 // prepare selects the unique one-piece chariot; the full inventory friend loads
@@ -562,11 +563,18 @@ private:
     static bool podIdentity(const OriginalWreckAssetBinding50LA& binding,const Document& doc,
                             std::string& error) {
         const auto* prefix=value(doc,"Pod Setup","Prefix");
-        if(!prefix||prefix->size()!=2||(*prefix)[0]<'0'||(*prefix)[0]>'9'||(*prefix)[1]<'0'||(*prefix)[1]>'9')
+        if(!prefix)return fail(error,"original wreck PHY pod identity missing");
+        const bool digits=prefix->size()==2&&(*prefix)[0]>='0'&&(*prefix)[0]<='9'&&(*prefix)[1]>='0'&&(*prefix)[1]<='9';
+        // One stem rule: a two-digit Prefix names "pod"+Prefix (stock); any
+        // other Prefix must be an admitted add-on pod's stem (dlc-contract-2:
+        // Prefix equals the stem; PORT EXTENSION, NOT ORIGINAL).
+        const auto* addon=digits?nullptr:rr::assets::dlc50DL::addonPodByPodId(*prefix);
+        if(!digits&&(!addon||lower(*prefix)!=addon->stem))
             return fail(error,"original wreck PHY pod identity missing");
-        const auto expectedPrefix="pods\\pod"+*prefix+"\\";
+        const auto stem=digits?"pod"+*prefix:addon->stem;
+        const auto expectedPrefix="pods\\"+stem+"\\";
         if(lower(binding.memberPrefix)!=expectedPrefix||
-           lower(binding.phyMember)!=expectedPrefix+"pod"+*prefix+".phy")
+           lower(binding.phyMember)!=expectedPrefix+stem+".phy")
             return fail(error,"original wreck PHY/archive pod identity mismatch");
         return true;
     }

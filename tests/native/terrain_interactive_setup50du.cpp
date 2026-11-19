@@ -1147,7 +1147,7 @@ SessionExit50DU Context::run() {
     // the dynamic registry. Camera position and AI/human state are not IDs.
     require50DU(slot==0||racerRigs[slot]!=nullptr,"actual announcer actor rig unavailable");
     const auto* selection=slot==0?selectedOriginal:
-        original_racer_selection50IJ::findByPodId(racerRigs[slot]->podId.c_str());
+        original_racer_selection50IJ::findAnyByPodId(racerRigs[slot]->podId.c_str());
     require50DU(selection,"actual announcer original racer60 unavailable");
     dynamicRacer60[slot]=selection->racer60;
    }

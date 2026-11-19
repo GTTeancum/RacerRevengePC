@@ -1,5 +1,6 @@
 #include "original_results104_storage50la.h"
 #include "original_time_stats_state50la.h"
+#include "../assets/dlc_registry50dl.h"
 #include "../../tests/native/original_results_roster_read50la.h"
 #include <cmath>
 
@@ -144,6 +145,12 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
         if(!texture(portrait,calls.portrait,0x1c2e80))return out.prefix;
         p.position(name,pageAdd(148.f,offset),y);p.color(name,color);
         std::int32_t nameId=-1;
+        // PORT EXTENSION, NOT ORIGINAL: an add-on racer (DLC registry row) has
+        // no Profile3C localization id; its name is the package string
+        // (AddonPod::name), assigned within this text's own capacity.
+        if(const auto* addon=assets::dlc50DL::addonNumberRange(row.racer60)?assets::dlc50DL::addonPod(row.racer60):nullptr){
+            p.assign(name,addon->name.data(),addon->name.size());
+        }else
         if(!::original_results_roster50LA::Read::profileRacerName(race,row.racer60,nameId)||
            !p.localized(name,static_cast<std::size_t>(nameId),d)){
             if(nameId<0)p.stop(d,Impl::S::source,0x1c3064,"Results real Profile3C racer name unavailable");

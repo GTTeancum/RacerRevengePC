@@ -1,5 +1,6 @@
 #pragma once
 #include "../../src/game/original_audio_directory_source50la.h"
+#include "../../src/assets/dlc_registry50dl.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -53,14 +54,26 @@ class LoadPrefix final {
         // Exact positive two-digit subset already authenticated by the caller.
         // %02d is minimum width, not modulo100. Other signed values are pending.
         if(!actualRacer60||actualRacer60>=100u)return false;
+        // PORT EXTENSION, NOT ORIGINAL: an add-on racer (32..99) spells its
+        // stem where the original formats pod%02d ("speech\<stem>\sounds.ini").
+        const auto* addon=actualRacer60>=rr::assets::dlc50DL::RegistryLimits::firstNumber?
+            rr::assets::dlc50DL::addonPod(actualRacer60):nullptr;
+        if(actualRacer60>=rr::assets::dlc50DL::RegistryLimits::firstNumber&&!addon)return false;
         constexpr std::string_view middle="speech\\pod",suffix="\\sounds.ini";
-        const auto length=sourceDirectory.size()+middle.size()+2u+suffix.size();
+        constexpr std::string_view addonMiddle="speech\\";
+        const auto length=addon?sourceDirectory.size()+addonMiddle.size()+addon->stem.size()+suffix.size():
+            sourceDirectory.size()+middle.size()+2u+suffix.size();
         if(length>=filename70_.size())return false; //Native extent guard; no source snprintf truncation.
         std::size_t at=0;
         for(const auto c:sourceDirectory)filename70_[at++]=c;
-        for(const auto c:middle)filename70_[at++]=c;
-        filename70_[at++]=static_cast<char>('0'+actualRacer60/10u);
-        filename70_[at++]=static_cast<char>('0'+actualRacer60%10u);
+        if(addon){
+            for(const auto c:addonMiddle)filename70_[at++]=c;
+            for(const auto c:addon->stem)filename70_[at++]=c;
+        }else{
+            for(const auto c:middle)filename70_[at++]=c;
+            filename70_[at++]=static_cast<char>('0'+actualRacer60/10u);
+            filename70_[at++]=static_cast<char>('0'+actualRacer60%10u);
+        }
         for(const auto c:suffix)filename70_[at++]=c;
         filename70_[at++]=0;filenameKnownBytes_=at;filenameReturned_=true;
         pc_=0x2c11c8u;return true;

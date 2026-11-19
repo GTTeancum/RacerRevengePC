@@ -3,6 +3,7 @@
 #include "runtime_startup50fl_fixture.h"
 #include "original_player_identity50ik_fixture.h"
 #include "original_racer_manager_entity50la.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -53,7 +54,9 @@ public:
            application->attachmentLock423F58()||actualRacerManager.application()!=application||
            actualRacerManager.generation()!=generation) {error="Time-trial record actor requires a fresh real application owner";return false;}
         const auto rider=std::uint32_t((packed1125C>>11u)&31u);
-        const auto* identity=original_player_identity50IK::find(rider);
+        // The packed rider is the profile's stock rider; a latched free-play
+        // add-on races in its place (PORT EXTENSION), so its row is checked.
+        const auto* identity=original_player_identity50IK::find(rr::game::dlc50DL::racedRider(rider));
         if(!identity){error="Time-trial record actor source rider is invalid";return false;}
         //Reject numeric-domain failures before allocating the persistent actor.
         for(const auto value:originalRankZeroPose.v)if(!std::isfinite(value)){

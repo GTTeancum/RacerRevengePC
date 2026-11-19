@@ -27,6 +27,7 @@
 #include "windows_framebuffer_capture50ld.h"
 #include "../../src/game/ai_cold_owners50iu.h"
 #include "../../src/game/original_racer_selection50ij.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include "../../src/game/original_ui_audio_options50kg.h"
 #include "../../src/game/dynamic_impact_events50iw.h"
 #include "../../src/assets/impact_authoring49y.h"
@@ -117,7 +118,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  bool originalUiActive=originalUiStarted&&enterOriginalUi,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
- const std::uint32_t playerRacer60=selectedRacer60;
+ // PORT EXTENSION, NOT ORIGINAL (DLC phase 2): at a consumed free-play Course
+ // launch the port-owned add-on rider selection (never in packed1125D or the
+ // save) names the racer that races; the profile keeps its stock rider, and
+ // every profile comparison below reads it back through profileRider().
+ rr::game::dlc50DL::applyTestAddonRider();
+ const std::uint32_t playerRacer60=[&]()->std::uint32_t{
+  rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection launched{};
+  if(!consumedLaunch||!originalMainApplication.riderProfile||
+     !originalMainApplication.riderProfile->courseRaceSnapshot(launched)){
+   rr::game::dlc50DL::clearRaceRider();return selectedRacer60;
+  }
+  return rr::game::dlc50DL::latchRaceRider(selectedRacer60,launched.mode34==0,
+      rr::platform::hostTrackCode50IM(effectiveTrack));
+ }();
  const auto loadedTrack=effectiveTrack;
  // A real Course consumption may reach only this next cold session. Direct
  // startup has no such owner; this check does not activate a counted race.
@@ -223,7 +237,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "original race entry lost its committed application sound-mode owner");
   return committed.volumes;
  }();
- const auto* selectedOriginal=original_racer_selection50IJ::findByRacer60(playerRacer60);
+ const auto* selectedOriginal=original_racer_selection50IJ::findAnyByRacer60(playerRacer60);
  require50DU(selectedOriginal&&selectedOriginal->humanJoinImplemented,"unsupported selected racer identity");
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
@@ -368,8 +382,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  require50DU(raceEnabled||!playerUsesRosterRig,"alternate original selection requires the native race");
  const std::string playerPodId(selectedOriginal->podId);
- const auto playerArchive=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/
-     playerPodId/(playerPodId+".RES");
+ const auto playerArchive=original_player_identity50IK::podArchive(
+     runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),playerPodId);
  const char* raceModeSetting=std::getenv("RR_RACE_MODE");
  require50DU(!raceModeSetting||std::string(raceModeSetting)=="1"||std::string(raceModeSetting)=="2",
      "RR_RACE_MODE must be 1 (source events) or 2 (HOST fallback)");
@@ -402,7 +416,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(nativeRacerManager->construct(originalMainApplication,sessionIndex+1,error),error.c_str());
    require50DU(nativeRacerManager->initializeSelection(*originalMainApplication.riderProfile,
        before,managerRuntimeSelection),"actual racer manager1AD520 profile transition failed");
-   require50DU(managerRuntimeSelection.rider==playerRacer60&&
+   require50DU(managerRuntimeSelection.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&
        managerRuntimeSelection.entrants==1u&&nativeRacerManager->count30()==1u&&
        nativeRacerManager->humans34()==1u&&nativeRacerManager->opponents38()==0u,
        "time-trial manager did not produce the actual singleton roster");
@@ -449,7 +463,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        original_course_targets50KX::target(selected)->track==loadedTrack&&
        selected.mode34==originalMainApplication.profile->mode34&&
        rr::game::nativeSingleHumanCourseMode50KG(selected)&&
-       selected.rider==playerRacer60&&selected.subtype>=1&&selected.subtype<=3&&selected.laps>=1&&selected.laps<=25&&
+       selected.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&selected.subtype>=1&&selected.subtype<=3&&selected.laps>=1&&selected.laps<=25&&
        selected.entrants==raceRacerCount&&((selected.packed1125C>>5)&3u)==1&&
        ((selected.packed1125C>>7)&15u)==raceOpponentCount,
        "human Course lap configuration requires its actual retained profile");
@@ -557,7 +571,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
       original_course_targets50KX::target(selected)&&
       original_course_targets50KX::target(selected)->track==loadedTrack&&
-      selected.rider==playerRacer60&&originalMainApplication.profile&&
+      selected.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&originalMainApplication.profile&&
       selected.mode34==originalMainApplication.profile->mode34&&
       rr::game::nativeSingleHumanCourseMode50KG(selected)&&
       selected.subtype>=1&&selected.subtype<=3&&selected.laps==(humanCourseEnabled?(originalAiSettings1125C&31u):3u)&&selected.entrants==raceRacerCount&&

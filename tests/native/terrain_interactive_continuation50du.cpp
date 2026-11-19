@@ -22,6 +22,7 @@
 #include "terrain_interactive_cold_owners50du.h"
 #include "../../src/game/original_opponent_selection50kg.h"
 #include "../../src/game/original_racer_selection50ij.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "terrain_interactive_cold_contacts50du.h"
 #include "player_loading_session50du.h"
@@ -2240,8 +2241,8 @@ SessionExit50DU Context::run() {
  //player's rank4 transform. Non-Tournament TA HOST placement stays unchanged.
  if(nativeRacerManager){
   require50DU(nativeRacerManager->count30()==racerBank.count()&&racerBank.count()==1u&&
-      managerRuntimeSelection.rider==playerRacer60&&
-      (managerRuntimeSelection.packed1125C>>11u)==playerRacer60,
+      managerRuntimeSelection.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&
+      (managerRuntimeSelection.packed1125C>>11u)==rr::game::dlc50DL::profileRider(playerRacer60),
       "record actor requires its actual selected rider and singleton bank");
   source_grid50IG::SelectedMapGrid recordGrid=selectedGridNavigation;
   if(!trackSession->originalStaticCandidates)

@@ -2396,8 +2396,12 @@ void Context::run() {
           //2C2C20. The shared Dax owner retains its real priority1 gate, bank
           // history and RNG; a rejected/suppressed source call is a return.
           RaceActorSnapshot50ID actual{};
+          // PORT EXTENSION, NOT ORIGINAL: an add-on pod has no named bank
+          // (generic lines only); the Dax owner returns its named request as a
+          // source rejection (source_announcer50ie_fixture.h request()).
+          const bool addonActor=rr::game::original_racer_selection50IJ::findAddon(request.racer60)!=nullptr;
           if(!request.actor||!dynamicActorResolver.read(dynamicActorResolver.context,request.actor,actual)||
-             actual.vehicle60!=request.racer60||!sourceAnnouncer->hasNamedBank(actual.vehicle60))
+             actual.vehicle60!=request.racer60||(!addonActor&&!sourceAnnouncer->hasNamedBank(actual.vehicle60)))
            dynamicBoundary(request.callPC,"actual collision announcer racer60 bank unavailable");
           if(!sourceAnnouncer->request(request.type,request.racer60,request.variant,
               dynamicMusicProfile.mode11258,originalAiSession.manager.flags58))

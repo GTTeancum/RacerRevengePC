@@ -1328,7 +1328,12 @@ void Visual::loadOriginalDisc(const Rig& rig) {
         rightPsgSha256_=s::sha256(rig.psg[Rig::right]);rightModelIndex_=rig.roots[Rig::right];
         if(componentCount==5)for(unsigned side=0;side<2;++side){const auto model=side?Rig::bottomRight:Rig::bottomLeft;
             lowerPsg_[side]={rig.psgMembers[model],s::sha256(rig.psg[model])};lowerModelIndex_[side]=rig.roots[model];}
-        const std::uint64_t textureIdentityBase=(std::uint64_t((podId[3]-'0')*10+(podId[4]-'0'))+1u)<<32;
+        // racer60 of the row: stock Pod%02d digits (as before) or the add-on
+        // number (PORT EXTENSION), so no two pods share a texture identity.
+        std::uint32_t identityRacer60=0;
+        s::need(rr::game::original_racer_selection50IJ::racer60OfPodId(podId,identityRacer60),
+            "Direct original pod texture identity unavailable");
+        const std::uint64_t textureIdentityBase=(std::uint64_t(identityRacer60)+1u)<<32;
         a::VehicleDrawAssetsInput50CR drawInput{};drawInput.componentCount=componentCount;
         std::array<d::Bytes,5> sceneBytes;
         std::array<std::array<std::uint8_t,a::maxModelNodes49O>,5> palettes{};

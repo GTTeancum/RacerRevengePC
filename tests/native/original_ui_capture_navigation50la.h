@@ -1,14 +1,22 @@
 #pragma once
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
+#include "../../src/assets/dlc_registry50dl.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <stdexcept>
 
 // Opt-in native window evidence navigation only. This owner emits the same
 // original Confirm event as Enter, at most three times. SA adds one original
 // Next and optionally one Rider Next. Explicit rider/course navigation allows
-// at most 26 Rider Nexts, followed by the original course sequence. GA takes
+// at most 26 Rider Nexts, followed by the original course sequence. The free-play
+// add-on rider test (RR_TEST_ADDON_RIDER=<package>/<item> on main-rider-course-ta,
+// PORT EXTENSION, NOT ORIGINAL) presses Rider Next at most 26 + add-on count times
+// until that add-on is highlighted; RR_TEST_ADDON_RIDER_HOLD=1 then stops there
+// (no Confirm) so the run holds on the Rider screen until its wall budget. GA takes
 // three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one; the explicit Mawhonic9/RA fixture takes four.
 // It does not write a profile, select a screen, advance a transition, control a racer, or admit a
 // missing destination. The caller owns the explicit native-window unattended opt-in,
@@ -44,9 +52,48 @@ class Route final {
     std::uint32_t priorRider_=19;
     std::uint64_t priorRiderSource_=0,priorRiderPublication_=0;
     std::uint8_t issued_=0;
+    // PORT EXTENSION, NOT ORIGINAL (DLC add-on rider test, main-rider-course-ta only).
+    bool addon_=false,addonHold_=false,awaitingAddonMove_=false,addonHoldLogged_=false;
+    const char* addonKey_=nullptr;
+    unsigned addonTarget_=0,priorHighlight_=0;
+    std::uint32_t addonMoves_=0;
+    std::uint64_t priorAddonSource_=0;
 
     static void require(bool condition,const char* message) {
         if(!condition)throw std::runtime_error(message);
+    }
+    static unsigned addonNumber(const char* key) noexcept {
+        if(!key)return 0;
+        for(std::size_t i=0;i<rr::game::dlc50DL::addonRiderCount();++i)
+            if(const auto* pod=rr::game::dlc50DL::addonRiderAt(i);pod&&pod->key==key)return pod->number;
+        return 0;
+    }
+    // Rider stage of the add-on test: -1 wait, 1 Rider Next, 2 go on to Confirm.
+    int pollAddonRider(const Snapshot& s,bool riderCaptured,bool accepted,
+        std::uint64_t source,std::uint64_t publication) {
+        if(!addonTarget_){
+            addonTarget_=addonNumber(addonKey_);
+            require(addonTarget_!=0,"RR_TEST_ADDON_RIDER is not an admitted add-on pod (check RR_DLC_ROOT and the dlc_item lines)");
+            require(!addonMoves_&&s.rider.rider4C4==19&&s.rider.slot4C8==1,
+                "add-on rider route requires the actual fresh Rider19 entry");
+        }
+        if(!accepted||!source||!publication||source<=priorAddonSource_)return -1;
+        const auto highlighted=rr::game::dlc50DL::highlightedAddonRider();
+        if(highlighted!=addonTarget_){
+            require(!riderCaptured,"add-on rider route captured the Rider screen before its add-on rider");
+            require(addonMoves_<26u+rr::game::dlc50DL::addonRiderCount(),
+                "add-on rider was not reached within the stock roster plus the add-on count");
+            priorRider_=s.rider.rider4C4;priorHighlight_=highlighted;priorAddonSource_=source;
+            awaitingAddonMove_=awaitingDispatch_=true;return 1;
+        }
+        if(!riderCaptured)return -1;
+        if(addonHold_){
+            if(!addonHoldLogged_){addonHoldLogged_=true;
+                std::cerr<<"addon_rider_route hold key="<<addonKey_<<" number="<<addonTarget_<<" moves="<<addonMoves_
+                    <<" anchor_rider="<<s.rider.rider4C4<<" (no Confirm; the run ends at its wall budget)\n";}
+            return -1;
+        }
+        return 2;
     }
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,
         rr::game::OriginalUiTransitionRoute50KG b) noexcept {
@@ -121,9 +168,16 @@ public:
     explicit Route(bool enabled,bool sa=false,bool occo=false,bool dudGa=false,bool benGa=false,bool alderMa=false,
         bool odyMa=false,bool gasganoSa=false,bool mawhonicRa=false) noexcept:
         enabled_(enabled),sa_(enabled&&(sa||occo)),occo_(enabled&&occo),selectedRoute_(enabled&&(dudGa||benGa||alderMa||odyMa||gasganoSa||mawhonicRa)),
-        gasganoInitial_(enabled&&gasganoSa),mawhonicRa_(enabled&&mawhonicRa),selectedRider_(mawhonicRa?9u:gasganoSa?7u:odyMa?11u:alderMa?10u:benGa?2u:4u),targetCourseMoves_(mawhonicRa?4u:gasganoSa?1u:(alderMa||odyMa)?2u:3u){}
+        gasganoInitial_(enabled&&gasganoSa),mawhonicRa_(enabled&&mawhonicRa),selectedRider_(mawhonicRa?9u:gasganoSa?7u:odyMa?11u:alderMa?10u:benGa?2u:4u),targetCourseMoves_(mawhonicRa?4u:gasganoSa?1u:(alderMa||odyMa)?2u:3u){
+        // Free-play TA route only (no SA/Occo/selected fixture). Unset = stock route unchanged.
+        const char* key=std::getenv("RR_TEST_ADDON_RIDER");
+        addon_=enabled_&&!selectedRoute_&&!sa_&&!occo_&&key&&*key;
+        addonKey_=addon_?key:nullptr;
+        const char* hold=std::getenv("RR_TEST_ADDON_RIDER_HOLD");
+        addonHold_=addon_&&hold&&std::strcmp(hold,"1")==0;
+    }
     bool enabled()const noexcept{return enabled_;}
-    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+
         (selectedRoute_?courseMoves_+riderMoves_:(moved_?1u:0u)+(riderMoved_?1u:0u)));}
     // Dispatch completion is not proof of a loaded race or a captured track.
     bool actionsDispatched()const noexcept{return issued_==3&&!awaitingDispatch_;}
@@ -158,6 +212,10 @@ public:
         // Wait for actual character readiness for the screenshot, without
         // skipping animation, advancing time, or changing original inputs.
         if(s.route.screen==5&&!s.rider.selectedCharacterReady)return false;
+        // Add-on test: only the settled frame with the requested add-on highlighted.
+        if(addon_&&s.route.screen==5)return addonTarget_&&!awaitingDispatch_&&issued_==1&&
+            rr::game::dlc50DL::highlightedAddonRider()==addonTarget_&&settled(s)&&
+            sourceAccepted&&source>priorAddonSource_&&publication;
         if(selectedRoute_){
             if(s.route.screen==5){
                 if(gasganoInitial_||mawhonicRa_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
@@ -202,7 +260,10 @@ public:
             if(!mainCaptured)return -1;
         }else if(issued_==1){
             require(mainCaptured,"unattended Rider arrived without the completed Main screenshot");
-            if(occo_&&riderMoved_){
+            if(addon_){
+                const int action=pollAddonRider(s,riderCaptured,riderSourceAccepted,riderSource,riderPublication);
+                if(action!=2)return action;
+            }else if(occo_&&riderMoved_){
                 require(selectedOcco(s),"unattended Rider requires committed Occo20/slot2 selection");
                 if(!freshOccoSource(riderSourceAccepted,riderSource,riderPublication))return -1;
             }else{
@@ -241,6 +302,24 @@ public:
     // Call immediately after originalMain.input(action), BEFORE update/render.
     // No successful dispatch is inferred from the host having issued an event.
     void validateDispatch(const Snapshot& s) {
+        if(awaitingAddonMove_){
+            const auto& t=s.transition;
+            require(enabled_&&addon_&&awaitingDispatch_&&issued_==1&&!s.faulted&&!s.quitRequested&&
+                s.route.screen==5&&s.route.page==1&&s.switches==1&&t.bound&&same(t.current,s.route)&&
+                same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
+                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
+                "add-on rider route Rider Next changed the route");
+            const auto highlighted=rr::game::dlc50DL::highlightedAddonRider();
+            // Either the original stock move committed, or the port-owned add-on slot moved.
+            const bool stockMove=s.rider.rider4C4!=priorRider_&&s.rider.slot4C8>0&&s.rider.selectionAttached&&
+                s.rider.deferred4EC==3&&!s.rider.framePublished&&highlighted==0;
+            const bool addonMove=highlighted!=priorHighlight_&&highlighted!=0&&s.rider.rider4C4==priorRider_;
+            require(stockMove||addonMove,"add-on rider route Rider Next moved neither a stock nor an add-on rider");
+            ++addonMoves_;awaitingAddonMove_=awaitingDispatch_=false;
+            std::cerr<<"addon_rider_route move="<<addonMoves_<<" rider="<<s.rider.rider4C4<<" slot="<<s.rider.slot4C8
+                <<" addon="<<highlighted<<'\n';
+            return;
+        }
         if(selectedRoute_&&(awaitingRiderMove_||awaitingMove_)){
             const auto& t=s.transition;
             const bool rider=awaitingRiderMove_;

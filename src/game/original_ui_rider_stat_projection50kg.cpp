@@ -1,5 +1,6 @@
 #include "original_ui_rider_stat_projection50kg.h"
 #include "original_ui_text_position50kg.h"
+#include "../assets/dlc_registry50dl.h"
 #include <cmath>
 
 namespace rr::game {
@@ -13,7 +14,11 @@ bool count(float f,std::int32_t& n) noexcept {
     return n>=0; // explicit bounded domain; source negative counts are not clamped.
 }
 float gap(unsigned i) noexcept {return i<4?0.f:(i<8?12.f:24.f);}
-bool rider(std::uint32_t r) noexcept {return r>=1&&r<=26&&r!=5&&r!=6&&r!=13;}
+bool stockRider(std::uint32_t r) noexcept {return r>=1&&r<=26&&r!=5&&r!=6&&r!=13;}
+// PORT EXTENSION, NOT ORIGINAL (DLC): a registry add-on number (32..99) is a
+// valid identity here; its stats come from the caller (the pod PHY) and it has
+// no original portrait object, so none is emitted for it.
+bool rider(std::uint32_t r) noexcept {return stockRider(r)||rr::assets::dlc50DL::addonNumberRange(r);}
 }
 bool projectOriginalUiRiderStats50KG(const OriginalUiRiderStatInput50KG& in,
     OriginalUiRiderStatProjection50KG& output) noexcept {
@@ -52,7 +57,7 @@ bool projectOriginalUiRiderStats50KG(const OriginalUiRiderStatInput50KG& in,
        !emit(K::panelRight,0x23A0,in.mode34==2?0x1EC588:0x1EC768,
         348.f,panelY,true,color,292.f,in.mode34==2?135.f:0.f))return false;
     if(in.unlocked10FAC) {
-        if(!emit(K::riderPortrait,0x1920+in.selectedRider*0x60,0x1EC85C,
+        if(stockRider(in.selectedRider)&&!emit(K::riderPortrait,0x1920+in.selectedRider*0x60,0x1EC85C,
             250.f,add(300.f,in.panelY4DC)))return false;
         for(unsigned i=0;i<6;++i) {
             if(!count(in.current1920[i],p.current[i])||!count(in.maximum0408[i],p.maximum[i]))return false;

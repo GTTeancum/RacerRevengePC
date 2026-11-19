@@ -1,5 +1,6 @@
 #include "original_ui_rider_stat_owner50kg.h"
 #include "original_ui_text_position50kg.h"
+#include "../assets/dlc_registry50dl.h"
 #include <cmath>
 #include <utility>
 namespace rr::game {
@@ -78,8 +79,10 @@ bool OriginalUiRiderStatOwner50KG::bind(std::shared_ptr<const assets::OriginalUi
     }catch(...){return fail(d,E::allocation);}
 }
 bool OriginalUiRiderStatOwner50KG::applyAppearance(const OriginalUiRiderStatInput50KG& in,D& d) noexcept {
+    // PORT EXTENSION (DLC): a registry add-on number has no original portrait object.
+    const bool addon=rr::assets::dlc50DL::addonNumberRange(in.selectedRider);
     d={};if(!storage_||!in.profileReady||in.selectedRider!=in.observedRider||
-        !storage_->assets->portrait(static_cast<std::uint8_t>(in.selectedRider))||in.selectedRider>26)return fail(d,E::input);
+        (!addon&&(in.selectedRider>26||!storage_->assets->portrait(static_cast<std::uint8_t>(in.selectedRider)))))return fail(d,E::input);
     std::array<std::int32_t,6> current{},maximum{};
     for(unsigned i=0;i<6;++i)if(!count(in.current1920[i],current[i])||!count(in.maximum0408[i],maximum[i]))return fail(d,E::arithmetic);
     auto& s=*storage_;const auto color=in.accentColor17FA00;

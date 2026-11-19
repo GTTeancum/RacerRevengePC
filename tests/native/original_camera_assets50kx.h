@@ -3,6 +3,7 @@
 #include "runtime_startup50fl_fixture.h"
 #include "track_session_assets50ig_fixture.h"
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "course_archive_receipt50ci.h"
 #include "../../src/assets/import_decode48c.h"
 #include "rc_cold_sources50la.h"
@@ -39,15 +40,14 @@ public:
                 "ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b"&&
             source&&source->ready(),
             "RC camera requires the authenticated retained RC source");
-        require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
-            pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+        require(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
         const auto& sourceTob=source->originalTob();
         require(sourceTob.size()==124930u&&pod_materials50ed_fixture::detail::sha256(sourceTob)==
             "71b1f9609c0a6ce84d71ff69355d9cfcbc8771eb7ddb8876473b4fddd6e23e6d",
             "RC camera retained TOB identity rejected");
         auto selectedCam=runtime_startup50fl::readBytes(
-            std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
+            original_player_identity50IK::podCamera(std::filesystem::path("work/native/project/disc/PODS"),pod));
         require(!selectedCam.empty(),"original camera selected CAM unavailable");
         // All throwing validation precedes publication. The actual selected
         // PHY remains borrowed from its existing retained original racer rig.
@@ -70,15 +70,14 @@ public:
                 "1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b"&&
             source&&source->ready(),
             "TB camera requires the authenticated retained TB source");
-        require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
-            pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+        require(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
         const auto& sourceTob=source->originalTob();
         require(sourceTob.size()==106139u&&pod_materials50ed_fixture::detail::sha256(sourceTob)==
             "12c908874736ea91dcd6d3f8af97413a0cfe3bcd87cfce0798e8ff86fe5fb0bc",
             "TB camera retained TOB identity rejected");
         auto selectedCam=runtime_startup50fl::readBytes(
-            std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
+            original_player_identity50IK::podCamera(std::filesystem::path("work/native/project/disc/PODS"),pod));
         require(!selectedCam.empty(),"original camera selected CAM unavailable");
         // All throwing validation precedes publication. The actual selected
         // PHY remains borrowed from its existing retained original racer rig.
@@ -102,8 +101,7 @@ public:
         require(track.world&&track_session_assets50IG::codeEquals(track.world->code,"GB")&&
             source&&source->ready(),
             "GB camera requires the authenticated retained GB source");
-        require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
-            pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+        require(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
         const auto& sourceTob=source->originalTob();
         // Stock TOB identity is a receipt (course_archive_receipt50ci.h).
@@ -112,7 +110,7 @@ public:
             "96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1"))
             std::cerr<<"course_member_identity site=gb_camera member=tracks\\gb.tob bytes="<<sourceTob.size()<<" stock=0\n";
         auto selectedCam=runtime_startup50fl::readBytes(
-            std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
+            original_player_identity50IK::podCamera(std::filesystem::path("work/native/project/disc/PODS"),pod));
         require(!selectedCam.empty(),"original camera selected CAM unavailable");
         // All throwing validation precedes publication. The actual selected
         // PHY remains borrowed from its existing retained original racer rig.
@@ -136,10 +134,9 @@ public:
         const bool rc=track_session_assets50IG::codeEquals(track.world->code,"RC");
         require(tc||sc||ga||ta||ma||sa||ra||rc||mb||track_session_assets50IG::codeEquals(track.world->code,"GC"),
             "original camera authoring requires an owned original track");
-        require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
-            pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+        require(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
-        cam=runtime_startup50fl::readBytes(std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
+        cam=runtime_startup50fl::readBytes(original_player_identity50IK::podCamera(std::filesystem::path("work/native/project/disc/PODS"),pod));
         const auto bytes=runtime_startup50fl::readBytes(track.archive);
         // Common course rule: identity is a receipt; shared decode capacity.
         course_archive_receipt50CI::receipt("camera_assets",track.world->code,bytes,track.archiveSha256,track.archiveBytes);

@@ -8,6 +8,7 @@
 #include "../assets/original_standard_screen_material_reference50la.h"
 #include "../assets/pod_physics49n.h"
 #include "../assets/native_phy_load50la.h"
+#include "../assets/dlc_registry50dl.h"
 #include <string_view>
 #include <array>
 #include <cstddef>
@@ -399,7 +400,10 @@ class OriginalRacerEntityCold50LA final {
     std::optional<const void*> sourceCandidate388_; //Unknown first inline-array word/address anchor only; no extent.
     std::optional<std::uint32_t> sourcePod60_; //Actual21081C store.
     //Retained source stack1E0 formatter output, not a new Racer field.
-    std::optional<std::array<char,6>> sourcePodName1E0_;
+    //Host storage: "PodNN" (stock, 6 bytes used) or an add-on stem of at most
+    //16 characters (dlc-contract-2) plus NUL; the formatter bounds-checks it.
+    static constexpr std::size_t sourcePodNameBytes1E0=17;
+    std::optional<std::array<char,sourcePodNameBytes1E0>> sourcePodName1E0_;
     std::optional<const void*> sourceList488_; //20FA44 NULL, later producer not joined.
     std::optional<std::uint32_t> sourceCount48C_; //Unknown: address borrow is not a count read.
     std::optional<const OriginalWreckTerrainProvider50LA*> sourceTerrain330_;
@@ -673,8 +677,20 @@ public:
             //Bounded native308C90 formatting for the admitted Pod01..Pod99
             //slice. The actual21081C store survives an unsupported value.
             if(*sourcePod60_==0u||*sourcePod60_>=100u)return result(S::binding,0x210824u);
-            sourcePodName1E0_=std::array<char,6>{{'P','o','d',
-                static_cast<char>('0'+*sourcePod60_/10u),static_cast<char>('0'+*sourcePod60_%10u),'\0'}};
+            if(*sourcePod60_<rr::assets::dlc50DL::RegistryLimits::firstNumber){
+                sourcePodName1E0_=std::array<char,sourcePodNameBytes1E0>{{'P','o','d',
+                    static_cast<char>('0'+*sourcePod60_/10u),static_cast<char>('0'+*sourcePod60_%10u),'\0'}};
+            }else{
+                // PORT EXTENSION, NOT ORIGINAL: an add-on racer (32..99) spells
+                // its stem where the original formats Pod%02d (one name rule
+                // for every pod, from that pod's registry row).
+                const auto* pod=rr::assets::dlc50DL::addonPod(*sourcePod60_);
+                if(!pod||pod->stem.empty()||pod->stem.size()>=sourcePodNameBytes1E0)
+                    return result(S::binding,0x210824u); //Refused before any store.
+                std::array<char,sourcePodNameBytes1E0> name{};
+                for(std::size_t i=0;i<pod->stem.size();++i)name[i]=pod->stem[i];
+                sourcePodName1E0_=name;
+            }
 
         }
         if(!overlay240.construct199840And199950(racer,*b.actualRace28C,b.overlay240Key,

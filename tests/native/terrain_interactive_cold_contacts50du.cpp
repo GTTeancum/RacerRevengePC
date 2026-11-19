@@ -322,10 +322,12 @@ void ContactsContext::run() {
     // selectedOriginal is already authenticated before any cold installation.
     require50DU(slot==0||racerRigs[slot]!=nullptr,"actual contact actor rig unavailable");
     const auto* selection=slot==0?selectedOriginal:
-        original_racer_selection50IJ::findByPodId(racerRigs[slot]->podId.c_str());
+        original_racer_selection50IJ::findAnyByPodId(racerRigs[slot]->podId.c_str());
     require50DU(selection,"actual contact actor original racer60 unavailable");
+    // An add-on row (PORT EXTENSION) has no named bank: generic lines only.
     require50DU(dynamicRacer60[slot]==selection->racer60&&
-        sourceAnnouncer->collisionRequestsEnabled()&&sourceAnnouncer->hasNamedBank(selection->racer60),
+        sourceAnnouncer->collisionRequestsEnabled()&&
+        (sourceAnnouncer->hasNamedBank(selection->racer60)||selection->addon),
         "actual dynamic actor and shared announcer bank identity differ");
    }
    std::string error;

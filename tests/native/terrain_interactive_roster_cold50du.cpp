@@ -150,15 +150,18 @@ void Context::run() const {
    const auto& entry=roster.at("racers").at(racer);
    const auto id=entry.at("pod_id").get<std::string>();
    coldRacerStage50DU(id,"roster identity",[&](){
-    require50DU(id.size()==5&&id.substr(0,3)=="POD"&&
-        id[3]>='0'&&id[3]<='9'&&id[4]>='0'&&id[4]<='9'&&
+    // Stock Pod%02d spelling or an admitted add-on row (player only: an
+    // add-on pod never joins a stock AI field).
+    require50DU(original_player_identity50IK::admittedPodId(id)&&
+        (rr::game::original_racer_selection50IJ::stockPodId(id)||racer==0)&&
         (racer!=0||id==playerPodId),"original roster identity rejected");
     for(std::size_t previous=0;previous<racer;++previous)
      require50DU(roster.at("racers").at(previous).at("pod_id")!=id,"duplicate original racer");
    });
    if(racer||playerUsesRosterRig)coldRacerStage50DU(id,"rig construction",[&](){
     if(directOriginalInputs){
-     const auto archive=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/id/(id+".RES");
+     const auto archive=original_player_identity50IK::podArchive(
+         runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
      racerRigs[racer]=std::make_unique<native_racer50HW::Rig>(".",archive);
     }else{
      const auto relative=std::filesystem::path(entry.at("path").get<std::string>());
@@ -171,7 +174,8 @@ void Context::run() const {
    coldRacerStage50DU(id,"collision owner construction",[&](){
     racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
    });
-   const auto archive=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/id/(id+".RES");
+   const auto archive=original_player_identity50IK::podArchive(
+       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
    std::vector<std::uint8_t> retainedRes;
    coldRacerStage50DU(id,"resource archive verification",[&](){
     retainedRes=f::readBytes(archive);
@@ -186,7 +190,7 @@ void Context::run() const {
    coldRacerStage50DU(id,"collision resource preparation",[&](){
     std::string error;
     const bool collisionReady=racerCollisions[racer]->prepare(
-        {archive.string(),"Pods\\Pod"+id.substr(3)+"\\"},endpointPolicy,error);
+        {archive.string(),original_player_identity50IK::podFolderMember(id)},endpointPolicy,error);
     require50DU(collisionReady,error.empty()?"original racer collision load failed":error.c_str());
    });
    // Wreckage pieces for the destroy handlers (2261B0/226750). Debris is
@@ -252,7 +256,7 @@ bool Read::currentBank(std::size_t& count)const {
         for(std::size_t slot=0;slot<n;++slot){
             if(!op.bank_->active(slot)||!op.completed_[slot]||op.bank_->completedSteps(slot)!=0u||
                !op.resources_->rigs_[slot]||!op.resources_->collisions_[slot])return false;
-            const auto* source=rr::game::original_racer_selection50IJ::findByPodId(
+            const auto* source=rr::game::original_racer_selection50IJ::findAnyByPodId(
                 op.resources_->rigs_[slot]->podId);
             // Revalidate the actual whole field before every lookup/final
             // commit; these comparisons publish or retain no future ID list.
@@ -293,7 +297,7 @@ bool Read::racer60At1AF330(std::int32_t index,std::uint32_t& actual60)const noex
         const auto initialized=bank.bindRead(op.arena_.ai.initialized);
         const auto managerIndex=bank.bindRead(op.arena_.ai.managerIndexFE0);
         const auto id=bank.bindRead(op.arena_.ai.racer60);
-        const auto* source=rr::game::original_racer_selection50IJ::findByPodId(
+        const auto* source=rr::game::original_racer_selection50IJ::findAnyByPodId(
             op.resources_->rigs_[slot]->podId);
         if(!source||bank.read(slot,role)!=1u||!bank.read(slot,bound)||
            bank.read(slot,ready)!=rr::game::VehicleFramePhase49W::Ready||

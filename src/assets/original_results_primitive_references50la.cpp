@@ -2,7 +2,9 @@
 #include "original_results_screen_fallback50la.h"
 #include "original_standard_material_domain50la.h"
 #include "original_ui_screen_assets50kg.h"
+#include "dlc_registry50dl.h"
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <bit>
 #include <exception>
@@ -202,6 +204,15 @@ bool OriginalResultsPrimitiveReferences50LA::acquireNext(Role role,std::uint32_t
        domain_->application_!=context_->materialApplication()||
        domain_->materials382B38()->populationTerminal()||domain_->materials382B38()->demandTerminal()||
        !domain_->textures383400()||domain_->textures383400()->populationTerminal())return stop(S::phase,0x14D370);
+    if(role==Role::portrait&&dlc50DL::addonNumberRange(racer60)&&dlc50DL::addonPod(racer60)){
+        // PORT EXTENSION, NOT ORIGINAL: see Reference::absent. No name lookup,
+        // store or retain happens; the source order of later occurrences is kept.
+        auto& reference=references_[next_];reference=Reference{};reference.absent=true;
+        const auto* pod=dlc50DL::addonPod(racer60);
+        std::fprintf(stderr,"dlc_results_portrait racer=%u key=%s icon=%s status=absent reason=\"package UI archive not mounted by Results\"\n",
+            racer60,pod->key.c_str(),pod->ui.resultsIcon.c_str());
+        ++next_;return true;
+    }
     try {
         const auto provider=domain_->archiveProvider3E1A70();
         if(!provider||!provider->sealed())return stop(S::source,0x132820);

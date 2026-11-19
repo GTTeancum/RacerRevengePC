@@ -3,6 +3,7 @@
 #include "original_shader_pass_groups50la.h"
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_material_animation50la.h"
+#include "dlc_registry50dl.h"
 #include <array>
 #include <atomic>
 #include <cfenv>
@@ -156,6 +157,11 @@ struct OriginalStandardMaterialTable50LA::Storage {
     // Monotonic native provenance on this exact Storage, not a guest field or
     // readiness bit. A failed parse never publishes it; attachment moves it.
     bool sourceNames17CAD4=false;
+    // PORT EXTENSION, NOT ORIGINAL: rows appended after the 3235 Mat_Stbl rows
+    // for the material names admitted add-on pods bring (DLC registry,
+    // dlc_registry50dl.h: each name is stem-named and belongs to one pod).
+    // Zero without add-on pods: the table is then exactly the original one.
+    std::size_t extensionRows=0;
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
     std::vector<Row> rows;
@@ -180,6 +186,27 @@ struct OriginalStandardMaterialTable50LA::Storage {
             rows.push_back(std::move(row));
         }
         if(rows.size()!=tableRows)return fail(d,S::table,0x2988D8);
+        return appendAddonNames(d);
+    }
+    // After the original rows, never instead of them: stock indices 0..3234 keep
+    // their meaning; a name the original table already has resolves to that
+    // original row (first-name match, as 29B854) and is not added again.
+    bool appendAddonNames(D& d) {
+        std::size_t added=0;
+        for(const auto* list:{&rr::assets::dlc50DL::addonPodMaterialNames(),&rr::assets::dlc50DL::addonPodUiMaterialNames()}){
+            for(const auto& raw:*list){
+                if(!ascii(raw,255,false))return fail(d,S::table,0x298788);
+                bool present=false;
+                for(const auto& r:rows)if(same(r.name00,raw)){present=true;break;}
+                if(present)continue;
+                Storage::Row row;row.byteOffset=static_cast<std::uint32_t>(tableBytes); // past the source text: no source offset
+                row.name00=raw;for(char& c:row.name00)c=lower(c);
+                row.object04=nullptr;row.references08=0;row.associated30=nullptr;
+                rows.push_back(std::move(row));++added;
+            }
+        }
+        extensionRows=added;
+        if(added)std::fprintf(stderr,"dlc_materials table_rows=%zu addon_rows=%zu (port extension after Mat_Stbl)\n",tableRows,added);
         return true;
     }
     std::unique_ptr<OriginalStandardMaterialObject50LA> partial;
@@ -452,7 +479,7 @@ bool OriginalStandardMaterialTable50LA::attachAppStartTemplates(
 }
 bool OriginalStandardMaterialTable50LA::sourceNames17CAD4Current() const noexcept {
     return storage_&&storage_->sourceNames17CAD4&&storage_->appStart&&
-        storage_->templates&&storage_->rows.size()==tableRows;
+        storage_->templates&&storage_->rows.size()==tableRows+storage_->extensionRows;
 }
 bool OriginalStandardMaterialTable50LA::prepared() const noexcept {return bool(storage_);}
 std::size_t OriginalStandardMaterialTable50LA::rowCount() const noexcept {return storage_?storage_->rows.size():0;}
@@ -1163,7 +1190,7 @@ bool OriginalStandardMaterialTable50LA::captureUiSharedHistorySlot(std::size_t i
     static constexpr const char* names[]={"ui/textures/dimpopup","ui/textures/overlay1popup","font/venus16popup","font/venus14popup","ui/textures/icon_x_popup","ui/textures/icon_tri_popup"};
     static constexpr const char* sources[]={"ui/textures/dimpopup.psm","ui/textures/overlay1popup.psm","font/venus16popup.psm","font/venus14popup.psm","ui/textures/icon_x_popup.psm","ui/textures/icon_tri_popup.psm"};
     static constexpr std::uint32_t offsets[]={70804,70826,70853,70872,70891,70917};
-    if(!storage_||index>=6||storage_->rows.size()!=tableRows||!storage_->construction||!storage_->templates||
+    if(!storage_||index>=6||storage_->rows.size()!=tableRows+storage_->extensionRows||!storage_->construction||!storage_->templates||
        !storage_->programs||!storage_->textures)return false;
     const auto& s=*storage_;const auto number=static_cast<std::int32_t>(3228+index);
     const auto& row=s.rows[static_cast<std::size_t>(number)];

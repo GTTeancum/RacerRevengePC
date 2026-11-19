@@ -925,8 +925,8 @@ void Context::run() {
        consumedRaStage.race()?&originalMainApplication.applicationMode22C():nullptr});
   };
   auto readRaCameraCam=[&](){
-   sourceCameraAssets.cam=runtime_startup50fl::readBytes(
-       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+   sourceCameraAssets.cam=runtime_startup50fl::readBytes(original_player_identity50IK::podCamera(
+       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),playerPodId));
   };
   auto prepareIntroAuthoring=[&](){
    if(!taIntroAuthoring&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
@@ -2068,7 +2068,7 @@ void Context::run() {
    if(isMcTrack){
     requireMbRuntimeNavigation50MB();
     const auto pods=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS");
-    const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(pods/playerPodId/(playerPodId+".CAM")));
+    const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(original_player_identity50IK::podCamera(pods,playerPodId)));
     reserveMcEnvironment(static_cast<std::size_t>(camBytes),"MC retained CAM exceeds remaining payload");
     reserveMcEnvironment(4u*186642u,"MC TOB authentication scratch exceeds remaining payload");
     std::string error;
@@ -2081,8 +2081,8 @@ void Context::run() {
    else if(isGbTrack){
     requireMbRuntimeNavigation50MB();
     require50DU(gbSourceCameraAssets&&gbColdSources&&gbColdSources->ready(),"GB scoped camera source unavailable");
-    const auto path=runtime_asset_paths50LB::resolve(
-        std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+    const auto path=original_player_identity50IK::podCamera(runtime_asset_paths50LB::resolve(
+        std::filesystem::path("work/native/project/disc/PODS")),playerPodId);
     const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(path));
     require50DU(camBytes&&camBytes<=gbRemainingPayloadBytes(),"GB selected CAM exceeds remaining payload");
     reserveGbAdditionalPayload(static_cast<std::size_t>(camBytes),"GB retained CAM exceeds remaining payload");
@@ -2095,8 +2095,8 @@ void Context::run() {
    else if(isTbTrack){
     requireMbRuntimeNavigation50MB();
     require50DU(tbSourceCameraAssets&&tbColdSources&&tbColdSources->ready(),"TB scoped camera source unavailable");
-    const auto path=runtime_asset_paths50LB::resolve(
-        std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+    const auto path=original_player_identity50IK::podCamera(runtime_asset_paths50LB::resolve(
+        std::filesystem::path("work/native/project/disc/PODS")),playerPodId);
     const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(path));
     require50DU(camBytes&&camBytes<=tbRemainingPayloadBytes(),"TB selected CAM exceeds remaining payload");
     reserveTbAdditionalPayload(static_cast<std::size_t>(camBytes),"TB retained CAM exceeds remaining payload");

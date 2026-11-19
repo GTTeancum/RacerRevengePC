@@ -10,6 +10,9 @@
 #include "../../../src/game/original_ui_controls_controller50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
 #include "../../../src/game/original_hall_record_queries50kg.h"
+#include "../../../src/assets/dlc_progress50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
+#include "../../../src/game/dlc_rider_entries50dl.h"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -460,6 +463,75 @@ bool OriginalUiRiderProfileOwner50KG::hallRecordsReady() const noexcept {
         storage_->saveProfile.hallRecordsCurrent(storage_->hallRecords,
             storage_->hallProfileIdentity,storage_->generation);
 }
+namespace {
+// PORT EXTENSION, NOT ORIGINAL: one add-on record waiting for its stock-stage
+// commit (owner thread only; host memory). Cleared at every commit.
+struct PendingDlcRecord50DL {
+    bool armed=false;const void* owner=nullptr;std::uint64_t generation=0;
+    assets::dlc50DL::ProgressRaceResult result;
+};
+PendingDlcRecord50DL& pendingDlcRecord() noexcept {static PendingDlcRecord50DL pending;return pending;}
+// PORT EXTENSION, NOT ORIGINAL (DESIGN.md, Hall decision 2026-11-16): the
+// stock course's Hall rows merged at display/qualification time with the DLC
+// side file's add-on pod rows for that course. Stock rows are never written.
+// A DLC slot joins only when its racer key is an admitted add-on pod (or
+// "stock:NN"), so a removed package drops out and the stock rows show again.
+// Each DLC entry is inserted with the original 1AC440 ordering (before the
+// first stock entry it strictly beats: lower lap/race time, higher knockout
+// count), then each table keeps its 3 entries. An add-on entry's name lane
+// carries the pod's package name (at most 20 characters + NUL).
+const assets::dlc50DL::AddonPod* admittedPodByKey(const std::string& key) noexcept {
+    for(std::size_t i=0;i<assets::dlc50DL::addonPodCount();++i){
+        const auto* p=assets::dlc50DL::addonPodAt(i);if(p&&p->key==key)return p;}
+    return nullptr;
+}
+struct HallMergeCounts50DL {unsigned lap=0,race=0,knockouts=0;};
+bool mergeDlcHallRows50DL(std::uint32_t course,game::OriginalUiHallCourseRecords50KG& row,
+    HallMergeCounts50DL& counts) noexcept {
+    counts={};
+    try {
+        assets::dlc50DL::CourseRow stock;
+        if(!assets::dlc50DL::courseRow(course,stock)||stock.addon)return false;
+        assets::dlc50DL::ProgressHallView view;
+        if(!assets::dlc50DL::progressOwner().stockCourseAddonPodHall(stock.code,view))return false;
+        using Lane=std::array<char,21>;
+        const auto laneOf=[](const std::string& key,const Lane& stored,Lane& out){
+            out.fill(0);
+            if(key.rfind("stock:",0)==0){
+                if(!assets::dlc50DL::validRacerReference(key))return false;
+                out=stored;out[out.size()-1]=0;return true;
+            }
+            const auto* pod=admittedPodByKey(key);if(!pod)return false;
+            for(std::size_t k=0;k<pod->name.size()&&k+1<out.size()&&k<assets::dlc50DL::ProgressLimits::nameChars;++k)out[k]=pod->name[k];
+            return true;
+        };
+        // One table: values v (3 stock), lanes n; candidate (value,lane) inserted.
+        const auto table=[&](auto& values,std::array<Lane,3>& names,const auto& dlcValues,
+            const std::array<Lane,3>& dlcNames,const std::array<std::string,3>& racers,bool higherWins,unsigned& added){
+            for(std::size_t i=0;i<3;++i){
+                if(racers[i].empty())continue;
+                Lane lane;if(!laneOf(racers[i],dlcNames[i],lane))continue;
+                const auto value=dlcValues[i];
+                std::size_t at=3;
+                for(std::size_t k=0;k<3;++k){
+                    const bool better=higherWins?value>values[k]:value<values[k];
+                    if(better){at=k;break;}
+                }
+                if(at>=3)continue;   // bounds: only slots 0..2 are written
+                for(std::size_t k=2;k>at;--k){values[k]=values[k-1];names[k]=names[k-1];}
+                values[at]=value;names[at]=lane;++added;
+            }
+        };
+        auto next=row;
+        table(next.lap102F0,next.lapNames102FC,view.rows.lap102F0,view.rows.lapNames102FC,view.lapRacers,false,counts.lap);
+        table(next.race1033C,next.raceNames10348,view.rows.race1033C,view.rows.raceNames10348,view.raceRacers,false,counts.race);
+        table(next.knockouts10388,next.knockoutNames10394,view.rows.knockouts10388,view.rows.knockoutNames10394,
+            view.knockoutRacers,true,counts.knockouts);
+        if(!counts.lap&&!counts.race&&!counts.knockouts)return false;
+        row=next;return true;
+    }catch(...){counts={};return false;}
+}
+}
 bool OriginalUiRiderProfileOwner50KG::prepareSingleHumanRecordInsertion1AC440(
     const game::OriginalRaceRecordRacerObservation50KG& row0,std::uint8_t race1B0,
     std::optional<game::OriginalRaceRecordInsertionStage50KG>& out,
@@ -488,9 +560,30 @@ bool OriginalUiRiderProfileOwner50KG::prepareSingleHumanRecordInsertion1AC440(
     }
     const auto packed=static_cast<std::uint16_t>(s.common->playerBits1125C|
         (std::uint16_t(s.packed1125D)<<8));
-    return Stage::prepareSingleHuman(s.hallRecords,s.subtype11258,
+    if(!Stage::prepareSingleHuman(s.hallRecords,s.subtype11258,
         s.common->playerBits1125C,packed,s.packed1125F,race1B0,row0,name,
-        s.hallProfileIdentity,s.generation,s.common->mode34,out,d);
+        s.hallProfileIdentity,s.generation,s.common->mode34,out,d))return false;
+    // PORT EXTENSION, NOT ORIGINAL (DLC decision D7 b): a free-play race run
+    // with an add-on pod never changes the stock Hall. The stock stage keeps
+    // its gates (owner, course, name, generation) but carries the unchanged
+    // rows and zero ranks; the record goes to the DLC side file at commit.
+    const auto profileRider=std::uint32_t(s.packed1125D>>3);
+    const auto raced=game::dlc50DL::racedRider(profileRider);
+    if(out&&s.common->mode34==0u&&raced!=profileRider&&assets::dlc50DL::addonPod(raced))try{
+        auto& pending=pendingDlcRecord();
+        pending={};
+        assets::dlc50DL::CourseRow row;std::string upper;
+        if(!assets::dlc50DL::courseRow(out->course(),row)||row.addon||
+           !assets::dlc50DL::stockCourseCode(row.code,upper))return false;
+        auto& r=pending.result;
+        r.stockCode=upper;r.subtype11258=s.subtype11258;r.lapCount1125C=s.common->playerBits1125C;
+        r.packed1125C=packed;r.unlock10FAC=s.unlock10FAC;r.race1B0Low2=static_cast<std::uint8_t>(race1B0&3u);
+        r.racers[0].racer=game::dlc50DL::riderKey(raced);r.racers[0].name=std::string(name.data());
+        r.racers[0].values={row0,0u}; // 1AC440 is reached only for the finished, unretired row0
+        pending.owner=this;pending.generation=s.generation;pending.armed=true;
+        out->after_=out->before_;out->ranks_={};
+    }catch(...){pendingDlcRecord()=PendingDlcRecord50DL{};return false;}
+    return true;
 }
 bool OriginalUiRiderProfileOwner50KG::prepareTwoHumanRecordInsertion1AC440(
     const std::array<game::OriginalRaceRecordRacerObservation50KG,2>& rows,
@@ -542,6 +635,24 @@ bool OriginalUiRiderProfileOwner50KG::prepareRaceRecordQualification1ABFC0(
     const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
         static_cast<std::uint16_t>(s.common->playerBits1125C|
             (std::uint16_t(s.packed1125D)<<8))};
+    // PORT EXTENSION, NOT ORIGINAL: a free-play run with a latched add-on pod
+    // qualifies against the merged Hall (stock + DLC rows of this course), the
+    // same table the Hall shows. Stock runs, with or without DLC, read the
+    // stock rows exactly as before.
+    const auto profileRider=std::uint32_t(s.packed1125D>>3);
+    const auto raced=game::dlc50DL::racedRider(profileRider);
+    if(s.common->mode34==0u&&raced!=profileRider&&assets::dlc50DL::addonPod(raced)){
+        const auto course=std::uint32_t(s.packed1125F&15u);
+        if(course<s.hallRecords.courses.size()){
+            auto merged=s.hallRecords; // host copy; the stock rows stay untouched
+            HallMergeCounts50DL counts;
+            if(mergeDlcHallRows50DL(course,merged.courses[course],counts))
+                std::fprintf(stderr,"dlc_record_qualify course=%u table=merged lap_addon=%u race_addon=%u knockout_addon=%u\n",
+                    course,counts.lap,counts.race,counts.knockouts);
+            return Query::prepare(config,merged,s.unlock10FAC,s.packed1125F,race1B0Low2,
+                selectorA1,rows,rowCount,s.generation,out,d);
+        }
+    }
     return Query::prepare(config,s.hallRecords,s.unlock10FAC,s.packed1125F,race1B0Low2,
         selectorA1,rows,rowCount,s.generation,out,d);
 }
@@ -648,6 +759,16 @@ bool OriginalUiRiderProfileOwner50KG::commitSingleHumanHallRecords1AC440(
     s.saveProfile.hallRecordDescendant_.swap(prepared.hallRecordDescendant_);
     ++s.generation; // Preflight rejects MAX; consumes this exact stage once.
     after={s.generation,s.common->mode34};
+    // PORT EXTENSION, NOT ORIGINAL: the add-on pod's record staged by
+    // prepareSingleHumanRecordInsertion1AC440 for this exact stage.
+    {auto& pending=pendingDlcRecord();
+     if(pending.armed&&pending.owner==this&&pending.generation==stage.profileGeneration()){
+         const auto outcome=assets::dlc50DL::progressOwner().submit(pending.result);
+         std::fprintf(stderr,"dlc_record racer=%s course=%s status=%u lap_rank=%u race_rank=%u knockout_rank=%u\n",
+             pending.result.racers[0].racer.c_str(),pending.result.stockCode.c_str(),unsigned(outcome.status),
+             unsigned(outcome.first.lap),unsigned(outcome.first.race),unsigned(outcome.first.knockouts));
+     }
+     pending={};}
     // Native autosave (as the tournament result and unlock grants): the new
     // Hall rows persist even if the session ends before the next save point.
     if(s.betaSettings&&(s.betaSettings->flags11050&1u))(void)saveNativeBetaProgress();
@@ -726,7 +847,22 @@ bool OriginalUiRiderProfileOwner50KG::hallBrowseRecordSnapshot(std::uint32_t cou
     game::OriginalUiHallCourseRecords50KG& out) const noexcept {
     if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
        course>=storage_->hallRecords.courses.size())return false;
-    out=storage_->hallRecords.courses[course];return true;
+    out=storage_->hallRecords.courses[course];
+    // PORT EXTENSION, NOT ORIGINAL: add-on pod records merged at display time
+    // (mergeDlcHallRows50DL). Without DLC rows nothing changes or is logged.
+    HallMergeCounts50DL counts;
+    if(mergeDlcHallRows50DL(course,out,counts)){
+        // One line per course and merged shape (the page renders every frame).
+        static std::array<std::uint32_t,13> logged{};
+        const auto shape=1u+counts.lap+4u*counts.race+16u*counts.knockouts;
+        if(course<logged.size()&&logged[course]!=shape){
+            logged[course]=shape;
+            std::fprintf(stderr,"dlc_hall_merge course=%u lap_addon=%u race_addon=%u knockout_addon=%u icon=absent "
+                "reason=\"add-on UI archive art is not catalogued for the Hall\"\n",
+                course,counts.lap,counts.race,counts.knockouts);
+        }
+    }
+    return true;
 }
 bool OriginalUiRiderProfileOwner50KG::hallBrowsePlanetColors(std::uint32_t planet,
     OriginalUiCourseProfileColors50KG& out) const noexcept {
@@ -1730,7 +1866,11 @@ bool OriginalUiRiderProfileOwner50KG::saveNativeBetaProgress() noexcept {
   const auto size=static_cast<std::uint32_t>(bytes.size()-16),crc=native_beta50kg::checksum(bytes,16);
   for(unsigned i=0;i<4;++i){bytes[8+i]=static_cast<std::uint8_t>(size>>(8*i));bytes[12+i]=static_cast<std::uint8_t>(crc>>(8*i));}
   const auto result=native_beta50kg::writeFile(s.betaPath,bytes);
-  if(result==R::ok){s.betaStatus=BetaPersistenceStatus::saved;s.saveProfile.cardFlags_.value&=static_cast<std::uint8_t>(~1u);return true;}
+  if(result==R::ok){s.betaStatus=BetaPersistenceStatus::saved;s.saveProfile.cardFlags_.value&=static_cast<std::uint8_t>(~1u);
+   // PORT EXTENSION, NOT ORIGINAL: the DLC side file is written at this same
+   // stock save moment, only when its progress changed (silent otherwise).
+   (void)assets::dlc50DL::progressOwner().saveIfChanged();
+   return true;}
   s.betaStatus=result==R::durabilityUnknown?BetaPersistenceStatus::durabilityUnknown:BetaPersistenceStatus::writeError;return false;
  }catch(...){s.betaStatus=BetaPersistenceStatus::writeError;return false;}
 }

@@ -3,6 +3,7 @@ namespace original_main_entry50KG { struct Application; }
 #include "track_session_assets50ig_fixture.h"
 #include "original_course_roster50kg_fixture.h"
 #include "../../src/game/original_course_load_selection50kg.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
 #include "course_archive_receipt50ci.h"
@@ -242,7 +243,12 @@ public:
         if((s.laps!=3&&!directHumanTrack(selected->track))||
            (directDisc_&&!directDiscTarget(selected->track)))return A::unsupportedNativeMode;
         bool rosterPresent=false;
-        for(std::size_t i=0;i<riders.size();++i)
+        // PORT EXTENSION, NOT ORIGINAL: a selected free-play add-on rider races
+        // instead of the profile's stock rider; its row is the DLC registry's
+        // and its archive identity the common pod admission's (read once).
+        const unsigned addon=s.mode34==0?rr::game::dlc50DL::selectedAddonRider():0u;
+        if(addon)rosterPresent=original_player_identity50IK::find(addon)!=nullptr;
+        else for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;
         if(!rosterPresent)return A::riderResourcesUnavailable;
         for(std::size_t i=0;i<targets.size();++i)
@@ -275,8 +281,10 @@ public:
     bool matches(const rr::platform::OriginalUiRiderProfileOwner50KG& actual,
         std::uint64_t generation,Track loadedTrack,std::uint32_t loadedRacer)const noexcept {
         Selection current;
+        // loadedRacer may be the latched free-play add-on (PORT EXTENSION):
+        // the profile's own stock rider is compared, never the add-on number.
         return profile_.get()==&actual&&target_&&generation==nextGeneration_&&
-            target_->track==loadedTrack&&selection_.rider==loadedRacer&&
+            target_->track==loadedTrack&&selection_.rider==rr::game::dlc50DL::profileRider(loadedRacer)&&
             actual.courseRaceSnapshot(current)&&same(selection_,current)&&target(current)==target_;
     }
     // Restart Race re-runs the SAME consumed race constructor. Mint an

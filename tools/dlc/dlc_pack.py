@@ -1,13 +1,16 @@
-"""Racer Revenge PC DLC package tool (phase 1). PC enhancement, not original behaviour.
+"""Racer Revenge PC DLC package tool (phases 1-2). PC enhancement, not original behaviour.
 
-Same rules as the game's startup checker (src/assets/dlc_package50dl.cpp and
-dlc_files50dl.cpp). Field reference: work/scratch/dlc/DLC-JSON.md.
+Same rules as the game's startup checker (src/assets/dlc_package50dl.cpp,
+dlc_files50dl.cpp and, for add-on items of contract dlc-contract-2,
+dlc_registry50dl.cpp). Field reference: work/scratch/dlc/DLC-JSON.md.
 
   dlc_pack.py check   <package-or-DLC-root> [--stock <install>]
       Validate one package folder, or every package under a DLC root (then
       dependencies, conflicts and replacement collisions are resolved as the game
       does). With --stock, replacements are checked against the installed stock
-      files. Exit code 0 when every enabled package would be admitted.
+      files, and add-on pod items get the shared-original-name check (read from
+      the stock pod and Garage archives); without --stock that one check is
+      skipped (reported). Exit code 0 when every enabled package would be admitted.
   dlc_pack.py files   <package>
       (Re)generate the "files" list of dlc.json from the folder contents (sizes
       and SHA-256). Other fields are kept; the file is written UTF-8 without BOM.
@@ -24,11 +27,14 @@ import hashlib
 import json
 import re
 import shutil
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 SCHEMA = 'rrpc-dlc/1'
-CONTRACT = 'dlc-contract-1'
+CONTRACT = 'dlc-contract-1'          # replacement packages
+ITEMS_CONTRACT = 'dlc-contract-2'    # add-on items (courses, pods)
 PERSONAL_NOTE = 'built from your own copy of the source games; do not share'
 REFUSED = ('.exe', '.dll', '.com', '.bat', '.cmd', '.ps1', '.vbs', '.js', '.py', '.sh', '.lua', '.so',
            '.dylib', '.scr', '.msi', '.jar', '.wsf', '.hta')
@@ -136,12 +142,17 @@ def read_manifest(folder):
     need(-1000 <= pr <= 1000, 'priority must be -1000..1000')
     p['priority'] = pr
     rp = s('requires_port', False)
-    need(not rp or rp == CONTRACT, f'package needs port data contract "{rp}"; this build has "{CONTRACT}"')
+    need(not rp or rp in (CONTRACT, ITEMS_CONTRACT),
+         f'package needs port data contract "{rp}"; this build has "{CONTRACT}" and "{ITEMS_CONTRACT}"')
     need(p['kind'] in KINDS, f'kind "{p["kind"]}" is not course, pod, menu_assets, replacement or bundle')
+    need(p['kind'] != 'menu_assets', 'kind "menu_assets" needs a later version of the port')
     items = d.get('items')
     need(isinstance(items, list), 'dlc.json: missing field "items"' if items is None else 'dlc.json: field "items" must be a list')
-    need(not items and p['kind'] == 'replacement',
-         f'add-on items (kind "{p["kind"]}") need a later version of the port; this build loads replacement packages only')
+    need(len(items) <= 256, 'dlc.json: too many entries in "items"')
+    need(p['kind'] != 'replacement' or not items, 'kind "replacement" must list no items')
+    need(p['kind'] not in ('course', 'pod') or items, f'kind "{p["kind"]}" lists no items')
+    need(not items or rp == ITEMS_CONTRACT, f'add-on items need "requires_port": "{ITEMS_CONTRACT}"')
+    p['raw'] = d
     files = d.get('files')
     need(isinstance(files, list), 'dlc.json: field "files" must be a list')
     need(len(files) <= MAX_FILES, 'dlc.json: too many entries in "files"')
@@ -181,6 +192,8 @@ def read_manifest(folder):
         need(w.lower() in seen, f'replacements: "{w}" is not listed in files')
         p['replacements'].append(dict(target=t, expect_bytes=eb, expect_sha256=eh, with_=w))
     need(p['kind'] != 'replacement' or p['replacements'], 'kind "replacement" lists no replacements')
+    need(p['kind'] not in ('course', 'pod') or not p['replacements'],
+         f'kind "{p["kind"]}" must not list replacements (use kind "bundle")')
     p['dependencies'] = []
     for row in d.get('dependencies', []):
         need(isinstance(row, dict), 'dependencies: every entry must be an object')
@@ -195,7 +208,400 @@ def read_manifest(folder):
         cid = row.get('id', '')
         need(isinstance(cid, str) and ID.match(cid) and cid != p['id'], f'conflicts: "{cid}" is not another package id')
         p['conflicts'].append(dict(id=cid, reason=str(row.get('reason', ''))))
+    p['pods'], p['courses'], p['strings'] = [], [], {}
+    if items:
+        read_items(p, d)
     return p
+
+
+# ---------------------------------------------------------------- add-on items (dlc-contract-2)
+# Same rules as src/assets/dlc_registry50dl.cpp (readItems / checkItems).
+ITEM_ID = re.compile(r'^[a-z0-9][a-z0-9-]{1,46}$')
+STEM = re.compile(r'^[a-z0-9_]{3,16}$')
+KEY = re.compile(r'^[A-Z0-9_]{1,47}$')
+RECORDS_KEY = re.compile(r'^[a-z0-9-]{1,47}$')
+STOCK_CODES = {'ta', 'tb', 'tc', 'rc', 'ma', 'mb', 'mc', 'ra', 'ga', 'gb', 'gc', 'sa', 'sc', 'sb'}
+STOCK_RACERS = {1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 15, 16, 19, 20, 22, 24, 17, 18, 23, 14, 21, 25, 26}
+POD_CAPACITY = dict(file=16 << 20, decoded=16 << 20, entries=512)
+UI_CAPACITY = dict(file=16 << 20, decoded=32 << 20, entries=512)
+COURSE_CAPACITY = dict(file=64 << 20, decoded=128 << 20, entries=10000)
+TEXT_MEMBER, CAMERA_BYTES, LOOSE_PST = 8192, 64 << 10, 4 << 20
+
+
+def font_text(s, limit):  # printable ASCII: the stock menu fonts draw every glyph of it
+    return isinstance(s, str) and 0 < len(s) <= limit and all(0x20 <= ord(c) <= 0x7e for c in s)
+
+
+def read_res(path, cap):
+    """RES3 names and decoded storage (layout of src/assets/import_decode48c.cpp)."""
+    b = Path(path).read_bytes()
+    need(0 < len(b) <= cap['file'], f'{Path(path).name} is outside the archive capacity ({cap["file"]} bytes)')
+    try:
+        v, meta, codec, z, tb = struct.unpack_from('<5I', b, 0)
+        assert v == 3 and tb >= 2 and tb % 2 == 0
+        nb = tb // 2 - 1
+        sizes = struct.unpack_from('<%dH' % nb, b, 20)
+        off = 20 + tb
+        cnt, ib = struct.unpack_from('<2I', b, off); off += 8
+        assert cnt <= cap['entries']
+        ents = []
+        for _ in range(cnt):
+            n, = struct.unpack_from('<I', b, off); off += 4
+            name = b[off:off + n].decode('ascii'); off += n
+            lo, sz = struct.unpack_from('<2I', b, off); off += 8
+            ents.append((name, lo, sz))
+        out = bytearray()
+        for s_ in sizes:
+            out += zlib.decompress(b[off:off + s_]); off += s_ + 1
+            assert len(out) <= cap['decoded']
+        for _, lo, sz in ents:
+            assert lo + sz <= len(out)
+    except (AssertionError, struct.error, zlib.error, UnicodeDecodeError, ValueError):
+        raise Refused(f'{Path(path).name} does not decode as a RES archive within its capacity')
+    names = {}
+    for n, lo, sz in ents:
+        need(n.lower() not in names, f'archive member {n} is listed twice')
+        names[n.lower()] = (n, lo, sz)
+    return names, bytes(out)
+
+
+def ini(data):
+    out, section = {}, ''
+    for line in data.decode('latin-1').splitlines():
+        line = line.split(';', 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            section = line[1:-1].lower(); continue
+        if '=' in line:
+            k, v = line.split('=', 1)
+            v = v.strip()
+            if len(v) >= 2 and v[0] == v[-1] == '"':
+                v = v[1:-1]
+            out.setdefault(section, {}).setdefault(k.strip().lower(), v)
+    return out
+
+
+def leaf(name):
+    return name.replace('/', '\\').rsplit('\\', 1)[-1].rsplit('.', 1)[0]
+
+
+def ext(name):
+    return name.rsplit('.', 1)[-1] if '.' in name else ''
+
+
+def stem_leaf(lf, stem):
+    return lf == stem or any(lf.startswith(stem + t) for t in ('_', 'c', 'e')) or \
+        lf.startswith('flame' + stem) or lf.startswith('concring' + stem)
+
+
+def pod_slot(part):
+    return re.fullmatch(r'pod\d\d', part) is not None
+
+
+_SHARED = {}
+
+
+def shared_names(stock):
+    """Member names present in at least two stock pod (or Garage pod) archives."""
+    if stock in _SHARED:
+        return _SHARED[stock]
+    res = []
+    for garage in (False, True):
+        seen, read = {}, 0
+        for r in sorted(STOCK_RACERS):
+            q = Path(stock) / ('UI/UIGARAGE/%02dE.RES' % r if garage else 'PODS/POD%02d/POD%02d.RES' % (r, r))
+            if not q.is_file():
+                continue
+            try:
+                names, _ = read_res(q, UI_CAPACITY if garage else POD_CAPACITY)
+            except Refused:
+                continue
+            read += 1
+            for n in names:
+                seen[n] = seen.get(n, 0) + 1
+        need(read >= 2, 'fewer than two stock ' + ('UI/UIGARAGE pod' if garage else 'pod') + ' archives are readable')
+        res.append({n for n, k in seen.items() if k >= 2})
+    _SHARED[stock] = tuple(res)
+    return _SHARED[stock]
+
+
+def read_items(p, d):
+    strings = d.get('strings', {})
+    need(isinstance(strings, dict), 'strings must be an object of languages')
+    need(len(strings) <= 16, 'strings: too many languages')
+    keys = 0
+    for lang, table in strings.items():
+        need(re.fullmatch(r'[a-z]{1,16}', lang) is not None, f'strings: language "{lang}" is not a lower-case language name')
+        need(isinstance(table, dict), f'strings: "{lang}" must be an object of KEY: text')
+        for k, v in table.items():
+            need(KEY.match(k) is not None, f'strings: key "{k}" is not [A-Z0-9_]{{1,47}}')
+            need(font_text(v, 255), f'strings: {lang}.{k} must be 1-255 characters the menu fonts draw (printable ASCII)')
+            keys += 1
+            need(keys <= 4096, 'strings: more than 4096 keys')
+    p['strings'] = strings
+    english = strings.get('english', {})
+    listed = {f['path'].lower(): f['path'] for f in p['files']}
+
+    def path(raw, what):
+        n = norm(raw) if isinstance(raw, str) else None
+        need(n, f'{what} "{raw}" is not a plain package path')
+        need(n.lower() in listed, f'{what} "{raw}" is not listed in files')
+        return listed[n.lower()]
+
+    def txt(o, k, where, required=True):
+        need(not required or k in o, f'{where}: missing field "{k}"')
+        v = o.get(k, '')
+        need(isinstance(v, str), f'{where}: field "{k}" must be text')
+        return v
+
+    def eng(k, where, what):
+        need(k in english, f'{where}: {what} "{k}" has no English string')
+        return english[k]
+
+    ids = set()
+    for o in p['raw']['items']:
+        need(isinstance(o, dict), 'items: every entry must be an object')
+        kind, iid = txt(o, 'kind', 'items'), txt(o, 'id', 'items')
+        need(ITEM_ID.match(iid) is not None, f'items: id "{iid}" is not [a-z0-9][a-z0-9-]{{1,46}}')
+        need(iid not in ids, f'items: id "{iid}" is used twice'); ids.add(iid)
+        if kind == 'pod':
+            w = f'pod item "{iid}"'
+            stem = txt(o, 'stem', w)
+            need(STEM.match(stem) is not None and not pod_slot(stem),
+                 f'{w}: stem "{stem}" is not [a-z0-9_]{{3,16}} (and not pod plus two digits)')
+            sp = stem.upper()
+            pod = dict(id=iid, key=f'{p["id"]}/{iid}', stem=stem)
+            pod['archive'] = path(txt(o, 'archive', w), f'{w}: archive')
+            need(pod['archive'].lower() == f'pods/{stem}/{stem}.res', f'{w}: archive must be PODS/{sp}/{sp}.RES')
+            pod['camera'] = path(txt(o, 'camera', w), f'{w}: camera')
+            need(pod['camera'].lower() == f'pods/{stem}/{stem}.cam', f'{w}: camera must be PODS/{sp}/{sp}.CAM')
+            nk = txt(o, 'name_key', w); sk = txt(o, 'short_name_key', w, False) or nk
+            pod['name'] = eng(nk, w, 'name_key'); eng(sk, w, 'short_name_key')
+            ui = o.get('ui')
+            need(isinstance(ui, dict), f'{w}: missing object "ui"')
+            uw = w + ' ui'
+            pod['ui_archive'] = path(txt(ui, 'archive', uw), f'{uw}: archive')
+            need(pod['ui_archive'].lower() == f'ui/{stem}_ui.res', f'{uw}: archive must be UI/{sp}_UI.RES')
+            named = [txt(ui, 'rider_model', uw), txt(ui, 'results_icon', uw)]
+            need(all(named), f'{uw}: rider_model and results_icon must name members')
+            lists = {}
+            for k in ('character', 'character_pages', 'pod_pages', 'shadow', 'portraits', 'background', 'garage_model'):
+                v = ui.get(k, None)
+                need(v is not None or k == 'garage_model', f'{uw}: missing field "{k}"')
+                v = v or []
+                need(isinstance(v, list) and len(v) <= 512 and all(isinstance(x, str) and x for x in v),
+                     f'{uw}: every entry of "{k}" must be a member name')
+                lists[k] = v; named += v
+            ch = [x.lower() for x in lists['character']]
+            base = next((x.rsplit('.', 1)[0] for x in ch if ext(x) == 'psg'), None)
+            need(base, f'{uw}: character lists no .psg')
+            want = {base + '.psg', base + '.mcf', base + '.vut'} | {base + m + '.mot' for m in ('_ent', '_idl1', '_idl2', '_idl3', '_breathe', '_sel')}
+            need(set(ch) == want and len(ch) == len(want),
+                 f'{uw}: character must be {base}.psg/.mcf/.vut and the six motions _ent _idl1 _idl2 _idl3 _breathe _sel')
+            pod['ui_named'] = named
+            pod['loose'] = []
+            v = o.get('voice')
+            if v is not None:
+                need(isinstance(v, dict), f'{w}: voice must be an object')
+                pod['loose'].append(path(txt(v, 'ini', w + ' voice'), f'{w}: voice ini'))
+                fi, co = v.get('first'), v.get('count')
+                need(isinstance(fi, int) and isinstance(co, int) and not isinstance(fi, bool) and 0 <= fi <= 255 and 1 <= co <= 255,
+                     f'{w}: voice needs whole numbers first (0-255) and count (1-255)')
+            a = txt(o, 'announcer', w, False)
+            if a:
+                pod['loose'].append(path(a, f'{w}: announcer'))
+            ai, unlock = txt(o, 'ai', w, False) or 'addon_courses', txt(o, 'unlock', w, False) or 'always'
+            need(ai != 'anywhere', f'{w}: ai "anywhere" needs a later version of the port (contract 2: addon_courses or never)')
+            need(ai in ('addon_courses', 'never'), f'{w}: ai must be addon_courses or never')
+            need(unlock == 'always', f'{w}: unlock must be "always" (contract 2)')
+            need(all(x['stem'] != stem for x in p['pods']), f'items: stem "{stem}" is used twice')
+            p['pods'].append(pod)
+        elif kind == 'course':
+            w = f'course item "{iid}"'
+            code = txt(o, 'code', w)
+            need(re.fullmatch(r'[a-z][a-z0-9]', code) is not None, f'{w}: code "{code}" must be 2 characters [a-z][a-z0-9]')
+            need(code not in STOCK_CODES, f'{w}: code "{code}" is a stock course code')
+            c = dict(id=iid, key=f'{p["id"]}/{iid}', code=code, loose=[])
+            c['archive'] = path(txt(o, 'archive', w), f'{w}: archive')
+            need(c['archive'].lower() == f'tracks/{code}.res', f'{w}: archive must be TRACKS/{code.upper()}.RES')
+            c['name'] = eng(txt(o, 'name_key', w), w, 'name_key')
+            pk = txt(o, 'planet_name_key', w, False)
+            if pk:
+                eng(pk, w, 'planet_name_key')
+            need(txt(o, 'phy_class', w) in ('A', 'B', 'C'), f'{w}: phy_class must be A, B or C')
+            need(txt(o, 'ai_class', w) in ('A', 'B', 'C'), f'{w}: ai_class must be A, B or C')
+            rival = txt(o, 'rival', w)
+            if rival != 'none':
+                m = re.fullmatch(r'stock:(\d\d)', rival)
+                if rival.startswith('stock:'):
+                    need(m and int(m.group(1)) in STOCK_RACERS, f'{w}: rival "{rival}" is not an existing stock racer (stock:01..26)')
+                else:
+                    pkg, _, it = rival.partition('/')
+                    need(len(pkg) >= 3 and ITEM_ID.match(it or '') is not None,
+                         f'{w}: rival must be stock:NN, <package-id>/<pod-item-id> or none')
+            ls = o.get('loading_screen')
+            need(isinstance(ls, dict), f'{w}: missing object "loading_screen"')
+            need(('file' in ls) != ('stock' in ls), f'{w}: loading_screen needs exactly one of file or stock')
+            if 'file' in ls:
+                f = path(txt(ls, 'file', w + ' loading_screen'), f'{w}: loading_screen file')
+                need(f.lower() == f'ui/textures/ld_{code}.pst', f'{w}: loading_screen file must be UI/TEXTURES/LD_{code.upper()}.PST')
+                c['loose'].append(f)
+            else:
+                sc = txt(ls, 'stock', w + ' loading_screen').lower()
+                need(sc in STOCK_CODES and sc != 'sb', f'{w}: loading_screen stock must be a stock course code')
+            cs = o.get('course_screen')
+            if cs is not None:
+                need(isinstance(cs, dict), f'{w}: course_screen must be an object')
+                need('archive' not in cs and 'hologram' not in cs,
+                     f'{w}: own hologram archives need a later version of the port (contract 2: stock_template)')
+                st = txt(cs, 'stock_template', w + ' course_screen').lower()
+                need(st in STOCK_CODES and st != 'sb', f'{w}: course_screen stock_template must be a stock course code')
+                pv = txt(cs, 'preview', w + ' course_screen', False)
+                if pv:
+                    pv = path(pv, f'{w}: course_screen preview')
+                    need(ext(pv.lower()) == 'pst', f'{w}: course_screen preview must be a .PST')
+                    c['loose'].append(pv)
+            inh = o.get('inherit', {})
+            need(isinstance(inh, dict), f'{w}: inherit must be an object')
+            c['inherit'] = {}
+            for k in ('tuning', 'particles'):
+                v = inh.get(k, '')
+                need(isinstance(v, str), f'{w} inherit: field "{k}" must be text')
+                need(not v or (v.lower() in STOCK_CODES and v.lower() != 'sb'), f'{w}: inherit values must be stock course codes')
+                c['inherit'][k] = v.lower()
+            if 'modes' in o:
+                m = o['modes']
+                need(isinstance(m, list) and m, f'{w}: modes must be a non-empty list')
+                for x in m:
+                    need(x != 'circuit', f'{w}: mode circuit needs a later version of the port')
+                    need(x in ('single', 'time_trial'), f'{w}: modes may only hold single and time_trial')
+            rk = txt(o, 'records_key', w, False) or iid
+            need(RECORDS_KEY.match(rk) is not None, f'{w}: records_key must be [a-z0-9-]{{1,47}}')
+            h = o.get('hall_defaults')
+            if h is not None:
+                need(isinstance(h, dict), f'{w}: hall_defaults must be an object')
+                for k in ('lap', 'race', 'knockouts'):
+                    rows = h.get(k, [])
+                    need(isinstance(rows, list) and len(rows) <= 3, f'{w}: hall_defaults.{k} must be a list of at most 3 rows')
+                    for r in rows:
+                        need(isinstance(r, dict), f'{w}: hall_defaults.{k} rows must be objects')
+                        need(font_text(r.get('name'), 20), f'{w}: hall_defaults names must be 1-20 printable characters (original 21-byte lane with its end byte)')
+                        if k == 'knockouts':
+                            n = r.get('count')
+                            need(isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= 999, f'{w}: hall_defaults knockouts need a whole count')
+                        else:
+                            t_ = r.get('time')
+                            need(isinstance(t_, (int, float)) and not isinstance(t_, bool) and 0 < t_ <= 35999,
+                                 f'{w}: hall_defaults times must be seconds above 0')
+            e = o.get('enhancements', [])
+            need(isinstance(e, list) and len(e) <= 16 and all(font_text(x, 32) for x in e), f'{w}: enhancements must be a short list')
+            need(all(x['code'] != code for x in p['courses']), f'items: code "{code}" is used twice')
+            p['courses'].append(c)
+        else:
+            raise Refused(f'items: kind "{kind}" is not course or pod')
+    need(p['kind'] != 'pod' or (p['pods'] and not p['courses']), 'kind "pod" must list only pod items (at least one)')
+    need(p['kind'] != 'course' or (p['courses'] and not p['pods']), 'kind "course" must list only course items (at least one)')
+
+
+def check_items(p, stock):
+    """Item content (names only; the game's own loaders decode the content again)."""
+    for pod in p['pods']:
+        stem, w = pod['stem'], f'pod {pod["stem"]}'
+        shared = shared_names(stock) if stock else None
+        try:
+            names, data = read_res(p['folder'] / pod['archive'], POD_CAPACITY)
+        except Refused as x:
+            raise Refused(f'{w}: archive {pod["archive"]} {x}')
+        own, speech = f'pods\\{stem}\\', f'audio\\speech\\{stem}\\'
+        for n, (spelling, _, _) in names.items():
+            parts = re.split(r'[\\/]', n)
+            need(not (len(parts) >= 2 and parts[0] == 'pods' and parts[1] != stem),
+                 f'{w}: archive member {spelling} is named for another pod (stem must be {stem})')
+            need(not (len(parts) >= 3 and parts[:2] == ['audio', 'speech'] and parts[2] != stem),
+                 f'{w}: archive member {spelling} is named for another pod (stem must be {stem})')
+            need(not any(pod_slot(x) for x in parts), f'{w}: archive member {spelling} still names an original pod slot')
+            if n.startswith(own) or n.startswith(speech) or stem_leaf(leaf(n), stem):
+                continue
+            need(shared is None or n in shared[0],
+                 f'{w}: archive member {spelling} is neither a shared original name nor named with the stem {stem}')
+
+        def text_member(name):
+            need(name in names, f'{w}: archive lacks member {name}')
+            _, lo, sz = names[name]
+            need(0 < sz <= TEXT_MEMBER, f'{w}: archive member {name} is outside the 8 KiB text capacity')
+            return data[lo:lo + sz]
+        phy = ini(text_member(own + stem + '.phy'))
+        prefix = phy.get('pod setup', {}).get('prefix', '')
+        need(prefix.lower() == stem, f'{w}: PHY [Pod Setup] Prefix is "{prefix}"; it must equal the stem')
+        for sec, label in (('baseabilities', 'BaseAbilities'), ('maxabilities', 'MaxAbilities')):
+            for k in ('maxthrust', 'theoreticaltopspeed', 'spoileryawmoment', 'defense', 'baserepairamount', 'basecoolingtime'):
+                need(k in phy.get(sec, {}), f'{w}: PHY lacks [{label}] {k} (stats bars)')
+        text_member(own + stem + '.ai')
+        sounds = ini(text_member(speech + 'sounds.ini'))
+        need('indices' in sounds, f'{w}: sounds.ini lacks [Indices]')
+        for k, v in sounds['indices'].items():
+            if k.startswith('numberof'):
+                need(re.fullmatch(r'\d{1,3}', v) is not None and int(v) <= 255, f'{w}: sounds.ini {k} exceeds its uint8 storage')
+        for table in ('curses.ini', 'taunts.ini', 'special.ini'):
+            text_member(speech + table)
+        cam = (p['folder'] / pod['camera']).stat().st_size
+        need(0 < cam <= CAMERA_BYTES, f'{w}: camera {pod["camera"]} is empty or larger than 64 KiB')
+        try:
+            ui_names, _ = read_res(p['folder'] / pod['ui_archive'], UI_CAPACITY)
+        except Refused as x:
+            raise Refused(f'{w}: menu archive {pod["ui_archive"]} {x}')
+        seen = set()
+        for m in pod['ui_named']:
+            need(m.lower() in ui_names, f'{w}: menu archive lacks member {m} named in dlc.json')
+            need(m.lower() not in seen, f'{w}: menu member {m} is named twice in dlc.json'); seen.add(m.lower())
+        for n, (spelling, _, _) in ui_names.items():
+            need(n in seen, f'{w}: menu archive member {spelling} is not named by any ui field')
+            need(stem_leaf(leaf(n), stem) or shared is None or n in shared[1],
+                 f'{w}: menu archive member {spelling} is neither a shared original name nor named with the stem {stem}')
+        pod['materials'] = {n.rsplit('.', 1)[0] for n in names if ext(n) == 'psm' and stem_leaf(leaf(n), stem)}
+        pod['ui_materials'] = {n.rsplit('.', 1)[0] for n in ui_names if ext(n) == 'psm' and stem_leaf(leaf(n), stem)}
+        for f in pod['loose']:
+            n = (p['folder'] / f).stat().st_size
+            need(0 < n <= TEXT_MEMBER, f'{w}: {f} is outside the 8 KiB INI capacity')
+        if shared is None:
+            print(f'  ({w}: shared original names not checked; pass --stock <install>)')
+    for c in p['courses']:
+        code, w = c['code'], f'course {c["code"]}'
+        try:
+            names, _ = read_res(p['folder'] / c['archive'], COURSE_CAPACITY)
+        except Refused as x:
+            raise Refused(f'{w}: archive {c["archive"]} {x}')
+        for want in (f'tracks\\{code}.scb', f'tracks\\{code}.tob', f'tracks\\{code}.aub', f'tracks\\m{code}.spl', f'tracks\\a{code}.spl'):
+            need(want in names, f'{w}: archive lacks member {want}')
+        for n, (spelling, _, _) in names.items():
+            parts = re.split(r'[\\/]', n)
+            lf = leaf(n)
+            need(not (len(parts) == 2 and parts[0] == 'tracks' and len(lf) == 2 and lf != code and lf in STOCK_CODES),
+                 f'{w}: archive member {spelling} is named by stock course code {lf}')
+        own_tun = f'tracks\\{code}.tun' in names
+        own_part = all(f'particle\\demoprt.{e}' in names for e in ('prt', 'pst', 'psm'))
+        need(own_tun or c['inherit']['tuning'], f'{w}: archive has no tracks\\{code}.tun and no inherit.tuning')
+        need(own_part or c['inherit']['particles'], f'{w}: archive has no particle\\demoprt.prt/.pst/.psm and no inherit.particles')
+        for f in c['loose']:
+            n = (p['folder'] / f).stat().st_size
+            need(0 < n <= LOOSE_PST, f'{w}: {f} is empty or larger than 4 MiB')
+
+
+def items_collide(a, b):
+    for x in a['pods']:
+        for y in b['pods']:
+            if x['stem'] == y['stem']:
+                return f'pod stem {x["stem"]}'
+            for k, label in (('materials', 'material name'), ('ui_materials', 'menu material name')):
+                common = sorted(x.get(k, set()) & y.get(k, set()))
+                if common:
+                    return f'{label} {common[0]}'
+    for x in a['courses']:
+        for y in b['courses']:
+            if x['code'] == y['code']:
+                return f'course code {x["code"]}'
+    return None
 
 
 def is_program(path):
@@ -301,6 +707,13 @@ def resolve(entries):
                     others = ','.join(o['p']['id'] for o in who if o is not x)
                     refuse(x, f'replaces {target} ' + ('at the same priority as ' if tie else 'with lower priority than ') + others)
                     changed = True
+        for i, e in enumerate(order):  # pod stem / course code / material name claimed twice
+            if not ok(e) or not (e['p']['pods'] or e['p']['courses']):
+                continue
+            for o in order[:i]:
+                what = ok(o) and items_collide(o['p'], e['p'])
+                if what:
+                    refuse(e, f'{what} is already used by package {o["p"]["id"]}'); changed = True; break
         if not changed:
             break
 
@@ -319,10 +732,19 @@ def check(target, stock):
                 check_files(e['p'])
                 if stock:
                     check_stock(e['p'], stock)
+                if e['p']['pods'] or e['p']['courses']:
+                    check_items(e['p'], stock)
         except Refused as x:
             e['status'], e['reason'] = 'refused', str(x)
         entries.append(e)
     resolve(entries)
+    numbers = {'pods': 32, 'courses': 32}
+    order = sorted(entries, key=lambda e: (-(e['p']['priority'] if e.get('p') else 0), e['folder'].name))
+    for e in order:
+        if e['status'] == 'admitted':
+            for kind in ('pods', 'courses'):
+                for it in e['p'][kind]:
+                    it['number'] = numbers[kind]; numbers[kind] += 1
     bad = 0
     for e in entries:
         p = e['p'] or {}
@@ -334,6 +756,11 @@ def check(target, stock):
             print(f'  personal: {p["personal_note"]}')
         for r in p.get('replacements', []) if e['status'] == 'admitted' else []:
             print(f'  replaces {r["target"]} with {r["with_"]}')
+        for it in p.get('pods', []) if e['status'] == 'admitted' else []:
+            print(f'  pod {it["key"]} stem={it["stem"]} number={it["number"]} name="{it["name"]}"'
+                  f' materials={len(it.get("materials", ()))} ui_materials={len(it.get("ui_materials", ()))}')
+        for it in p.get('courses', []) if e['status'] == 'admitted' else []:
+            print(f'  course {it["key"]} code={it["code"]} number={it["number"]} name="{it["name"]}"')
         bad += e['status'] == 'refused'
     if not stock:
         print('(stock files not checked: pass --stock <install> to check "expects")')

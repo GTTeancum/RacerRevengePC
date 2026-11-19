@@ -52,6 +52,9 @@ bool OriginalResults10450LA::Impl::texture(Texture& t,Role role,std::uint32_t pc
     if(!domain->populateTimeStatsResources2DF144(context,materialDiagnostic))
         return stop(d,S::material,materialDiagnostic.sourcePC,"Results actual whole-table population");
     const auto* ref=references.reference(t.primitive54->reference);
+    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's absent portrait has no
+    // material, atlas or packet; every later reader skips it (never drawn).
+    if(ref&&ref->absent)return true;
     const assets::OriginalStandardMaterialObject50LA* object=nullptr;
     assets::OriginalStandardMaterialPassView50LA pass;
     assets::OriginalStandardTextureRowView50LA row;

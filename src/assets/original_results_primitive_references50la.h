@@ -25,7 +25,12 @@ public:
     enum class Role : std::uint8_t { baseResults1,baseResults2,letterBox,baseTextPause,
         iconSquare,iconTriangle,iconCross,iconCircle,denmark16,eurostile13,portrait,
         medalGold,medalSilver,medalBronze,separator };
-    struct Reference {std::int32_t material00=-1;bool started=false,retained=false;};
+    // absent: PORT EXTENSION, NOT ORIGINAL. An add-on racer's Results
+    // portrait (DLC pod): the original "%02d_fsm" catalogue has no row for
+    // it and its own results icon lives in a package UI archive the Results
+    // owner does not mount, so the occurrence is consumed with no material
+    // (nothing stored or retained) and the portrait is simply not drawn.
+    struct Reference {std::int32_t material00=-1;bool started=false,retained=false,absent=false;};
     ~OriginalResultsPrimitiveReferences50LA();
     OriginalResultsPrimitiveReferences50LA(const OriginalResultsPrimitiveReferences50LA&)=delete;
     OriginalResultsPrimitiveReferences50LA& operator=(const OriginalResultsPrimitiveReferences50LA&)=delete;

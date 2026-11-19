@@ -83,16 +83,28 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
             "50IE invalid actual announcer roster extent");
         Authoring next;next.parameters={.80f,7.f};next.collisionRequests=roster;
         const std::size_t count=roster?actualRacerCount:1;
+        // PORT EXTENSION, NOT ORIGINAL: an add-on pod (DLC registry row) has
+        // no named announcer INI, so it gets no named bank and no named cues
+        // (generic lines only). It never indexes the 27-row original table.
+        const auto addonRacer=[](std::uint32_t racer){return original_player_identity50IK::addonPodOf(racer)!=nullptr;};
+        std::size_t named=0,addons=0;
         for(std::size_t i=0;i<count;++i){
             const auto racer=roster?actualRacer60[i]:playerRacer60;
+            if(addonRacer(racer)){
+                d::need(original_player_identity50IK::find(racer)!=nullptr,"50IE add-on announcer identity unsupported");
+                for(std::size_t k=0;k<i;++k)d::need((roster?actualRacer60[k]:playerRacer60)!=racer,
+                    "50IE duplicate actual announcer racer60");
+                ++addons;continue;
+            }
             d::need(racer<next.namedBanks.size()&&original_player_identity50IK::find(racer)&&
                 rr::game::original_racer_selection50IJ::findByRacer60(racer),
                 "50IE actual named announcer identity unsupported");
             d::need(!next.namedBanks[racer],"50IE duplicate actual announcer racer60");
-            next.namedBanks[racer]=true;
+            next.namedBanks[racer]=true;++named;
         }
-        d::need(playerRacer60<next.namedBanks.size()&&next.namedBanks[playerRacer60],
+        d::need(addonRacer(playerRacer60)||(playerRacer60<next.namedBanks.size()&&next.namedBanks[playerRacer60]),
             "50IE selected racer is absent from actual announcer roster");
+        if(addons)std::cerr<<"dlc_announcer named_banks="<<named<<" addon_racers="<<addons<<" addon_lines=generic\n";
         // One generic INI, one SPCHPCT, at most eight2496-byte named INIs.
         // These are cold metadata reads only; no selector or RNG is touched.
         d::Inputs input;input.capacity=32768;
@@ -106,7 +118,7 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
         d::need(pct.find("DaxGenericPercent=0.80f")!=pct.npos&&pct.find("DaxSpeechDelay=7.0f")!=pct.npos,
             "50IE original announcer fields absent");
         const auto g=detail::events(generic,150);
-        next.cues.reserve(roster?74+18*count:54);
+        next.cues.reserve(roster?74+18*named:42+12*named);
         //2C2FBC/2C30CC select generic1..4/5..32 for collision types1/2.
         for(unsigned key=roster?1u:33u;key<=51;++key)next.cues.push_back({0,key,g[key-1]});
         for(unsigned key=128;key<=150;++key)next.cues.push_back({0,key,g[key-1]});
@@ -114,6 +126,7 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
         // of vehicle58. This also permits the real AI event5 type12 fallback.
         for(std::size_t i=0;i<count;++i){
             const auto racer=roster?actualRacer60[i]:playerRacer60;
+            if(addonRacer(racer))continue; // no named bank (see above)
             const auto& identity=*original_player_identity50IK::find(racer);
             const auto pod=input.read(original_player_identity50IK::announcerPath(discRoot,identity),
                 identity.announcerBytes);
@@ -125,7 +138,7 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
             for(unsigned key=roster?1u:7u;key<=15;++key)next.cues.push_back({racer,key,p[key-1]});
             for(unsigned key=24;key<=26;++key)next.cues.push_back({racer,key,p[key-1]});
         }
-        d::need(next.cues.size()==(roster?74+18*count:54),"50IE semantic roster count differs");
+        d::need(next.cues.size()==(roster?74+18*named:42+12*named),"50IE semantic roster count differs");
         for(const auto&c:next.cues)d::need(!c.request.loop&&!c.request.stereo&&c.request.stream,
             "50IE original announcer delivery flags differ");
         out=std::move(next);error.clear();return true;

@@ -1,5 +1,6 @@
 #include "dlc_files50dl.h"
 #include "dlc_package50dl.h"
+#include "dlc_registry50dl.h"
 // NOT ORIGINAL BEHAVIOUR (PC enhancement). Design: work\scratch\dlc\DESIGN.md 2.5, 3, 5.
 // This file owns the one session layout of the overlay (struct Session below).
 // It writes no file, no save byte and no game memory; it only answers host().
@@ -23,9 +24,14 @@ struct Active {                 // one admitted whole-file replacement
     fs::path file;              // the replacing package file (absolute)
     std::uintmax_t bytes=0;fs::file_time_type written{};
 };
+struct AddonFile {             // one listed file of an admitted add-on package
+    fs::path file;std::uintmax_t bytes=0;fs::file_time_type written{};
+};
 struct Session {
     bool started=false;
     std::map<std::wstring,Active> replacements; // key: folded absolute stock path
+    // "dlc:/<id>/<path>": key = "<id>/<folded path>". Only packages with add-on items.
+    std::map<std::string,AddonFile> addonFiles;
 };
 Session& session(){static Session s;return s;}
 std::once_flag once;
@@ -54,6 +60,7 @@ const char* env(const char* name){const char* v=std::getenv(name);return v&&*v?v
 enum class Status{pending,admitted,refused,disabled,off};
 struct Entry {
     Package package;Status status=Status::pending;std::string reason;std::string folderName;
+    PackageItems items;             // add-on items (dlc-contract-2), dlc_registry50dl.cpp
 };
 bool before(const Entry* a,const Entry* b){
     if(a->package.priority!=b->package.priority)return a->package.priority>b->package.priority;
@@ -102,8 +109,10 @@ void run(){
         const fs::path folder=e.package.folder;std::string reason;
         if(!readManifest(folder,e.package,reason)){e.package.folder=folder;refuse(e,reason);continue;}
         if(!e.package.enabled){e.status=Status::disabled;e.reason="enabled is false in dlc.json";continue;}
+        if(e.package.itemCount&&!readItems(e.package,e.items,reason)){refuse(e,reason);continue;}
         if(!replacementsOn&&!e.package.replacements.empty()){e.status=Status::off;e.reason="replacements are switched off";continue;}
         if(!checkFiles(e.package,reason)){refuse(e,reason);continue;}
+        if(e.package.itemCount&&!checkItems(e.package,e.items,stock,reason)){refuse(e,reason);continue;}
         // 5. Replacements must be built for exactly the installed stock file.
         for(const auto& r:e.package.replacements){
             const auto target=stock/fromUtf8(r.target);
@@ -185,23 +194,43 @@ void run(){
                 changed=true;
             }
         }
+        // Pod stem, course code or material name claimed twice: the first in
+        // package order keeps it; the later package is refused as a whole.
+        for(std::size_t i=0;i<order.size();++i){
+            if(order[i]->status!=Status::admitted||!order[i]->package.itemCount)continue;
+            for(std::size_t j=0;j<i;++j){
+                std::string what;
+                if(order[j]->status!=Status::admitted||!itemsCollide(order[j]->items,order[i]->items,what))continue;
+                refuse(*order[i],what+" is already used by package "+order[j]->package.id);changed=true;break;
+            }
+        }
         if(!changed)break;
     }
 
     // Log one line per package, then the active replacements, then a summary.
     std::size_t admitted=0,refused=0,replacements=0;
+    std::vector<AdmittedItems> addons;
     for(auto* e:order){
         const auto& p=e->package;
         const char* status=e->status==Status::admitted?"admitted":e->status==Status::disabled?"disabled":
             e->status==Status::off?"switched_off":"refused";
         std::string text="dlc_package id="+(p.id.empty()?e->folderName:p.id)+" version="+(p.versionText.empty()?"?":p.versionText)+
-            " status="+status+" priority="+std::to_string(p.priority)+" items=0 replacements="+std::to_string(p.replacements.size());
+            " status="+status+" priority="+std::to_string(p.priority)+" items="+std::to_string(p.itemCount)+
+            " replacements="+std::to_string(p.replacements.size());
         if(e->status!=Status::admitted)text+=" reason="+inQuotes(e->reason);
         line(text);
         if(e->status==Status::refused)++refused;
         if(p.personal&&e->status!=Status::refused)line("dlc_personal id="+p.id+" note="+inQuotes(p.personalNote));
         if(e->status!=Status::admitted)continue;
         ++admitted;
+        if(p.itemCount){
+            AdmittedItems a;a.package=&p;a.items=std::move(e->items);addons.push_back(std::move(a));
+            for(const auto& f:p.files){
+                const auto file=fs::absolute(p.folder/fromUtf8(f.path),error).lexically_normal();
+                AddonFile row;row.file=file;row.bytes=fs::file_size(file,error);row.written=fs::last_write_time(file,error);
+                s.addonFiles[p.id+"/"+foldCase(f.path)]=row;
+            }
+        }
         for(const auto& r:p.replacements){
             const auto file=fs::absolute(p.folder/fromUtf8(r.with),error).lexically_normal();
             Active a;a.target=r.target;a.package=p.id;a.file=file;
@@ -213,17 +242,21 @@ void run(){
                  " new_sha="+newSha.substr(0,16)+" file="+inQuotes(utf8(file)));
         }
     }
+    std::vector<std::string> itemLines;
+    publishRegistry(addons,admitted,itemLines); // numbers in package order; freezes the registry
+    for(const auto& l:itemLines)line(l);
     line("dlc_registry packages="+std::to_string(admitted)+" refused="+std::to_string(refused)+
-         " courses=0 pods=0 replacements="+std::to_string(replacements));
+         " courses="+std::to_string(addonCourseCount())+" pods="+std::to_string(addonPodCount())+
+         " replacements="+std::to_string(replacements));
 }
 } // namespace
 
 void startup() noexcept {
     try{std::call_once(once,[]{
         try{run();}catch(const std::exception& e){
-            session().replacements.clear();
+            session().replacements.clear();session().addonFiles.clear();
             line(std::string("dlc_root failed reason=")+inQuotes(e.what())+" (stock files only this session)");
-        }catch(...){session().replacements.clear();line("dlc_root failed (stock files only this session)");}
+        }catch(...){session().replacements.clear();session().addonFiles.clear();line("dlc_root failed (stock files only this session)");}
     });}catch(...){}
 }
 
@@ -231,6 +264,32 @@ bool replacing() noexcept {return !session().replacements.empty();}
 
 fs::path host(const fs::path& path){
     const auto& s=session();
+    if(!s.addonFiles.empty()){
+        // Add-on file: "dlc:/<id>/<path>", a listed file of an admitted package.
+        // Never falls back to stock and never leaves the package folder.
+        const auto text=path.generic_u8string();
+        const std::u8string scheme(u8"dlc:/");
+        if(text.size()>scheme.size()&&text.compare(0,scheme.size(),scheme)==0){
+            const std::string rest(text.begin()+static_cast<std::ptrdiff_t>(scheme.size()),text.end());
+            const auto slash=rest.find('/');
+            std::string normalised;
+            const bool plain=slash!=std::string::npos&&normalisePackagePath(rest.substr(slash+1),normalised);
+            const auto at=plain?s.addonFiles.find(rest.substr(0,slash)+"/"+foldCase(normalised)):s.addonFiles.end();
+            if(at==s.addonFiles.end()){
+                line("dlc_open_refused target="+inQuotes(rest)+" reason=\"not a listed file of an admitted add-on package\"");
+                throw std::runtime_error("DLC: "+rest+" is not a listed file of an admitted add-on package");
+            }
+            std::error_code error;
+            const auto bytes=fs::file_size(at->second.file,error);
+            const auto written=error?fs::file_time_type{}:fs::last_write_time(at->second.file,error);
+            if(error||bytes!=at->second.bytes||written!=at->second.written){
+                line("dlc_open_refused target=dlc:/"+rest+" reason=\"the package file changed after startup\" file="+inQuotes(utf8(at->second.file)));
+                throw std::runtime_error("DLC: dlc:/"+rest+" changed on disk after startup; restart the game");
+            }
+            line("dlc_open target=dlc:/"+rest+" by="+rest.substr(0,slash)+" file="+inQuotes(utf8(at->second.file)));
+            return at->second.file;
+        }
+    }
     if(s.replacements.empty())return path; // stock: exactly the path the caller built
     const auto at=s.replacements.find(key(path));
     if(at==s.replacements.end())return path;

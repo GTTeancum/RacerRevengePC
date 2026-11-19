@@ -1,0 +1,59 @@
+#pragma once
+// Add-on rider overlay for one Rider frame (DLC phase 2, user decisions D4/D5).
+// PORT EXTENSION, NOT ORIGINAL BEHAVIOUR: the original Rider screen has 23 authored
+// rider controls and no add-on content.
+//
+// An add-on carousel slot is port state only (original_ui_rider_session50kg.cpp):
+// the original navigation, widgets, models and profile stay on the stock control
+// the add-on block follows (the "anchor"). For that frame the anchor control's
+// four authored widgets (pod model, venus16 name, swhutt44 name, character model)
+// draw nothing; the add-on's lines are laid out with the venus16 name widget's own
+// font, colour and position. The stats code gets the add-on's own registry
+// number (no stock portrait), and the anchor's NN_bkg background is not drawn,
+// so no stock rider's model or image shows under an add-on name.
+//
+// The session sets the overlay for exactly one collector frame (Scope) and the
+// collector reads it only when it names that collector. Narrow on purpose
+// (standard headers only): included by the Rider session and its collector .cpp.
+#include <array>
+#include <cstdint>
+#include <string>
+
+namespace rr::platform::riderAddon50DL {
+
+struct Line {
+    const std::string* text=nullptr;      // first choice (pilot name / package name)
+    const std::string* fallback=nullptr;  // used when the font cannot draw `text`
+};
+struct Overlay {
+    const void* collector=nullptr;               // the one collector this frame belongs to
+    std::array<std::uint16_t,4> suppressed{};    // anchor control widgets, authored order
+    std::uint16_t nameWidget=0;                  // suppressed[1]: venus16 name text
+    std::array<Line,2> lines{};                  // pilot name, then package name under it
+    std::uint32_t statRider=0;                   // the add-on's registry number the stats input carries
+    mutable std::uint32_t drawnLines=0;          // this frame (logged once per highlighted add-on)
+    mutable std::uint32_t skippedLines=0;        // lines the font could not draw
+    bool suppresses(std::uint16_t id) const noexcept {
+        if(!id)return false;
+        for(const auto w:suppressed)if(w==id)return true;
+        return false;
+    }
+};
+
+inline const Overlay*& activeOverlay() noexcept {
+    static thread_local const Overlay* overlay=nullptr;
+    return overlay;
+}
+inline const Overlay* overlayFor(const void* collector) noexcept {
+    const auto* overlay=activeOverlay();
+    return overlay&&collector&&overlay->collector==collector?overlay:nullptr;
+}
+// One render call: set on entry, always cleared on exit (also on early return).
+struct Scope {
+    explicit Scope(const Overlay* overlay) noexcept {activeOverlay()=overlay;}
+    ~Scope() {activeOverlay()=nullptr;}
+    Scope(const Scope&)=delete;
+    Scope& operator=(const Scope&)=delete;
+};
+
+} // namespace rr::platform::riderAddon50DL

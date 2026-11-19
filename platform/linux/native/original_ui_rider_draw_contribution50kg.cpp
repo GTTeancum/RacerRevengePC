@@ -2,6 +2,7 @@
 #include "original_ui_shared_dialog_material_history50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "vehicle_window_gl50ds.h"
+#include "original_ui_rider_addon_overlay50dl.h"
 #include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include "../../../src/assets/original_ui_material_equivalence50kg.h"
 #include "../../../src/assets/original_ui_material_binding50kg.h"
@@ -913,9 +914,68 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
 bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noexcept {
     auto& s=*storage_;auto& widgets=*s.resources->widgets();const auto* order=widgets.order(top);
     if(!order)return fail(d,E::widget);const auto& materials=*s.resources->materials();
+    const auto* addon=riderAddon50DL::overlayFor(this); // PORT EXTENSION: add-on rider frame only
     for(const auto id:*order){d.widget=id;
         d.geometrySurface=0xffffffffu;d.geometryComponent=0;d.geometryStoredColors=false;d.geometryStatus=255;
         const auto state=widgets.state(id);if(!shown||!state.shown)continue;
+        if(addon&&addon->suppresses(id)){
+            // PORT EXTENSION, NOT ORIGINAL: the anchor control under an add-on rider.
+            if(state.kind==game::OriginalUiRiderWidgetKind50KG::pod||state.kind==game::OriginalUiRiderWidgetKind50KG::character){
+                // Run the unchanged model projection (same per-frame owner effects),
+                // then drop its output: no stock model under an add-on name.
+                const auto vertices=s.vertices.size(),w=s.w.size(),fog=s.fog.size(),packets=s.packets.size();
+                if(!model(id,d))return false;
+                if(s.vertices.size()<vertices||s.w.size()<w||s.fog.size()<fog||s.packets.size()<packets)return fail(d,E::geometry);
+                s.vertices.erase(s.vertices.begin()+std::ptrdiff_t(vertices),s.vertices.end());
+                s.w.erase(s.w.begin()+std::ptrdiff_t(w),s.w.end());s.fog.erase(s.fog.begin()+std::ptrdiff_t(fog),s.fog.end());
+                s.packets.erase(s.packets.begin()+std::ptrdiff_t(packets),s.packets.end());
+                continue;
+            }
+            const auto* descriptor=id==addon->nameWidget?widgets.textDescriptor(id):nullptr;
+            if(!descriptor)continue; // the anchor's large name: nothing drawn for it
+            const auto materialIndex=s.resources->widgetMaterial(id);
+            const auto* font=s.resources->textFont(id);const auto* atlas=s.resources->textAtlas(id);
+            if(!font||!atlas||materialIndex>=materials.size()||materials[materialIndex].images.size()!=1)return fail(d,E::resource);
+            const auto& material=materials[materialIndex];const auto* map=s.backend->staticImage(s.staticOwner,material.images[0]);
+            if(!map)return fail(d,E::bank);const auto binding=s.find(&material.material.passes[0],map->combinedIndex);
+            if(binding==unresolved)return fail(d,E::material);float z=0;if(!s.resources->textPacketDepth(id,z))return fail(d,E::geometry);
+            float below=0; // the package name goes one font line under the pilot name
+            for(const auto& line:addon->lines){
+                // A line whose glyphs the authored font lacks is skipped (logged by the
+                // session), never drawn with invented glyphs and never a frame failure.
+                const std::string* text=nullptr;game::OriginalUiTextDiagnostic50KG probe;
+                for(const auto* candidate:{line.text,line.fallback}){
+                    if(!candidate||candidate->empty())continue;
+                    const game::OriginalUiTextInput50KG trial{font,atlas,reinterpret_cast<const std::uint8_t*>(candidate->data()),candidate->size(),0,0};
+                    if(game::layoutOriginalUiText50KG(trial,s.textScratch,probe)){text=candidate;break;}
+                }
+                if(!text){if(line.text&&!line.text->empty())++addon->skippedLines;continue;}
+                game::OriginalUiTextInput50KG input{font,atlas,reinterpret_cast<const std::uint8_t*>(text->data()),text->size(),0,0};
+                std::int32_t width=0,height=0;
+                if(!game::roundOriginalUiTextMetric50KG(s.textScratch.widthBeforeScaleAndRounding,1,width)||
+                    !game::roundOriginalUiTextMetric50KG(s.textScratch.firstGlyphHeightBeforeScaleAndRounding,1,height)){++addon->skippedLines;continue;}
+                const float lineHeight=s.textScratch.fontLineHeight;
+                game::OriginalUiRiderTextProjection50KG live;
+                if(!widgets.projectText(id,0,lineHeight,width,height,shown,live,d.widgetDetail)){
+                    d.widgetDetail={};break; // hidden (or not projectable): no add-on name either
+                }
+                if(live.descriptor!=descriptor||live.line.scale!=1||live.line.rotation!=0||live.line.packetColor[3]>128)
+                    return fail(d,E::geometry);
+                input.localX=live.position.positionedX;input.localY=live.position.positionedY+below;
+                if(!std::isfinite(input.localY)||!game::layoutOriginalUiText50KG(input,s.textScratch,d.text)){d.text={};++addon->skippedLines;continue;}
+                if(std::isfinite(lineHeight)&&lineHeight>0)below+=lineHeight;
+                const auto count=s.textScratch.count;if(!count)continue;if(!s.capacity(count))return fail(d,E::capacity);
+                const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+                for(unsigned q=0;q<count;++q)for(const auto& glyph:s.textScratch.quads[q].vertices){
+                    assets::Vertex48B vertex{};vertex.position[0]=glyph.x;vertex.position[1]=glyph.y;vertex.position[2]=z;
+                    vertex.uv[0]=glyph.u;vertex.uv[1]=glyph.v;for(unsigned c=0;c<4;++c)vertex.color[c]=live.line.packetColor[c];s.vertices.push_back(vertex);
+                }
+                s.w.insert(s.w.end(),std::size_t(count)*4,1.f);s.fog.insert(s.fog.end(),std::size_t(count)*4,0.f);
+                s.packets.push_back({first,count,binding,static_cast<std::uint32_t>(s.packets.size())});
+                ++addon->drawnLines;
+            }
+            continue;
+        }
         if(state.kind==game::OriginalUiRiderWidgetKind50KG::pod||state.kind==game::OriginalUiRiderWidgetKind50KG::character){
             if(!model(id,d))return false;continue;
         }
@@ -1016,6 +1076,11 @@ bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRide
     if(!s.stats.applyAppearance(input,d.stat)||!s.stats.project(input,{s.clock.known,s.clock.advanceAnimations,s.clock.milliseconds},s.statFrame,d.stat)||
        !s.statDraw.project(s.statAssets,s.statFrame,s.bank,s.statOwner,d.statDraw)){s.failed=true;return fail(d,E::stat);}
     if(!s.resources->widgets()->setTextPosition(4,s.statFrame.lockedWidgetX,s.statFrame.lockedWidgetY,d.widgetDetail))return fail(d,E::widget);
+    // PORT EXTENSION, NOT ORIGINAL: an add-on rider frame (stats input carries the
+    // add-on's own registry number, so no stock portrait is projected) draws no
+    // stock NN_bkg background either.
+    const auto* addon=riderAddon50DL::overlayFor(this);
+    if(addon&&input.selectedRider!=addon->statRider)return fail(d,E::input);
     for(const auto& packet:s.statDraw.packets()){
         const auto binding=s.find(&packet.resource->material.passes[0],packet.imageIndex);
         if(binding==unresolved)return fail(d,E::material);if(!s.capacity(packet.quadCount))return fail(d,E::capacity);
@@ -1024,6 +1089,7 @@ bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRide
         s.w.insert(s.w.end(),std::size_t(packet.quadCount)*4,1.f);s.fog.insert(s.fog.end(),std::size_t(packet.quadCount)*4,0.f);
         s.packets.push_back({first,packet.quadCount,binding,static_cast<std::uint32_t>(s.packets.size())});
     }
+    if(addon){guard.complete=true;return true;}
     const auto* background=s.resources->background(static_cast<std::uint8_t>(input.selectedRider));
     if(!background)return fail(d,E::resource);
     for(const auto& quad:background->quadrants)if(!append(quad,background->material,16777200.f,d))return false;

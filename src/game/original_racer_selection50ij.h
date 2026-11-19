@@ -3,9 +3,12 @@
 // 21079C/21081C/210820 stores racer60 and formats that SAME value as Pod%02d.
 // These IDs never denote the human/bot bank slot. Choosing a racer must move
 // its whole immutable rig/collision/audio identity, never just its model/name.
+#include "../assets/dlc_registry50dl.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
+#include <string>
 #include <string_view>
 
 namespace rr::game::original_racer_selection50IJ {
@@ -14,6 +17,7 @@ struct Entry {
     std::string_view podId,name,retainedPodJson;
     bool humanJoinImplemented;
     const char* menuLabel;
+    bool addon=false; // PORT EXTENSION: a DLC registry row (racer 32..99), never a stock row
 };
 inline constexpr std::array<Entry,8> entries{{
     {1,"POD01","Anakin Skywalker","pod01/pod.json",true,"RACER: ANAKIN SKYWALKER"},
@@ -61,6 +65,47 @@ inline constexpr const Entry* findByPodId(std::string_view value) noexcept {
     if(value==coursePod19.podId)return &coursePod19;
     for(const auto& entry:additionalCoursePods)if(entry.podId==value)return &entry;
     return nullptr;
+}
+// ---- PORT EXTENSION, NOT ORIGINAL: add-on pod rows (DLC phase 2).
+// One Entry per admitted add-on pod (racer 32..99), the same shape as the
+// stock rows. Its string_views point into the frozen DLC registry, which never
+// changes after startup. The stock lookups above are unchanged; race sites
+// that may see either kind of row use findAny*(), the one lookup for both.
+inline const Entry* findAddon(std::uint32_t racer60) noexcept {
+    namespace reg=rr::assets::dlc50DL;
+    if(!reg::addonNumberRange(racer60)||!reg::registryFrozen())return nullptr;
+    const auto* pod=reg::addonPod(racer60);
+    if(!pod)return nullptr;
+    struct Slot {std::once_flag once;Entry entry{0,{},{},{},false,"",true};};
+    static std::array<Slot,reg::RegistryLimits::pods> rows;
+    // Bounds: addonNumberRange admits 32..99 only, i.e. index 0..pods-1.
+    auto& slot=rows[racer60-reg::RegistryLimits::firstNumber];
+    try{std::call_once(slot.once,[&]{slot.entry={racer60,pod->podId,pod->name,{},true,"",true};});}
+    catch(...){return nullptr;}
+    return slot.entry.racer60==racer60?&slot.entry:nullptr;
+}
+inline const Entry* findAnyByRacer60(std::uint32_t value) noexcept {
+    if(const auto* entry=findByRacer60(value))return entry;
+    return findAddon(value);
+}
+inline const Entry* findAnyByPodId(std::string_view value) noexcept {
+    if(const auto* entry=findByPodId(value))return entry;
+    try{
+        const auto* pod=rr::assets::dlc50DL::addonPodByPodId(std::string(value));
+        return pod?findAddon(pod->number):nullptr;
+    }catch(...){return nullptr;}
+}
+// The original Pod%02d spelling ("POD" + two digits) of a stock pod id.
+inline constexpr bool stockPodId(std::string_view id) noexcept {
+    return id.size()==5&&id.substr(0,3)=="POD"&&id[3]>='0'&&id[3]<='9'&&id[4]>='0'&&id[4]<='9';
+}
+// racer60 of a pod id: the stock rule (the two Pod%02d digits, exactly as
+// before) or the add-on row's number. False for any other spelling.
+inline bool racer60OfPodId(std::string_view id,std::uint32_t& racer60) noexcept {
+    if(stockPodId(id)){racer60=std::uint32_t((id[3]-'0')*10+(id[4]-'0'));return true;}
+    const auto* entry=findAnyByPodId(id);
+    if(!entry||!entry->addon)return false;
+    racer60=entry->racer60;return true;
 }
 inline constexpr bool canSelectHuman(std::uint32_t value) noexcept {
     const auto* entry=findByRacer60(value);return entry&&entry->humanJoinImplemented;

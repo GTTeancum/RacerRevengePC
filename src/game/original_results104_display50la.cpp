@@ -79,6 +79,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     const auto texture=[&](const Impl::Texture& t,std::uint32_t pc){
         if(!t.primitive54)return stop(0x2df8a0,"Results slot40 actual texture primitive absent");
         const auto* ref=p.references.reference(t.primitive54->reference);
+        if(ref&&ref->absent&&!t.buffer58)return true; // add-on portrait: no texture to demand (PORT EXTENSION)
         const assets::OriginalStandardMaterialObject50LA* material=nullptr;
         assets::OriginalStandardMaterialRowView50LA row;assets::OriginalStandardMaterialPassView50LA pass;
         if(!ref||!ref->retained||!t.buffer58||t.primitive54->packet10!=t.buffer58.get()||
@@ -417,6 +418,10 @@ bool OriginalResults10450LA::Impl::projectTextureCpu2DF694(Texture& t,
             return stop(d,S::owner,caller,"Results native texture occurrence owner thread");
         if(!application->screenQuadEnabled383678_)return true; //Source gate BEFORE projection/service.
     }
+    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's absent portrait
+    // (Reference::absent) is not projected or drawn.
+    if(t.primitive54){const auto* absent=references.reference(t.primitive54->reference);
+        if(absent&&absent->absent&&!t.buffer58)return true;}
     // Only the zero-rotation CPU span2DF694..2DF860. In particular this is
     // NOT2DF550: source phase5/global383678 checks, current camera1E8/1EC
     // packet header writes and246760 submission are not implemented here.

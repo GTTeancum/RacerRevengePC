@@ -370,7 +370,7 @@ void OwnersContext::run() {
     const auto& createSelection=originalAiCreateSelection;
     require50DU(createSelection.bound&&applyAiCreateClass50IU(createSelection.actualRaceClass,profile),
         "selected original AI create class unavailable");
-    const auto* identity=original_racer_selection50IJ::findByPodId(rig.podId.c_str());
+    const auto* identity=original_racer_selection50IJ::findAnyByPodId(rig.podId.c_str());
     require50DU(identity,"original AI racer60 identity unavailable");
     AiCreateIdentity50IU createIdentity{};
     require50DU(bindAiCreateIdentity50IU(static_cast<std::uint32_t>(racer-originalAiHumanCount),originalAiHumanCount,
@@ -563,6 +563,15 @@ void OwnersContext::run() {
   }
   // Keep exact original names in fixed cold storage for allocation-free HUD publication.
   for(std::size_t racer=0;racer<raceRacerCount;++racer){
+   // PORT EXTENSION, NOT ORIGINAL: an add-on pod's package name can exceed
+   // the fixed HUD field; its package short name (short_name_key) is the
+   // name shown where a short name is needed. Stock names are unchanged.
+   if(racerNames[racer].size()>platform::maxVehicleWindowRacerName50DS&&racerRigs[racer])
+    if(const auto* pod=original_player_identity50IK::addonPodOf(racerRigs[racer]->podId)){
+     std::cerr<<"dlc_hud_name racer="<<pod->number<<" name_chars="<<racerNames[racer].size()
+         <<" short_name=\""<<pod->shortName<<"\"\n";
+     racerNames[racer]=pod->shortName;
+    }
    require50DU(!racerNames[racer].empty()&&racerNames[racer].size()<=platform::maxVehicleWindowRacerName50DS,
        "original racer display name exceeds fixed HUD capacity");
    std::memcpy(racerHudNames[racer].data(),racerNames[racer].c_str(),racerNames[racer].size()+1);

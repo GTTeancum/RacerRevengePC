@@ -196,7 +196,7 @@ class Operation final {
     }
     bool resultsRacerIdentityCurrent(std::size_t index,std::uint32_t racer60)const noexcept {
         if(!resources_||index>=resources_->racerCount_||!resources_->rigs_[index])return false;
-        const auto* source=g::original_racer_selection50IJ::findByPodId(resources_->rigs_[index]->podId);
+        const auto* source=g::original_racer_selection50IJ::findAnyByPodId(resources_->rigs_[index]->podId);
         return source&&source->racer60==racer60;
     }
     void effects(){
@@ -398,7 +398,7 @@ public:
                         "actual selected original AI profile rejected");
                     const auto& selected=navigation_->freshSelection();
                     need(selected.bound&&g::applyAiCreateClass50IU(selected.actualRaceClass,profile),"actual RA AI class unavailable");
-                    const auto* identity=g::original_racer_selection50IJ::findByPodId(rig.podId);
+                    const auto* identity=g::original_racer_selection50IJ::findAnyByPodId(rig.podId);
                     need(identity,"actual original racer60 absent");g::AiCreateIdentity50IU aiIdentity{};
                     need(g::bindAiCreateIdentity50IU(static_cast<std::uint32_t>(slot-arena_.humanCount),arena_.humanCount,
                         static_cast<std::int32_t>(identity->racer60),selected.freshCourseRecordPod11280,aiIdentity),

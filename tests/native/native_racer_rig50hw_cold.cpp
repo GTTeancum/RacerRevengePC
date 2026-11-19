@@ -38,7 +38,9 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
             podId=pod.at("pod_id").get<std::string>();name=pod.at("name").get<std::string>();
             resourceFile=repository/runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/podId/(podId+".RES");
         }
-        need(podId.size()==5&&podId.substr(0,3)=="POD"&&podId[3]>='0'&&podId[3]<='9'&&podId[4]>='0'&&podId[4]<='9',"Roster pod identity");
+        // Stock Pod%02d spelling, or an admitted add-on row's id (upper-case
+        // stem; PORT EXTENSION, NOT ORIGINAL). Same pod load either way.
+        need(original_player_identity50IK::admittedPodId(podId),"Roster pod identity");
         struct Member {std::filesystem::path path;std::string digest;std::size_t bytes;std::string sourceName;};
         std::map<std::string,Member> members;
         for(const auto& entry:manifest.at("members")){
@@ -54,12 +56,22 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
                 "Roster "+podId+" retained original member identity differs: "+member);return bytes;};
         phy=read(pod.at("phy").at("source_member").get<std::string>());
         const auto setup=ini(phy);const auto prefix=value(setup,"pod setup","prefix");
-        need(prefix==podId.substr(3),"Roster PHY prefix identity differs");
+        need(prefix==original_player_identity50IK::phyPrefix(podId),"Roster PHY prefix identity differs");
         if(directOriginal){
             const auto* identity=original_player_identity50IK::find(podId);
             need(identity&&pod_materials50ed_fixture::detail::sha256(phy)==identity->phySha256,
                 "Original disc PHY identity differs");
             name=value(setup,"pod setup","name");
+        }
+        if(directOriginal&&original_player_identity50IK::addonPodOf(podId)){
+            // PORT EXTENSION, NOT ORIGINAL: an add-on pod has no row in the
+            // original UIACCEPT first-event table; its display name is the
+            // package string (AddonPod::name, dlc-contract-2 name_key).
+            displayName=original_player_identity50IK::addonPodOf(podId)->name;
+            need(!displayName.empty(),"Add-on pod display name unavailable");
+        }else if(directOriginal){
+            const auto* identity=original_player_identity50IK::find(podId);
+            need(identity,"Original disc pod has no admitted identity");
             // Original1E7C74..1E7E80 fills the UIACCEPT first-event table at
             // +5428+4*racer60 (counts at +53BC+4*racer60); 1EA764..1EA780 plays
             // Event(first+random). The racer-keyed table is the original's own

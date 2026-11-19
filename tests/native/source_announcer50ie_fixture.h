@@ -70,8 +70,19 @@ public:
     bool request(std::uint32_t type,std::uint32_t racer,std::uint32_t variant,
                  std::uint32_t mode11258,std::uint8_t managerFlags58)noexcept {
         using P=rr::game::AnnouncerPhase50IE;using U=rr::game::AnnouncerUpdatePhase50IE;
-        if(!current()||!hasNamedBank(racer)||(type<=2&&!authoring_.collisionRequests)||
+        // PORT EXTENSION, NOT ORIGINAL: an add-on pod (DLC registry row) has no
+        // named bank (generic lines only). A named request for it returns as
+        // a source rejection (no line, no RNG, no history), so every caller's
+        // FIFO return proceeds as for any rejected call.
+        const bool addonRacer=!hasNamedBank(racer)&&
+            rr::game::original_racer_selection50IJ::findAddon(racer)!=nullptr;
+        if(!current()||(!hasNamedBank(racer)&&!addonRacer)||(type<=2&&!authoring_.collisionRequests)||
            (update_.phase!=U::Idle&&update_.phase!=U::Done))return false;
+        if(addonRacer){
+            if(cursor_.phase!=P::Idle&&cursor_.phase!=P::Done)return false;
+            last_={rr::game::AnnouncerStatus50IE::Complete,rr::game::AnnouncerBoundary50IE::None,0x2c2c20};
+            return true;
+        }
         const rr::game::AnnouncerRequest50IE request{type,racer,variant};
         if(cursor_.phase==P::Idle||cursor_.phase==P::Done){
             if(!rr::game::beginAnnouncerRequest50IE(request,{mode11258,managerFlags58},cursor_)){

@@ -2,6 +2,7 @@
 #include "mc_cold_sources50la.h"
 #include "original_camera_session50kx.h"
 #include "runtime_startup50fl_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 
 namespace mc_camera_assets50MC {
 // Stable cold authoring leaf. This owns CAM and retains the actual MC source.
@@ -23,7 +24,7 @@ public:
   try{
    using pod_materials50ed_fixture::detail::need;
    need(source&&source->ready(),"MC camera requires actual cold source");
-   need(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+   need(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
     "MC camera requires actual selected rig authoring");
    const auto& doc=source->triggerParameters();const auto& tob=doc.original_bytes;
    need(tob.size()==186642&&pod_materials50ed_fixture::detail::sha256(tob)==
@@ -32,7 +33,7 @@ public:
    for(const auto& b:doc.blocks){need(b.name!="321_anims","MC unexpected countdown section");if(b.name=="cscameras"){need(!cameras,"MC duplicate camera section");cameras=&b;}}
    need(cameras&&cameras->offset==36822&&cameras->fields.size()==1&&cameras->fields[0].name=="numberofcameras"&&
     cameras->fields[0].value=="4"&&cameras->fields[0].value_offset==36869,"MC authored camera count differs");
-   auto cam=runtime_startup50fl::readBytes(discPods/pod/(pod+".CAM"));
+   auto cam=runtime_startup50fl::readBytes(original_player_identity50IK::podCamera(discPods,pod));
    need(!cam.empty(),"MC selected original CAM absent");
    // Existing native loader authenticates exact selected POD CAM before parsing.
    // No renderer/camera placement occurs in this cold check.

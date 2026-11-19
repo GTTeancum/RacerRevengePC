@@ -1,20 +1,23 @@
 #pragma once
-// DLC packages: dlc.json reader and package checker (phase 1).
+// DLC packages: dlc.json reader and package checker (phases 1-2).
 // NOT ORIGINAL BEHAVIOUR: the original game has no add-on content. This is a PC
 // enhancement. Packages carry data only; nothing here runs package code.
 // Design: work\scratch\dlc\DESIGN.md sections 2 and 5. Field reference: same
 // folder, DLC-JSON.md (the converter contract).
 // This header defines the one in-memory layout of a package; nothing else
 // invents package fields. No global state: dlc_files50dl.cpp owns the session.
+#include "dlc_registry50dl.h"
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
 namespace rr::assets::dlc50DL {
 
 inline constexpr const char* schemaName="rrpc-dlc/1";
-inline constexpr const char* portContract="dlc-contract-1";
+inline constexpr const char* portContract="dlc-contract-1";      // replacement packages
+inline constexpr const char* itemsContract="dlc-contract-2";     // add-on items (courses, pods)
 inline constexpr const char* personalNoteDefault=
     "built from your own copy of the source games; do not share";
 
@@ -63,6 +66,8 @@ struct Package {
     std::vector<Dependency> dependencies;
     std::vector<Conflict> conflicts;
     std::uint64_t totalBytes=0;
+    std::size_t itemCount=0;             // entries of "items" (checked by readItems)
+    std::string manifestText;            // the dlc.json text (<= 1 MiB), read again by readItems
 };
 
 // dlc.json only: size, UTF-8 JSON, schema, fields, types, ranges, folder name.
@@ -74,5 +79,26 @@ bool readManifest(const std::filesystem::path& folder,Package& out,std::string& 
 bool checkFiles(const Package& package,std::string& reason);
 // Streaming SHA-256 of a whole file (lower-case hex). False if unreadable.
 bool sha256File(const std::filesystem::path& path,std::uint64_t& bytes,std::string& hex);
+
+// ---- Add-on items (dlc-contract-2). Implemented in dlc_registry50dl.cpp, the
+// one owner of add-on storage; called only by dlc50DL::startup().
+struct PackageItems {
+    std::vector<AddonPod> pods;
+    std::vector<AddonCourse> courses;
+    std::map<std::string,std::map<std::string,std::string>> strings; // language -> KEY -> text
+};
+// Items and strings of a package whose dlc.json passed readManifest (json rules).
+bool readItems(const Package& package,PackageItems& out,std::string& reason);
+// Item content: archives decode within their capacity, members found by name
+// (stem / code rule), PHY prefix, menu members named exactly once, material
+// names either shared originals or stem-named. `stock` is the install root
+// (shared original names are read from the stock pod and garage archives).
+bool checkItems(const Package& package,PackageItems& items,const std::filesystem::path& stock,std::string& reason);
+// True when two packages claim the same pod stem, course code or material name.
+bool itemsCollide(const PackageItems& a,const PackageItems& b,std::string& what);
+struct AdmittedItems {const Package* package=nullptr;PackageItems items;};
+// Numbers in package order (priority high first, then id), publishes and
+// freezes the registry; appends one dlc_item line per item to `lines`.
+void publishRegistry(std::vector<AdmittedItems>& admittedInOrder,std::size_t admittedPackages,std::vector<std::string>& lines);
 
 } // namespace rr::assets::dlc50DL

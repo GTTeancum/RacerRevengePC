@@ -171,19 +171,28 @@ public:
             const auto* identity=original_player_identity50IK::find(playerRacer60);
             d::need(identity,"50IK HOST named announcer player identity unsupported");
             const auto speechSize=identity->announcerBytes;
+            // PORT EXTENSION, NOT ORIGINAL: an add-on pod row has no named
+            // announcer INI (generic lines only); its named clips stay absent
+            // (Unavailable), the four RACE_SND clips are unchanged.
+            const bool named=!original_player_identity50IK::addonPodOf(identity->racer60);
             const auto raceBytes=input.read(discRoot/"AUDIO/RACE_SND.INI",661);
-            const auto speechBytes=input.read(original_player_identity50IK::announcerPath(discRoot,*identity),speechSize);
+            const auto speechBytes=named?input.read(original_player_identity50IK::announcerPath(discRoot,*identity),speechSize):
+                std::vector<std::uint8_t>{};
             d::need(raceBytes.size()==661&&d::sha256(raceBytes)=="2ab8596ed7c33efc7ca771c73850fc5262b17b05fb07e3a3b8de95f9a6ef1b65","50HQ original RACE_SND.INI identity differs");
-            d::need(speechBytes.size()==speechSize&&d::sha256(speechBytes)==identity->announcerSha256,
+            d::need(!named||(speechBytes.size()==speechSize&&d::sha256(speechBytes)==identity->announcerSha256),
                 "50HQ original selected player announcer authoring differs");
-            auto race=detail::readEvents(raceBytes,4),speech=detail::readEvents(speechBytes,identity->announcerEvents);
+            auto race=detail::readEvents(raceBytes,4);
+            const auto speech=named?detail::readEvents(speechBytes,identity->announcerEvents):
+                std::vector<rr::assets::AudioRequest50HC>{};
+            const std::size_t present=named?clipCount:4;
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(clipCount);
-            for(std::size_t i=0;i<clipCount;++i){const auto&r=i<4?race[detail::keys[i]-1]:speech[detail::keys[i]-1];
+            for(std::size_t i=0;i<present;++i){const auto&r=i<4?race[detail::keys[i]-1]:speech[detail::keys[i]-1];
                 d::need(!r.loop&&!r.stereo&&r.stream==(i>=4),"50HQ authored delivery flags differ");requests.push_back(r);}
+            if(!named)std::cerr<<"dlc_race_audio racer="<<identity->racer60<<" named_clips=0 race_clips=4\n";
             const auto unique=detail::uniquePcmRequests(requests);
             if(!rr::assets::loadAudioBank50HC(audioRoot,unique,bank_,error))return false;
             d::need(bank_.clips.size()==unique.size(),"50HQ incomplete PCM registry");
-            for(std::size_t i=0;i<clipCount;++i){const auto* asset=bank_.find(requests[i].name);
+            for(std::size_t i=0;i<present;++i){const auto* asset=bank_.find(requests[i].name);
                 d::need(asset,"50HQ logical event lacks original PCM registry entry");
                 const auto&c=*asset;availability_[i]=c.state;
                 if(c.state!=rr::assets::AudioAssetState50HC::ready)continue;

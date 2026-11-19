@@ -76,10 +76,11 @@ inline bool Owner::constructRuntimeSourceCameraImpl(
             return fail(d,"RA camera Bank/Application/context/manager or selected rig ownership differs");
         for(std::size_t i=0;i<actual.bank.count();++i){
             const auto* rig=actual.actualRigs[i].get();
+            // Stock Pod%02d digits or an add-on row's number (PORT EXTENSION).
+            std::uint32_t rigRacer60=0;
             if(!rig||(!fresh&&(!actual.actualCables[i]||actual.actualCables[i]->sourceRig_!=rig))||!actual.actualRightModels[i]||!actual.actualLeftModels[i]||!actual.actualChariotModels[i]||
-               rig->podId.size()!=5u||rig->podId.compare(0,3,"POD")||
-               rig->podId[3]<'0'||rig->podId[3]>'9'||rig->podId[4]<'0'||rig->podId[4]>'9'||
-               static_cast<std::uint32_t>((rig->podId[3]-'0')*10+rig->podId[4]-'0')!=actual.racer60[i])
+               !rr::game::original_racer_selection50IJ::racer60OfPodId(rig->podId,rigRacer60)||
+               rigRacer60!=actual.racer60[i])
                 return fail(d,"RA camera requires the actual active rig/model identities");
         }
         // Already authenticated from this same retained RA archive by the

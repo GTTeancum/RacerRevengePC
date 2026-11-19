@@ -27,6 +27,9 @@ ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
 # Free Play routes start from a fresh profile (Main slot 1, Rider19), so a
 # seeded racer applies to the tournament route only.
 PLAYER_RACER_ROUTES = ('main-tournament-course-ta',)
+# Add-on riders join the free-play (mode 0) Rider carousel only; the plain
+# free-play route starts from a fresh profile on Rider19 and races TA.
+ADDON_RIDER_ROUTES = ('main-rider-course-ta',)
 
 
 # Tournament course order (career progress219C) -> course code.
@@ -83,6 +86,19 @@ def seed_player_racer(data, racer):
     put(8, len(d) - 16)
     put(12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
     return bytes(d)
+
+
+def seed_dlc_hall(pod_key):
+    """DLC save side file (schema rrpc-dlc-progress/1, the layout DlcProgress50DL
+    ::serialise writes, src/assets/dlc_progress50dl.cpp) holding one add-on pod
+    record on stock TA, faster than any stock row: lap 1.00 s, race 5.00 s.
+    Empty slots are null; knockouts stay empty. The stock save is not touched."""
+    entry = lambda t: {'time': t, 'name': 'EYECHECK', 'racer': pod_key}
+    return {'schema': 'rrpc-dlc-progress/1', 'courses': {},
+            'stock_course_addon_pod_records': {'TA': {'lap': [entry(1.0), None, None],
+                                                      'race': [entry(5.0), None, None],
+                                                      'knockouts': [None, None, None]}},
+            'pods': {pod_key: {'unlocked': True}}, 'careers': {}}
 
 
 def digest(path):
@@ -169,6 +185,26 @@ def main():
                         help='Test only: unlock and remember this original racer in the seeded save '
                              '(requires --seed-save; main-tournament-course-ta only). The game '
                              'loads it through its own Rider screen; the route only checks it opened on it')
+    # PORT EXTENSION, NOT ORIGINAL (DLC phase 2): add-on riders and courses.
+    parser.add_argument('--addon-rider', metavar='PACKAGE/ITEM',
+                        help='Test only (DLC): on --route main-rider-course-ta, press Rider Next until this '
+                             'admitted add-on rider is highlighted, then Confirm (sets RR_TEST_ADDON_RIDER). '
+                             'Needs the package in the DLC root, e.g. --env RR_DLC_ROOT=<folder>\\DLC')
+    parser.add_argument('--eyecheck-dlc-hall', metavar='PACKAGE/ITEM',
+                        help='Eye check (DLC Hall merge): seed saves\\dlc-progress-v1.json with a TA record of this '
+                             'admitted add-on pod (lap 1.00 s, race 5.00 s, name EYECHECK; faster than any stock TA '
+                             'row) and start the game as a normal interactive window (no unattended route, no '
+                             'capture). Go Main -> Options -> Hall of Fame -> TA by hand; the add-on entry shows the '
+                             'pod name and no icon. Needs --env RR_DLC_ROOT=<folder with the package>; the run ends '
+                             'at --seconds (use e.g. 900).')
+    parser.add_argument('--hold-rider', action='store_true',
+                        help='With --addon-rider: stop on the Rider screen with the add-on highlighted (no Confirm, '
+                             'sets RR_TEST_ADDON_RIDER_HOLD=1) and write that Rider frame as an image for an eye '
+                             'check (turns logs-only off for this run). The run then idles until its wall budget; '
+                             'use a short --seconds (60)')
+    parser.add_argument('--addon-course', metavar='PACKAGE/ITEM',
+                        help='Test only (DLC): add-on course (sets RR_TEST_ADDON_COURSE). Not implemented in this '
+                             'build: the variable is passed through and nothing reads it yet')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     parser.add_argument('--keep-binaries', action='store_true',
@@ -182,6 +218,28 @@ def main():
             parser.error('--player-racer needs --seed-save: a progress file the game itself wrote')
         if args.route not in PLAYER_RACER_ROUTES:
             parser.error('--player-racer works only with --route ' + ' / '.join(PLAYER_RACER_ROUTES))
+    addon_key = re.compile(r'[a-z0-9][a-z0-9-]{1,46}/[a-z0-9][a-z0-9-]{1,46}')
+    if args.addon_rider is not None:
+        if not addon_key.fullmatch(args.addon_rider):
+            parser.error('--addon-rider expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
+        if args.route not in ADDON_RIDER_ROUTES:
+            parser.error('--addon-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
+        if args.player_racer is not None:
+            parser.error('--addon-rider and --player-racer cannot be combined')
+    if args.hold_rider and args.addon_rider is None:
+        parser.error('--hold-rider needs --addon-rider')
+    if args.eyecheck_dlc_hall is not None:
+        if not addon_key.fullmatch(args.eyecheck_dlc_hall):
+            parser.error('--eyecheck-dlc-hall expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
+        if args.addon_rider is not None or args.player_racer is not None:
+            parser.error('--eyecheck-dlc-hall is an interactive run; it cannot be combined with test routes')
+        if not any(item.startswith('RR_DLC_ROOT=') for item in args.env):
+            parser.error('--eyecheck-dlc-hall needs --env RR_DLC_ROOT=<folder with the package>')
+    if args.addon_course is not None:
+        if not addon_key.fullmatch(args.addon_course):
+            parser.error('--addon-course expects <package-id>/<item-id>, e.g. n64-vengeance/nv')
+        print('addon_course: --addon-course is not implemented in this build; RR_TEST_ADDON_COURSE is '
+              'passed through and the run uses the route\'s own stock course', flush=True)
     build, output = inside(args.build), inside(args.output)
     assets, sdl = args.assets.resolve(), args.sdl.resolve()
     receipt = json.loads((build / 'build-receipt.json').read_text(encoding='utf-8-sig'))
@@ -212,6 +270,8 @@ def main():
             shutil.copy2(seed, saves / 'progress-v1.bin')
         else:
             (saves / 'progress-v1.bin').write_bytes(seed_player_racer(seed.read_bytes(), args.player_racer))
+    if args.eyecheck_dlc_hall is not None:
+        (saves / 'dlc-progress-v1.json').write_text(json.dumps(seed_dlc_hall(args.eyecheck_dlc_hall), indent=2) + '\n')
     staged = output / 'RacerRevengePC.exe'
     shutil.copy2(executable, staged)
     for dll in runtime:
@@ -227,7 +287,15 @@ def main():
                RR_NATIVE_FIXED_WINDOW='1',
                RR_TEST_MUTE_OUTPUT='1',  # Tests are silent; player builds are not.
                RR_VIDEO_MAXIMIZED='0')  # Never cover the desktop unless asked.
-    if args.logs_only:
+    if args.eyecheck_dlc_hall is not None:
+        # Interactive eye check: a normal window the user drives (no unattended
+        # route, no automatic capture, no wall-budget hand-off inside the game).
+        for key in ('RR_UNATTENDED_CAPTURE', 'RR_UNATTENDED_UI_ROUTE', 'RR_UNATTENDED_SECONDS',
+                    'RR_WINDOW_CAPTURE_AUTO'):
+            env.pop(key, None)
+    # A --hold-rider run writes its held Rider frame as an image (eye check).
+    logs_only = args.logs_only and not args.hold_rider
+    if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
         env['RR_CAMERA_POSE_TRACE'] = '1'
@@ -279,6 +347,13 @@ def main():
         env['RR_HUMAN_INPUT_DEVICE'] = args.input_device
     if args.player_racer is not None:
         env['RR_TEST_PLAYER_RACER'] = str(args.player_racer)
+    if args.addon_rider is not None:
+        env['RR_TEST_ADDON_RIDER'] = args.addon_rider
+    if args.hold_rider:
+        env['RR_TEST_ADDON_RIDER_HOLD'] = '1'
+        env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Rider frame as an image
+    if args.addon_course is not None:
+        env['RR_TEST_ADDON_COURSE'] = args.addon_course
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
     if args.race_full:
@@ -307,7 +382,9 @@ def main():
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
-                  visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=args.logs_only,
+                  visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
+                  addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
+                  eyecheckDlcHall=args.eyecheck_dlc_hall,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
                   serializedGpuStageProfiling=args.profile_gpu_stages)
@@ -389,7 +466,7 @@ def main():
         result['routeCompleted'] = bool(result.get('exitCode') == 0 and
             not result.get('watchdogExpired', True) and
             result['windowContinuity']['verified'] and
-            (args.logs_only or result['originalLoadingScreens']['captured']) and
+            (logs_only or result['originalLoadingScreens']['captured']) and
             {row[0] for row in loading_assets} == {'LD_UI.PST', f'LD_{track}.PST'} and
             result.get('gameSummary', {}).get('completed') and
             result.get('gameSummary', {}).get('cleanup_complete'))
@@ -400,12 +477,12 @@ def main():
             files = [first.get('image_file'), first.get('receipt_file'), first.get('baseline_file'),
                      second.get('image_file'), second.get('receipt_file'),
                      result.get('gameSummary', {}).get('baseline_file')]
-            if args.logs_only:
+            if logs_only:
                 files = [first.get('receipt_file'), first.get('baseline_file'), second.get('receipt_file'), result.get('gameSummary', {}).get('baseline_file')]
             result['nativeRestartVerified'] = bool(restart.get('issued') and
-                len(displays) == 3 and len(retained) == 2 and len(set(files)) == (4 if args.logs_only else 6) and
+                len(displays) == 3 and len(retained) == 2 and len(set(files)) == (4 if logs_only else 6) and
                 all(path and inside(Path(path)).is_file() for path in files) and
-                second.get('receipt_file' if args.logs_only else 'image_file') == str(capture / 'race-session-3' / ('track-1.json' if args.logs_only else 'track-1.ppm')))
+                second.get('receipt_file' if logs_only else 'image_file') == str(capture / 'race-session-3' / ('track-1.json' if logs_only else 'track-1.ppm')))
             if result['nativeRestartVerified']:
                 before = json.loads(Path(first['receipt_file']).read_text())
                 after = json.loads(Path(second['receipt_file']).read_text())
@@ -418,9 +495,25 @@ def main():
                         row.get('world_ticks', 0) > 0 and 0 < row.get('race_seconds', 0) < 2
                         for row in (before, after)))
             result['routeCompleted'] = result['routeCompleted'] and result['nativeRestartVerified']
-        if args.logs_only:
+        if logs_only:
             result['noImagesWritten'] = not any(p.suffix.lower() in {'.ppm', '.png', '.jpg', '.pending'} for p in output.rglob('*'))
             result['routeCompleted'] = result['routeCompleted'] and result['noImagesWritten']
+        if args.hold_rider:
+            # A held run never confirms and ends at its wall budget, so the race
+            # receipts above are absent. It is complete when the Rider frame with
+            # the add-on highlighted was written and the hold was reached.
+            texts = log_text
+            for name in ('stderr.log', 'stdout.log'):
+                extra = output / name
+                if extra.is_file():
+                    texts += extra.read_text(errors='replace')
+            rider_images = sorted(str(p) for p in capture.rglob('rider-*.ppm'))
+            result['addonRiderHold'] = dict(
+                key=args.addon_rider, riderImages=rider_images,
+                holdReached=f'addon_rider_route hold key={args.addon_rider} ' in texts,
+                carousel=re.findall(r'dlc_rider_carousel [^\r\n]*', texts),
+                draw=re.findall(r'dlc_rider_draw [^\r\n]*', texts))
+            result['routeCompleted'] = bool(rider_images and result['addonRiderHold']['holdReached'])
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

@@ -2332,7 +2332,7 @@ class OwnershipBridge final {
         const g::AiRuntimeState50IV& ai,const native_racer50HW::Rig& rig,
         std::size_t slot,std::uint32_t humanCount)noexcept {
         if(humanCount>1u||slot>=8u)return false;
-        const auto* identity=g::original_racer_selection50IJ::findByPodId(rig.podId);
+        const auto* identity=g::original_racer_selection50IJ::findAnyByPodId(rig.podId);
         if(!identity)return false;
         if(slot<humanCount)return frame.fields.vehicle58==0u&&!frame.fields.nativeAiOwnersBound50IV&&!ai.initialized;
         return frame.fields.vehicle58==1u&&frame.fields.nativeAiOwnersBound50IV&&ai.initialized&&

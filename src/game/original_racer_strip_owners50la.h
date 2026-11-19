@@ -1,6 +1,7 @@
 #pragma once
 #include "original_pod_cable_allocation50la.h"
 #include "original_racer_model_scene50la.h"
+#include "../assets/dlc_registry50dl.h"
 #include <string>
 
 namespace rr::game {
@@ -177,8 +178,13 @@ class OriginalRacerStripOwners50LA final {
             // including zero, negative values and widths above two digits.
             const std::int64_t signedRacer=racer60<=0x7fffffffu?std::int64_t(racer60):
                 std::int64_t(racer60)-0x100000000ll;
-            const std::string name="concring"+std::string(signedRacer>=0&&signedRacer<10?"0":"")+
-                std::to_string(signedRacer);
+            // PORT EXTENSION, NOT ORIGINAL: an add-on racer (32..99) spells its
+            // stem where the original formats %02d ("concring<stem>").
+            const auto* addon=racer60>=rr::assets::dlc50DL::RegistryLimits::firstNumber?
+                rr::assets::dlc50DL::addonPod(racer60):nullptr;
+            if(racer60>=rr::assets::dlc50DL::RegistryLimits::firstNumber&&!addon)return {S::owner,0x213eb4u};
+            const std::string name=addon?"concring"+addon->stem:
+                "concring"+std::string(signedRacer>=0&&signedRacer<10?"0":"")+std::to_string(signedRacer);
             auto result=setup(ring_,name,15u,*racer_->color260_,directory,0x213ed0u,
                 ringAllocationAttempted_,ringPublished_,pc);
             if(result.status!=S::selectionAttachmentComplete)return result;

@@ -1,5 +1,5 @@
 #pragma once
-#include "original_ui_hall_records50kg.h"
+#include "original_race_record_rule50kg.h"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -22,15 +22,6 @@ private:
     friend class rr::platform::OriginalUiRiderProfileOwner50KG;
     OriginalHallProfileIdentity50KG() noexcept=default;
 };
-// Values observed from the SAME actual 1AF330(managerB0,index) racer. This is
-// ordinary data, NOT a proof of a finish, earned kills or permission to write.
-// CB4/CB8 have live timing owners. Binding CD0 still requires the original
-// destruction/credit owner; playerEventsCD0 is NOT an interchangeable source.
-struct OriginalRaceRecordRacerObservation50KG {
-    float bestLapCB4,timeCB8;
-    std::uint32_t countCD0;
-};
-
 // Single/two-human 1AC440 preparation only. No application mutation, qualification
 // query, dirty/save operation, Hall transition, callback or acknowledgment.
 // Factory is private to the actual profile owner; snapshots do not confer live
@@ -64,94 +55,11 @@ public:
 private:
     friend class rr::platform::OriginalUiRiderProfileOwner50KG;
     OriginalRaceRecordInsertionStage50KG() noexcept=default;
-    static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&
-        std::numeric_limits<float>::digits==24,"original binary32 record lanes");
+    // The rule bodies live in race_record_rule50kg (original_race_record_rule50kg.h),
+    // shared with the DLC progress side file. This stage keeps the owner,
+    // identity, course and name gates and the before/after publication.
     static bool fail(Diagnostic& d,Status status,std::uint32_t pc) noexcept {
         d={status,pc};return false;
-    }
-    static bool ordinary(float value) noexcept {
-        return std::isfinite(value)&&(value==0.f||std::isnormal(value));
-    }
-    // 309980 strncpy(...,20). Shifted destinations keep their OWN byte20;
-    // only a newly inserted name receives the explicit source byte20=0 store.
-    // Copy via local bytes also avoids accidental aliasing of source/destination.
-    static void copyName20(std::array<char,21>& destination,
-        const std::array<char,21>& source) noexcept {
-        std::array<char,20> prefix{};
-        bool ended=false;
-        for(std::size_t i=0;i<prefix.size();++i){
-            if(!ended&&source[i]==0)ended=true;
-            if(!ended)prefix[i]=source[i];
-        }
-        std::memcpy(destination.data(),prefix.data(),prefix.size());
-    }
-    template<class Value>
-    static void insert(std::array<Value,3>& values,
-        std::array<std::array<char,21>,3>& names,std::size_t rank,
-        Value candidate,const std::array<char,21>& name) noexcept {
-        // Source shifts rank2 -> rank3 BEFORE rank1 -> rank2. Do not sort the
-        // row or re-rank ties. Preserve copied float representations exactly.
-        for(std::size_t destination=2;destination>rank;--destination){
-            std::memcpy(&values[destination],&values[destination-1],sizeof(Value));
-            copyName20(names[destination],names[destination-1]);
-        }
-        std::memcpy(&values[rank],&candidate,sizeof(Value));
-        copyName20(names[rank],name);names[rank][20]=0;
-    }
-    static bool timeRank(std::array<float,3>& values,
-        std::array<std::array<char,21>,3>& names,float candidate,
-        const std::array<char,21>& name,bool race,std::uint32_t& rank,
-        Diagnostic& d) noexcept {
-        const std::uint32_t lapPCs[]{0x1859acu,0x185a5cu,0x185ad8u};
-        const std::uint32_t racePCs[]{0x185ca4u,0x185d54u,0x185dd0u};
-        // Native ordinary-binary32 admission, NOT an original rejection or a
-        // false qualification. NaN/infinity/subnormals stay unsupported. Leaf
-        // gates precede this helper; timePair separately checks the two-human
-        // outer comparison even when that leaf category will be skipped.
-        if(!ordinary(candidate))return fail(d,Status::unsupportedNumeric,
-            race?0x185c74u:0x18596cu);
-        if(!race&&candidate<=0.f)return true; //185974 BC1F /18597C return.
-        // 185C74 computes C.LE.S but NO branch consumes it. 185CA4 overwrites
-        // the condition. Unlike readonly186280, race insertion has NO <=0 gate.
-        for(std::size_t i=0;i<values.size();++i){
-            if(!ordinary(values[i]))return fail(d,Status::unsupportedNumeric,
-                race?racePCs[i]:lapPCs[i]);
-            if(candidate<values[i]){
-                insert(values,names,i,candidate,name);
-                rank=static_cast<std::uint32_t>(i+1);return true;
-            }
-        }
-        return true;
-    }
-    static void knockoutRank(std::array<std::uint32_t,3>& values,
-        std::array<std::array<char,21>,3>& names,std::uint32_t candidate,
-        const std::array<char,21>& name,std::uint32_t& rank) noexcept {
-        for(std::size_t i=0;i<values.size();++i){
-            //185F94/186040/1860B8 are SLTU, not signed compare. No cap7.
-            if(values[i]<candidate){
-                insert(values,names,i,candidate,name);
-                rank=static_cast<std::uint32_t>(i+1);return;
-            }
-        }
-    }
-    static bool timePair(std::array<float,3>& values,
-        std::array<std::array<char,21>,3>& names,float first,float second,
-        const std::array<std::array<char,21>,2>& playerNames,bool race,
-        bool leafEnabled,std::uint32_t& firstRank,std::uint32_t& secondRank,
-        Diagnostic& d) noexcept {
-        //1AC5E0/1AC6D8 compare BOTH human values before either writer checks
-        //its gates. Unlike the single-human path, even a skipped category
-        //requires supported operands for this reached outer C.LE.S.
-        if(!ordinary(first)||!ordinary(second))return fail(d,Status::unsupportedNumeric,
-            race?0x1ac6d8u:0x1ac5e0u);
-        const bool firstBeforeSecond=first<=second; //Ties: manager row0 first.
-        if(!leafEnabled)return true;
-        if(firstBeforeSecond){
-            if(!timeRank(values,names,first,playerNames[0],race,firstRank,d))return false;
-            return timeRank(values,names,second,playerNames[1],race,secondRank,d);
-        }
-        if(!timeRank(values,names,second,playerNames[1],race,secondRank,d))return false;
-        return timeRank(values,names,first,playerNames[0],race,firstRank,d);
     }
     // a2=0 automatic-insertion branch ONLY. The nonzero direct-slot seed
     // branches remain in1801D0's existing initializer; do not duplicate them.
@@ -175,22 +83,12 @@ private:
         next.profileIdentity_=identity;
         next.course_=course;next.generation_=generation;next.mode34_=mode34;
         next.before_=records.courses[course];next.after_=next.before_;
-        //1AC51C then11260;1AC554 then11264;1AC58C then11268. These are
-        // proposed rank stores only. In particular CD4 is NOT a local gate:
-        // eligibility/retirement belongs to preceding1ABFC0/1AB520.
-        if(currentSubtype11258!=2u&&
-           !timeRank(next.after_.lap102F0,next.after_.lapNames102FC,
-             racer.bestLapCB4,firstName,false,next.ranks_.lap11260,d))return false;
-        const auto humans=(targetPacked1125C>>5u)&3u;
-        const auto opponents=(targetPacked1125C>>7u)&15u;
-        const bool raceAndKnockouts=currentSubtype11258==1u&&
-            (currentLapCount1125C&31u)==3u&&humans+opponents==8u;
-        if(raceAndKnockouts){
-            if(!timeRank(next.after_.race1033C,next.after_.raceNames10348,
-                racer.timeCB8,firstName,true,next.ranks_.race11264,d))return false;
-            knockoutRank(next.after_.knockouts10388,next.after_.knockoutNames10394,
-                racer.countCD0,firstName,next.ranks_.knockouts11268);
-        }
+        //1AC51C..1AC5AC: shared rule body on the temporary after_ row.
+        race_record_rule50kg::InsertionRanks ranks;std::uint32_t failPC=0;
+        if(!race_record_rule50kg::insertSingleHuman1AC440(next.after_,currentSubtype11258,
+            currentLapCount1125C,targetPacked1125C,racer,firstName,ranks,failPC))
+            return fail(d,Status::unsupportedNumeric,failPC);
+        next.ranks_={ranks.lap,ranks.race,ranks.knockouts};
         out=next;d={Status::ok,0x1ac8bcu};return true;
     }
     //1AC5B4..1AC8BC. rows[0/1] MUST retain original manager getter order,
@@ -218,32 +116,13 @@ private:
         next.before_=records.courses[course];next.after_=next.before_;
         next.secondHumanRanks_=SecondHumanRanks{};
         auto& secondRanks=*next.secondHumanRanks_;
-        //First helper result is stored to its PLAYER lane before the second
-        //insertion. Do not swap names/rank destinations with the sorted order.
-        if(!timePair(next.after_.lap102F0,next.after_.lapNames102FC,
-            rows[0].bestLapCB4,rows[1].bestLapCB4,playerNames,false,
-            currentSubtype11258!=2u,next.ranks_.lap11260,secondRanks.lap1126C,d))return false;
-        const auto humans=(targetPacked1125C>>5u)&3u;
-        const auto opponents=(targetPacked1125C>>7u)&15u;
-        const bool raceAndKnockouts=currentSubtype11258==1u&&
-            (currentLapCount1125C&31u)==3u&&humans+opponents==8u;
-        if(!timePair(next.after_.race1033C,next.after_.raceNames10348,
-            rows[0].timeCB8,rows[1].timeCB8,playerNames,true,raceAndKnockouts,
-            next.ranks_.race11264,secondRanks.race11270,d))return false;
-        //1AC7D0 is signed SLT on the raw CD0 words, while185EC0 uses SLTU.
-        //XOR sign-bit gives exact signed32 ordering without narrowing uint32
-        //to host int32. Preserve this source distinction, even for high-bit
-        //words; do not 'repair' already returned ranks after a later shift.
-        const bool secondBeforeFirst=(rows[0].countCD0^0x80000000u)<
-            (rows[1].countCD0^0x80000000u);
-        if(raceAndKnockouts){
-            const std::size_t order[]{secondBeforeFirst?1u:0u,secondBeforeFirst?0u:1u};
-            for(const auto player:order){
-                auto& rank=player==0?next.ranks_.knockouts11268:secondRanks.knockouts11274;
-                knockoutRank(next.after_.knockouts10388,next.after_.knockoutNames10394,
-                    rows[player].countCD0,playerNames[player],rank);
-            }
-        }
+        //1AC5B4..1AC8BC: shared rule body on the temporary after_ row.
+        race_record_rule50kg::InsertionRanks first,second;std::uint32_t failPC=0;
+        if(!race_record_rule50kg::insertTwoHumans1AC440(next.after_,currentSubtype11258,
+            currentLapCount1125C,targetPacked1125C,rows,playerNames,first,second,failPC))
+            return fail(d,Status::unsupportedNumeric,failPC);
+        next.ranks_={first.lap,first.race,first.knockouts};
+        secondRanks={second.lap,second.race,second.knockouts};
         out=next;d={Status::ok,0x1ac8bcu};return true;
     }
     std::uint32_t course_=0,mode34_=0;

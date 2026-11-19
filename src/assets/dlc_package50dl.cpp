@@ -282,15 +282,20 @@ bool readManifest(const fs::path& folder,Package& out,std::string& reason){
     }
     std::string requiredPort;
     if(!str(root,"requires_port",requiredPort,false,reason))return false;
-    if(!requiredPort.empty()&&requiredPort!=portContract)
-        return fail(reason,"package needs port data contract \""+requiredPort+"\"; this build has \""+portContract+"\"");
+    if(!requiredPort.empty()&&requiredPort!=portContract&&requiredPort!=itemsContract)
+        return fail(reason,"package needs port data contract \""+requiredPort+"\"; this build has \""+portContract+"\" and \""+itemsContract+"\"");
     static const std::set<std::string> kinds{"course","pod","menu_assets","replacement","bundle"};
     if(!kinds.count(out.kind))return fail(reason,"kind \""+out.kind+"\" is not course, pod, menu_assets, replacement or bundle");
-    // Phase 1: replacements only. Add-on items load through later phases.
+    if(out.kind=="menu_assets")return fail(reason,"kind \"menu_assets\" needs a later version of the port");
+    // Add-on items (contract 2): read item by item by readItems (dlc_registry50dl.cpp).
     const Json* items=nullptr;
     if(!array(root,"items",items,true,Limits::items,reason))return false;
-    if(!items->empty()||out.kind!="replacement")
-        return fail(reason,"add-on items (kind \""+out.kind+"\") need a later version of the port; this build loads replacement packages only");
+    out.itemCount=items->size();
+    if(out.kind=="replacement"&&!items->empty())return fail(reason,"kind \"replacement\" must list no items");
+    if((out.kind=="course"||out.kind=="pod")&&items->empty())return fail(reason,"kind \""+out.kind+"\" lists no items");
+    if(!items->empty()&&requiredPort!=itemsContract)
+        return fail(reason,std::string("add-on items need \"requires_port\": \"")+itemsContract+"\"");
+    out.manifestText=text;
 
     const Json* files=nullptr;
     if(!array(root,"files",files,true,Limits::files,reason))return false;
@@ -336,6 +341,8 @@ bool readManifest(const fs::path& folder,Package& out,std::string& reason){
         out.replacements.push_back(std::move(item));
     }
     if(out.kind=="replacement"&&out.replacements.empty())return fail(reason,"kind \"replacement\" lists no replacements");
+    if((out.kind=="course"||out.kind=="pod")&&!out.replacements.empty())
+        return fail(reason,"kind \""+out.kind+"\" must not list replacements (use kind \"bundle\")");
 
     const Json* dependencies=nullptr;
     if(!array(root,"dependencies",dependencies,false,Limits::dependencies,reason))return false;

@@ -51,7 +51,7 @@ public:
                     throw std::runtime_error("actual original roster owners or bounded model roles absent");
                 for(std::size_t old=0;old<slot;++old)if(rigs[old]->podId==rig->podId)
                     throw std::runtime_error("duplicate actual roster identity");
-                const auto* selected=g::original_racer_selection50IJ::findByPodId(rig->podId);
+                const auto* selected=g::original_racer_selection50IJ::findAnyByPodId(rig->podId);
                 const auto* pin=selected?original_player_identity50IK::find(selected->racer60):nullptr;
                 if(!pin)throw std::runtime_error("original roster source pin absent");
                 auto bytes=runtime_startup50fl::readBytes(rig->resourceFile);

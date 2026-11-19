@@ -7,6 +7,8 @@
 #include "json.hpp"
 #include "runtime_asset_paths50lb.h"
 #include "../../src/assets/dlc_files50dl.h"
+#include "../../src/assets/dlc_progress50dl.h"
+#include "../../platform/linux/native/native_beta_file50kg.h"
 #include "track_session_assets50ig_fixture.h"
 #include "checkpoint_recovery50fi_fixture.h"
 #include "lap_drive50gj_fixture.h"
@@ -127,6 +129,11 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   // PC enhancement (NOT ORIGINAL): check DLC packages once, before the first
   // original file is opened. No DLC folder = no overlay, stock paths unchanged.
   rr::assets::dlc50DL::startup();
+  // DLC save side file (PORT EXTENSION, NOT ORIGINAL; src\assets\dlc_progress50dl.h).
+  // The registry is frozen here: load the side file once, before the first menu,
+  // next to the stock save. With no admitted package nothing is read, created or
+  // logged. It is written only right after a stock save write, when it changed.
+  rr::assets::dlc50DL::loadProgressFromRegistry(rr::platform::native_beta50kg::defaultDirectory());
  }
  const bool headlessLive=argc==4&&std::string(argv[2])=="--headless-live";
  if(argc!=2&&!headlessLive&&!discEntry){
