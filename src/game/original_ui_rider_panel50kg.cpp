@@ -27,7 +27,8 @@ OriginalUiApertureStatus50KG OriginalUiRiderPanel50KG::begin7C(Phase phase) noex
     return phase==Phase::exit?OriginalUiApertureStatus50KG::noChange:OriginalUiApertureStatus50KG::invalidPhase;
 }
 bool OriginalUiRiderPanel50KG::update38(float dt,Life life,Phase phase,
-    const OriginalUiNavigation50KG& nav,OriginalUiRiderDynamicOwner50KG& dynamic) noexcept {
+    const OriginalUiNavigation50KG& nav,OriginalUiRiderDynamicOwner50KG& dynamic,
+    const OriginalUiRiderCharacterScene50KG* addonCharacter) noexcept {
     if(!aperture_||!ordinary(dt)||dt<0||std::fegetround()!=FE_TONEAREST||nav.page!=page_)return false;
     if(life!=Life::waitScreenExit&&life!=Life::waitPageTransition)return true;
     const auto state=aperture_->snapshot().state;
@@ -54,7 +55,7 @@ bool OriginalUiRiderPanel50KG::update38(float dt,Life life,Phase phase,
     bool ready=true;
     if(control.widgets.size()==4){const auto character=control.widgets[3];
         if(dynamic.state(character).kind!=OriginalUiRiderWidgetKind50KG::character)return false;
-        ready=dynamic.sourceCharacterReadiness(character);
+        ready=addonCharacter?addonCharacter->sourceReadiness():dynamic.sourceCharacterReadiness(character);
     }
     if(!ready&&!bypass_)return true;
     if(state==A::closed||state==A::closing)return true;

@@ -15,6 +15,7 @@ struct OriginalUiRiderCharacterAssets50KG::Storage {
     Scene48D scene;
     std::array<float,3> position{},look{},up{};
     std::array<OriginalUiRiderCharacterMotion50KG,6> motions{};
+    std::shared_ptr<const OriginalUiArchive50KG> layoutArchive; // PORT EXTENSION: stock Rider (transform source)
 };
 namespace {
 using E=OriginalUiRiderCharacterAssetError50KG;
@@ -47,12 +48,22 @@ bool OriginalUiRiderCharacterAssets50KG::loadUnlock(std::shared_ptr<const Origin
     d={};if(widget<24||widget>38)return fail(d,E::widget,0x20A850);
     return loadImpl(std::move(archive),widget,true,d);
 }
+bool OriginalUiRiderCharacterAssets50KG::loadAddon(std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+    std::uint16_t layoutWidget,std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& mcfName,
+    OriginalUiRiderCharacterAssetDiagnostic50KG& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if (!addonUi || !addonUi->addon() || mcfName.empty()) return fail(d,E::archive,0x1D22A0);
+    return loadImpl(std::move(stockRider),layoutWidget,false,d,std::move(addonUi),&mcfName);
+}
+bool OriginalUiRiderCharacterAssets50KG::addon() const noexcept { return storage_&&storage_->layoutArchive; }
 bool OriginalUiRiderCharacterAssets50KG::loadImpl(std::shared_ptr<const OriginalUiArchive50KG> archive,
-    std::uint16_t widget,bool unlock,OriginalUiRiderCharacterAssetDiagnostic50KG& d) noexcept {
+    std::uint16_t widget,bool unlock,OriginalUiRiderCharacterAssetDiagnostic50KG& d,
+    std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string* addonMcf) noexcept {
     d={};
     if (storage_) return fail(d,E::alreadyLoaded,0x1D22A0);
     if (!archive || !archive->loaded() || !archive->identity() ||
         archive->identity()->id!=(unlock?OriginalUiArchiveId50KG::unlock:OriginalUiArchiveId50KG::rider)) return fail(d,E::archive,0x1D22A0);
+    if (bool(addonUi)!=bool(addonMcf) || (addonUi && (unlock || !addonUi->addon()))) return fail(d,E::archive,0x1D22A0);
     try {
         auto next=std::make_unique<Storage>();next->archive=std::move(archive);next->widget=widget;
         OriginalUiDat50KG widgets,mcf;
@@ -64,9 +75,17 @@ bool OriginalUiRiderCharacterAssets50KG::loadImpl(std::shared_ptr<const Original
         if (!type || type->text!="Soultree_Character" || !reference ||
             !stem(reference->text,".mcf",next->base)) return fail(d,E::widget,0x1D2178);
         next->widgetSource=widgets.identity();
+        std::string mcfMember="UI/Anim/"+reference->text;
+        if (addonUi) {
+            // PORT EXTENSION (DLC): every model/motion member from the add-on archive.
+            const auto slash=addonMcf->find_last_of("\\/");
+            if (!stem(addonMcf->substr(slash==std::string::npos?0:slash+1),".mcf",next->base))
+                return fail(d,E::config,0x1538B0);
+            next->layoutArchive=std::move(next->archive);next->archive=std::move(addonUi);mcfMember=*addonMcf;
+        }
         // Native binding to exact authenticated UI/Anim members. This does not
         // emulate the original global resource cache's filename-search policy.
-        if (!readOriginalUiDat50KG(*next->archive,"UI/Anim/"+reference->text,mcf,d.text,
+        if (!readOriginalUiDat50KG(*next->archive,mcfMember,mcf,d.text,
                 OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d,E::config,0x1538B0);
         next->mcfSource=mcf.identity();
         // Actual Rider files author every transform; admit no guessed axes.
@@ -138,6 +157,7 @@ bool OriginalUiRiderCharacterAssets50KG::loadImpl(std::shared_ptr<const Original
       catch (...) { return fail(d,E::config,0x1D22A0); }
 }
 bool OriginalUiRiderCharacterAssets50KG::loaded() const noexcept { return !!storage_; }
+std::shared_ptr<const OriginalUiArchive50KG> OriginalUiRiderCharacterAssets50KG::archive() const noexcept { return storage_?storage_->archive:nullptr; }
 std::uint16_t OriginalUiRiderCharacterAssets50KG::widgetId() const noexcept { return storage_?storage_->widget:0; }
 const std::string* OriginalUiRiderCharacterAssets50KG::baseName() const noexcept { return storage_?&storage_->base:nullptr; }
 const OriginalUiMemberIdentity50KG* OriginalUiRiderCharacterAssets50KG::widgetSource() const noexcept { return storage_?storage_->widgetSource:nullptr; }

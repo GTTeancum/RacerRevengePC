@@ -126,6 +126,8 @@ private:
     // PORT EXTENSION, NOT ORIGINAL (DLC): draw add-on model table row `row`
     // with the anchor pod's selection flags; see original_ui_rider_addon_overlay50dl.h.
     bool addonModel(std::size_t row,std::uint8_t flags191,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    // Step B: the add-on character, lit with the anchor character's Rider lights.
+    bool addonCharacter(std::size_t row,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool append(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,float packetZ,
         OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;

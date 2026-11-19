@@ -142,8 +142,28 @@ bool OriginalUiRiderModelMaterials50KG::loadAddonPod(std::shared_ptr<const Origi
     const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
     // PORT EXTENSION, NOT ORIGINAL: see the header.
     d={};if(storage_)return fail(d,E::alreadyLoaded);
-    const auto addonUi=model?model->archive():nullptr;const auto* scene=model?model->scene():nullptr;
-    if(!model||!model->loaded()||!model->addon()||!addonUi||!addonUi->addon()||!scene||
+    if(!model||!model->loaded()||!model->addon())return fail(d,E::input);
+    const auto* scene=model->scene();auto addonUi=model->archive();
+    return loadAddonModel(std::move(model),scene,std::move(addonUi),std::move(stockRider),std::move(app),
+        std::move(podTextures),runtime,cache,d);
+}
+bool OriginalUiRiderModelMaterials50KG::loadAddonCharacter(std::shared_ptr<const OriginalUiRiderCharacterAssets50KG> model,
+    std::shared_ptr<const OriginalUiArchive50KG> stockRider,std::shared_ptr<const OriginalUiArchive50KG> app,
+    std::shared_ptr<const OriginalUiArchive50KG> podTextures,const OriginalUiMaterialRuntime50KG& runtime,
+    const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if(storage_)return fail(d,E::alreadyLoaded);
+    if(!model||!model->loaded()||!model->addon())return fail(d,E::input);
+    const auto* scene=model->scene();auto addonUi=model->archive();
+    return loadAddonModel(std::move(model),scene,std::move(addonUi),std::move(stockRider),std::move(app),
+        std::move(podTextures),runtime,cache,d);
+}
+bool OriginalUiRiderModelMaterials50KG::loadAddonModel(std::shared_ptr<const void> model,const Scene48D* scene,
+    std::shared_ptr<const OriginalUiArchive50KG> addonUi,std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+    std::shared_ptr<const OriginalUiArchive50KG> app,std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    d={};if(storage_)return fail(d,E::alreadyLoaded);
+    if(!model||!addonUi||!addonUi->addon()||!scene||
        scene->materials.empty()||scene->materials.size()>256||!stockRider||!stockRider->loaded()||
        stockRider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
        !app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)||

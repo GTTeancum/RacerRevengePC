@@ -122,8 +122,10 @@ struct OriginalUiRiderCharacterScene50KG::Storage {
     std::array<ChariotIkChain49T,2> chains{};
     ModelMode0IkContext50KG context{};
     ModelPlaybackIk50KG ik{};
-    bool attached=false,destroyed=false;
+    bool attached=false,destroyed=false,addon=false;
+    bool live()const noexcept{return addon||material.active();}
     bool destroy(D& d)noexcept {
+        if(addon){if(!destroyed){lifecycle.modelDestroyed();attached=false;destroyed=true;model={};ik={};context={};chains={};}return true;}
         if(!material.beforeInvalidation(d))return false;
         // This runs only for an unpublished candidate or AFTER actual detach.
         // Clear every mutable graph/IK/playback reference before its domain.
@@ -174,8 +176,32 @@ bool OriginalUiRiderCharacterScene50KG::beginLoad(
         storage_=std::move(next);return true;
     } catch (...) {return reject(E::allocation,0x1D22A0);}
 }
+bool OriginalUiRiderCharacterScene50KG::beginLoadAddon(
+    std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> assets,
+    ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ikShared,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D22A0);
+    if (!assets||!assets->loaded()||!assets->addon()||!assets->hierarchy()||!assets->bindings()||
+        !assets->position()||!assets->look()||!assets->up()) return fail(d,E::asset,0x1D22A0);
+    try {
+        auto next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);next->addon=true;
+        if (!next->model.build(*next->sourceAssets->hierarchy(),*next->sourceAssets->position(),
+            *next->sourceAssets->look(),*next->sourceAssets->up(),true)) return fail(d,E::graph,0x1D2438);
+        next->bindings=*next->sourceAssets->bindings();
+        for (std::uint32_t row=0;row<next->bindings.count;++row) {
+            auto& index=next->bindings.rows[row].sceneNode;
+            if (index>=next->model.count) return fail(d,E::binding,0x153218);
+            ++index;
+        }
+        if (!next->lifecycle.bind(*next->sourceAssets)) return fail(d,E::binding,0x1D244C);
+        ModelPlaybackWorkspace50KG workspace{};
+        if (!next->lifecycle.startEntry(next->bindings,next->model.view(),shared,ikShared,workspace,d.playback))
+            return fail(d,E::playback,0x1D2478);
+        storage_=std::move(next);return true;
+    } catch (...) {return fail(d,E::allocation,0x1D22A0);}
+}
 bool OriginalUiRiderCharacterScene50KG::finishAttachment(SourceLibmState49T& libm,D& d) noexcept {
-    d={};if (!storage_||storage_->attached||storage_->destroyed||!storage_->material.active()) return fail(d,E::phase,0x1D24A8);
+    d={};if (!storage_||storage_->attached||storage_->destroyed||!storage_->live()) return fail(d,E::phase,0x1D24A8);
     auto& s=*storage_;
     if (!s.lifecycle.captureAfterAttachment(s.bindings,s.model.view(),d.playback)) return fail(d,E::playback,0x1D24A8);
     std::array<I,2> endpoints{};std::uint32_t count=0;
@@ -197,7 +223,8 @@ bool OriginalUiRiderCharacterScene50KG::modelDestroyedAfterDetach(D& d) noexcept
     d={};return !storage_||storage_->destroy(d);
 }
 bool OriginalUiRiderCharacterScene50KG::requiresModelCleanup() const noexcept {
-    return storage_&&(!storage_->destroyed||storage_->material.pending());
+    // An add-on graph owns no lifetime row: plain destruction is complete cleanup.
+    return storage_&&!storage_->addon&&(!storage_->destroyed||storage_->material.pending());
 }
 bool OriginalUiRiderCharacterScene50KG::reload(ModelMotionSharedState49T& shared,
     ModelMode0IkShared50KG& ikShared,OriginalUiRiderMaterialLifetime50KG& ledger,
@@ -217,7 +244,7 @@ bool OriginalUiRiderCharacterScene50KG::reload(ModelMotionSharedState49T& shared
         return reject(E::playback,0x1D2478);
     return true;
 }
-bool OriginalUiRiderCharacterScene50KG::attached() const noexcept {return storage_&&storage_->attached&&storage_->material.active();}
+bool OriginalUiRiderCharacterScene50KG::attached() const noexcept {return storage_&&storage_->attached&&storage_->live();}
 void OriginalUiRiderCharacterScene50KG::selected() noexcept {if (storage_) storage_->lifecycle.selected();}
 bool OriginalUiRiderCharacterScene50KG::preflightConfirm(D& d) const noexcept {
     d={};if(!attached())return fail(d,E::phase,0x1D2690);

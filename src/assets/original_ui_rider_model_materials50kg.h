@@ -70,6 +70,13 @@ public:
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
         OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    // PORT EXTENSION (DLC): the same rules for an add-on character (character->addon()).
+    bool loadAddonCharacter(std::shared_ptr<const OriginalUiRiderCharacterAssets50KG>,
+        std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
     bool addonShared(std::uint32_t material) const noexcept;
     bool loaded() const noexcept;
     std::uint32_t materialCount() const noexcept;
@@ -82,6 +89,11 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
         OriginalUiRiderModelMaterialDiagnostic50KG&,bool tournament=false,bool unlock=false) noexcept;
+    bool loadAddonModel(std::shared_ptr<const void> pin,const Scene48D*,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi,std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

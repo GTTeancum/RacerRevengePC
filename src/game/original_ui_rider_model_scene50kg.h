@@ -38,6 +38,12 @@ public:
     // Call at actual observer-attachment + parent callback completion boundary.
     // Captures155730, constructs optional l_IK/r_IK chains in source order from
     // sampled graph, binds endpoints, installs real mode0 solver, sets IK204.
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on character (assets->addon()).
+    // Same graph build, bindings, entry sample, attachment capture and IK as
+    // beginLoad/finishAttachment, with the same shared motion state; it acquires
+    // no material-lifetime row (add-on materials are static Rider-page rows).
+    bool beginLoadAddon(std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,
+        ModelMotionSharedState49T&,ModelMode0IkShared50KG&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool finishAttachment(SourceLibmState49T&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     // Source widget survives model destruction. Retain idle counter/last idle and
     // ready across real unload/reload, rather than constructing a fresh widget.

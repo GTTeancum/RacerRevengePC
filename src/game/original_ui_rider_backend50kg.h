@@ -85,6 +85,7 @@ public:
     const assets::OriginalUiImageBankMapping50KG* binderImage(std::uint32_t) const noexcept;
     // PORT EXTENSION (DLC): image `image` of add-on model table row `row`.
     const assets::OriginalUiImageBankMapping50KG* addonImage(std::size_t row,std::uint32_t image) const noexcept;
+    const assets::OriginalUiImageBankMapping50KG* addonCharacterImage(std::size_t row,std::uint32_t image) const noexcept;
     const OriginalUiRiderAddonModels50DL* addonModels() const noexcept;
     const assets::OriginalUiRiderModelMaterials50KG* materials(std::uint16_t) const noexcept;
     const OriginalUiRiderVisibilityHandle50KG* membership(std::uint16_t) const noexcept;

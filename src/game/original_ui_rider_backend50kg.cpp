@@ -328,14 +328,19 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         }
         // PORT EXTENSION, NOT ORIGINAL (DLC): ready add-on model rows, after every
         // stock owner (stock indices unchanged; nothing appended without add-ons).
-        std::vector<std::pair<std::size_t,std::uint32_t>> addonOwners;
+        std::vector<std::pair<std::size_t,std::uint32_t>> addonOwners,addonCharacterOwners;
         if(auto* addon=s.input.addonModels){
             for(std::size_t i=0;i<addon->size();++i){const auto* row=addon->row(i);
                 if(!row||!row->ready||!row->materials||!row->materials->images())continue;
-                if(population.owners.size()>=std::numeric_limits<std::uint32_t>::max()-1)return fail(E::bank);
+                if(population.owners.size()>=std::numeric_limits<std::uint32_t>::max()-2)return fail(E::bank);
                 addonOwners.emplace_back(i,static_cast<std::uint32_t>(population.owners.size()));
                 population.owners.push_back(row->materials->images());
-                // The add-on archive is pinned in the bank's own add-on list (no stock archive slot).
+                // Step B: the character's own images, right after its pod's.
+                if(row->characterReady&&row->characterMaterials&&row->characterMaterials->images()){
+                    addonCharacterOwners.emplace_back(i,static_cast<std::uint32_t>(population.owners.size()));
+                    population.owners.push_back(row->characterMaterials->images());
+                }
+                // The add-on archive is pinned once in the bank's own add-on list (no stock archive slot).
                 population.addonArchives.push_back(row->archive);
             }
         }
@@ -349,6 +354,8 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
             addonOwners.size(),population.owners.size(),bank->images()&&bank->images()->textures()?bank->images()->textures()->textureCount():0u);
         for(const auto& [row,owner]:addonOwners)
             if(!bank->mapping(owner,0)||!s.input.addonModels->setImageOwner(row,owner))return fail(E::bank);
+        for(const auto& [row,owner]:addonCharacterOwners)
+            if(!bank->mapping(owner,0)||!s.input.addonModels->setCharacterImageOwner(row,owner))return fail(E::bank);
         // Explicit preview pairs require complete private candidates before seal.
         // Mapping alone never implies descriptor/material readiness.
         for(const auto rider:originalUiRiderRoster50KG)
@@ -506,6 +513,12 @@ const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::addonI
     if(!storage_||!storage_->bank||!storage_->coldSealed||!storage_->input.addonModels)return nullptr;
     const auto* r=storage_->input.addonModels->row(row);
     return r&&r->ready&&r->imageOwner!=OriginalUiRiderAddonModels50DL::noOwner?storage_->bank->mapping(r->imageOwner,image):nullptr;
+}
+const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::addonCharacterImage(std::size_t row,std::uint32_t image)const noexcept {
+    if(!storage_||!storage_->bank||!storage_->coldSealed||!storage_->input.addonModels)return nullptr;
+    const auto* r=storage_->input.addonModels->row(row);
+    return r&&r->characterReady&&r->characterImageOwner!=OriginalUiRiderAddonModels50DL::noOwner?
+        storage_->bank->mapping(r->characterImageOwner,image):nullptr;
 }
 const OriginalUiRiderAddonModels50DL* OriginalUiRiderBackend50KG::addonModels()const noexcept {
     return storage_?storage_->input.addonModels:nullptr;

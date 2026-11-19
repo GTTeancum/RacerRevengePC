@@ -48,6 +48,17 @@ public:
     // Separate archive gate: UIUnlock widgets 24..38 from UI/UIUnlock/Widgets.Dat.
     bool loadUnlock(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
         OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on rider's menu character.
+    // Position/Look/Up are a read-only copy of the authored stock Soultree_Character
+    // widget `layoutWidget` (PORT STAND-IN: a package has no Rider widget); the
+    // MCF `mcfName` and every member it names (PSG, VUT, the six motions) come
+    // from the add-on's own archive (identity addonUi), found by name.
+    bool loadAddon(std::shared_ptr<const OriginalUiArchive50KG> stockRider,std::uint16_t layoutWidget,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& mcfName,
+        OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
+    bool addon() const noexcept;
+    // The archive the model and motions come from (the add-on archive for addon()).
+    std::shared_ptr<const OriginalUiArchive50KG> archive() const noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;
     const std::string* baseName() const noexcept;
@@ -65,7 +76,8 @@ public:
     const OriginalUiRiderCharacterMotion50KG* findMotion(const std::string& name) const noexcept;
 private:
     bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t,bool unlock,
-        OriginalUiRiderCharacterAssetDiagnostic50KG&) noexcept;
+        OriginalUiRiderCharacterAssetDiagnostic50KG&,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi=nullptr,const std::string* addonMcf=nullptr) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

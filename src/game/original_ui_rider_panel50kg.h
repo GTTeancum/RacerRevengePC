@@ -12,8 +12,11 @@ public:
     void acceptedBack() noexcept;
     void confirmWhileClosing() noexcept;
     OriginalUiApertureStatus50KG begin7C(OriginalUiTransitionPhase50KG) noexcept;
+    // PORT EXTENSION (DLC): addonCharacter, when given, is the shown add-on
+    // character whose own _sel readiness gates the exit (in place of the anchor's).
     bool update38(float,OriginalUiTransitionLifecycle50KG,OriginalUiTransitionPhase50KG,
-        const OriginalUiNavigation50KG&,OriginalUiRiderDynamicOwner50KG&) noexcept;
+        const OriginalUiNavigation50KG&,OriginalUiRiderDynamicOwner50KG&,
+        const OriginalUiRiderCharacterScene50KG* addonCharacter=nullptr) noexcept;
     OriginalUiTransitionCompletion50KG pollCompletion(OriginalUiTransitionPhase50KG)const noexcept;
     float offset4DC()const noexcept{return offset_;}
     bool inputBlocked4E0()const noexcept{return blocked_;}

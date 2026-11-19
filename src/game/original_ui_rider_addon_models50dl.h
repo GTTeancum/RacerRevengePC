@@ -39,12 +39,23 @@ public:
         std::uint32_t imageOwner=noOwner;     // bank owner index, set by the Rider backend seal
         bool ready=false;
         std::string refused;                  // why the row draws nothing ("" when ready)
+        // Menu-art step B: the rider's character (ui.character: <stem>c psg/mcf/vut
+        // and the six motions) with its character-page materials. The graph is
+        // built when the add-on is highlighted and destroyed when it leaves, as
+        // the original loads a selected character and unloads a deselected one.
+        std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> characterAssets;
+        std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG> characterMaterials;
+        std::unique_ptr<OriginalUiRiderCharacterScene50KG> character;
+        std::uint32_t characterImageOwner=noOwner;
+        bool characterReady=false;
+        std::string characterRefused;
     };
     struct Input {
         std::shared_ptr<const assets::OriginalUiArchive50KG> stockRider,appStart,podTextures;
         assets::OriginalUiMaterialRuntime50KG materialRuntime{};
         const assets::OriginalUiIpumTextureCache50KG* ipumCache=nullptr;
         std::uint16_t layoutWidget=0;         // authored stock User_Rotate pod widget (placement copy)
+        std::uint16_t characterLayoutWidget=0;// authored stock Soultree_Character widget (placement copy)
     };
     OriginalUiRiderAddonModels50DL() noexcept=default;
     OriginalUiRiderAddonModels50DL(const OriginalUiRiderAddonModels50DL&)=delete;
@@ -61,6 +72,14 @@ public:
     Row* byNumber(unsigned number) noexcept;
     // Backend seal only: record the bank owner of row `index` (bounds-checked).
     bool setImageOwner(std::size_t index,std::uint32_t owner) noexcept;
+    bool setCharacterImageOwner(std::size_t index,std::uint32_t owner) noexcept;
+    // Build the row's character graph (entry motion sampled, attached, IK bound)
+    // with the same shared motion/IK/libm owners the stock characters use, or
+    // destroy it. start refuses a row without a ready character or a live graph.
+    bool startCharacter(std::size_t index,ModelMotionSharedState49T&,ModelMode0IkShared50KG&,
+        SourceLibmState49T&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
+    void stopCharacter(std::size_t index) noexcept;
+    OriginalUiRiderCharacterScene50KG* liveCharacter(std::size_t index) noexcept;
     // Destroys every graph (no lifetime rows are held). Idempotent.
     void drain() noexcept;
 private:
