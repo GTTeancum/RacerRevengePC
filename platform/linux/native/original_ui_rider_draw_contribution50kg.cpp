@@ -49,6 +49,9 @@ struct Binding {
     RegistrationKind kind=RegistrationKind::existingStatic;
     MaterialRow row{};
     std::shared_ptr<LiveMaterial> live;
+    // PORT EXTENSION (DLC): an add-on model table row's own static pass, ranked
+    // after Mat_Stbl (addonShared: its copy of a shared original name).
+    bool addon=false,addonShared=false;
 };
 struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;};
 struct Registration {
@@ -478,6 +481,7 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
                 const auto* pass=m->pass(slot,p);if(!pass)return fail(d,E::material);
                 const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->addonImage(r,pass->imageIndex);
                 if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d))return false;
+                bindings.back().addon=true;bindings.back().addonShared=m->addonShared(slot);
                 ++addonBindings;
             }
             // Step B: the character's own materials (character pages), same static rows.
@@ -489,6 +493,7 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
                 const auto* pass=cm->pass(slot,p);if(!pass)return fail(d,E::material);
                 const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->addonCharacterImage(r,pass->imageIndex);
                 if(!s.add("ui/textures/"+cscene->materials[slot],pass->source,*cm->images(),pass->imageIndex,map,bindings,d))return false;
+                bindings.back().addon=true;bindings.back().addonShared=cm->addonShared(slot);
                 ++addonBindings;
             }
         }
@@ -994,18 +999,8 @@ bool OriginalUiRiderDrawContribution50KG::addonModel(std::size_t index,std::uint
         s.scratchVertices.resize(count*4);s.scratchW.resize(count*4);s.scratchFog.resize(count*4);
         // Own material passes, or the stock rows of a shared original name.
         std::vector<std::pair<const assets::OriginalUiMaterialPass50KG*,std::uint32_t>> passes;
-        if(materials->addonShared(materialIndex)){
-            const auto name="ui/textures/"+scene->materials[materialIndex];
-            for(std::uint32_t ordinal=1;ordinal<=8;++ordinal){std::uint32_t found=unresolved;
-                for(std::size_t b=0;b<s.bindings.size();++b){const auto& binding=s.bindings[b];
-                    if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass&&binding.pass->pass==ordinal&&
-                       same(binding.registeredName,name.c_str())&&binding.sourceRegistered&&binding.leaf!=unresolved&&
-                       s.drawablePacket(static_cast<std::uint32_t>(b))){found=static_cast<std::uint32_t>(b);break;}}
-                if(found==unresolved)break;
-                passes.emplace_back(s.bindings[found].pass,found);
-            }
-            if(passes.empty())return refuse("shared original material has no live stock row");
-        }else for(std::uint32_t p=0;p<materials->passCount(materialIndex);++p){
+        // Own passes, including this row's own copies of shared original names.
+        for(std::uint32_t p=0;p<materials->passCount(materialIndex);++p){
             const auto* material=materials->pass(materialIndex,p);if(!material)return refuse("material pass");
             const auto* map=material->imageIndex==unresolved?nullptr:s.backend->addonImage(index,material->imageIndex);
             if(material->imageIndex!=unresolved&&!map)return refuse("add-on image not in the bank");
@@ -1065,18 +1060,8 @@ bool OriginalUiRiderDrawContribution50KG::addonCharacter(std::size_t index,D& d)
         if(count>originalUiMaximumSourceQuads50KM)return refuse("surface size");
         s.scratchVertices.resize(count*4);s.scratchW.resize(count*4);s.scratchFog.resize(count*4);
         std::vector<std::pair<const assets::OriginalUiMaterialPass50KG*,std::uint32_t>> passes;
-        if(materials->addonShared(materialIndex)){
-            const auto name="ui/textures/"+model->materials[materialIndex];
-            for(std::uint32_t ordinal=1;ordinal<=8;++ordinal){std::uint32_t found=unresolved;
-                for(std::size_t b=0;b<s.bindings.size();++b){const auto& binding=s.bindings[b];
-                    if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass&&binding.pass->pass==ordinal&&
-                       same(binding.registeredName,name.c_str())&&binding.sourceRegistered&&binding.leaf!=unresolved&&
-                       s.drawablePacket(static_cast<std::uint32_t>(b))){found=static_cast<std::uint32_t>(b);break;}}
-                if(found==unresolved)break;
-                passes.emplace_back(s.bindings[found].pass,found);
-            }
-            if(passes.empty())return refuse("shared original character material has no live stock row");
-        }else for(std::uint32_t p=0;p<materials->passCount(materialIndex);++p){
+        // Own passes, including this row's own copies of shared original names.
+        for(std::uint32_t p=0;p<materials->passCount(materialIndex);++p){
             const auto* material=materials->pass(materialIndex,p);if(!material)return refuse("material pass");
             const auto* map=material->imageIndex==unresolved?nullptr:s.backend->addonCharacterImage(index,material->imageIndex);
             if(material->imageIndex!=unresolved&&!map)return refuse("add-on character image not in the bank");
@@ -1379,7 +1364,8 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;
         if(cursor==table.size)break;
         const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
-        for(std::size_t i=0;i<input.size();++i){const auto& name=input[i].registeredName;
+        for(std::size_t i=0;i<input.size();++i){if(input[i].addon)continue; // add-on rows rank below
+            const auto& name=input[i].registeredName;
             if(name.size()!=cursor-start)continue;std::size_t j=0;
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(table.data[start+j]));++j){}
             if(j!=name.size())continue;
@@ -1404,10 +1390,19 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
     // same rows the material table appends). Only static add-on rows reach here.
     {
         const auto& names=rr::assets::dlc50DL::addonPodUiMaterialNames();
+        // Copies of shared original names rank after every own add-on name, one
+        // rank per distinct name (in first-binding order); never a Mat_Stbl rank.
+        std::vector<std::string> shared;
         for(std::size_t i=0;i<input.size();++i){
-            if(ranks[i]!=unresolved||input[i].kind!=RegistrationKind::existingStatic)continue;
-            for(std::size_t k=0;k<names.size()&&k<0x100000u;++k)
-                if(same(input[i].registeredName,names[k].c_str())){ranks[i]=3235u+static_cast<std::uint32_t>(k);break;}
+            if(!input[i].addon||ranks[i]!=unresolved||input[i].kind!=RegistrationKind::existingStatic)continue;
+            if(!input[i].addonShared){
+                for(std::size_t k=0;k<names.size()&&k<0x100000u;++k)
+                    if(same(input[i].registeredName,names[k].c_str())){ranks[i]=3235u+static_cast<std::uint32_t>(k);break;}
+                continue;
+            }
+            std::size_t k=0;for(;k<shared.size();++k)if(same(input[i].registeredName,shared[k].c_str()))break;
+            if(k==shared.size()){if(shared.size()>=0x10000u)return fail(d,E::schedule);shared.push_back(input[i].registeredName);}
+            ranks[i]=3235u+static_cast<std::uint32_t>(names.size()+k);
         }
     }
     for(std::size_t i=0;i<input.size();++i){

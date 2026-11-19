@@ -180,14 +180,15 @@ bool OriginalUiRiderModelMaterials50KG::loadAddonModel(std::shared_ptr<const voi
             d.material=static_cast<std::uint32_t>(m);const auto& name=scene->materials[m];
             if(!basename(name))return fail(d,E::material);
             const auto psm="ui/textures/"+name+".psm";
-            if(!addonUi->find(psm).identity){
-                // Shared original name: the stock Rider archive must own it.
-                if(!stockRider->find(psm).identity)return fail(d,E::material);
-                next->shared[m]=true;continue;
-            }
-            if(stockRider->find(psm).identity)return fail(d,E::material); // ambiguous owner
+            if(addonUi->find(psm).identity&&stockRider->find(psm).identity)return fail(d,E::material); // ambiguous owner
+            // A shared original name (cable, pod_wndw, ...): the stock Rider archive's
+            // own PSM, loaded here as this row's own copy (its own static row),
+            // never borrowed from a stock row that happens to be live.
+            const bool shared=!addonUi->find(psm).identity;
+            if(shared&&!stockRider->find(psm).identity)return fail(d,E::material);
+            next->shared[m]=shared;
             OriginalUiMaterial50KG material;
-            if(!readOriginalUiMaterial50KG(*addonUi,psm,templates,
+            if(!readOriginalUiMaterial50KG(shared?*stockRider:*addonUi,psm,templates,
                 OriginalUiTemplate50KG::defaultMt,runtime,material,d.materialDetail))return fail(d,E::material);
             auto& passes=next->materials[m];passes.reserve(material.passes.size());
             for(std::size_t p=0;p<material.passes.size();++p){
@@ -198,7 +199,8 @@ bool OriginalUiRiderModelMaterials50KG::loadAddonModel(std::shared_ptr<const voi
                     const auto prefix="ui/textures/"+pass.source.textureName;
                     if(addonUi->find(prefix+".atm").identity||stockRider->find(prefix+".atm").identity||
                        next->podTextures->find(prefix+".atm").identity)return fail(d,E::animatedTexture);
-                    const OriginalUiMemberView50KG owners[3]{addonUi->find(prefix+".pst"),
+                    // A shared original material takes only original textures.
+                    const OriginalUiMemberView50KG owners[3]{next->shared[m]?OriginalUiMemberView50KG{}:addonUi->find(prefix+".pst"),
                         stockRider->find(prefix+".pst"),next->podTextures->find(prefix+".pst")};
                     OriginalUiMemberView50KG member{};std::size_t found=0;
                     for(const auto& owner:owners)if(owner.identity){member=owner;++found;}

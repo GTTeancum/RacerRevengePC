@@ -62,8 +62,8 @@ public:
     // textures (add-on archive first, else the stock Rider archive or UIPODTEX;
     // a name in two owners is refused). A material the add-on archive does not
     // have but the stock Rider archive does (shared original names such as cable,
-    // pod_wndw) is NOT loaded: addonShared(m) is true and it has no passes here;
-    // the drawer uses the stock row of that name. Anything else is refused.
+    // pod_wndw) is loaded from the stock Rider archive as this row's own copy with
+    // original textures only; addonShared(m) is true for it. Anything else is refused.
     bool loadAddonPod(std::shared_ptr<const OriginalUiRiderPodAssets50KG>,
         std::shared_ptr<const OriginalUiArchive50KG> stockRider,
         std::shared_ptr<const OriginalUiArchive50KG> appStart,
