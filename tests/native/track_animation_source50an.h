@@ -140,8 +140,9 @@ public:
   try{using namespace detail;
    need(std::fegetround()==FE_TONEAREST,"track animation source requires nearest arithmetic");
    need(static_cast<bool>(extract),"track animation source has no archive extractor");
-   need(a::readTrackAnimations50AN(tob,zoneCount,limits_.reader,table_,d.reader),
-     "track animation table rejected: "+d.reader.message);
+   // Read first, then build the message: an argument-order-dependent message lost the reason.
+   const bool tableRead=a::readTrackAnimations50AN(tob,zoneCount,limits_.reader,table_,d.reader);
+   need(tableRead,"track animation table rejected: "+d.reader.message);
    auto nextLibm=libm;
    for(std::size_t i=0;i<table_.animations.size();++i){
     d.row=static_cast<std::uint32_t>(i+1);const auto& authored=table_.animations[i];

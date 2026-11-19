@@ -6,6 +6,7 @@
 #include "track_animation_runtime50an.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/import_world48f.h"
+#include "../../src/assets/dlc_files50dl.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -19,7 +20,8 @@ inline Loaded load(const std::filesystem::path& archivePath,const char* code,std
     g::SourceLibmState49T& libm,g::ModelMotionSharedState49T& shared){
  Loaded out;std::string label=code?code:"??";std::string lower=label;for(auto& c:lower)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
  auto archive=std::make_shared<a::ResArchive48C>();
- {std::ifstream f(archivePath,std::ios::binary);if(!f)throw std::runtime_error("track animation course archive unreadable");
+ {std::ifstream f(rr::assets::dlc50DL::host(archivePath),std::ios::binary); // through the DLC overlay, as every course-archive open
+  if(!f)throw std::runtime_error("track animation course archive unreadable");
   const a::DecodeLimits48C limits{};std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(f)),std::istreambuf_iterator<char>());
   if(bytes.size()>limits.resource_file_bytes)throw std::runtime_error("track animation course archive above the RES limit");
   a::DecodeError48C e{};if(!a::decodeResource48C(bytes,*archive,e,nullptr,limits))throw std::runtime_error("track animation course archive rejected: "+e.code);}
