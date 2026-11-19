@@ -119,8 +119,11 @@ bool validHostHudName(const char (&name)[maxVehicleWindowRacerName50DS + 1]) noe
         if (!letter) return i != 0 && visible;
         if (i == maxVehicleWindowRacerName50DS) return false;
         if (letter == ' ') continue;
-        if (!((letter >= 'a' && letter <= 'z') || (letter >= 'A' && letter <= 'Z') ||
-              (letter >= '0' && letter <= '9') || letter == '(' || letter == ')')) return false;
+        // One rule for every racer name, stock or add-on (DLC package name such
+        // as "ARK 'BUMPY' ROOSE"): a character is admitted when this HUD font
+        // draws it (hostHudGlyph). Every stock name (letters, digits, parens)
+        // is admitted exactly as before.
+        if (!hostHudGlyph(letter)) return false;
         visible = true;
     }
     return false;
