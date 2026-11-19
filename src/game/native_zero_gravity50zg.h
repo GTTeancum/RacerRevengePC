@@ -25,6 +25,7 @@
 // ============================================================================
 #include "native_surface_traction50st.h"
 #include "native_zero_gravity_step50zg.h"
+#include "n64_floor_table50nh.h" // PORT EXTENSION: N64 floor table (.nft) as the table source
 #include "undertrack_reposition50et.h"
 #include "body_scene48g.h"
 #include "../assets/collision_mesh48i.h"
@@ -114,6 +115,7 @@ struct ZeroGravityRacer50ZG {
     // Flight summary (logs only).
     float minSpeed=0.f,maxAbsRoll=0.f,maxAbsPitch=0.f,minAhead=0.f,maxAhead=0.f;
     std::uint64_t flightSteps=0,steerPinnedSteps=0; // |steer| >= 0.999 in Flight (logs only)
+    float maxLineOffset=0.f,maxUpSlip=0.f;          // ft off the line, deg of travel off the nose along up (logs only)
     bool linkMissingLogged=false;
 };
 struct ZeroGravityStepInput50ZG {
@@ -126,7 +128,13 @@ struct ZeroGravityStepInput50ZG {
     float speed=0.f;               // cached speed (+34), gates the tilt
     bool finished=false;           // vehicle +CD8 bit0
     float dt=0.f;
+    // Logs only (flight samples): world velocity and the main190 basis rows
+    // (right, up, forward). Absent (haveMotion false) -> no slip figures.
+    bool haveMotion=false;
+    float velocity[3]{},right[3]{},up[3]{},forward[3]{};
 };
+// Flight sample period in racer steps (logs only, about 0.5 s at 62.5 Hz).
+inline constexpr std::uint64_t zeroGFlightSampleSteps50ZG=31;
 
 class ZeroGravity50ZG {
 public:
@@ -136,7 +144,7 @@ public:
     // a ZeroGravity "on" owner and the switch is on.
     template<class Owners>
     void loadCourse(const std::vector<std::uint8_t>& archiveBytes,const char* mapMember,const char* aiMember,
-        const Owners& owners,const SurfaceRules50ST& rules)noexcept {
+        const Owners& owners,const SurfaceRules50ST& rules,const char* floorMember=nullptr)noexcept {
         resetCourse();
         if(!rules.zeroGravityEnabled()||!rules.courseHasZeroGravity())return;
         try {
@@ -151,6 +159,10 @@ public:
             ok=readGraph(archive,mapMember,meshes,graphs_[0],"map")&&ok;
             ok=readGraph(archive,aiMember,meshes,graphs_[1],"ai")&&ok;
             if(!ok){resetCourse();std::cerr<<"zero_gravity_load failed; course stays original\n";return;}
+            // PORT EXTENSION, NOT ORIGINAL (n64_floor_table50nh.h): the track's own N64
+            // floor table replaces the line sampling's owner per sample when present;
+            // absent or refused = the line sampling below (the log line says which).
+            floor_.load(archive,floorMember,graphs_,rules);
             loaded_=true;
             std::cerr<<"zero_gravity_load map_nodes="<<graphs_[0].nodes.size()<<" map_samples="<<graphs_[0].samples.size()
                 <<" map_hits="<<graphs_[0].hits<<" ai_nodes="<<graphs_[1].nodes.size()<<" ai_samples="<<graphs_[1].samples.size()
@@ -158,6 +170,8 @@ public:
         }catch(...){resetCourse();std::cerr<<"zero_gravity_load failed; course stays original\n";}
     }
     bool active()const noexcept {return loaded_;}
+    // N64 floor table bound to the line graphs (empty when the course has no .nft).
+    const N64FloorTableOwner50NH& floorTable()const noexcept {return floor_;}
     // The player's lean channel is bound only in the default control preset
     // (set once per race session by the input binding; host state, no guest memory).
     void setHumanLeanBound(bool bound)noexcept {humanLeanBound_=bound;}
@@ -192,7 +206,9 @@ public:
             r.lineOwner=noSurfaceOwner50ST;
             if(!r.linkMissingLogged&&r.mode!=ZeroGravityMode50ZG::Normal){r.linkMissingLogged=true;
                 std::cerr<<"zero_gravity line_link_missing slot="<<slot<<" from="<<in.from<<" to="<<in.to<<'\n';}
-        }else r.lineOwner=c.sample?c.sample->owner:noSurfaceOwner50ST;
+        }else{
+            floor_.apply(slot,in.human?0u:1u,c.from,c.slot,c.t,c.sample,floorSample_[slot]); // .nft when bound
+            r.lineOwner=c.sample?c.sample->owner:noSurfaceOwner50ST;}
         if(r.mode==ZeroGravityMode50ZG::Normal||!c.valid)return out;
         const float frames=zeroGReferenceFrameRate50ZG*in.dt;
         // f0 = 30 is the designers' reference (the N64 used measured frame
@@ -254,6 +270,32 @@ public:
             r.maxAbsRoll=std::max(r.maxAbsRoll,std::fabs(r.rollRate));r.maxAbsPitch=std::max(r.maxAbsPitch,std::fabs(r.pitchRate));
             r.minAhead=r.minAhead==0.f?aheadDistance:std::min(r.minAhead,aheadDistance);r.maxAhead=std::max(r.maxAhead,aheadDistance);
             ++r.flightSteps;if(std::isfinite(in.steer)&&std::fabs(in.steer)>=0.999f)++r.steerPinnedSteps;
+            // Where the racer is against the line and how far its travel is
+            // off its nose (logs only; settles why a pod leaves the line).
+            // line_dy = world height above the line point, line_dx = sideways
+            // off the line in the horizontal plane (+ = right of the link).
+            const auto& a=g.nodes[c.from].line;const auto& b=g.nodes[c.to].line;
+            float hx=b[0]-a[0],hz=b[2]-a[2];const float hl=std::sqrt(hx*hx+hz*hz);
+            const float ox=in.position[0]-c.point[0],oy=in.position[1]-c.point[1],oz=in.position[2]-c.point[2];
+            float dx=0.f;if(hl>1e-3f){hx/=hl;hz/=hl;dx=ox*hz-oz*hx;} // right = up x forward
+            const float offset=std::sqrt(ox*ox+oy*oy+oz*oz);
+            float upSlip=0.f,sideSlip=0.f;bool slip=false;
+            if(in.haveMotion){
+                const float* v=in.velocity;const float speed=std::sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+                if(speed>1.f&&std::isfinite(speed)){slip=true;
+                    const float rad=180.f/zeroGPi50ZG;
+                    upSlip=std::asin(std::clamp((v[0]*in.up[0]+v[1]*in.up[1]+v[2]*in.up[2])/speed,-1.f,1.f))*rad;
+                    sideSlip=std::asin(std::clamp((v[0]*in.right[0]+v[1]*in.right[1]+v[2]*in.right[2])/speed,-1.f,1.f))*rad;}
+            }
+            if(std::isfinite(offset))r.maxLineOffset=std::max(r.maxLineOffset,offset);
+            if(slip&&std::isfinite(upSlip))r.maxUpSlip=std::max(r.maxUpSlip,std::fabs(upSlip));
+            if(r.flightSteps%zeroGFlightSampleSteps50ZG==1u){
+                std::cerr<<"zero_gravity sample slot="<<slot<<" step="<<r.steps<<" flight_step="<<r.flightSteps
+                    <<" link="<<c.from<<"->"<<c.to<<" t="<<c.t<<" line_dy="<<oy<<" line_dx="<<dx<<" line_ft="<<offset
+                    <<" ahead_ft="<<aheadDistance<<" speed="<<in.speed<<" steer="<<in.steer<<" roll_rate="<<r.rollRate;
+                if(slip)std::cerr<<" up_slip_deg="<<upSlip<<" side_slip_deg="<<sideSlip<<" pod_up_y="<<in.up[1]<<" nose_y="<<in.forward[1];
+                std::cerr<<'\n';
+            }
         }
         return out;
     }
@@ -321,10 +363,11 @@ private:
         if(r.mode==ZeroGravityMode50ZG::Flight)
             std::cerr<<" min_speed="<<r.minSpeed<<" max_roll_rate="<<r.maxAbsRoll<<" max_pitch_rate="<<r.maxAbsPitch
                 <<" lookahead_ft="<<r.minAhead<<".."<<r.maxAhead
-                <<" steer_pinned_pct="<<(r.flightSteps?100.0*static_cast<double>(r.steerPinnedSteps)/static_cast<double>(r.flightSteps):0.0);
+                <<" steer_pinned_pct="<<(r.flightSteps?100.0*static_cast<double>(r.steerPinnedSteps)/static_cast<double>(r.flightSteps):0.0)
+                <<" max_line_ft="<<r.maxLineOffset<<" max_up_slip_deg="<<r.maxUpSlip;
         std::cerr<<'\n';
         if(to==ZeroGravityMode50ZG::Flight){r.minSpeed=0.f;r.maxAbsRoll=0.f;r.maxAbsPitch=0.f;r.minAhead=0.f;r.maxAhead=0.f;
-            r.flightSteps=0;r.steerPinnedSteps=0;}
+            r.flightSteps=0;r.steerPinnedSteps=0;r.maxLineOffset=0.f;r.maxUpSlip=0.f;}
         r.mode=to;r.modeStep=r.steps;r.linkMissingLogged=false;
     }
     static void transform(const BodyMatrix48G& m,const std::array<float,3>& p,float out[3])noexcept {
@@ -461,12 +504,14 @@ private:
         t=std::min(t,1.f);const auto& a=g.nodes[from];const auto& b=g.nodes[to];
         for(unsigned i=0;i<3;++i)out[i]=a.line[i]+t*(b.line[i]-a.line[i]);
     }
-    void resetCourse()noexcept {loaded_=false;for(auto& g:graphs_)g=ZeroGravityLineGraph50ZG{};resetRacers();}
+    void resetCourse()noexcept {loaded_=false;for(auto& g:graphs_)g=ZeroGravityLineGraph50ZG{};floor_.reset();resetRacers();}
 
     bool loaded_=false,humanLeanBound_=false;
     std::array<ZeroGravityLineGraph50ZG,2> graphs_{};
     std::array<ZeroGravityRacer50ZG,zeroGravitySlots50ZG> racers_{},pending_{};
     std::array<bool,zeroGravitySlots50ZG> pendingValid_{};
+    N64FloorTableOwner50NH floor_;                                   // .nft table source (PORT EXTENSION)
+    std::array<ZeroGravityLineSample50ZG,zeroGravitySlots50ZG> floorSample_{}; // per-slot sample the cursor points at
 };
 inline ZeroGravity50ZG zeroGravity50ZG;
 } // namespace rr::game

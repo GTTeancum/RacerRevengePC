@@ -8,14 +8,18 @@ inline std::size_t prepare(const tc_trigger_authoring50TC::Owner& source,
  tc_trigger_actions50TC::Owner& actions,std::vector<g::Type2StaticCandidate49X>& candidates,
  std::vector<track_runtime_storage50IG::Binding>& bindings,std::uint8_t tag,
  std::uint8_t flags31,std::uint8_t flagsF8){
- if(!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=69||candidates.size()!=bindings.size()||
-    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-tc_trigger_authoring50TC::count)
-  throw std::runtime_error("TC native trigger actual69 COL prefix/source owner extent");
+ // Live authored triggers only (capacity store); the COL prefix is whatever
+ // the ground placed (stock 69 is the ground's receipt, not checked here).
+ const auto live=source.liveCount();
+ if(!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=bindings.size()||
+    candidates.size()>track_runtime_storage50IG::hardTerrainOwners||
+    live>track_runtime_storage50IG::hardTerrainOwners-candidates.size())
+  throw std::runtime_error("TC native trigger COL prefix/source owner extent");
  // Cold append only. The aggregate owns all real memberships and must finish
  // this relocation before Storage admission or any Bank enrollment.
- const auto first=candidates.size();candidates.resize(first+tc_trigger_authoring50TC::count);bindings.resize(candidates.size());
+ const auto first=candidates.size();candidates.resize(first+live);bindings.resize(candidates.size());
  for(std::size_t i=0;i<first;++i)bindings[i].candidate=&candidates[i];
- for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
+ for(std::size_t i=0;i<live;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
   target.shapeType=authored.shapeType;target.nativeTriggersTC=&actions.nativeGroup();target.nativeTriggerIndex=i;
   target.nativeTriggerBox=authored.box;
   auto& c=target.candidate.collision;c.shapeType=authored.shapeType;

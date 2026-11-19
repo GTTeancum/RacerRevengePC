@@ -15,6 +15,8 @@
 #include "../../src/game/packed_vehicle_tail50r.h"
 #include "../../src/game/native_test_undertrack50ut.h"
 #include "../../src/game/native_zero_gravity50zg.h"
+#include "../../src/game/n64_track_hazards_runtime50nh.h"
+#include "../../src/game/impact_damage_apply50nh.h"
 #include <bit>
 #include "../../src/game/original_vehicle_damage50la.h"
 #include <cstring>
@@ -482,6 +484,29 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   consumer.dynamicPartnerEventsBound=true;consumer.partnerEventThresholdBound=dynamicTuning.bound;
   consumer.partnerEventThreshold48=dynamicTuning.points3C[3];
  }
+ // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): an N64
+ // BreakObject hit (asteroid) from this racer's last completed step, through
+ // the original impact-damage rule 221754 with this frame's own consumer gate
+ // inputs, before the consumers run. Writes only this racer's own damage,
+ // cooldown and environmental fields (the ones 221754 writes).
+ {rr::game::N64BreakDamageRequest50NH hit{};
+  if(rr::game::n64HazardRuntime50NH.takeBreakDamage(actualRacerSlot,hit)){
+   ImpactConsumerInput49Z in=consumer;
+   in.vehicle3C=s.fields.vehicle3C;in.vehicle40=s.bodies.main.vehicleState40;in.vehicle58=s.fields.vehicle58;
+   in.flagsCD8=s.fields.impactFlagsCD8;std::memcpy(&in.factor,&s.bodies.main.frameFactor,sizeof(float));
+   in.componentPresence=3u|(x.bindings.visual.extra1C0Present?4u:0u)|(x.bindings.visual.extra1C4Present?8u:0u);
+   auto& z=s.impactSupplement;ImpactConsumerState49Z st{};
+   st.damage7D0[0]=s.fields.damage7D0;st.damage7D0[1]=s.fields.damage7D4;st.damage7D0[2]=s.fields.damage7D8;st.damage7D0[3]=s.fields.damage7DC;
+   st.cooldown7E0=z.cooldown7E0;st.periodic7E8=z.periodic7E8;st.partnerState=z.partnerState;st.partnerId=z.partnerId;
+   st.environmentalD38=z.environmentalD38;st.environmentalD3C=z.environmentalD3C;
+   const float before0=st.damage7D0[0],before1=st.damage7D0[1];bool ok=true;
+   for(std::size_t k=0;k<hit.count&&k<hit.mask.size();++k)ok=rr::game::applyImpactDamage50NH(in,st,hit.mask[k],hit.amount[k])&&ok;
+   if(ok){s.fields.damage7D0=st.damage7D0[0];s.fields.damage7D4=st.damage7D0[1];
+    z.cooldown7E0=st.cooldown7E0;z.environmentalD38=st.environmentalD38;z.environmentalD3C=st.environmentalD3C;}
+   std::cerr<<"n64_break_damage slot="<<actualRacerSlot<<" trigger="<<rr::game::n64HazardRuntime50NH.triggerOf(hit.row)
+       <<" hits="<<hit.count<<" d7D0="<<before0<<"->"<<s.fields.damage7D0<<" d7D4="<<before1<<"->"<<s.fields.damage7D4
+       <<" rule=221754 applied="<<ok<<'\n';
+  }}
  bool consumersCompleted=consumeVehicleImpacts49Z(s,x.bindings,consumer,consumerEvents,x.workspace,x.diagnostic);
  if(dynamicContactEnabled&&(consumersCompleted||
      (x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
@@ -649,6 +674,34 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   if(!isLimpEntry(forced))return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
   require50DU(commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor),"test limp entry rejected");
   limpContinued=true;
+ }
+ // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): an N64
+ // ExplodePod (energy column) from this racer's last completed step takes the
+ // same 225C50 sites the original's own debug input 1A17EC reaches: 225E7C
+ // (slot90, 227370, left engine lost) or 225EC0 (slot94, 227A40, right). The
+ // human limps (2-s countdown, then 2261B0/226750); an AI is sent to 226750,
+ // as the original branches on +58. The 225C50 suffix runs as for any hit.
+ if(damageReady&&!limpContinued){
+  rr::game::N64ExplodeRequest50NH q{};
+  if(rr::game::n64HazardRuntime50NH.takeExplode(actualRacerSlot,q)){
+   const auto trigger=rr::game::n64HazardRuntime50NH.triggerOf(q.row);
+   if(!originalAiEnabled||s.bodies.main.vehicleState40){
+    std::cerr<<"n64_explode refused slot="<<actualRacerSlot<<" trigger="<<trigger<<" reason="
+        <<(originalAiEnabled?"state":"no_destroy_owner")<<" state40="<<s.bodies.main.vehicleState40<<'\n';
+   }else{
+    const ImpactTransitionResult50C forced=q.left?
+        ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225e7cu,0x90u,0x227370u}:
+        ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225ec0u,0x94u,0x227a40u};
+    const bool limp=isLimpEntry(forced);
+    std::cerr<<"n64_explode slot="<<actualRacerSlot<<" trigger="<<trigger<<" side="<<(q.left?"left":"right")
+        <<" gate="<<q.gate<<" dist="<<q.dist<<" handler="<<(q.left?"227370":"227A40")<<" path="<<(limp?"limp":"wreck")
+        <<" after="<<(q.after==rr::game::N64AfterDestroy50NH::respawn?"respawn":"retire")<<" frame="<<completedFrames<<'\n';
+    rr::game::n64HazardRuntime50NH.explodeDispatched(actualRacerSlot,q);
+    if(!limp)return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
+    require50DU(commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor),"N64 explode limp entry rejected");
+    limpContinued=true;
+   }
+  }
  }
  if(!damageReady&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     decision.status==ImpactTransitionStatus50C::unsupportedTransition){

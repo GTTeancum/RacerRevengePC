@@ -81,8 +81,8 @@ GA_SOURCE_PATHS = (
     "platform/linux/native/host_session_menu50if.h",
     "tests/native/track_session_assets50ig_fixture.h",
     "tests/native/native_ai_session50iv_fixture.h", "src/game/ai_cold_owners50iu.h",
-    "tests/native/ga_animated_world_fixture.h", "tests/native/ga_trigger_actions_fixture.h",
-    "tests/native/ga_dynamic_window_fixture.h", "tests/native/ga_atm_window_fixture.h",
+    "tests/native/track_animation_runtime50an.h", "tests/native/ga_trigger_actions_fixture.h",
+    "tests/native/track_animation_window50an.h", "tests/native/ga_atm_window_fixture.h",
     "tests/native/gameplay_binder_window_candidate_fixture.h",
     "src/game/original_gameplay_binder_candidate.cpp",
 ) + GA_PROFILES

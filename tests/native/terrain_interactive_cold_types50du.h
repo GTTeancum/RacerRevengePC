@@ -5,8 +5,7 @@
 #include "gb_collision_world50gb.h"
 #include "mc_collision_world50mc.h"
 #include "native_racer_contact50hw_fixture.h"
-#include "gc_animated_world50ig_fixture.h"
-#include "ga_animated_world_fixture.h"
+#include "track_animation_runtime50an.h"
 #include "ga_trigger_authoring_fixture.h"
 #include "gc_trigger_authoring50in_fixture.h"
 #include "ma_trigger_authoring_fixture.h"
@@ -44,8 +43,7 @@ struct VehicleTerrainProbe50FP;
 namespace original_racer_selection50IJ { struct Entry; }
 }
 namespace rr::platform { struct KeyboardPacketDiagnostic50DR; }
-namespace gb_animation_binding50GB { class Binding; struct Diagnostic; }
-namespace mc_animation_binding50MC { class Binding; struct Diagnostic; }
+namespace track_animation_binding50AN { class Binding; struct Diagnostic; }
 namespace gc_gate_audio50IN { class Owner; }
 namespace native_ai50IV { struct ObservationReads; }
 namespace native_racer50HW { class Rig; class Visual; }

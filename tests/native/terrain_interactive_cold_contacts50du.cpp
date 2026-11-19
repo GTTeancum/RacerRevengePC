@@ -76,7 +76,8 @@ void ContactsContext::run() {
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(gcTriggerActions->prepare(*gcTriggerAuthoring,*gcAnimatedWorld,identities,
+   require50DU(static_cast<bool>(trackAnimations),"GC Gate trigger names an animation the course data does not author");
+   require50DU(gcTriggerActions->prepare(*gcTriggerAuthoring,*trackAnimations,identities,
        navigationAI->track.count,gcGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),
        "GC actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
@@ -238,21 +239,28 @@ void ContactsContext::run() {
    });
   }
   if(gaTriggerActions){
-   require50DU(humanCourseEnabled&&originalAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount&&navigationAI->track.count,
-       "GA triggers require real Player0, seven original AI and canonical107-node navigation");
+   // The common trigger chain (GA, TA): the actual manager roster (one human
+   // and the AI field, or an all-AI race) and the live AI spline, as SA's.
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
+       ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==raceRacerCount)||
+        (humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
+       "common course triggers require the actual human/AI manager roster and the live AI spline");
+   // 2A00A0's chance draw: the one application RNG (308030) with its lazy
+   // seed/range slots and the application clock, as MC's chain binds them.
+   require50DU(gaTriggerActions->bindChance(gaTriggerAuthoring->code(),
+       {&s.noiseOwner().sharedRandomState,&sessionRandom,&applicationClock}),"common trigger chance binding rejected");
    std::array<ga_trigger_actions::RacerIdentities,ga_trigger_actions::racers> triggerIdentities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     triggerIdentities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,gaAnimatedWorld.get(),triggerIdentities,
-       navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),"GA actual trigger/action destinations unavailable");
+   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,trackAnimations.get(),triggerIdentities,
+       navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),gaTriggerActions->error().empty()?"common trigger/action destinations unavailable":gaTriggerActions->error().c_str());
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
         gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
         "GA trigger lifecycle cold actual COL poses unavailable");
    });
-   std::cerr<<"GA NATIVE TRIGGERS:"<<gaTriggerAuthoring->liveCount()<<" authored spheres, method1 zones,16 actual racer COL identities; "
+   std::cerr<<gaTriggerAuthoring->code()<<" NATIVE TRIGGERS:"<<gaTriggerAuthoring->liveCount()<<" authored spheres/boxes, method1 zones,16 actual racer COL identities; "
        "unchanged GC endpoint/swept-surface geometry policy, original action/lifecycle semantics; reverse108E90 parity unresolved.\n";
    if(audioEnabled&&gaGateAudio)std::cerr<<"GA BIGDOOR uses the existing shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
   }

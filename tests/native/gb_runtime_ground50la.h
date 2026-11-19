@@ -56,6 +56,13 @@ public:
  // copies of observed source capacities bound the fresh copy and temporary
  // source strings in this fixed libstdc++ parent profile. Recheck retained
  // capacities after preparation; do not reclaim this reservation early.
+ // Placed COL owners the data authors (an instance whose collision member the
+ // archive holds); stock GB 615. 0 when the source is not ready.
+ static std::size_t placedCollisionCount(const gb_cold_sources50LA::Owner& source)noexcept {
+  if(!source.ready())return 0;
+  try{std::size_t count=0;for(const auto& i:source.world().instances)if(hasCollisionMember(source.archive(),i.collision_member))++count;
+   return count;}catch(...){return 0;}
+ }
  static std::size_t maximumDescriptorPayloadBytes(const gb_cold_sources50LA::Owner& source)noexcept {
   if(!source.ready())return std::numeric_limits<std::size_t>::max();
   std::size_t world=0;worldBytes(world,source.world());
@@ -112,7 +119,9 @@ public:
    }
    need(next->owners.size()==count,"GB COL source order/extent changed");
    std::string heightError;
-   need(track_height_cold50JB::prepareFreshGameTrack(source,"tracks\\gb.scb",next->height,heightError),
+   // The slot's own world member (gb_cold_sources50la.h source pin 0, the
+   // session row's worldMember), not a course literal.
+   need(track_height_cold50JB::prepareFreshGameTrack(source,gb_cold_sources50LA::sources[0].name,next->height,heightError),
        "GB actual fresh height descriptor rejected");
    // Both exact GB Environment filename labels are absent and default to
    // none. Preserve the actual fresh-game terrain330 clearing/water bypass.

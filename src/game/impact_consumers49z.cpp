@@ -1,4 +1,5 @@
 #include "impact_consumers49z.h"
+#include "impact_damage_apply50nh.h"
 #include <cfenv>
 #include <cstring>
 
@@ -154,5 +155,16 @@ ImpactConsumerStatus49Z resumeImpactsAfterControllerFeedback50KZ(
     ImpactConsumerState49Z& output,ImpactPartnerEvents49Z* partners) noexcept {
     std::size_t count=0;
     return consumeImpactsImpl50KZ(i,state,output,nullptr,0,count,partners,true);
+}
+// N64 BreakObject hit (impact_damage_apply50nh.h): the same 221754 rule as a contact hit.
+// PORT EXTENSION as a caller only; the arithmetic is damage() above, unchanged.
+bool applyImpactDamage50NH(const ImpactConsumerInput49Z& input, ImpactConsumerState49Z& state,
+                           unsigned mask, float amount) noexcept {
+    if (std::fegetround() != FE_TONEAREST) return false;
+    ImpactConsumerState49Z next; std::memcpy(&next, &state, sizeof next);
+    Math m; damage(input, next, mask, amount, m);
+    if (!m.valid) return false;
+    std::memcpy(&state, &next, sizeof state);
+    return true;
 }
 }

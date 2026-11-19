@@ -8,9 +8,13 @@
 #include <limits>
 namespace mc_particle_source50MC {
 namespace a=rr::assets;namespace g=rr::game;
-inline constexpr std::size_t descriptorCount=40,definitionCount=7,attachmentCount=8,atlasFrameCount=152;
-enum class Kind:std::uint8_t {Sparks2=2,Fire8=8};
+// Capacities, not stock counts: descriptorCount = the common emitter reader's
+// store (live count = the TOB's table); definitionCount = distinct EMT files.
+// atlasFrameCount stays the stock demoprt atlas store (PORT STAND-IN, see decode).
+inline constexpr std::size_t descriptorCount=mc_particle_authoring50MC::count,definitionCount=7,attachmentCount=descriptorCount,atlasFrameCount=152;
+using Kind=mc_particle_authoring50MC::Kind;
 struct MemberPin {const char* name;std::size_t bytes;const char* sha256;};
+// Stock member identities: receipts only (course_member_identity lines).
 inline constexpr std::array<MemberPin,10> members{{
  {"particle\\mcFire.emt",793,"4c35ea94e3d7586c0989aebb0cd1e3aac309818f96ed6cfeb008bea4f8253386"},
  {"particle\\ma_water01.emt",1208,"10f3c94ca97b599bbc2349813985774555d60b42ad475ae537201f3f96c1ce7c"},
@@ -107,12 +111,11 @@ inline const Section& section(const std::vector<Section>& doc,const char* name,c
 }
 
 inline float bits(std::uint32_t word)noexcept {float f;std::memcpy(&f,&word,4);return f;}
-inline bool definition(const std::vector<std::uint8_t>& bytes,std::size_t index,Definition& out,D& d){
+inline bool definition(const std::vector<std::uint8_t>& bytes,Kind kind,Definition& out,D& d){
  if(std::fegetround()!=FE_TONEAREST)return false;
  std::vector<Section> doc;if(!sections(bytes,doc,d))return false;
  const Section absent{};const auto& general=section(doc,"General Info",absent);
  const auto& properties=section(doc,"Properties",absent);const auto& animation=section(doc,"Animation",absent);
- if(index>=definitionCount)return false;const auto kind=index==0?Kind::Fire8:Kind::Sparks2;
  Definition f;f.kind=kind;g::water_wake_detail50jc::Math m;
  auto n=[&](const Section& s,const char* key,float fallback,float& value,std::uint32_t pc){return a::originalUiNumber50KG(s,key,fallback,value,d,pc);};
  auto i=[&](const Section& s,const char* key,std::int32_t fallback,std::int32_t& value,std::uint32_t pc){return a::originalUiInteger50KG(s,key,fallback,value,d,pc);};
@@ -160,21 +163,37 @@ inline bool definition(const std::vector<std::uint8_t>& bytes,std::size_t index,
 
 class Owner final {
  std::shared_ptr<const mc_cold_sources50LA::Owner> source_;mc_particle_authoring50MC::Owner authoring_;
- std::array<Definition,definitionCount> definitions_{};std::array<Attachment,attachmentCount> attachments_{};
- Atlas atlas_{};std::array<std::vector<std::uint8_t>,10> bytes_{};
+ std::array<Definition,definitionCount> definitions_{};std::array<std::string,definitionCount> definitionNames_{};std::size_t definitionLive_=0;
+ std::array<std::uint8_t,descriptorCount> definitionOf_{};
+ std::array<Attachment,attachmentCount> attachments_{};std::size_t live_=0,attachedLive_=0;
+ // EMT bytes per definition, then the three atlas members (PRT, PSM, PST).
+ Atlas atlas_{};std::array<std::vector<std::uint8_t>,definitionCount+3> bytes_{};
  const std::thread::id thread_=std::this_thread::get_id();bool attempted_=false,ready_=false;
  bool fail(Diagnostic& d,const char* text){d.message=text;d.retainedPayloadBytes=retainedPayloadBytes();return false;}
+ static const MemberPin* stockPin(const std::string& name)noexcept{for(const auto& p:members)if(detail::same(name,p.name))return &p;return nullptr;}
+ // Member by name; the stock pin (if this name has one) is a receipt.
+ static bool member(const mc_cold_sources50LA::Owner& s,const std::string& name,std::size_t cap,std::vector<std::uint8_t>& out,Diagnostic& d){
+  if(!s.extractMember(name,out,d.decode,cap)||out.empty())return false;
+  const auto* pin=stockPin(name);
+  course_archive_receipt50CI::memberReceipt("particles_MC",name,out,0,0,pin?pin->bytes:0,pin?pin->sha256:nullptr);return true;
+ }
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  ~Owner(){if(thread_!=std::this_thread::get_id())std::terminate();}
+ // Per-member extraction caps (the reservation is charged per slot, inside
+ // the 64 MB console budget): EMT 4 KiB each, PRT 16 KiB, PSM 8 KiB, PST
+ // 136 KiB (stock: <=1210, 10770, 5022, 132124 bytes). A larger member is
+ // refused by capacity, never by identity.
+ static constexpr std::size_t emtCap=4096;
+ static constexpr std::array<std::size_t,3> atlasCap{{16384,8192,139264}};
  static constexpr std::size_t maximumAdditionalPayloadBytes()noexcept{
-  std::size_t raw=0;for(const auto& p:members)raw+=p.bytes;
+  const std::size_t raw=definitionCount*emtCap+atlasCap[0]+atlasCap[1]+atlasCap[2];
   return sizeof(Owner)+mc_particle_authoring50MC::Owner::maximumAdditionalPayloadBytes()+8*raw+65536+
     3*256*sizeof(a::OriginalUiDatSection50KG)+3*1024*sizeof(a::OriginalUiDatValue50KG)+16*10770;
  }
  std::size_t retainedPayloadBytes()const noexcept{
   if(thread_!=std::this_thread::get_id())return 0;std::size_t n=sizeof(Owner)+atlas_.textureMap.capacity()+1;
-  for(const auto& v:bytes_)n+=v.capacity();return n;
+  for(const auto& v:bytes_)n+=v.capacity();for(const auto& s:definitionNames_)n+=s.capacity()+1;return n;
  }
  bool decode(std::shared_ptr<const mc_cold_sources50LA::Owner> cold,std::size_t available,Diagnostic& d){
   d={};if(thread_!=std::this_thread::get_id())return fail(d,"MC particle source thread mismatch");
@@ -183,24 +202,46 @@ public:
   if(available>32u*1024u*1024u||available<d.peakReservedPayloadBytes)return fail(d,"MC particle source exceeds remaining allowance");
   try{using namespace detail;need(cold&&cold->ready(),"MC actual cold particle source");std::string why;
    need(authoring_.decode(cold,authoring_.maximumAdditionalPayloadBytes(),why),why.c_str());source_=std::move(cold);
-   const auto& world=source_->world();need(world.instances.size()==458,"MC actual complete placement world");
-   //27CC4C..27CFBC traverses actual model groups, stopping at declared match
-   //count. Every MC attached descriptor declares1 and has exactly1 name hit.
-   for(std::size_t row=0;row<attachmentCount;++row){const auto& descriptor=authoring_.source(row);need(descriptor.attached,"MC actual attached descriptor prefix");
-    const std::size_t expected=row<2?282:441;std::size_t found=world.instances.size();
+   live_=authoring_.liveCount();
+   const auto& world=source_->world();
+   //27CC4C..27CFBC traverses actual model groups, stopping at the declared
+   //match count (1 per MC descriptor): first placed model whose SLT names the
+   //descriptor's AttachToSoultree.
+   for(std::size_t row=0;row<live_;++row){const auto& descriptor=authoring_.source(row);if(!descriptor.attached)continue;
+    std::size_t found=world.instances.size();
     for(std::size_t i=0;i<world.instances.size();++i){const auto& instance=world.instances[i];need(instance.parameter_block<world.parameters.blocks.size(),"MC attachment block bound");
      const auto& b=world.parameters.blocks[instance.parameter_block];const auto* slt=optional(b,"slt");
      if(slt&&same(*slt,descriptor.attachToSoulTree->c_str())){found=i;break;}}
-    need(found==expected,"MC original first attachment traversal");const auto& instance=world.instances[found];
-    need(instance.section==(row<2?"zone13-model8":"zone27-model47")&&instance.source_block_offset==world.parameters.blocks[instance.parameter_block].offset,"MC actual immutable attachment identity");
-    attachments_[row]={row,found,&instance};
+    need(found<world.instances.size(),"MC attached emitter names no placed SoulTree model");
+    const auto& instance=world.instances[found];
+    need(instance.source_block_offset==world.parameters.blocks[instance.parameter_block].offset,"MC actual immutable attachment identity");
+    // Old pins (rows 0..1 -> world 282 zone13-model8, rows 2..7 -> 441 zone27-model47) are receipts.
+    if(live_==mc_particle_authoring50MC::stockCount&&found!=(row<2?282u:441u))
+     std::cerr<<"course_count site=particles_MC attachment="<<row<<" world="<<found<<" stock="<<(row<2?282:441)<<"\n";
+    attachments_[row]={row,found,&instance};++attachedLive_;
    }
-   for(std::size_t index=0;index<members.size();++index){d.member=index;const auto& pin=members[index];auto& bytes=bytes_[index];
-    need(source_->extractMember(pin.name,bytes,d.decode,pin.bytes)&&bytes.size()==pin.bytes&&pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha256,"MC original particle member identity");
-    if(index<definitionCount)need(detail::definition(bytes,index,definitions_[index],d.text),"MC original subtype/common EMT decoder");
+   // One definition per distinct EmitterFilename, in first-use order; kind from
+   // the descriptor's TypeID (a file used with two types is refused).
+   for(std::size_t row=0;row<live_;++row){const auto& descriptor=authoring_.source(row);const auto name="particle\\"+*descriptor.filename;
+    std::size_t k=0;while(k<definitionLive_&&!same(definitionNames_[k],name.c_str()))++k;
+    if(k==definitionLive_){need(k<definitionCount,"MC distinct emitter definitions exceed the definition store");
+     d.member=k;need(member(*source_,name,emtCap,bytes_[k],d),"MC emitter definition member missing");
+     need(detail::definition(bytes_[k],descriptor.kind,definitions_[k],d.text),"MC original subtype/common EMT decoder");
+     definitionNames_[k]=name;++definitionLive_;}
+    need(definitions_[k].kind==descriptor.kind,"MC one EMT file authored with two emitter types");
+    definitionOf_[row]=static_cast<std::uint8_t>(k);
    }
-   std::vector<Section> doc;need(g::readOriginalGcParticleText50KG(bytes_[7],members[7].bytes,members[7].sha256,doc),"MC actual atlas original text");
+   if(live_==mc_particle_authoring50MC::stockCount)course_archive_receipt50CI::countReceipt("particles_MC","definitions",definitionLive_,7);
+   const char* atlasNames[3]={"particle\\demoprt.prt","particle\\demoprt.psm","particle\\demoprt.pst"};
+   for(std::size_t j=0;j<3;++j){d.member=definitionCount+j;need(member(*source_,atlasNames[j],atlasCap[j],bytes_[definitionCount+j],d),"MC particle atlas member missing");}
+   const auto& prt=bytes_[definitionCount];
+   // The atlas text reader verifies the bytes against the identity it is
+   // given; it is given the actual bytes' own identity (the stock pin is the
+   // receipt above), so a converted atlas is read, not refused by checksum.
+   std::vector<Section> doc;need(g::readOriginalGcParticleText50KG(prt,prt.size(),pod_materials50ed_fixture::detail::sha256(prt).c_str(),doc),"MC actual atlas original text");
    const Section absent{};const auto& general=section(doc,"General Info",absent);std::int32_t frames=0,groups=0;
+   // PORT STAND-IN (flagged): the atlas store is the stock demoprt extent
+   // (152 frames, 10 groups); a different atlas is refused here.
    need(a::originalUiInteger50KG(general,"NumFrames",61,frames,d.text,0x161828)&&frames==152&&
     a::originalUiInteger50KG(general,"NumGroups",0,groups,d.text,0x161854)&&groups==10&&
     a::originalUiNumber50KG(general,"GlowScalar",255,atlas_.glowScalar148,d.text,0x1618a8)&&atlas_.glowScalar148==128,"MC exact atlas extents");
@@ -212,18 +253,29 @@ public:
     need(a::originalUiNumber50KG(b,"UVLeft",0,l,d.text,0x161a0c)&&a::originalUiNumber50KG(b,"UVRight",0,r,d.text,0x161a0c)&&
      a::originalUiNumber50KG(b,"UVTop",0,t,d.text,0x161a0c)&&a::originalUiNumber50KG(b,"UVBottom",0,bot,d.text,0x161a0c),"MC actual atlas UV");
     atlas_.frames[i].sourceUv={{{{l,t}},{{r,t}},{{r,bot}},{{l,bot}}}};}
-   need(definitions_[0].particleGroup1B8==9&&atlas_.groups[9].type==8,"MC actual fire atlas group9 type8");
-   for(std::size_t i=1;i<7;++i)need(definitions_[i].particleGroup1B8==6&&atlas_.groups[6].type==6&&definitions_[i].movingEmitter200&&definitions_[i].timing.mode1D8==3,"MC water-named Sparks2 definition route");
+   // Each definition's particle group must exist with the type its emitter
+   // kind draws (Fire8 -> group type 8, Sparks2 -> type 6; checked again at staging).
+   for(std::size_t k=0;k<definitionLive_;++k){const auto& f=definitions_[k];
+    need(f.particleGroup1B8>=0&&static_cast<std::size_t>(f.particleGroup1B8)<atlas_.groups.size()&&
+     atlas_.groups[f.particleGroup1B8].type==(f.kind==Kind::Fire8?8:6),"MC emitter definition particle group/type");
+    // PORT STAND-IN (flagged): the native Sparks2 path implements the moving
+    // emitter with timing mode 3 only.
+    if(f.kind==Kind::Sparks2)need(f.movingEmitter200&&f.timing.mode1D8==3,"PORT STAND-IN: MC native Sparks2 implements MovingEmitter timing mode 3 only");}
    need(retainedPayloadBytes()<=available&&retainedPayloadBytes()<=maximumAdditionalPayloadBytes(),"MC retained particle payload budget");
    ready_=true;d.message.clear();d.retainedPayloadBytes=retainedPayloadBytes();return true;
   }catch(const std::exception& e){return fail(d,e.what());}
  }
  bool ready()const noexcept{return thread_==std::this_thread::get_id()&&ready_&&source_&&source_->ready()&&authoring_.ready();}
  const mc_cold_sources50LA::Owner* coldSource()const noexcept{return ready()?source_.get():nullptr;}
- const mc_particle_authoring50MC::Source& descriptor(std::size_t i)const{return authoring_.source(i);}
- const Definition& definition(std::size_t i)const{if(!ready())throw std::runtime_error("MC particle resources unavailable");return definitions_.at(i);}
- const Definition& definitionForDescriptor(std::size_t i)const{return definition(i>=2&&i<8?i-1:0);}
- const Attachment& attachment(std::size_t i)const{if(!ready())throw std::runtime_error("MC particle attachments unavailable");return attachments_.at(i);}
+ // Live emitter table (the TOB's own count) and its attached subset.
+ std::size_t emitterCount()const noexcept{return ready()?live_:0;}
+ std::size_t attachedCount()const noexcept{return ready()?attachedLive_:0;}
+ std::size_t definitionCountLive()const noexcept{return ready()?definitionLive_:0;}
+ const mc_particle_authoring50MC::Source& descriptor(std::size_t i)const{if(!ready()||i>=live_)throw std::out_of_range("MC particle descriptor outside the live table");return authoring_.source(i);}
+ const Definition& definition(std::size_t i)const{if(!ready()||i>=definitionLive_)throw std::runtime_error("MC particle resources unavailable");return definitions_[i];}
+ std::size_t definitionIndexForDescriptor(std::size_t i)const{if(!ready()||i>=live_)throw std::out_of_range("MC particle descriptor outside the live table");return definitionOf_[i];}
+ const Definition& definitionForDescriptor(std::size_t i)const{return definition(definitionIndexForDescriptor(i));}
+ const Attachment& attachment(std::size_t i)const{if(!ready()||i>=live_||!authoring_.source(i).attached)throw std::runtime_error("MC particle attachments unavailable");return attachments_[i];}
  const Atlas& atlas()const{if(!ready())throw std::runtime_error("MC atlas unavailable");return atlas_;}
  const std::vector<std::uint8_t>& originalMember(std::size_t i)const{if(!ready())throw std::runtime_error("MC particle bytes unavailable");return bytes_.at(i);}
 };

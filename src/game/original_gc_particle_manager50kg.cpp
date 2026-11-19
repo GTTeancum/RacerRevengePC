@@ -1,4 +1,6 @@
 #include "original_gc_particle_manager50kg.h"
+#include "../assets/original_particle_emitters50pe.h"
+#include <iostream>
 #include "original_particle_fog_velocity50la.h"
 #include "original_particle_fog_lifetime50la.h"
 #include "import_world48f.h"
@@ -797,10 +799,16 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepare(const Bytes&
     const Bytes& emt,const Bytes& tob) noexcept {
     if(poolMode_!=PoolMode::empty||storage_||sourcePool_)return Status::alreadyPrepared;
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
-    if(prt.size()!=9210||emt.size()!=1298||tob.size()!=9623||
+    // The course TOB is the data: its stock identity (9623 bytes, e677f80d..)
+    // is a receipt. PORT STAND-IN (flagged): the GC atlas (PRT) and fog EMT
+    // stay pinned because this native fog/fire store holds exactly the stock
+    // 9-group/129-frame atlas and one fog definition (header storage, ~188 TUs).
+    if(prt.size()!=9210||emt.size()!=1298||
        !hashMatches(prt.data(),prt.size(),"d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
-       !hashMatches(emt.data(),emt.size(),"3ca0cc75636e0f357e6ed1a8ada590bdc51862fef90cd30a0a3d5085e152e17c")||
-       !hashMatches(tob.data(),tob.size(),"e677f80d12da2c2225c8ba030e2a29e3a358c52bcfd4f9c981b79c3c53b72454"))return Status::assetIdentity;
+       !hashMatches(emt.data(),emt.size(),"3ca0cc75636e0f357e6ed1a8ada590bdc51862fef90cd30a0a3d5085e152e17c"))return Status::assetIdentity;
+    if(tob.empty()||tob.size()>2u*1024u*1024u)return Status::authoredData;
+    if(tob.size()!=9623||!hashMatches(tob.data(),tob.size(),"e677f80d12da2c2225c8ba030e2a29e3a358c52bcfd4f9c981b79c3c53b72454"))
+        std::cerr<<"course_member_identity site=particles_GC member=tracks\\gc.tob bytes="<<tob.size()<<" stock=0\n";
     try {
         auto s=std::make_unique<Storage>();Document atlas,emitterDoc;
         if(!readText(prt,atlas)||!readText(emt,emitterDoc)||!readFog(emitterDoc,s->fog))return Status::authoredData;
@@ -829,21 +837,33 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepare(const Bytes&
             for(const auto& f:block.fields)section.values.push_back({f.name,f.value,f.entry_offset,f.value_offset,!f.value.empty()});
             toy.push_back(std::move(section));
         }
-        if(!integer(findSection(toy,"particleemitters"),"numberofemitters",count)||count!=4)return Status::authoredData;
-        const auto* fire=findSection(toy,"particleemitter1");bool fireStart=false;
-        if(!integer(fire,"typeid",count)||count!=8||!integer(fire,"startingzone",count)||count!=10||
-           !integer(fire,"numberofinstances",count)||count!=6||!boolean(fire,"starton",fireStart)||!fireStart||
-           !textIs(fire,"attachtosoultree","shade_a.slt")||!textIs(fire,"emitterfilename","genratorfire.emt")||
-           !triple(fire,"offsetfromsoultree",s->fireOffset))return Status::authoredData;
-        // Emitter1's six attached generator fires are a separate source owner;
+        // ONE common [ParticleEmitters] reader (27DE00/27C600/27C7B0,
+        // src\\assets\\original_particle_emitters50pe.h) reads the table.
+        namespace pe=assets::particle_emitters50PE;pe::Table table;
+        if(!pe::read(compiled,"GC",table))return Status::authoredData;
+        // PORT STAND-IN (flagged): this native GC fog/fire chain implements one
+        // attached generator-fire emitter (row 1, read by its own source owner)
+        // followed by exactly three positioned fog emitters (fixed store in the
+        // header, ~188 TUs). Another table is refused here, not ignored.
+        if(table.live!=4||table.loadedCount!=4)return Status::authoredData;
+        const auto& fireRow=table.rows[0];
+        if(fireRow.typeId!=8||!fireRow.attached||fireRow.startOn==0||fireRow.childObject!="NONE"||
+           fireRow.startingZone<1||!pe::detail::sameNoCase(fireRow.filename,"genratorfire.emt"))return Status::authoredData;
+        // Stock receipts: zone 10, 6 instances, shade_a.slt.
+        if(fireRow.startingZone!=10||fireRow.instances!=6||fireRow.attachToSoulTree!="shade_a.slt")
+            std::cerr<<"course_count site=particles_GC fire_zone="<<fireRow.startingZone<<" instances="<<fireRow.instances<<" stock_layout=0\n";
+        // Vector values keep this file's own decimal reader (bit-identical stock values).
+        const auto* fire=findSection(toy,"particleemitter"+std::to_string(fireRow.ordinal));
+        if(!triple(fire,"offsetfromsoultree",s->fireOffset))return Status::authoredData;
+        // Emitter1's attached generator fires are a separate source owner;
         // this cold path neither invents their particles nor consumes their RNG.
         for(std::size_t i=0;i<3;++i) {
-            const auto* section=findSection(toy,"particleemitter"+std::to_string(i+2));
-            std::int32_t type=0,zone=0,instances=0;bool start=false;
-            if(!integer(section,"typeid",type)||type!=12||!integer(section,"startingzone",zone)||zone!=10||
-               !integer(section,"numberofinstances",instances)||instances!=1||
-               !boolean(section,"starton",start)||!start||!textIs(section,"emitterfilename","fog.emt")||
-               section->find("attachtosoultree")||!triple(section,"position",s->fogPositions[i]))return Status::authoredData;
+            const auto& row=table.rows[i+1];
+            if(row.typeId!=12||row.attached||row.instances!=1||row.startOn==0||
+               !pe::detail::sameNoCase(row.filename,"fog.emt"))return Status::authoredData;
+            if(row.startingZone!=10)std::cerr<<"course_count site=particles_GC fog="<<i<<" zone="<<row.startingZone<<" stock=10\n";
+            const auto* section=findSection(toy,"particleemitter"+std::to_string(row.ordinal));
+            if(!triple(section,"position",s->fogPositions[i]))return Status::authoredData;
             s->fogCurrentFrames[i]=s->groups[0].first;
         }
         s->gcFogAuthoring=true;storage_=std::move(s);poolMode_=PoolMode::nativePrepared;return Status::complete;

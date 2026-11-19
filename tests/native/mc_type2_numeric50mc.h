@@ -15,7 +15,7 @@ inline g::OriginalGcSprayReceipt50KG emitAfterCommon(const source::Owner& author
  float dt,std::uint32_t& sharedRawRandom)noexcept{
  using Math=g::water_wake_detail50jc::Math;g::OriginalGcSprayReceipt50KG r;
  const auto fail=[&](Status status,std::uint32_t pc){r.status=status;r.sourcePC=pc;return r;};
- if(!authored.ready()||definitionIndex<1||definitionIndex>=7||!manager.prepared())return fail(Status::unprepared,0x15d938);
+ if(!authored.ready()||definitionIndex>=authored.definitionCountLive()||!manager.prepared())return fail(Status::unprepared,0x15d938);
  const auto& f=authored.definition(definitionIndex);const auto* row=manager.emitter(owner);const auto* group=manager.group(f.particleGroup1B8);
  if(!row||!group||f.kind!=source::Kind::Sparks2||group->type!=6||row->particleGroup!=f.particleGroup1B8||
     row->framesPerSet!=f.framesPerSet||row->gravity!=f.gravityMultiplier||row->bouncePlane!=f.groundLevel||row->bounceFactor!=f.restitution||

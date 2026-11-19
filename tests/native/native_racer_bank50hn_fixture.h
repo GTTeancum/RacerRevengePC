@@ -28,10 +28,10 @@
 #include <utility>
 #include <vector>
 
-namespace gb_animation_binding50GB { class Binding; }
+namespace track_animation_binding50AN { class Binding; }
+namespace track_animation_world50AN { class World; }
 namespace native_racer_contact50HW { class SnapshotAccess; }
 namespace roster_pod_contact50PC { class SlotAccess; }
-namespace mc_animation_binding50MC { class Binding; }
 namespace mc_collision_world50MC { class Owner; }
 namespace gb_query50GB { class Binding; }
 namespace mc_query50MC { class Binding; }
@@ -97,7 +97,7 @@ public:
         ReadHandle()=default;
     };
     template<class T> ReadHandle<T> bindRead(const T& value) const {
-        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||mcAnimationBlocked_||gbAnimationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_)
             throw std::runtime_error("racer read binding requires a sealed idle bank");
         const auto address=reinterpret_cast<std::uintptr_t>(&value);
         for(const auto& span:spans_){
@@ -114,7 +114,7 @@ public:
         throw std::runtime_error("racer read field is not within one registered owner span");
     }
     template<class T> T read(std::size_t index,const ReadHandle<T>& handle) const {
-        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||mcAnimationBlocked_||gbAnimationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
             throw std::runtime_error("invalid or leased native racer scalar read");
         T value;
         // Slot0 may have advanced since its last save. Every nonzero slot is
@@ -158,7 +158,7 @@ public:
     template<class F> decltype(auto) visit(std::size_t index,F&& operation) {
         if(retired_||!sealed_||index>=count_||visiting_||pendingToken_||
            mcQueryActive_||gbQueryActive_||(mcTerminalBlocked_&&!mcTerminalVisit_)||(gbTerminalBlocked_&&!gbTerminalVisit_)||
-           ((gbAnimationBlocked_&&!gbAnimationVisit_)||(mcAnimationBlocked_&&!mcAnimationVisit_)))
+           (animationBlocked_&&!animationVisit_))
             throw std::runtime_error("invalid or nested native racer visit");
         if(!index){
             // Legacy slot0 visits do not take the swapping lease. Keep their
@@ -192,7 +192,7 @@ public:
         std::size_t visitCount,F&& operation) {
         if(retired_||!sealed_||visiting_||pendingToken_||visitCount>count_||
            mcQueryActive_||gbQueryActive_||(mcTerminalBlocked_&&!mcTerminalVisit_)||(gbTerminalBlocked_&&!gbTerminalVisit_)||
-           ((gbAnimationBlocked_&&!gbAnimationVisit_)||(mcAnimationBlocked_&&!mcAnimationVisit_)))
+           (animationBlocked_&&!animationVisit_))
             throw std::runtime_error("invalid or nested native racer batch visit");
         for(std::size_t position=0;position<visitCount;++position)
             if(order&&order[position]>=count_)
@@ -247,18 +247,17 @@ public:
     // and registration spans before releasing the actual RA lifetime owner.
     bool retireNativeBacking()noexcept {
         if(retired_)return true;
-        if(visiting_||readBlocked_||visitDepth_||retirementVisit_||mcAnimationVisit_||gbAnimationVisit_||mcTerminalVisit_||gbTerminalVisit_||pendingToken_||sourceIssuer_||nativeFifoPins_||mcAnimationIssuer_||gbAnimationIssuer_||mcQueryIssuer_||gbQueryIssuer_||mcQueryActive_||gbQueryActive_||
+        if(visiting_||readBlocked_||visitDepth_||retirementVisit_||animationVisit_||mcTerminalVisit_||gbTerminalVisit_||pendingToken_||sourceIssuer_||nativeFifoPins_||animationIssuer_||mcQueryIssuer_||gbQueryIssuer_||mcQueryActive_||gbQueryActive_||
            (raWorldLifetime_&&!raWorldLifetime_->canRetire()))return false;
         retired_=true;sealed_=false;
         for(auto& slot:slots_)std::vector<unsigned char>().swap(slot.bytes);
         std::vector<Span>().swap(spans_);
-        raWorldLifetime_.reset();gbAnimationBacking_.reset();mcAnimationBacking_.reset();return true;
+        raWorldLifetime_.reset();animationBacking_.reset();return true;
     }
     std::size_t count()const noexcept{return count_;}
     std::size_t bytesPerRacer()const noexcept{return bytes_;}
 private:
-    friend class ::gb_animation_binding50GB::Binding;
-    friend class ::mc_animation_binding50MC::Binding;
+    friend class ::track_animation_binding50AN::Binding;
     friend class ::mc_query50MC::Binding;
     const ::mc_query50MC::Binding* mcQueryIssuer_=nullptr;
     bool mcQueryActive_=false,mcTerminalBlocked_=false,mcTerminalVisit_=false;
@@ -274,12 +273,11 @@ private:
     //actual Bank retirement releases the concrete aggregate retain.
     // Distinct MC global publication fence. Actual animation graph/motion/RNG
     // memory remains explicitly excluded from per-racer mutable Bank spans.
-    std::shared_ptr<::mc_collision_world50MC::Owner> mcAnimationBacking_;
-    const ::mc_animation_binding50MC::Binding* mcAnimationIssuer_=nullptr;
-    bool mcAnimationBlocked_=false,mcAnimationVisit_=false;
-    std::shared_ptr<::gb_collision_world50GB::Owner> gbAnimationBacking_;
-    const ::gb_animation_binding50GB::Binding* gbAnimationIssuer_=nullptr;
-    bool gbAnimationBlocked_=false,gbAnimationVisit_=false;
+    // ONE track-animation publication fence (track_animation_binding50an.h, every course
+    // whose collision world banks its animation lane); replaces the GB and MC copies.
+    std::shared_ptr<::track_animation_world50AN::World> animationBacking_;
+    const ::track_animation_binding50AN::Binding* animationIssuer_=nullptr;
+    bool animationBlocked_=false,animationVisit_=false;
     friend class mb_source_trigger50MB::Owner;
     friend class ::tc_cold_visibility50TC::Retirement;
     friend class ::tb_cold_visibility50TB::Retirement;

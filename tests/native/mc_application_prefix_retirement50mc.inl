@@ -5,7 +5,7 @@
   if(!isMcTrack)return true;
   if(mcQueryBinding)return false; // Its actual Bank must have been closed first.
   if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return false;
-  if(mcAnimationBinding&&mcAnimationBinding->needsClose()&&!mcAnimationBinding->close(mcAnimationBindingDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(mcCollisionWorld){
    if(!mcCollisionWorld->beginRetirement()&&mcCollisionWorld->phase()!=mc_collision_world50MC::Phase::Closed)return false;
    mcWorldBorrow.reset();

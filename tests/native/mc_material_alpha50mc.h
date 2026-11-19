@@ -75,7 +75,9 @@ inline bool selectMc(const track_materials50fa_fixture::Selection& selection,
     bool identity=false;
     for(const auto& row:identities)if(selection.materialKey==row.key&&detail::lower(selection.materialName)==row.name&&
         selection.program==row.program&&selection.textureName==row.map&&selection.pass==row.pass&&selection.passCount==row.count){identity=true;break;}
-    if(!identity)return false;
+    // Stock material identities: a receipt list, not an admission gate. A
+    // material outside it (new or changed bytes) takes the same field rule below.
+    (void)identity;
     const auto* inherited = templates.get(rr::assets::OriginalUiTemplate50KG::defaultMt);
     if (!inherited || !inherited->identity || !inherited->identity->sha256 ||
         std::string(inherited->identity->sha256) !=

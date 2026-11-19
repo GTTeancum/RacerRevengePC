@@ -3,7 +3,7 @@
 // same-root renderer, Bank, navigation and action binding.
 #include "gb_runtime_ground50la.h"
 #include "gb_navigation50gb.h"
-#include "gb_animation_runtime50gb.h"
+#include "track_animation_world50an.h"
 #include "gb_trigger_candidates50gb.h"
 #include "track_static_candidates50ig_fixture.h"
 #include <array>
@@ -11,12 +11,17 @@
 #include <span>
 #include <thread>
 
-namespace gb_animation_binding50GB { class Binding; }
 namespace gb_query50GB { class Binding; }
 namespace gb_collision_world50GB {
 namespace g=rr::game;namespace a=rr::assets;namespace rt=track_runtime_storage50IG;
-inline constexpr std::size_t sourceCandidates=615,triggerCandidates=18,animationCandidates=4,totalCandidates=637;
-static_assert(triggerCandidates==gb_trigger_authoring50GB::count);
+// Capacity store with live counts (common course rule). The ground, trigger
+// and animation extents come from the data: placed COL owners (stock 615), the
+// TOB's live triggers (stock 18, capacity 22) and the track-animation rows with
+// UseCollision (common player, track_animation_world50an.h; stock 4, absent = 0).
+// Stock 615 + 18 + 4 = 637 is a receipt.
+inline constexpr std::size_t triggerCapacity=gb_trigger_authoring50GB::capacity;
+inline constexpr std::size_t animationCapacity=rr::assets::TrackAnimationLimits50AN{}.animations;
+inline constexpr std::size_t stockSourceCandidates=615,stockTriggerCandidates=18,stockTotalCandidates=637;
 struct Payload {
  std::size_t sharedSource=0,externalReserved=0,ownerDescriptors=0,groundDescriptors=0;
  std::size_t candidateDescriptors=0,memberships=0,navigationReservation=0;
@@ -26,22 +31,23 @@ enum class Phase {Empty,Ground,Candidates,Storage,Memberships,AnimationPending,R
 struct Diagnostic {Phase phase=Phase::Empty;std::size_t trigger=0;std::string message;rt::Diagnostic storage{};g::LiveZoneResult50EN membership{};Payload payload{};};
 // Complete637-owner aggregate only. A615+4 prefix cannot reach Storage/Ready
 // or mint navigation authority. Actual trigger source/actions are mandatory.
-class Owner final : public std::enable_shared_from_this<Owner> {
- friend class ::gb_animation_binding50GB::Binding;
+class Owner final : public std::enable_shared_from_this<Owner>,public track_animation_world50AN::World {
  friend class ::gb_query50GB::Binding;
  std::shared_ptr<const gb_cold_sources50LA::Owner> source_;
  std::unique_ptr<gb_runtime_ground50LA::Owner> ground_;
  std::shared_ptr<const gb_trigger_authoring50GB::Owner> triggers_;
  std::shared_ptr<gb_trigger_actions50GB::Owner> actions_;
- std::shared_ptr<gb_animation_runtime50GB::Owner> animations_;
+ std::shared_ptr<track_animation_runtime50AN::Owner> animations_;
+ track_animation_world50AN::Lane lane_;
  std::vector<g::Type2StaticCandidate49X> candidates_;
  std::vector<track_static_candidates50IG::Radii> radii_;
  std::vector<rt::Binding> bindings_;
- std::array<std::unique_ptr<rt::Membership>,triggerCandidates> triggerMemberships_;
- std::array<std::unique_ptr<rt::Membership>,animationCandidates> animationMemberships_;
- std::array<g::LiveZoneMembership50EN,animationCandidates> committedMemberships_{};
+ std::array<std::unique_ptr<rt::Membership>,triggerCapacity> triggerMemberships_;
  std::unique_ptr<rt::Owner> storage_;
  std::size_t externalReserved_=0,preStorageReservation_=0,coldLimit_=0,queryBorrows_=0,structuralBorrows_=0;
+ // Live extents (set at Storage) and the counts the pre-Storage reservation was charged for.
+ std::size_t sourceCount_=0,triggerCount_=0,animationCount_=0,membershipCapacity_=0;
+ std::size_t plannedTriggers_=0,plannedAnimations_=0;
  mutable g::GbCollisionWorldBorrowState worldBorrows_{};
  const std::thread::id thread_=std::this_thread::get_id();
  bool groundAttempted_=false,storageAttempted_=false,publicationBlocked_=false;
@@ -53,94 +59,20 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  bool sameOwners()const noexcept {
   return thread()&&source_&&source_->ready()&&ground_&&ground_->coldSource()==source_.get()&&triggers_&&triggers_->ready()&&
    triggers_->coldSource()==source_.get()&&actions_&&actions_->sourceOwner()==triggers_.get()&&
-   actions_->preparedSourceFor(*triggers_,false)&&animations_&&
-   actions_->animationOwner()==animations_.get()&&animations_->coldSource()==source_.get();
+   actions_->preparedSourceFor(*triggers_,false)&&(animations_||!animationCount_)&&
+   actions_->animationOwner()==animations_.get();
  }
  bool actualIdle()const noexcept {return thread()&&!queryBorrows_&&(!actions_||actions_->queryIdle())&&
    (!storage_||!storage_->get()||!storage_->get()->queue.count);}
- bool animationAccess(const ::gb_animation_binding50GB::Binding* issuer)const noexcept {
-  return actualIdle()&&issuer&&animations_&&animations_->binding_==issuer&&storage_&&storage_->get()&&
-    (phase_==Phase::AnimationPending||phase_==Phase::Ready||phase_==Phase::Retiring);
- }
  bool currentPublication()const noexcept {
-  if(!animations_||!storage_||!storage_->get()||std::fegetround()!=FE_TONEAREST)return false;const auto& s=*storage_->get();
-  for(std::size_t i=0;i<animationCandidates;++i){const auto index=sourceCandidates+triggerCandidates+i;const auto object=index+1;
-   const auto& state=animations_->state_[i];const auto& c=state.collision;const auto& view=animations_->views_[i];
-   const auto* candidate=animations_->candidates_[i];if(!candidate||s.candidates[index]!=candidate||candidate!=&candidates_[index]||
-      candidate->shapeType!=1||candidate->compound!=&view||candidate->candidate.collision.shapeType!=1||
-      candidate->candidate.collision.compound!=&view||view.parts!=c.parts.data()||view.count!=animations_->source(i).collisionCount||
-      std::memcmp(view.ownerWorld.v,c.ownerWorld.v,sizeof c.ownerWorld.v)||std::memcmp(view.center.v,c.center.v,sizeof c.center.v)||
-      std::memcmp(view.half.v,c.half.v,sizeof c.half.v)||!animationMemberships_[i])return false;
-   const auto& shape=candidate->candidate.collision;const auto& movement=s.movement[index].collision;
-   if(s.movement[index].shapeType!=1||s.movement[index].compound!=&view||movement.shapeType!=1||movement.compound!=&view||shape.geometry.id!=0x3e000000u+i||shape.filter.identity!=shape.geometry.id||shape.ownerIdentity9C!=0x3f000000u+i||
-      shape.filter.categoryA4!=1u||shape.hasResponseCallbackE8||
-      std::memcmp(shape.geometry.worldMatrix.v,c.ownerWorld.v,sizeof c.ownerWorld.v)||
-      std::memcmp(shape.sphere.center.v,c.sphereCenter.v,sizeof c.sphereCenter.v)||std::memcmp(&shape.sphere.radius,&c.radius,sizeof(float))||
-      std::memcmp(movement.geometry.worldMatrix.v,c.ownerWorld.v,sizeof c.ownerWorld.v)||
-      std::memcmp(movement.sphere.center.v,c.sphereCenter.v,sizeof c.sphereCenter.v)||std::memcmp(&movement.sphere.radius,&c.radius,sizeof(float)))return false;
-   const auto projected=g::projectCollectionObject50CF(shape.filter,shape.sphere,shape.typeTag,1,0);
-   if(!projected.valid||std::memcmp(s.source[index].cachedCenter.v,projected.state.cachedCenter.v,3*sizeof(float))||
-      std::memcmp(&s.source[index].cachedRadius,&projected.state.cachedRadius,sizeof(float)))return false;
-   const auto& m=animationMemberships_[i]->state;const auto& committed=committedMemberships_[i];
-   if(!m.attached||m.object!=object||m.method!=g::ZoneMethod50CL::Second||!m.revision||m.revision!=committed.revision||
-      m.lastShapeTag!=1||m.lastType2Resource||m.storage.capacity!=18||m.storage.links!=animationMemberships_[i]->links.data()||
-      m.storage.entries!=animationMemberships_[i]->entries.data()||std::memcmp(m.lastShapeWorld.v,c.ownerWorld.v,sizeof c.ownerWorld.v))return false;
-   const auto& primary=m.storage.entries[0].registration;const auto& registration=s.registrations[index];
-   if(!primary.owner||primary.owner!=registration.owner||primary.slot!=registration.slot||primary.encodedObject!=registration.encodedObject||registration.encodedObject!=(object<<2u))return false;
-   g::CollectionBoundsResult48S expected{};const auto bounds=animations_->collisionBounds(i);
-   if(g::prepareCollectionBounds48S(bounds.bounds,expected)!=g::CollectionBoundsStatus48S::Complete||
-      std::memcmp(m.bounds.center.v,expected.center.v,sizeof expected.center.v)||std::memcmp(m.bounds.half.v,expected.half.v,sizeof expected.half.v)||
-      std::memcmp(m.bounds.cachedCenter.v,expected.cachedCenter.v,sizeof expected.cachedCenter.v)||std::memcmp(&m.bounds.cachedRadius,&expected.cachedRadius,sizeof(float)))return false;
-  }
-  return true;
- }
- bool attachAnimation(const ::gb_animation_binding50GB::Binding* issuer,std::size_t i,g::LiveZoneResult50EN& result)noexcept {
-  if(!animationAccess(issuer)||phase_!=Phase::AnimationPending||i>=animationCandidates||!animationMemberships_[i])return false;
-  auto& s=*storage_->get();auto& m=*animationMemberships_[i];const auto bounds=animations_->collisionBounds(i);
-  result=g::attachLiveZoneMembership50EN(s.lifecycle,s.world,m.state,m.storage(),
-    static_cast<g::CollectionRef50BX>(sourceCandidates+triggerCandidates+i+1),animations_->source(i).authored.startingZone,
-    g::ZoneMethod50CL::Second,0.f,bounds,s.membershipWork);
-  return result.status==g::LiveZoneStatus50EN::Complete&&m.state.attached&&m.state.object==sourceCandidates+triggerCandidates+i+1;
- }
- bool updateAnimation(const ::gb_animation_binding50GB::Binding* issuer,std::size_t i,g::LiveZoneResult50EN& result)noexcept {
-  if(!animationAccess(issuer)||i>=animationCandidates||!animationMemberships_[i])return false;
-  auto& s=*storage_->get();auto& m=*animationMemberships_[i];const auto object=sourceCandidates+triggerCandidates+i+1;
-  if(!m.state.attached||m.state.object!=object||s.candidates[object-1]!=animations_->candidates_[i])return false;
-  const auto bounds=animations_->collisionBounds(i);
-  const auto& current=animations_->candidates_[i]->candidate.collision;
-  const auto projected=g::projectCollectionObject50CF(current.filter,current.sphere,current.typeTag,1,0);
-  if(!projected.valid)return false;
-  result=g::updateLiveZoneMembership50EN(s.lifecycle,s.world,m.state,bounds,s.membershipWork);
-  if(result.status!=g::LiveZoneStatus50EN::Complete)return false;
-  //Movement candidate geometry is shared/global, while the mutable query
-  //flags/history lanes remain per-racer. Never copy their vectors or flags.
-  auto& movement=s.movement[object-1];const auto& actual=animations_->candidates_[i]->candidate.collision;
-  movement.collision.geometry.worldMatrix=actual.geometry.worldMatrix;movement.collision.sphere=actual.sphere;
-  //Native query-cache projection follows the same current pose in each peer.
-  //Keep that racer's query epochs/flags and original cache W untouched.
-  auto& objectView=s.objects[object-1];for(unsigned k=0;k<3;++k)objectView.position[k]=projected.object.position[k];
-  objectView.scale10=projected.object.scale10;objectView.scale11=projected.object.scale11;
-  auto& cached=s.source[object-1];std::memcpy(cached.cachedCenter.v,projected.state.cachedCenter.v,3*sizeof(float));cached.cachedRadius=projected.state.cachedRadius;
-  return true;
- }
- bool commitAnimations(const ::gb_animation_binding50GB::Binding* issuer)noexcept {
-  if(!animationAccess(issuer)||!sameOwners()||animations_->failed_||!currentPublication())return false;
-  for(std::size_t i=0;i<animationCandidates;++i)if(!animations_->state_[i].initialComplete||!animationMemberships_[i]||
-    !animationMemberships_[i]->state.attached||animationMemberships_[i]->state.object!=sourceCandidates+triggerCandidates+i+1)return false;
-  if(!generation_)generation_=1;phase_=Phase::Ready;publicationBlocked_=false;return true;
- }
- bool removeAnimation(const ::gb_animation_binding50GB::Binding* issuer,std::size_t i,g::LiveZoneResult50EN& result)noexcept {
-  if(!animationAccess(issuer)||i>=animationCandidates)return false;if(!animationMemberships_[i])return true;
-  auto& s=*storage_->get();auto& m=*animationMemberships_[i];
-  result=g::removeLiveZoneMembership50EN(s.lifecycle,s.world,m.state,s.membershipWork);
-  return result.status==g::LiveZoneStatus50EN::Complete&&!m.state.attached&&!m.state.object;
+  if(!storage_||!storage_->get()||std::fegetround()!=FE_TONEAREST)return false;
+  return lane_.current(*storage_->get());
  }
  bool idleForRetirement()const noexcept {
-  if(!actualIdle()||(animations_&&(animations_->binding_||animations_->servicing_)))return false;
-  for(const auto& member:animationMemberships_)if(member&&(member->state.attached||member->state.object))return false;
+  if(!actualIdle()||!lane_.detached())return false;
   if(!storage_||!storage_->get())return true;const auto& s=*storage_->get();
   if(!s.rowsDetached())return false; //every racer's query rows (shared world: all of them)
-  for(std::size_t i=totalCandidates;i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
+  for(std::size_t i=totalCount();i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
   return true;
  }
  bool removeTriggers()noexcept {
@@ -159,8 +91,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
   // all-peer cleanup. Never clear shared hooks on the root's behalf here.
   if(structuralBorrows_||worldBorrows_.leases||!idleForRetirement()||!triggerMembershipsDetached()||(actions_&&!actions_->closed())||!removeTriggers())return false;
   generation_=0;phase_=Phase::Closed;groundAttempted_=storageAttempted_=true;
-  storage_.reset();for(auto& m:triggerMemberships_)m.reset();for(auto& m:animationMemberships_)m.reset();
-  if(animations_)animations_->candidates_.fill(nullptr);
+  storage_.reset();for(auto& m:triggerMemberships_)m.reset();lane_.reset();
   candidates_.clear();bindings_.clear();radii_.clear();actions_.reset();triggers_.reset();animations_.reset();ground_.reset();source_.reset();return true;
  }
  void account(const rt::Limits& limits){
@@ -170,9 +101,10 @@ class Owner final : public std::enable_shared_from_this<Owner> {
   addElements<track_static_candidates50IG::Radii>(p.candidateDescriptors,radii_.capacity());
   for(const auto& c:candidates_){const auto& f=c.candidate.collision.filter;addElements<std::uint32_t>(p.candidateDescriptors,f.categoryMasks.capacity());
    for(const auto& l:f.identityLists)addElements<std::uint32_t>(p.candidateDescriptors,l.identities.capacity());}
-  addElements<rt::Membership>(p.memberships,triggerCandidates+animationCandidates);
-  addElements<g::CollectionZoneLink50BX>(p.memberships,18*(triggerCandidates+animationCandidates));
-  addElements<g::LiveZoneEntry50EN>(p.memberships,18*(triggerCandidates+animationCandidates));
+  addElements<rt::Membership>(p.memberships,triggerCount_);
+  addElements<g::CollectionZoneLink50BX>(p.memberships,membershipCapacity_*triggerCount_);
+  addElements<g::LiveZoneEntry50EN>(p.memberships,membershipCapacity_*triggerCount_);
+  add(p.memberships,track_animation_world50AN::Lane::payloadBytes(animationCount_,membershipCapacity_));
   p.navigationReservation=gb_navigation50GB::Owner::ownerBytes()+gb_navigation50GB::Owner::persistentPayloadBytes()+gb_navigation50GB::Owner::topologyScratchBytes();
   std::size_t observed=0;for(auto n:{p.sharedSource,p.externalReserved,p.ownerDescriptors,p.groundDescriptors,p.candidateDescriptors,p.memberships,p.navigationReservation})add(observed,n);
   need(observed<=preStorageReservation_&&limits.coldPayloadBytes==coldLimit_,"GB actual descriptors exceed charged pre-Storage reservation");
@@ -206,24 +138,42 @@ public:
   g::LiveZoneWorld50EN* world()const noexcept{auto* s=registrationStorage();return s?&s->world:nullptr;}
   std::span<g::Type2StaticCandidate49X> candidateStorage()const noexcept{return *this?std::span<g::Type2StaticCandidate49X>{owner_->candidates_}:std::span<g::Type2StaticCandidate49X>{};}
   std::span<const rt::Binding> bindingStorage()const noexcept{return *this?std::span<const rt::Binding>{owner_->bindings_}:std::span<const rt::Binding>{};}
-  rt::Membership* triggerMembership(std::size_t i)const noexcept{return *this&&i<triggerCandidates?owner_->triggerMemberships_[i].get():nullptr;}
+  rt::Membership* triggerMembership(std::size_t i)const noexcept{return *this&&i<owner_->triggerCount_?owner_->triggerMemberships_[i].get():nullptr;}
+  std::size_t triggerCount()const noexcept{return *this?owner_->triggerCount_:0;}
   gb_trigger_actions50GB::Owner* actions()const noexcept{return *this?owner_->actions_.get():nullptr;}
  };
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  ~Owner();
- static std::size_t requiredPreStoragePayloadBytes(const gb_cold_sources50LA::Owner& source,std::size_t external)noexcept {
-  try{std::size_t n=source.retainedPayloadBytes();add(n,external);add(n,sizeof(Owner)+sizeof(rt::Owner));add(n,gb_runtime_ground50LA::Owner::maximumDescriptorPayloadBytes(source));
-   addElements<g::Type2StaticCandidate49X>(n,totalCandidates);addElements<rt::Binding>(n,totalCandidates);addElements<track_static_candidates50IG::Radii>(n,sourceCandidates);
-   addElements<rt::Membership>(n,triggerCandidates+animationCandidates);addElements<g::CollectionZoneLink50BX>(n,18*(triggerCandidates+animationCandidates));
-   addElements<g::LiveZoneEntry50EN>(n,18*(triggerCandidates+animationCandidates));
+ // Object reference of animation owner i in the one world (after the ground
+ // and trigger candidates; stock 634..637).
+ std::size_t animationObject(std::size_t i)const noexcept{return sourceCount_+triggerCount_+i+1;}
+ std::size_t sourceCount()const noexcept{return sourceCount_;}
+ std::size_t triggerCount()const noexcept{return triggerCount_;}
+ std::size_t animationCount()const noexcept{return animationCount_;}
+ std::size_t totalCount()const noexcept{return sourceCount_+triggerCount_+animationCount_;}
+ // triggers / animations: the live counts the data authors (the decoded
+ // trigger store and the animation owners), charged exactly.
+ static std::size_t requiredPreStoragePayloadBytes(const gb_cold_sources50LA::Owner& source,std::size_t external,
+     std::size_t triggers,std::size_t animations)noexcept {
+  try{need(triggers<=triggerCapacity&&animations<=animationCapacity,"GB live trigger/animation extent exceeds the store");
+   const auto ground=gb_runtime_ground50LA::Owner::placedCollisionCount(source);need(ground,"GB source has no placed COL");
+   const auto total=ground+triggers+animations,members=triggers+animations;
+   const auto membership=source.world().portals.size()+1; // track_runtime_storage50IG: portals + 1
+   std::size_t n=source.retainedPayloadBytes();add(n,external);add(n,sizeof(Owner)+sizeof(rt::Owner));add(n,gb_runtime_ground50LA::Owner::maximumDescriptorPayloadBytes(source));
+   addElements<g::Type2StaticCandidate49X>(n,total);addElements<rt::Binding>(n,total);addElements<track_static_candidates50IG::Radii>(n,ground);
+   addElements<rt::Membership>(n,triggers);addElements<g::CollectionZoneLink50BX>(n,membership*triggers);
+   addElements<g::LiveZoneEntry50EN>(n,membership*triggers);add(n,track_animation_world50AN::Lane::payloadBytes(animations,membership));(void)members;
    add(n,gb_navigation50GB::Owner::ownerBytes()+gb_navigation50GB::Owner::persistentPayloadBytes()+gb_navigation50GB::Owner::topologyScratchBytes());return n;
   }catch(...){return std::numeric_limits<std::size_t>::max();}
  }
  bool prepareGround(std::shared_ptr<const gb_cold_sources50LA::Owner> source,a::TrackCollisionMasks50AN masks,
-      const std::vector<std::uint8_t>& actualPhy,unsigned rank,std::size_t external,const rt::Limits& limits,std::string& error){
+      const std::vector<std::uint8_t>& actualPhy,unsigned rank,std::size_t external,const rt::Limits& limits,
+      std::size_t triggers,std::size_t animations,std::string& error){
   if(!thread()||groundAttempted_||weak_from_this().expired()){error="GB aggregate requires one shared owner-thread lifetime";return false;}
   groundAttempted_=true;phase_=Phase::Ground;
-  try{need(source&&source->ready(),"GB same actual cold source required");const auto reserved=requiredPreStoragePayloadBytes(*source,external);
+  try{need(source&&source->ready(),"GB same actual cold source required");
+   const auto reserved=requiredPreStoragePayloadBytes(*source,external,triggers,animations);
+   plannedTriggers_=triggers;plannedAnimations_=animations;
    need(limits.coldPayloadBytes&&limits.coldPayloadBytes<=32u*1024u*1024u&&reserved<limits.coldPayloadBytes,"GB complete shared source/external/aggregate budget exhausted");
    externalReserved_=external;preStorageReservation_=reserved;coldLimit_=limits.coldPayloadBytes;source_=std::move(source);ground_=std::make_unique<gb_runtime_ground50LA::Owner>();
    if(!ground_->prepare(source_,masks,actualPhy,rank,error))return false;
@@ -232,49 +182,65 @@ public:
  }
  bool prepareStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> application,
       std::shared_ptr<const gb_trigger_authoring50GB::Owner> triggers,std::shared_ptr<gb_trigger_actions50GB::Owner> actions,
-      std::shared_ptr<gb_animation_runtime50GB::Owner> animations,const track_static_candidates50IG::Bindings& names,const rt::Limits& limits,Diagnostic& d)noexcept {
+      std::shared_ptr<track_animation_runtime50AN::Owner> animations,const track_static_candidates50IG::Bindings& names,const rt::Limits& limits,Diagnostic& d)noexcept {
   if(!thread()||storageAttempted_||!ground_||!ground_->ground())return false;storageAttempted_=true;phase_=Phase::Candidates;
   try{d={};d.phase=phase_;need(application&&application->application10(),"GB actual live Application required");
-   need(triggers&&triggers->ready()&&triggers->coldSource()==source_.get()&&actions&&animations&&
+   // The common track-animation runtime exists exactly when the TOB authors
+   // [Animations] (absent = no runtime; the trigger actions then hold none either).
+   need(triggers&&triggers->ready()&&triggers->coldSource()==source_.get()&&actions&&
      actions->sourceOwner()==triggers.get()&&actions->animationOwner()==animations.get()&&actions->preparedSourceFor(*triggers)&&
-     !actions->nativeGroup().ready&&actions->queryIdle()&&animations->stagedSourceReady()&&animations->binding_&&!animations->publicationReady_,
+     !actions->nativeGroup().ready&&actions->queryIdle()&&(!animations||animations->ready()),
      "GB real same-source trigger/actions/animation join required");
-   for(const auto& s:animations->state_)need(s.visualPrepared&&s.collisionPrepared&&!s.initialAttempted,"GB four actual visual/compound prefixes required");
+   sourceCount_=ground_->ground()->owners.size();triggerCount_=triggers->liveCount();
+   animationCount_=track_animation_world50AN::Lane::collisionRowCount(animations.get());membershipCapacity_=source_->world().portals.size()+1;
+   need(triggerCount_==plannedTriggers_&&animationCount_==plannedAnimations_&&sourceCount_&&
+     sourceCount_==gb_runtime_ground50LA::Owner::placedCollisionCount(*source_)&&triggerCount_==actions->nativeGroup().triggers.size(),
+     "GB live ground/trigger/animation extent differs from the charged reservation");
+   course_archive_receipt50CI::countReceipt("gb_collision_world","candidates",totalCount(),stockTotalCandidates);
    triggers_=std::move(triggers);actions_=std::move(actions);animations_=std::move(animations);
-   need(sameOwners()&&ground_->ground()->owners.size()==sourceCandidates,"GB actual615 placed Ground associations required");
-   candidates_.reserve(totalCandidates);bindings_.reserve(totalCandidates);radii_.reserve(sourceCandidates);
+   need(sameOwners(),"GB actual placed Ground associations required");
+   candidates_.reserve(totalCount());bindings_.reserve(totalCount());radii_.reserve(sourceCount_);
    track_static_candidates50IG::prepare(*ground_->ground(),names,candidates_,radii_,bindings_);
-   need(gb_trigger_candidates50GB::prepare(*triggers_,*actions_,candidates_,bindings_,names.collisionTypeTag,names.preservedFlags31,names.preservedFlagsF8)==sourceCandidates&&
-     candidates_.size()==sourceCandidates+triggerCandidates&&bindings_.size()==candidates_.size(),"GB actual615+18 trigger prefix required");
-   candidates_.resize(totalCandidates);bindings_.resize(totalCandidates);for(std::size_t i=0;i<totalCandidates;++i)bindings_[i].candidate=&candidates_[i];
-   for(std::size_t i=0;i<animationCandidates;++i){const auto index=sourceCandidates+triggerCandidates+i;
-    need(animations_->prepareCandidate(i,candidates_[index],names.collisionTypeTag,names.preservedFlags31,names.preservedFlagsF8),"GB genuine compound candidate issuance rejected");
-    bindings_[index]={std::numeric_limits<std::size_t>::max(),&candidates_[index],true,animations_->source(i).authored.startingZone,0,g::ZoneMethod50CL::Second};
-   }
+   need(gb_trigger_candidates50GB::prepare(*triggers_,*actions_,candidates_,bindings_,names.collisionTypeTag,names.preservedFlags31,names.preservedFlagsF8,
+     sourceCount_,totalCount())==sourceCount_&&
+     candidates_.size()==sourceCount_+triggerCount_&&bindings_.size()==candidates_.size(),"GB actual ground + trigger prefix required");
+   need(lane_.prepareCandidates(animations_,candidates_,bindings_,names.collisionTypeTag,names.preservedFlags31,names.preservedFlagsF8)==sourceCount_+triggerCount_&&
+     candidates_.size()==totalCount()&&bindings_.size()==totalCount()&&lane_.count()==animationCount_,"GB track-animation candidate lane rejected");
    account(limits);d.payload=payload_;auto reduced=limits;reduced.coldPayloadBytes-=preStorageReservation_;
    phase_=Phase::Storage;d.phase=phase_;storage_=std::make_unique<rt::Owner>();
    if(!storage_->prepare(std::move(application),*ground_->ground(),bindings_.data(),bindings_.size(),reduced,d.storage)){d.message=d.storage.message;return false;}
-   auto& s=*storage_->get();need(s.count.terrain==637&&s.count.zones==13&&s.count.portals==17&&s.count.portalLinks==34&&s.count.membership==18,"GB actual fixed Storage extent changed");
+   // Storage extent from the data (stock 637 / 13 / 17 / 34 / 18).
+   auto& s=*storage_->get();need(s.count.terrain==totalCount()&&s.count.zones==source_->world().zones.size()&&
+     s.count.portals==source_->world().portals.size()&&s.count.portalLinks==2*s.count.portals&&
+     s.count.membership==membershipCapacity_,"GB Storage extent differs from the course data");
    payload_.storageRequested=d.storage.requestedPayloadBytes;payload_.totalRequested=preStorageReservation_;add(payload_.totalRequested,payload_.storageRequested);
    need(payload_.totalRequested<=limits.coldPayloadBytes,"GB complete aggregate budget exceeded");d.payload=payload_;phase_=Phase::Memberships;d.phase=phase_;
-   for(auto& m:triggerMemberships_)m=std::make_unique<rt::Membership>(18);
-   for(std::size_t i=0;i<triggerCandidates;++i){d.trigger=i;const auto& actual=triggers_->source(i);auto& member=*triggerMemberships_[i];const auto bounds=gb_trigger_candidates50GB::bounds(actual);
-    d.membership=g::attachLiveZoneMembership50EN(s.lifecycle,s.world,member.state,member.storage(),static_cast<g::CollectionRef50BX>(sourceCandidates+i+1),actual.zone,g::ZoneMethod50CL::First,0.f,bounds,s.membershipWork);
+   for(std::size_t i=0;i<triggerCount_;++i)triggerMemberships_[i]=std::make_unique<rt::Membership>(membershipCapacity_);
+   for(std::size_t i=0;i<triggerCount_;++i){d.trigger=i;const auto& actual=triggers_->source(i);auto& member=*triggerMemberships_[i];const auto bounds=gb_trigger_candidates50GB::bounds(actual);
+    d.membership=g::attachLiveZoneMembership50EN(s.lifecycle,s.world,member.state,member.storage(),static_cast<g::CollectionRef50BX>(sourceCount_+i+1),actual.zone,g::ZoneMethod50CL::First,0.f,bounds,s.membershipWork);
     need(d.membership.status==g::LiveZoneStatus50EN::Complete,"GB authentic trigger attachment rejected");
     d.membership=g::updateLiveZoneMembership50EN(s.lifecycle,s.world,member.state,bounds,s.membershipWork);need(d.membership.status==g::LiveZoneStatus50EN::Complete,"GB authentic trigger publication rejected");
    }
-   for(auto& m:animationMemberships_)m=std::make_unique<rt::Membership>(18);phase_=Phase::AnimationPending;d.phase=phase_;d.message.clear();return true;
+   lane_.makeMemberships(membershipCapacity_);
+   std::cerr<<"gb_course_owner owner=collision_world placed_col="<<sourceCount_<<" triggers="<<triggerCount_
+       <<" animations="<<animationCount_<<" candidates="<<totalCount()<<" stock="<<(totalCount()==stockTotalCandidates&&
+       sourceCount_==stockSourceCandidates&&triggerCount_==stockTriggerCandidates?1:0)<<'\n';
+   // The track-animation binding publishes the lane next (track_animation_binding50an.h);
+   // with no [Animations] the aggregate is complete here.
+   if(animations_){phase_=Phase::AnimationPending;d.phase=phase_;d.message.clear();return true;}
+   if(!currentPublication())throw std::runtime_error("GB aggregate publication without animations rejected");
+   if(!generation_)generation_=1;publicationBlocked_=false;phase_=Phase::Ready;d.phase=phase_;d.message.clear();return true;
   }catch(const std::exception& e){try{d.phase=phase_;d.message=e.what();}catch(...){}return false;}
    catch(...){try{d.phase=phase_;d.message="GB cold aggregate allocation/assembly failure";}catch(...){}return false;}
  }
- bool geometryReady()const noexcept{return phase_==Phase::Ready&&generation_&&!publicationBlocked_&&sameOwners()&&storage_&&storage_->get()&&animations_->ready()&&!actions_->nativeGroup().actionsFailed&&currentPublication();}
+ bool geometryReady()const noexcept{return phase_==Phase::Ready&&generation_&&!publicationBlocked_&&sameOwners()&&storage_&&storage_->get()&&
+   !actions_->nativeGroup().actionsFailed&&currentPublication();}
  // Dynamic readiness is genuine ActionOwner destination admission. It may
  // remain true during a held action query; query() separately requires idle.
  bool queryReady()const noexcept{return geometryReady()&&actions_->queryReady()&&actions_->nativeGroup().ready&&
   !actions_->nativeGroup().actionsFailed;}
- bool animationPending()const noexcept{return phase_==Phase::AnimationPending&&sameOwners()&&storage_&&storage_->get();}
  bool beginRetirement()noexcept {
-  if(!actualIdle()||phase_==Phase::Closed||(animations_&&animations_->servicing_))return false;
+  if(!actualIdle()||phase_==Phase::Closed)return false;
   publicationBlocked_=true;phase_=Phase::Retiring;return true;
  }
  Phase phase()const noexcept{return phase_;}const Payload& payload()const noexcept{return payload_;}
@@ -286,11 +252,21 @@ public:
  // geometryReady/queryReady or mint final navigation authority. The retained
  // borrow must end before close; root still visits every actual Bank peer.
  Borrow retirementBorrow()noexcept {
-  if(phase_!=Phase::Retiring||!actualIdle()||(animations_&&animations_->servicing_)||!storage_||!storage_->get())return {};
+  if(phase_!=Phase::Retiring||!actualIdle()||!storage_||!storage_->get())return {};
   auto self=weak_from_this().lock();return self?Borrow{std::move(self)}:Borrow{};
  }
  QueryBorrow query()noexcept {if(!queryReady()||!actions_->queryIdle())return {};auto self=weak_from_this().lock();return self?QueryBorrow{std::move(self)}:QueryBorrow{};}
  g::GbCollisionWorldLease lease()const noexcept {if(!geometryReady())return {};auto self=weak_from_this().lock();return self?g::GbCollisionWorldLease{std::move(self),source_,storage_->get()->world,generation_,worldBorrows_}:g::GbCollisionWorldLease{};}
  bool close()noexcept {if(!thread()||weak_from_this().use_count()>1)return false;if(phase_==Phase::Closed)return true;return retire();}
+ // ---- track_animation_world50AN::World (the common binding's view of the lane) ----
+ track_animation_world50AN::Lane* animationLane()noexcept override{return thread()&&animations_?&lane_:nullptr;}
+ rt::Storage* animationStorage()noexcept override{return thread()&&storage_?storage_->get():nullptr;}
+ bool animationIdle()const noexcept override{return actualIdle();}
+ bool animationPending()const noexcept override{return phase_==Phase::AnimationPending&&sameOwners()&&storage_&&storage_->get();}
+ bool commitAnimationLane()noexcept override{
+  if(phase_!=Phase::AnimationPending||!actualIdle()||!sameOwners()||!currentPublication())return false;
+  if(!generation_)generation_=1;phase_=Phase::Ready;publicationBlocked_=false;return true;}
+ void blockAnimationPublication(bool blocked)noexcept override{if(phase_==Phase::Ready||phase_==Phase::AnimationPending)publicationBlocked_=blocked;}
+ bool animationLaneDetached()const noexcept{return lane_.detached();}
 };
 }

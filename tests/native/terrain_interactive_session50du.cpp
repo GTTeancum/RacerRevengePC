@@ -660,6 +660,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(gbSoundMode->initializeFromProfile1101C(1),"GB direct native stereo mode rejected");
   }
   require50DU(mixer->bindOriginalSoundMode50KG(gbSoundMode),"GB early source-mode binding rejected");
+  // The PodSound owner exists exactly when a trigger authors a PodSound
+  // action (stock GB: the door, trigger 16); absent = none.
+  std::cerr<<"gb_course_owner owner=podsound present="<<(authored->authorsPodSound()?1:0)<<'\n';
+  if(!authored->authorsPodSound())return;
   gbPodSound=std::make_shared<gb_pod_sound50GB::Owner>();
   const bool soundReady=gbPodSound->prepare(std::move(authored),*mixer,*groups,gbPreparedAudioRoot,error);
   require50DU(soundReady,error.empty()?"GB actual BIGDOOR source/voice126 rejected":error.c_str());

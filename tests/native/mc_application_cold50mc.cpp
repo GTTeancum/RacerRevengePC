@@ -8,9 +8,7 @@
 #include "mc_collision_world50mc.h"
 #include "mc_navigation50mc.h"
 #include "mc_trigger_actions50mc.h"
-#include "mc_animation_source50mc.h"
-#include "mc_animation_runtime50mc.h"
-#include "mc_animation_binding50mc.h"
+#include "track_animation_binding50an.h"
 #include "mc_particle_attachments50mc.h"
 #include "mc_particle_runtime50mc.h"
 #include "mc_track_fog50mc.h"
@@ -52,11 +50,9 @@ void McColdPrefix::run() const {
  auto& mcNavigationDiagnostic=this->mcNavigationDiagnostic;
  auto& mcTriggerAuthoring=this->mcTriggerAuthoring;
  auto& mcTriggerGeometry=this->mcTriggerGeometry;
- auto& mcAnimationSource=this->mcAnimationSource;
- auto& mcAnimationRuntime=this->mcAnimationRuntime;
- auto& mcAnimationDiagnostic=this->mcAnimationDiagnostic;
- auto& mcAnimationBinding=this->mcAnimationBinding;
- auto& mcAnimationBindingDiagnostic=this->mcAnimationBindingDiagnostic;
+ auto& trackAnimations=this->trackAnimations;
+ auto& trackAnimationBinding=this->trackAnimationBinding;
+ auto& trackAnimationBindingDiagnostic=this->trackAnimationBindingDiagnostic;
  auto& mcOriginalWorld=this->mcOriginalWorld;
  auto& mcParticleSource=this->mcParticleSource;
  auto& mcExternalPayloadReservation=this->mcExternalPayloadReservation;
@@ -84,11 +80,15 @@ void McColdPrefix::run() const {
   }
   reserveMcEarly(sizeof(mc_track_fog50MC::Owner));
   reserveMcEarly(mc_trigger_authoring50MC::Owner::maximumAdditionalPayloadBytes());
-  reserveMcEarly(mc_animation_source50MC::Owner::maximumAdditionalPayloadBytes());
-  reserveMcEarly(mc_animation_runtime50MC::Owner::requiredPayloadBytes());
-  reserveMcEarly(mc_animation_binding50MC::Binding::requiredPayloadBytes());
   reserveMcEarly(mc_query50MC::Binding::requiredPayloadBytes());
   mcLightOwner=std::make_shared<original_gc_gameplay_lighting_candidate::Owner>();
+  // Track animations: the course TOB's own [Animations] through the common player
+  // (track_animation_binding50an.h loadForLane; absent = no runtime); the rows plan
+  // the lighting owner's one visual-zone lane before its prepare.
+  try{trackAnimations=track_animation_binding50AN::loadForLane(trackSession->archive,trackSession->world->code,
+      mcColdSources->world().zones.size(),*mcLightOwner,s.animationShared.libm,s.animationShared.motion);}
+  catch(const std::exception& e){require50DU(false,e.what());}
+  reserveMcEarly(track_animation_binding50AN::lanePayloadBytes(trackAnimations.get(),mcColdSources->world().portals.size()));
   original_gc_gameplay_lighting_candidate::Diagnostic lightDiagnostic;
   require50DU(mcLightOwner->prepareMcNative(mcColdSources,raceRacerCount,lightDiagnostic),"MC original28-zone/29-record lighting rejected");
   reserveMcEarly(mcLightOwner->mcRetainedPayloadBytes());
@@ -98,18 +98,11 @@ void McColdPrefix::run() const {
   mcTriggerGeometry=std::make_shared<mc_trigger_geometry50MC::Owner>();
   {const bool mcPrepared=(mcTriggerGeometry->prepare(mcTriggerAuthoring,error));require50DU(mcPrepared,error.c_str());}
   reserveMcEarly(sizeof(*mcTriggerGeometry));
-  mcAnimationSource=std::make_shared<mc_animation_source50MC::Owner>();mc_animation_source50MC::Diagnostic animationSourceDiagnostic;
-  {const bool mcPrepared=(mcAnimationSource->decode(mcColdSources,mc_animation_source50MC::Owner::maximumAdditionalPayloadBytes(),animationSourceDiagnostic));require50DU(mcPrepared,animationSourceDiagnostic.message.c_str());}
-  // Decode returned: only measured source/scene capacities remain alive.
-  const auto animationPeak=mc_animation_source50MC::Owner::maximumAdditionalPayloadBytes();
-  const auto animationRetained=mcAnimationSource->retainedPayloadBytes();
-  require50DU(animationRetained<=animationPeak&&mcExternalPayloadReservation>=animationPeak-animationRetained,"MC animation scratch release accounting");
-  mcExternalPayloadReservation-=animationPeak-animationRetained;
-  mcAnimationRuntime=std::make_shared<mc_animation_runtime50MC::Owner>();
-  {const bool mcPrepared=(mcAnimationRuntime->beginPrepare(mcAnimationSource,s.animationShared.motion,
-    mc_animation_runtime50MC::Owner::requiredPayloadBytes(),mcAnimationDiagnostic));require50DU(mcPrepared,mcAnimationDiagnostic.message.c_str());}
-  mcAnimationBinding=std::make_unique<mc_animation_binding50MC::Binding>();
-  {const bool mcPrepared=(mcAnimationBinding->beginVisual(mcAnimationRuntime,mcLightOwner,mcAnimationBindingDiagnostic));require50DU(mcPrepared,mcAnimationBindingDiagnostic.message.c_str());}
+  if(trackAnimations){
+   trackAnimationBinding=std::make_unique<track_animation_binding50AN::Binding>();
+   require50DU(trackAnimationBinding->beginVisual(trackAnimations,mcLightOwner,trackAnimationBindingDiagnostic),
+       trackAnimationBindingDiagnostic.message.empty()?"track animation visual prefix rejected":trackAnimationBindingDiagnostic.message.c_str());
+  }
   mcOriginalWorld=std::make_shared<mc_original_world50LM::Owner>();mc_original_world50LM::Diagnostic worldDiagnostic;
   {const bool mcPrepared=(mcOriginalWorld->load(mcColdSources,worldDiagnostic));require50DU(mcPrepared,worldDiagnostic.message.c_str());}
   const auto mountReservation=mcColdSources->canonicalMountReservationBytes();reserveMcEarly(mountReservation);
@@ -122,6 +115,12 @@ void McColdPrefix::run() const {
   reserveMcEarly(mc_particle_attachments50MC::Owner::maximumAdditionalPayloadBytes()+128u);
   mcParticleSource=std::make_shared<mc_particle_source50MC::Owner>();mc_particle_source50MC::Diagnostic particleSourceDiagnostic;
   {const bool mcPrepared=(mcParticleSource->decode(mcColdSources,mc_particle_source50MC::Owner::maximumAdditionalPayloadBytes(),particleSourceDiagnostic));require50DU(mcPrepared,particleSourceDiagnostic.message.c_str());}
+  // PORT STAND-IN (flagged): the reader gives 0 emitters for a TOB without
+  // [ParticleEmitters], but this route's per-frame particle service and
+  // readiness (continuation/loop/publication, MC-18, keyed on the course) still
+  // require the emitter owners; such a TOB is refused here until CR2 retires
+  // that route, instead of failing later without a reason.
+  require50DU(mcParticleSource->emitterCount()>0,"PORT STAND-IN: MC route requires an authored [ParticleEmitters] table (absent-emitter MC route not yet common)");
   // This decoder phase has returned and destroyed its actual temporary owners.
   mcExternalPayloadReservation-=mc_particle_source50MC::Owner::maximumAdditionalPayloadBytes()-mcParticleSource->retainedPayloadBytes();
   mcParticleAttachments=std::make_shared<mc_particle_attachments50MC::Owner>();mc_particle_attachments50MC::Diagnostic attachmentsDiagnostic;
@@ -138,10 +137,10 @@ void McColdPrefix::run() const {
   {const bool mcPrepared=(mcParticleRuntime->prepare(mcParticleSource,mcParticleAttachments,mcTrackParticles,originalMainApplication.state,nativeWaterGlobals,
     originalMainApplication.animationClock(),sessionIndex+1,mcRegistryQuota,mcRegistryQuota+mc_particle_runtime50MC::Owner::retainedPayloadBytes(),mcParticleRuntimeDiagnostic));require50DU(mcPrepared,mcParticleRuntimeDiagnostic.message.c_str());}
   mcTriggerActions=std::make_shared<mc_trigger_actions50MC::Owner>();reserveMcEarly(sizeof(*mcTriggerActions));
-  require50DU(mcTriggerActions->prepare(mcTriggerAuthoring,mcAnimationRuntime,mcTriggerGeometry),"MC real LostAI/Animation action destinations rejected");
+  require50DU(mcTriggerActions->prepare(mcTriggerAuthoring,trackAnimations,mcTriggerGeometry),"MC real LostAI/Animation action destinations rejected");
   mcCollisionWorld=std::make_shared<mc_collision_world50MC::Owner>();
   {const bool mcPrepared=(mcCollisionWorld->prepareGround(mcColdSources,{4,16,32,64},x.assets.phy,trackSession->gridRank,
-    mcExternalPayloadReservation,trackStorageLimits,error));require50DU(mcPrepared,error.c_str());}
+    mcExternalPayloadReservation,trackStorageLimits,track_animation_world50AN::Lane::collisionRowCount(trackAnimations.get()),error));require50DU(mcPrepared,error.c_str());}
   mcFogOwner=std::make_shared<mc_track_fog50MC::Owner>();{const bool mcPrepared=(mcFogOwner->prepare(mcColdSources,error));require50DU(mcPrepared,error.c_str());}
  }
 }

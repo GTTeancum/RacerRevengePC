@@ -8,14 +8,20 @@ inline std::size_t prepare(const mc_trigger_authoring50MC::Owner& source,
  mc_trigger_actions50MC::Owner& actions,std::vector<g::Type2StaticCandidate49X>& candidates,
  std::vector<track_runtime_storage50IG::Binding>& bindings,std::uint8_t tag,
  std::uint8_t flags31,std::uint8_t flagsF8){
- if(!actions.queryIdle()||actions.nativeGroup().ready||candidates.capacity()<111||bindings.capacity()<111||!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=89||candidates.size()!=bindings.size()||
-    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-mc_trigger_authoring50MC::count)
-  throw std::runtime_error("MC native trigger actual89 COL prefix/source owner extent");
+ // Live authored triggers only (capacity store); the COL prefix is whatever
+ // the ground placed (stock 89 is the ground's receipt, not checked here).
+ // Callers reserve the full join first so the resize below never relocates.
+ const auto live=source.liveCount();
+ if(!actions.queryIdle()||actions.nativeGroup().ready||!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=bindings.size()||
+    candidates.size()>track_runtime_storage50IG::hardTerrainOwners||
+    live>track_runtime_storage50IG::hardTerrainOwners-candidates.size()||
+    candidates.capacity()<candidates.size()+live||bindings.capacity()<bindings.size()+live)
+  throw std::runtime_error("MC native trigger COL prefix/source owner extent");
  // Cold append only. The aggregate owns all real memberships and must finish
  // this relocation before Storage admission or any Bank enrollment.
- const auto first=candidates.size();candidates.resize(first+mc_trigger_authoring50MC::count);bindings.resize(candidates.size());
+ const auto first=candidates.size();candidates.resize(first+live);bindings.resize(candidates.size());
  for(std::size_t i=0;i<first;++i)bindings[i].candidate=&candidates[i];
- for(std::size_t i=0;i<mc_trigger_authoring50MC::count;++i){const auto& sourceRow=source.source(i);const auto& authored=actions.geometryOwner()->shape(i);auto& target=candidates[first+i];
+ for(std::size_t i=0;i<live;++i){const auto& sourceRow=source.source(i);const auto& authored=actions.geometryOwner()->shape(i);auto& target=candidates[first+i];
   target.shapeType=authored.shapeType;target.nativeTriggersMC=&actions.nativeGroup();target.nativeTriggerIndex=i;
   target.nativeTriggerBox=authored.box;
   auto& c=target.candidate.collision;c.shapeType=authored.shapeType;

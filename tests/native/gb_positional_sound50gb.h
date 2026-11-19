@@ -4,6 +4,7 @@
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
 #include "../../src/game/original_ai_aural.h"
+#include "positional_sound_rows50sr.h"
 #include <algorithm>
 #include <array>
 #include <cfenv>
@@ -13,7 +14,7 @@
 
 namespace gb_positional_sound50GB {
 namespace a=rr::assets;namespace g=rr::game;namespace p=rr::platform;
-inline constexpr std::size_t descriptorCount=49,firstVoice=128,voiceCount=24;
+inline constexpr std::size_t descriptorCapacity=a::soulTreeSoundCapacity50SR,ambientCapacity=a::ambientSoundCapacity50SR,firstVoice=128,voiceCount=24;
 static_assert(firstVoice==material_audio50HI::gaExtraFirstVoice);
 static_assert(firstVoice+voiceCount==152);
 static_assert(firstVoice>126&&firstVoice+voiceCount<=material_audio50HI::gbExtraFirstVoice);
@@ -23,41 +24,42 @@ struct Descriptor {
  bool loop=false,oneShot=false,resetWhenInaudible=false;
 };
 struct AmbientDescriptor {std::string name;float cycleSeconds=0,chance=0;};
+// Stock values of this slot: receipts only (positional_sound_rows50sr.h). Stock
+// GB: 49 SoulTree rows over 4 PCM files, 4 ambient rows.
+inline constexpr positional_sound_rows50SR::Stock stock{"GB","tracks\\gb.aub",29684u,"2d42e759aef7b80193d60581b611c572b836de91145ee18f439d45f46e4f530f",49u,4u};
+inline constexpr std::size_t stockAmbient=4;
 struct State {bool played=false,randomAttempted=false;int slot=-1;};
 struct Receipt {bool complete=false;std::size_t eligible=0,started=0,stopped=0,controlled=0,deferred=0,randomDraws=0;};
-// Native fixed-position adapter for the exact original GB SoulTree family.
-// The49 source descriptors are distinct from24 GB-exclusive transport slots.
+// Native fixed-position adapter for the course AUB's SoulTree list (the common
+// reader's live rows; stock GB authors 49), distinct from the 24 GB-exclusive
+// transport slots. The ambient list (stock 4) is retained, not scheduled.
 // Native policy: retain active eligible sounds, then use the lowest free slot
 // in authored descriptor order; never steal an active sound. Deferred rows do
 // not draw RNG or change played/random latches. No source hardware parity claim.
 class Owner final {
  std::shared_ptr<const gb_cold_sources50LA::Owner> source_;
  a::AudioBank50HC bank_;
- std::array<Descriptor,descriptorCount> rows_{};
- std::array<AmbientDescriptor,4> ambient_{}; // Authenticated retained only, no invented scheduler.
- std::array<p::AudioClip50HD,descriptorCount> clips_{};
- std::array<State,descriptorCount> states_{};
+ std::array<Descriptor,descriptorCapacity> rows_{};
+ std::array<AmbientDescriptor,ambientCapacity> ambient_{}; // Retained only, no invented scheduler.
+ std::array<p::AudioClip50HD,descriptorCapacity> clips_{};
+ std::array<State,descriptorCapacity> states_{};
+ std::size_t count_=0,ambientCount_=0; // live rows from the common AUB reader
  std::array<int,voiceCount> assigned_{};
  p::LogicalAudioOwner logical_;
  p::AudioMixer50HD* mixer_=nullptr;p::RaceAudioGroups50IC* groups_=nullptr;
  std::thread::id thread_=std::this_thread::get_id();std::uint64_t epoch_=0;
- bool attempted_=false,ready_=false,blocked_=false,closed_=false;
- static const std::string* field(const a::ParameterBlock48F& b,const char* key){
-  const std::string* result=nullptr;for(const auto& f:b.fields)if(f.name==key){if(result)throw std::runtime_error("GB duplicate sound field");result=&f.value;}return result;
- }
- static float number(const a::ParameterBlock48F& b,const char* key,float fallback){
-  const auto* v=field(b,key);if(!v)return fallback;float n=0;
-  if(!a::parseTrackNumber50AD(v->data(),v->size(),n)||!std::isfinite(n))throw std::runtime_error("GB sound number rejected");return n;
- }
- static bool flag(const a::ParameterBlock48F& b,const char* key){
-  const auto* v=field(b,key);if(!v)return false;if(*v=="T"||*v=="t"||*v=="1")return true;
-  if(*v=="F"||*v=="f"||*v=="0")return false;throw std::runtime_error("GB sound flag rejected");
- }
+ bool attempted_=false,ready_=false,blocked_=false,closed_=false,authored_=false;
  bool current()const noexcept {
   if(thread_!=std::this_thread::get_id()||!source_||!source_->ready()||!mixer_||!groups_||
      !groups_->uses(*mixer_)||mixer_->groupEpoch50IC()!=epoch_)return false;
   for(std::size_t i=0;i<voiceCount;++i)if(groups_->binding(firstVoice+i)!=g::RaceAudioGroup50IC::World4D8)return false;
   return true;
+ }
+ // The course AUB read by name at its own size (shared 1 MiB member cap).
+ static bool readAub(const gb_cold_sources50LA::Owner& source,std::vector<std::uint8_t>& raw,a::DecodeError48C& de){
+  std::size_t bytes=0;
+  for(const auto& e:source.archive().entries())if(a::OriginalStandardArchiveProvider50LA::sameName(e.name,"tracks\\gb.aub"))bytes=e.bytes;
+  return bytes&&bytes<=1024u*1024u&&source.extractMember("tracks\\gb.aub",raw,de,bytes)&&raw.size()==bytes;
  }
  bool release(std::size_t row,Receipt& r)noexcept {
   auto& state=states_[row];if(state.slot<0)return true;
@@ -66,6 +68,24 @@ class Owner final {
   assigned_[slot]=-1;state.slot=-1;++r.stopped;return true;
  }
 public:
+ // Presence (common course rule): the positional / ambient owner exists
+ // exactly when the course AUB's [Sounds] authors NumSoulTreeSounds or
+ // NumAmbientSounds (absent field = 0). Stock GB: 49 + 4.
+ static bool authoredSounds(const gb_cold_sources50LA::Owner& source,std::size_t& soulTree,std::size_t& ambient,
+     std::string& error)noexcept {
+  soulTree=ambient=0;
+  try{
+   // ONE AUB reader for every course (0x279910 / 0x2793A0 / 0x2787B0).
+   std::vector<std::uint8_t> raw;a::DecodeError48C de;a::ParameterDocument48F doc;
+   if(!source.ready()){error="GB course AUB unavailable";return false;}
+   if(!readAub(source,raw,de))return true; // no AUB member: no sounds
+   if(!a::decodeParameters48F(raw,doc,de)){error="GB course AUB rejected";return false;}
+   auto read=std::make_unique<a::OriginalPositionalSounds50SR>();
+   if(!a::readOriginalPositionalSounds50SR(doc,"positional_GB_count",*read,error))return false;
+   soulTree=read->soulTree.live;ambient=read->ambient.live;return true;
+  }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
+   catch(...){return false;}
+ }
  Owner(){assigned_.fill(-1);}Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  ~Owner(){if(!closed_&&!close())std::terminate();}
  bool prepare(std::shared_ptr<const gb_cold_sources50LA::Owner> source,
@@ -82,48 +102,34 @@ public:
    for(std::size_t i=0;i<voiceCount;++i)d::need(!mixer.active(firstVoice+i)&&!mixer.hasVoiceGroupGain50IC(firstVoice+i)&&
       groups.binding(firstVoice+i)==g::RaceAudioGroup50IC::Unrepresented&&groups.canBind(firstVoice+i,g::RaceAudioGroup50IC::World4D8),
       "GB positional pool conflicts with actual owner");
+   // ONE AUB reader for every course (original 0x279910 / 0x2793A0 /
+   // 0x2787B0, positional_sound_rows50sr.h); the stock AUB identity, row and
+   // PCM counts are receipts. GB retains its ambient list itself.
    std::vector<std::uint8_t> raw;a::DecodeError48C de;
-   d::need(source->extractMember("tracks\\gb.aub",raw,de,29684)&&raw.size()==29684&&
-      d::sha256(raw)=="2d42e759aef7b80193d60581b611c572b836de91145ee18f439d45f46e4f530f","GB positional source identity rejected");
-   a::ParameterDocument48F doc;d::need(a::decodeParameters48F(raw,doc,de),"GB positional authoring rejected");
-   const a::ParameterBlock48F* sounds=nullptr;for(const auto& b:doc.blocks)if(b.name=="sounds"){d::need(!sounds,"GB duplicate Sounds section");sounds=&b;}
-   d::need(sounds&&number(*sounds,"numsoultreesounds",-1)==49&&number(*sounds,"numambientsounds",-1)==4,"GB exact positional/ambient source counts differ");
-   std::vector<a::AudioRequest50HC> requests;
-   for(std::size_t i=0;i<descriptorCount;++i){
-    const auto name="soultreesound"+std::to_string(i+1);const a::ParameterBlock48F* b=nullptr;
-    for(const auto& candidate:doc.blocks)if(candidate.name==name){d::need(!b,"GB duplicate positional section");b=&candidate;}
-    d::need(b&&!field(*b,"attachtoobject")&&!flag(*b,"force2d")&&!flag(*b,"stereo"),"GB fixed mono source role rejected");
-    auto& row=rows_[i];const auto* resource=field(*b,"soundresourcefile");const auto* position=field(*b,"position");
-    d::need(resource&&position,"GB positional resource/position missing");row.name=*resource;
-    for(auto& c:row.name)if(c=='\\')c='/';row.name+=".vag";
-    std::size_t begin=0;for(unsigned axis=0;axis<3;++axis){const auto end=position->find(',',begin);
-     d::need((axis<2)==(end!=std::string::npos),"GB position shape rejected");const auto last=end==std::string::npos?position->size():end;
-     d::need(a::parseTrackNumber50AD(position->data()+begin,last-begin,row.position[axis])&&std::isfinite(row.position[axis]),"GB position scalar rejected");begin=last+1;}
-    row.loop=flag(*b,"looping");row.oneShot=flag(*b,"oneshot");row.resetWhenInaudible=flag(*b,"resetwheninaudible");
-    row.nearDistance=number(*b,"mindistance",0);row.farDistance=number(*b,"maxdistance",0);
-    row.triggerDistance=number(*b,"oneshotdistance",20);row.chance=number(*b,"randomtriggerpercent",100);
-    d::need(row.nearDistance>=0&&row.nearDistance<row.farDistance&&row.triggerDistance>=0&&row.chance>=0&&row.chance<=100,"GB positional ranges rejected");
-    auto found=std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==row.name;});
-    if(found==requests.end())requests.push_back({row.name,row.loop,false,false});else d::need(found->loop==row.loop,"GB PCM delivery flags conflict");
-   }
-   d::need(requests.size()==4,"GB positional distinct PCM count differs");
-   constexpr std::array<const char*,4> ambientNames{{"sfx/race/rain.vag","sfx/race/thunder1.vag","sfx/race/thunder2.vag","sfx/race/thunder3.vag"}};
-   constexpr std::array<float,4> cycles{{0,20,18,23}},chances{{100,35,45,40}};
-   for(std::size_t i=0;i<ambient_.size();++i){
-    const auto name="ambientsound"+std::to_string(i+1);const a::ParameterBlock48F* b=nullptr;
-    for(const auto& candidate:doc.blocks)if(candidate.name==name){d::need(!b,"GB duplicate ambient section");b=&candidate;}
-    d::need(b&&b->fields.size()==3,"GB exact ambient shape differs");const auto* file=field(*b,"soundresourcefile");d::need(file,"GB ambient resource absent");
-    auto& row=ambient_[i];row.name=*file;for(auto& c:row.name)if(c=='\\')c='/';row.name+=".vag";
-    row.cycleSeconds=number(*b,"cycletime",-1);row.chance=number(*b,"randomtriggerpercent",-1);
-    d::need(row.name==ambientNames[i]&&row.cycleSeconds==cycles[i]&&row.chance==chances[i],"GB exact ambient fields differ");
-    requests.push_back({row.name,false,false,false});
-   }
-   d::need(requests.size()==8&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"GB positional/retained ambient PCM bank rejected");
-   for(const auto& clip:bank_.clips)d::need(gb_audio_originals50GB::authentic(clip),"GB positional/ambient PCM identity differs");
-   for(std::size_t i=0;i<descriptorCount;++i){const auto* clip=bank_.find(rows_[i].name);
-    d::need(clip&&gb_audio_originals50GB::authentic(*clip),"GB actual positional PCM unavailable");const auto& pcm=clip->pcm;
+   const bool aub=readAub(*source,raw,de);
+   std::vector<a::AudioRequest50HC> requests;a::OriginalSoundList50SR<a::ambientSoundCapacity50SR> ambient;
+   count_=positional_sound_rows50SR::project(aub?&raw:nullptr,stock,rows_,requests,&ambient);
+   course_archive_receipt50CI::countReceipt("positional_GB","ambient_sounds",ambient.live,stockAmbient);
+   d::need(ambient.live<=ambient_.size(),"GB ambient list exceeds the retained ambient store");
+   for(std::size_t i=0;i<ambient.live;++i){const auto& s=ambient.rows[i];auto& row=ambient_[i];
+    row.name=s.resource;for(auto& c:row.name)if(c=='\\')c='/';row.name+=".vag";
+    row.cycleSeconds=s.cycleTime;row.chance=s.randomTriggerPercent;
+    if(std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==row.name;})==requests.end())
+     requests.push_back({row.name,false,false,false});}
+   ambientCount_=ambient.live;
+   std::cerr<<"gb_native_audio soultree_rows="<<count_<<" ambient_rows="<<ambientCount_
+       <<" ambient_scheduling=unsupported native_transport_slots="<<voiceCount<<"\n";
+   // Absent soul-tree data = no positional transport (ambient rows are retained
+   // only; PORT STAND-IN: no ambient scheduler). The caller drops the owner.
+   if(!count_){source_=std::move(source);error.clear();return true;}
+   d::need(count_<=rows_.size()&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"GB positional/retained ambient PCM bank rejected");
+   std::size_t stockClips=0;for(const auto& clip:bank_.clips)stockClips+=gb_audio_originals50GB::authentic(clip);
+   std::cerr<<"positional_pcm site=positional_GB clips="<<bank_.clips.size()<<" stock="<<(stockClips==bank_.clips.size()?1:0)<<"\n";
+   for(std::size_t i=0;i<count_;++i){const auto* clip=bank_.find(rows_[i].name);
+    d::need(clip,"GB actual positional PCM unavailable");const auto& pcm=clip->pcm;
     clips_[i]={pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,pcm.hasEmbeddedLoop?pcm.loopStart:0,pcm.hasEmbeddedLoop?pcm.loopEnd:0};
     d::need(p::AudioMixer50HD::validClip(clips_[i]),"GB positional PCM invalid");}
+   authored_=true;
    source_=std::move(source);mixer_=&mixer;groups_=&groups;epoch_=mixer.groupEpoch50IC();
    d::need(logical_.bind(mixer,firstVoice,voiceCount)&&groups.bindRange(firstVoice,voiceCount,g::RaceAudioGroup50IC::World4D8),"GB actual positional transport bind rejected");
    // Each reusable transport is registered with actual PCM. No playback starts
@@ -136,9 +142,13 @@ public:
  // This owner's World4D8 transport, for the Results 26D070 typed stop claim only.
  p::LogicalAudioOwner& resultsWorldTransport26D070()noexcept{return logical_;}
  const gb_cold_sources50LA::Owner* sourceIdentity()const noexcept{return source_.get();}
- const std::array<Descriptor,descriptorCount>& descriptors()const noexcept{return rows_;}
+ // False when the AUB authors no soul-tree sound: no transport (caller drops it).
+ bool authored()const noexcept{return authored_;}
+ std::size_t descriptorCount()const noexcept{return count_;}
+ std::size_t ambientCount()const noexcept{return ambientCount_;}
+ const std::array<Descriptor,descriptorCapacity>& descriptors()const noexcept{return rows_;}
  const a::AudioBank50HC& bank()const noexcept{return bank_;}
- const std::array<AmbientDescriptor,4>& ambientDescriptors()const noexcept{return ambient_;}
+ const std::array<AmbientDescriptor,ambientCapacity>& ambientDescriptors()const noexcept{return ambient_;}
  static constexpr bool ambientSchedulingSupported()noexcept{return false;}
  Receipt service(const g::OriginalAiAudioListener* listeners,std::size_t count,
      g::CoupledNoiseContext49M& shared)noexcept;
@@ -170,10 +180,10 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
  // the actual World4D8 mixer layer also pauses the retained playback cursors.
  if(*paused){r.complete=true;return r;}
  auto fail=[&](){blocked_=true;return r;};
- std::array<float,descriptorCount> distances{};std::array<std::size_t,descriptorCount> nearest{};
- std::array<bool,descriptorCount> eligible{};
+ std::array<float,descriptorCapacity> distances{};std::array<std::size_t,descriptorCapacity> nearest{};
+ std::array<bool,descriptorCapacity> eligible{};
  // Actual291350 shape: evaluate every descriptor before starting/stopping any.
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];auto& state=states_[i];
   float best=std::numeric_limits<float>::max();
   for(std::size_t l=0;l<count;++l){const float d=distance(row.position[0],row.position[2],listeners[l].position[0],listeners[l].position[2]);
    if(!std::isfinite(d))return fail();if(d<best){best=d;nearest[i]=l;}}
@@ -182,14 +192,14 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   else if(row.oneShot){if(row.resetWhenInaudible)state.played=false;state.randomAttempted=false;}
  }
  // Release completed/ineligible actual transport before deterministic admission.
- for(std::size_t i=0;i<descriptorCount;++i){auto& state=states_[i];if(state.slot<0)continue;
+ for(std::size_t i=0;i<count_;++i){auto& state=states_[i];if(state.slot<0)continue;
   auto* sound=logical_.sound(static_cast<std::size_t>(state.slot));if(!sound)return fail();
   const bool playing=logical_.active(*sound);
   // Foreign playback is never treated as a free owned transport.
   if(mixer_->active(firstVoice+static_cast<std::size_t>(state.slot))&&!playing)return fail();
   if(!eligible[i]||!playing){if(!eligible[i]&&playing)state.randomAttempted=false;if(!release(i,r))return fail();}
  }
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];auto& state=states_[i];
   if(!eligible[i]||state.slot>=0||(row.oneShot&&state.played))continue;
   // A latched unsuccessful random attempt does not create a playback.
   if(row.chance<100&&state.randomAttempted)continue;
@@ -207,7 +217,7 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   if(started.status!=g::AiLogicalSoundStatus::complete||!started.sourceReturned)return fail();
   sound->volume38=100;assigned_[slot]=static_cast<int>(i);state.slot=static_cast<int>(slot);++r.started;
  }
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];const auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];const auto& state=states_[i];
   if(state.slot<0||!count)continue;
   auto* sound=logical_.sound(static_cast<std::size_t>(state.slot));if(!sound||!logical_.active(*sound))return fail();
   const auto& listener=listeners[nearest[i]];const float d=distances[i];

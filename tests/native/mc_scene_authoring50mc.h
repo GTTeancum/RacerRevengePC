@@ -15,9 +15,11 @@ using namespace ga_trigger_authoring::detail;
 inline bool boolean(std::string s){for(auto& c:s)if(c>='a'&&c<='z')c=char(c-'a'+'A');return ga_trigger_authoring::detail::boolean(s);}
 inline const a::ParameterDocument48F& document(const mc_cold_sources50LA::Owner& cold){
  need(cold.ready(),"MC actual cold owner required");const auto& p=cold.triggerParameters();
- need(!p.preservesDuplicateLabels&&p.blocks.size()==1268&&p.original_bytes==cold.originalTob()&&
-   p.original_bytes.size()==186642&&pod_materials50ed_fixture::detail::sha256(p.original_bytes)==
-   "7070700a884c24a98a0a89d4ea58e61e34f9a89e19af3ca239779c56c0dd14b0", "MC exact original TOB identity");return p;
+ need(!p.preservesDuplicateLabels&&p.original_bytes==cold.originalTob(),"MC held TOB document required");
+ // Stock identity (1268 blocks, 186642 bytes, SHA) is a receipt, not a gate.
+ course_archive_receipt50CI::memberReceipt("mc_scene_authoring","tracks\\mc.tob",p.original_bytes,0,0,186642,
+   "7070700a884c24a98a0a89d4ea58e61e34f9a89e19af3ca239779c56c0dd14b0");
+ course_archive_receipt50CI::countReceipt("mc_scene_authoring","tob_blocks",p.blocks.size(),1268);return p;
 }
 }
 template<class Source,std::size_t Count> class OwnerBase {

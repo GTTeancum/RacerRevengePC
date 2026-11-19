@@ -56,7 +56,7 @@ public:
         // retirement/animation exception or a nested current-arena callback.
         if(bank.retired_||!bank.sealed_||!bank.count_||bank.visiting_||bank.readBlocked_||
            bank.visitDepth_||bank.currentSlot_||bank.pendingToken_||bank.managerFieldsVisit_||
-           bank.mcAnimationBlocked_||bank.gbAnimationBlocked_||bank.mcQueryActive_||bank.gbQueryActive_||
+           bank.animationBlocked_||bank.mcQueryActive_||bank.gbQueryActive_||
            bank.mcTerminalBlocked_||bank.gbTerminalBlocked_||bank.retirementVisit_)
             throw std::runtime_error("manager fields require an idle sealed Bank");
         if(!bank_)bind(bank,state,lap);

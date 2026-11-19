@@ -9,23 +9,25 @@ struct NativeTriggerTerminalValidation50GB {
 inline NativeTriggerTerminalValidation50GB validateNativeTriggerTerminalGraph50GB(
  const NativeTriggerGroup50GB& group)noexcept {
  NativeTriggerTerminalValidation50GB r{};
+ const std::size_t triggers=group.triggers.size(),owners=triggers+group.colliders.size();
  const auto owner=[&](std::size_t i)->const TriggerColliderContacts50IN& {
-  return i<18?group.triggers[i].collider:group.colliders[i-18];
+  return i<triggers?group.triggers[i].collider:group.colliders[i-triggers];
  };
- for(std::size_t i=0;i<34;++i){r.owner=i;const auto& a=owner(i);
+ // Live trigger count plus the bound racer colliders (stock GB: 18 + 16 = 34).
+ for(std::size_t i=0;i<owners;++i){r.owner=i;const auto& a=owner(i);
   if(!a.identity||a.highWaterD0>triggerContactCapacity50IN)return r;
   for(std::size_t j=0;j<i;++j)if(owner(j).identity==a.identity)return r;
   for(std::size_t s=0;s<triggerContactCapacity50IN;++s){r.slot=s;const auto id=a.membersCC[s];if(!id)continue;
    if(s>=a.highWaterD0||id==a.identity)return r;
    for(std::size_t p=0;p<s;++p)if(a.membersCC[p]==id)return r;
    const TriggerColliderContacts50IN* peer=nullptr;
-   const std::size_t begin=i<18?18:0,end=i<18?34:18;
+   const std::size_t begin=i<triggers?triggers:0,end=i<triggers?owners:triggers;
    for(std::size_t p=begin;p<end;++p)if(owner(p).identity==id){if(peer)return r;peer=&owner(p);}
    if(!peer||peer->highWaterD0>triggerContactCapacity50IN)return r;
    std::size_t matches=0;for(std::size_t p=0;p<triggerContactCapacity50IN;++p)
     if(peer->membersCC[p]==a.identity){if(p>=peer->highWaterD0)return r;++matches;}
    if(matches!=1)return r;
-   if(i<18)++r.pairs;
+   if(i<triggers)++r.pairs;
   }
  }
  r.valid=true;r.owner=r.slot=0;return r;

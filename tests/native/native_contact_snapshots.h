@@ -25,7 +25,7 @@ class SnapshotAccess final {
         const auto& b=bank_;
         if(b.retired_||!b.sealed_||slot>=b.count_||b.visiting_||b.readBlocked_||b.visitDepth_||
            b.currentSlot_||b.pendingToken_||b.managerFieldsVisit_||b.retirementVisit_||
-           b.mcAnimationBlocked_||b.gbAnimationBlocked_||b.mcQueryActive_||b.gbQueryActive_||
+           b.animationBlocked_||b.mcQueryActive_||b.gbQueryActive_||
            b.mcTerminalBlocked_||b.gbTerminalBlocked_)
             throw std::runtime_error("contact snapshots require an idle sealed Bank");
     }

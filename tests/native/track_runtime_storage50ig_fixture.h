@@ -12,7 +12,6 @@
 #include "../../src/game/pod_live_query50iz.h"
 #include "../../src/game/original_racer_main_body_owner50la.h"
 #include "candidate_handles50cb.h"
-#include "tb_door_runtime50tb.h"
 #include "static_type2_producer49x.h"
 #include "collection_projection50cf.h"
 #include "vehicle_candidates50ca.h"
@@ -97,7 +96,6 @@ struct Binding {
     std::uint8_t materialA9=0;
     ZoneMethod50CL method=ZoneMethod50CL::First;
     bool trigger=false; // authenticated additive TOB Gate sphere, no SCB index
-    const tb_door_runtime50TB::Owner* tbDoor=nullptr; // exact staged root-bound COL0 authority
 };
 struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
@@ -1145,7 +1143,7 @@ private:
                                 state.collider.highWaterD0==0;
                         }
                     }
-                    need(!binding.animated&&!binding.tbDoor&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
+                    need(!binding.animated&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
                         binding.authoredZone&&binding.authoredZone<=n.zones&&binding.method==ZoneMethod50CL::First&&
                         ((!target.nativeTriggersTC&&!target.nativeTriggersMC&&!target.nativeTriggersTB&&!target.nativeTriggersGB&&(sphere||box))||tc||tb||mc||gb)&&c.shapeType==target.shapeType&&
                         !c.geometry.mesh&&!c.compound&&c.hasResponseCallbackE8&&c.filter.categoryA4==8u&&
@@ -1153,13 +1151,12 @@ private:
                         "original native sphere/box trigger binding is incomplete");
                 }else if(binding.animated){
                     need(binding.originalOwner==std::numeric_limits<std::size_t>::max()&&binding.authoredZone&&binding.authoredZone<=n.zones&&
-                        ((!binding.tbDoor&&binding.candidate->shapeType==1&&binding.candidate->compound&&c.shapeType==1&&c.compound==binding.candidate->compound)||
-                         (binding.tbDoor&&binding.method==ZoneMethod50CL::Second&&binding.materialA9==0&&
-                          binding.tbDoor->admitsColdCollisionCandidate(*binding.candidate,binding.authoredZone)))&&
+                        // Every track-animation row (common player, any course) is a compound.
+                        binding.candidate->shapeType==1&&binding.candidate->compound&&c.shapeType==1&&c.compound==binding.candidate->compound&&
                         c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
                         "original animated compound binding is incomplete");
                 }else{
-                need(!binding.tbDoor&&binding.originalOwner<ground.owners.size(),"invalid original SCB collider index");++staticCount;
+                need(binding.originalOwner<ground.owners.size(),"invalid original SCB collider index");++staticCount;
                 const auto& original=ground.owners[binding.originalOwner];
                 need(original.zone&&original.zone<=n.zones&&c.geometry.mesh==&original.mesh&&
                     !std::memcmp(c.geometry.worldMatrix.v,original.instance.world.v,sizeof original.instance.world.v)&&

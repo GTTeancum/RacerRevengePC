@@ -97,29 +97,30 @@ public:
  static constexpr std::size_t retainedPayloadBytes()noexcept{return sizeof(Owner);}
  // Source authoring/source payload is charged separately and retained once.
  // The peak includes the bounded extracted member and existing SHA scratch.
- static constexpr std::size_t maximumAdditionalPayloadBytes()noexcept{return sizeof(Owner)+4*4420u+65536u;}
+ static constexpr std::size_t maximumAdditionalPayloadBytes()noexcept{return sizeof(Owner)+4*16384u+65536u;} // 16 KiB PSG extraction cap per attachment
  bool prepare(std::shared_ptr<const source::Owner> authored,std::size_t availablePayloadBytes,Diagnostic& d)noexcept {
   d={};if(!thread()||attempted_){d.message="RC attachment requires one owner-thread attempt";return false;}attempted_=true;
   try{
    need(authored&&authored->ready()&&availablePayloadBytes>=maximumAdditionalPayloadBytes()&&std::fegetround()==FE_TONEAREST,
         "RC actual attachment source/budget/rounding unavailable");
    source_=std::move(authored);const auto& cold=*source_->sourceOwner();
-   std::array<a::PsgNode49O,7> original{};
-   for(std::size_t i=0;i<members.size();++i){d.attachment=i;const auto& pin=members[i];std::vector<std::uint8_t> bytes;
-    need(cold.extractMember(pin.name,bytes,d.decode,pin.bytes)&&bytes.size()==pin.bytes&&
-       pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha,"RC actual attachment PSG identity");
-    a::PsgHierarchyView49O hierarchy{};
-    need(a::readPsgHierarchy49O(bytes.data(),bytes.size(),hierarchy,d.geometry)&&hierarchy.nodeCount==1&&
-       a::readPsgNode49O(hierarchy,0,original[i])&&original[i].parent==-1&&std::strcmp(original[i].name,pin.root)==0,
-       "RC actual one-root hierarchy rejected");
-    for(unsigned k=0;k<16;++k)need(original[i].local[k]==(k%5==0?1.f:0.f),"RC source root matrix changed");
-   }
    for(std::size_t i=0;i<roots_.size();++i){d.attachment=i;const auto& attached=source_->attachment(i);
-    const auto& descriptor=source_->descriptor(attached.descriptor);const auto& pin=members.at(attached.descriptor);
+    const auto& descriptor=source_->descriptor(attached.descriptor);
     need(attached.worldInstance&&attached.worldIndex<cold.world().instances.size()&&
-      attached.worldInstance==&cold.world().instances[attached.worldIndex]&&descriptor.childObject=="NONE"&&
-      source::detail::same(attached.worldInstance->geometry_member,pin.name),"RC actual source model/root join changed");
-    auto& root=roots_[i];root.original=original[attached.descriptor];root.placement=attached.worldInstance;
+      attached.worldInstance==&cold.world().instances[attached.worldIndex]&&descriptor.childObject=="NONE","RC actual source model/root join changed");
+    // The placed model's own PSG, by name; the stock pins (members) are receipts.
+    const auto& name=attached.worldInstance->geometry_member;const Member* pin=nullptr;
+    for(const auto& m:members)if(source::detail::same(name,m.name))pin=&m;
+    std::vector<std::uint8_t> bytes;need(cold.extractMember(name,bytes,d.decode,16384)&&!bytes.empty(),"RC attachment PSG member missing");
+    course_archive_receipt50CI::memberReceipt("particles_RC",name,bytes,0,0,pin?pin->bytes:0,pin?pin->sha:nullptr);
+    a::PsgNode49O original{};a::PsgHierarchyView49O hierarchy{};
+    // PORT STAND-IN (flagged): the native attachment projection implements a
+    // one-root PSG with an identity local matrix (every stock RC SoulTree).
+    need(a::readPsgHierarchy49O(bytes.data(),bytes.size(),hierarchy,d.geometry)&&hierarchy.nodeCount==1&&
+       a::readPsgNode49O(hierarchy,0,original)&&original.parent==-1&&(!pin||std::strcmp(original.name,pin->root)==0),
+       "RC actual one-root hierarchy rejected");
+    for(unsigned k=0;k<16;++k)need(original.local[k]==(k%5==0?1.f:0.f),"RC source root matrix changed");
+    auto& root=roots_[i];root.original=original;root.placement=attached.worldInstance;
     std::memcpy(root.node.localC0.v,root.original.local,sizeof root.original.local);
     std::memcpy(root.node.world100.v,root.original.local,sizeof root.original.local);
     root.node.parent180=root.node.firstChild184=root.node.nextSibling188=g::SceneNodeIndex49P::none;

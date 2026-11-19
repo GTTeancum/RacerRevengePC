@@ -5,14 +5,14 @@
   if(!isGbTrack)return true;
   if(gbQueryBinding)return false; // Its actual Bank must have been closed first.
   if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return false;
-  if(gbAnimationBinding&&gbAnimationBinding->needsClose()&&!gbAnimationBinding->close(gbAnimationBindingDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(gbCollisionWorld){
    if(!gbCollisionWorld->beginRetirement()&&gbCollisionWorld->phase()!=gb_collision_world50GB::Phase::Closed)return false;
    gbWorldBorrow.reset();
    auto retired=gbCollisionWorld->retirementBorrow();
    if(retired){auto* storage=retired.registrationStorage();if(!storage||storage->queue.count)return false;
     if(!storage->detachAllRows())return false; //every racer's query rows in the one world
-    for(std::size_t i=0;i<18;++i)if(auto* member=retired.triggerMembership(i)){
+    for(std::size_t i=0;i<retired.triggerCount();++i)if(auto* member=retired.triggerMembership(i)){
      const auto r=removeLiveZoneMembership50EN(storage->lifecycle,storage->world,member->state,storage->membershipWork);
      if(r.status!=LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;}
    }

@@ -96,18 +96,21 @@ public:
         using runtime_startup50fl::require;
         require(cam.empty()&&tob.empty()&&!gbSource_&&!rcSource_&&!tbSource_,
             "GB camera authoring requires fresh storage");
+        // The GB slot's session row and its retained cold source (which
+        // admitted the archive actually loaded; stock identity is a receipt
+        // there). No archive pin here.
         require(track.world&&track_session_assets50IG::codeEquals(track.world->code,"GB")&&
-            track.archiveBytes==4088586u&&track.archiveSha256&&std::string(track.archiveSha256)==
-                "e92af24305431dc5a96cebb5ebcf89159adb6d371045b2c5424dacd1f74b7d99"&&
             source&&source->ready(),
             "GB camera requires the authenticated retained GB source");
         require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
             pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
         const auto& sourceTob=source->originalTob();
-        require(sourceTob.size()==20617u&&pod_materials50ed_fixture::detail::sha256(sourceTob)==
-            "96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1",
-            "GB camera retained TOB identity rejected");
+        // Stock TOB identity is a receipt (course_archive_receipt50ci.h).
+        require(!sourceTob.empty(),"GB camera retained TOB missing");
+        if(!(sourceTob.size()==20617u&&pod_materials50ed_fixture::detail::sha256(sourceTob)==
+            "96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1"))
+            std::cerr<<"course_member_identity site=gb_camera member=tracks\\gb.tob bytes="<<sourceTob.size()<<" stock=0\n";
         auto selectedCam=runtime_startup50fl::readBytes(
             std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
         require(!selectedCam.empty(),"original camera selected CAM unavailable");

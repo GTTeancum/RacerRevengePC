@@ -18,6 +18,7 @@ bool Owner::load(std::shared_ptr<const gb_cold_sources50LA::Owner> sourceOwner,D
             for(std::size_t i=0;i<archive.entries().size();++i)
                 shared::need(next->entries.emplace(detail::key(archive.entries()[i].name),i).second,"Ambiguous original GB member");
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
+            std::map<std::string,const detail::SourceImage*> texturePins;
             std::vector<Bytes> images;
             std::vector<a::MaterialTextureSlotInput50EA> slots;
             constexpr std::uint64_t textureBase=assetIdentity<<48;
@@ -50,13 +51,14 @@ bool Owner::load(std::shared_ptr<const gb_cold_sources50LA::Owner> sourceOwner,D
                         texture=next->entry("textures\\"+stem+extension);if(texture)break;
                     }
                     shared::need(texture,"Original GB required texture absent: "+map.name);
-                    const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
+                    const auto textureKey=detail::key(texture->name);
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
-                        "Original GB material/ATM initial frame differs");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
+                        // Stock pin only when these are the stock bytes (receipt otherwise), as MA/SA.
+                        const auto* pin=detail::matchedSourceImage(textureKey,bytes,shared::sha256(bytes),false);
+                        texturePins.emplace(textureKey,pin);
                         std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
                         auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
                         shared::need(decodedAnimated==animated,"Original GB texture animation source classification");
@@ -74,6 +76,12 @@ bool Owner::load(std::shared_ptr<const gb_cold_sources50LA::Owner> sourceOwner,D
                         next->independentlyPinnedImages.push_back(independent?1:0);
                         if(independent)++d.independentlyPinnedImages;else ++d.runtimeIdentityImages;
                         found=textureIndices.emplace(textureKey,index).first;
+                    }
+                    {
+                        const auto pinned=texturePins.find(textureKey);
+                        const auto* pin=pinned==texturePins.end()?nullptr:pinned->second;
+                        if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
+                            "Original GB material/ATM initial frame differs");
                     }
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
                     shared::need(index<wma::maxWorldSelections,"Original GB authored pass count bound");

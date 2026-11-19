@@ -45,7 +45,11 @@ public:
   try {
    if(!source||!source->ready()||!source->coldSource()||!groups.uses(mixer)){
     error="TC ordinary Sound actual source/mixer/group unavailable";return false;}
-   const auto& trigger=source->source(tc_trigger_authoring50TC::gate);
+   // The trigger is found by data (the first one authoring a Sound); the stock
+   // descriptor checks below remain this stock-shaped owner's identity (TC-9).
+   const auto gate=source->firstTriggerWith(tc_trigger_authoring50TC::Action::Sound);
+   if(gate>=source->liveCount()){error="TC ordinary Sound owner requires an authored Sound trigger action";return false;}
+   const auto& trigger=source->source(gate);
    if(trigger.actionCount!=3||!trigger.oneTimeOnly){error="TC ordinary Sound source order changed";return false;}
    for(std::size_t i=0;i<2;++i){const auto& action=trigger.actions[i+1];
     const std::string expected=i?"sfx\\race\\latichit":"sfx\\race\\beambrk2";
@@ -77,7 +81,8 @@ public:
  }
  bool playEntering(const tc_trigger_authoring50TC::Owner& source,std::size_t actionIndex,
    const tc_trigger_authoring50TC::ActionSource& descriptor,std::string& error){
-  if(!readyFor(source,actionIndex)||&descriptor!=&source_->source(tc_trigger_authoring50TC::gate).actions[actionIndex]){
+  const auto gate=source_?source_->firstTriggerWith(tc_trigger_authoring50TC::Action::Sound):0;
+  if(!readyFor(source,actionIndex)||gate>=source_->liveCount()||&descriptor!=&source_->source(gate).actions[actionIndex]){
    error="TC ordinary Sound reached action/source ownership rejected";return false;}
   // Source constructor gain100, pitch4096, centered global delivery. Enter
   // calls ordinary start flags0; source one-time trigger prevents replay.

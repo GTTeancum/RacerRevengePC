@@ -13,12 +13,7 @@
  if(isMcTrack)mcNavigationOwner=std::make_shared<mc_navigation50MC::Owner>();
  auto& mcNavigation=mcNavigationOwner?*mcNavigationOwner:emptyMcNavigation;
  mc_navigation50MC::Diagnostic mcNavigationDiagnostic;
- std::shared_ptr<mc_animation_source50MC::Owner> mcAnimationSource;
- std::shared_ptr<mc_animation_runtime50MC::Owner> mcAnimationRuntime;
- std::unique_ptr<mc_animation_binding50MC::Binding> mcAnimationBinding;
  std::unique_ptr<mc_query50MC::Binding> mcQueryBinding;
- mc_animation_runtime50MC::Diagnostic mcAnimationDiagnostic;
- mc_animation_binding50MC::Diagnostic mcAnimationBindingDiagnostic;
  std::shared_ptr<mc_track_fog50MC::Owner> mcFogOwner;
  std::shared_ptr<mc_particle_source50MC::Owner> mcParticleSource;
  std::shared_ptr<mc_particle_attachments50MC::Owner> mcParticleAttachments;
@@ -55,11 +50,9 @@
   .mcNavigationDiagnostic=mcNavigationDiagnostic,
   .mcTriggerAuthoring=mcTriggerAuthoring,
   .mcTriggerGeometry=mcTriggerGeometry,
-  .mcAnimationSource=mcAnimationSource,
-  .mcAnimationRuntime=mcAnimationRuntime,
-  .mcAnimationDiagnostic=mcAnimationDiagnostic,
-  .mcAnimationBinding=mcAnimationBinding,
-  .mcAnimationBindingDiagnostic=mcAnimationBindingDiagnostic,
+  .trackAnimations=trackAnimations,
+  .trackAnimationBinding=trackAnimationBinding,
+  .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
   .mcOriginalWorld=mcOriginalWorld,
   .mcParticleSource=mcParticleSource,
   .mcExternalPayloadReservation=mcExternalPayloadReservation,

@@ -1,0 +1,156 @@
+﻿track_animations course=TA table=2 rows=2 vertices=1518 indices=2922 spans=11 motions=2 legacy_mot=2
+track_animation_row course=TA row=1 mcf=xsailbarge created=1 zone=6 collision=1 parts=1 loop=0 motion=xsailbarge looping=0 duration=8 start=trigger3 vertices=1228 loop_sounds=1
+track_animation_loop_sound course=TA row=1 sound=SFX\Race\sailbarg attach=xsailbarge attached=0 PORT STAND-IN: no common positional loop-sound owner yet
+track_animation_row course=TA row=2 mcf=x_sab created=1 zone=6 collision=1 parts=1 loop=0 motion=x_sab looping=0 duration=2.66667 start=trigger4 vertices=290 loop_sounds=1
+track_animation_loop_sound course=TA row=2 sound=SFX\Race\skiffbrg attach=x_sab attached=0 PORT STAND-IN: no common positional loop-sound owner yet
+TA surfaces=11 with_source_vertex_colours=0
+TA table compare OK
+track_animations course=TB table=1 rows=1 vertices=314 indices=510 spans=1 motions=1 legacy_mot=1
+track_animation_row course=TB row=1 mcf=tb_doorframe created=1 zone=4 collision=1 parts=1 loop=0 motion=tb_doorframe looping=0 duration=0.266667 start=trigger16 vertices=314 loop_sounds=0
+TB surfaces=1 with_source_vertex_colours=0
+TB table compare OK
+track_animations course=TC table=1 rows=1 vertices=490 indices=912 spans=1 motions=1 legacy_mot=0
+track_animation_row course=TC row=1 mcf=tc_gatepost created=1 zone=8 collision=0 parts=0 loop=0 motion=tc_gatepost looping=0 duration=1.1 start=trigger11 vertices=490 loop_sounds=0
+TC surfaces=1 with_source_vertex_colours=1
+TC table compare OK
+track_animations course=SA table=10 rows=10 vertices=5623 indices=8805 spans=21 motions=10 legacy_mot=0
+track_animation_row course=SA row=1 mcf=robotred01 created=1 zone=7 collision=0 parts=0 loop=1 motion=robotred01 looping=1 duration=15 start=race_start vertices=1927 loop_sounds=0
+track_animation_row course=SA row=2 mcf=slide02 created=1 zone=6 collision=0 parts=0 loop=1 motion=slide02 looping=1 duration=15 start=race_start vertices=4 loop_sounds=0
+track_animation_row course=SA row=3 mcf=conrobo01 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobo01 looping=1 duration=8.5 start=race_start vertices=252 loop_sounds=0
+track_animation_row course=SA row=4 mcf=conrobo06 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobo06 looping=1 duration=8.5 start=race_start vertices=204 loop_sounds=0
+track_animation_row course=SA row=5 mcf=conrobobox01 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobobox01 looping=1 duration=8.5 start=race_start vertices=206 loop_sounds=0
+track_animation_row course=SA row=6 mcf=conrobobox02 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobobox02 looping=1 duration=8.5 start=race_start vertices=206 loop_sounds=0
+track_animation_row course=SA row=7 mcf=conrobobox03 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobobox03 looping=1 duration=8.5 start=race_start vertices=206 loop_sounds=0
+track_animation_row course=SA row=8 mcf=conrobobox04 created=1 zone=4 collision=0 parts=0 loop=1 motion=conrobobox04 looping=1 duration=8.5 start=race_start vertices=206 loop_sounds=0
+track_animation_row course=SA row=9 mcf=lazerarm01 created=1 zone=4 collision=0 parts=0 loop=1 motion=lazerarm01 looping=1 duration=5.33333 start=race_start vertices=1206 loop_sounds=0
+track_animation_row course=SA row=10 mcf=lazerarm08 created=1 zone=4 collision=0 parts=0 loop=1 motion=lazerarm08 looping=1 duration=5.33333 start=race_start vertices=1206 loop_sounds=0
+SA surfaces=21 with_source_vertex_colours=0
+SA table compare OK
+SC table=0 -> no owner (absent) OK
+MA table=0 -> no owner (absent) OK
+MB table=0 -> no owner (absent) OK
+track_animations course=MC table=14 rows=14 vertices=5806 indices=13182 spans=14 motions=14 legacy_mot=0
+track_animation_row course=MC row=1 mcf=zbreak1floor created=1 zone=7 collision=1 parts=2 loop=0 motion=zbreak1 looping=0 duration=2.7 start=trigger21 vertices=203 loop_sounds=0
+track_animation_row course=MC row=2 mcf=ray15 created=1 zone=20 collision=0 parts=0 loop=1 motion=ray15 looping=1 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=3 mcf=ray2 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray2 looping=1 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=4 mcf=ray3 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray3 looping=1 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=5 mcf=ray4 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray4 looping=1 duration=8.33333 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=6 mcf=ray5 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray5 looping=1 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=7 mcf=ray6 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray6 looping=0 duration=8.33333 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=8 mcf=ray7 created=1 zone=20 collision=0 parts=0 loop=1 motion=ray7 looping=0 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=9 mcf=ray8 created=1 zone=12 collision=0 parts=0 loop=1 motion=ray8 looping=0 duration=10.7143 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=10 mcf=ray10 created=1 zone=23 collision=0 parts=0 loop=1 motion=ray10 looping=0 duration=7.14286 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=11 mcf=ray11 created=1 zone=23 collision=0 parts=0 loop=1 motion=ray11 looping=0 duration=7.14286 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=12 mcf=ray12 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray12 looping=0 duration=10 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=13 mcf=ray13 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray13 looping=1 duration=8.33333 start=race_start vertices=431 loop_sounds=0
+track_animation_row course=MC row=14 mcf=ray14 created=1 zone=7 collision=0 parts=0 loop=1 motion=ray14 looping=1 duration=12.5 start=race_start vertices=431 loop_sounds=0
+MC surfaces=14 with_source_vertex_colours=0
+MC table compare OK
+track_animations course=GA table=2 rows=2 vertices=605 indices=1095 spans=6 motions=2 legacy_mot=1
+track_animation_row course=GA row=1 mcf=Defensegate created=1 zone=11 collision=1 parts=3 loop=0 motion=Defensegate looping=0 duration=1 start=trigger1 vertices=300 loop_sounds=0
+track_animation_row course=GA row=2 mcf=opening created=1 zone=7 collision=1 parts=2 loop=0 motion=opening looping=0 duration=2.8 start=trigger10 vertices=305 loop_sounds=0
+GA surfaces=6 with_source_vertex_colours=0
+GA table compare OK
+track_animations course=GB table=4 rows=4 vertices=1795 indices=3393 spans=10 motions=4 legacy_mot=3
+track_animation_row course=GB row=1 mcf=Defensegate created=1 zone=2 collision=1 parts=3 loop=0 motion=Defensegate looping=0 duration=1 start=trigger16 vertices=300 loop_sounds=0
+track_animation_row course=GB row=2 mcf=opening created=1 zone=2 collision=1 parts=2 loop=0 motion=opening looping=0 duration=2.8 start=never vertices=305 loop_sounds=0
+track_animation_row course=GB row=3 mcf=Defensegate2 created=1 zone=3 collision=1 parts=3 loop=0 motion=Defensegate2 looping=0 duration=1 start=trigger17 vertices=300 loop_sounds=0
+track_animation_row course=GB row=4 mcf=windmill created=1 zone=13 collision=1 parts=2 loop=1 motion=windmill looping=1 duration=15 start=race_start vertices=890 loop_sounds=0
+GB surfaces=10 with_source_vertex_colours=0
+GB table compare OK
+track_animations course=GC table=2 rows=2 vertices=1195 indices=2337 spans=6 motions=2 legacy_mot=1
+track_animation_row course=GC row=1 mcf=opening created=1 zone=11 collision=1 parts=2 loop=0 motion=opening looping=0 duration=2.8 start=trigger9 vertices=305 loop_sounds=0
+track_animation_row course=GC row=2 mcf=windmill created=1 zone=2 collision=1 parts=2 loop=1 motion=windmill looping=1 duration=15 start=race_start vertices=890 loop_sounds=0
+GC surfaces=6 with_source_vertex_colours=0
+GC table compare OK
+RA table=0 -> no owner (absent) OK
+RC table=0 -> no owner (absent) OK
+cmd : course_archive_identity site=tb_cold_sources code=TB bytes=3749557 stock=1
+At line:1 char:1498
++ ...  $_.Line }; cmd /c "work\scratch\145g\check\pose_check.exe ""C:\Games ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (course_archive_...3749557 stock=1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+TB pose compare at step 1 (0.016 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 30 (0.48 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 61 (0.976 s): max |dworld| = 0 old stopped=1 new stopped=1
+track_animation_started course=TB row=1 mcf=tb_doorframe tick=62 by=trigger16
+TB pose compare at step 62 (0.992 s): max |dworld| = 0 old stopped=0 new stopped=0
+TB pose compare at step 63 (1.008 s): max |dworld| = 0 old stopped=0 new stopped=0
+TB pose compare at step 80 (1.28 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 100 (1.6 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 150 (2.4 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 200 (3.2 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 250 (4 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 300 (4.8 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB pose compare at step 400 (6.4 s): max |dworld| = 0 old stopped=1 new stopped=1
+TB shared RNG identical after 400 ticks (3760766167)
+TB node worlds identical to the old owner at every compared time
+TB visual spheres identical to the old leaf
+course_archive_identity site=tc_cold_sources code=TC bytes=3607868 stock=1
+TC pose compare at step 1 (0.016 s): max |dworld| = 0
+TC pose compare at step 30 (0.48 s): max |dworld| = 0
+TC pose compare at step 61 (0.976 s): max |dworld| = 0
+track_animation_started course=TC row=1 mcf=tc_gatepost tick=62 by=trigger11
+TC pose compare at step 62 (0.992 s): max |dworld| = 0
+TC pose compare at step 63 (1.008 s): max |dworld| = 0
+TC pose compare at step 80 (1.28 s): max |dworld| = 0
+TC pose compare at step 100 (1.6 s): max |dworld| = 0
+TC pose compare at step 150 (2.4 s): max |dworld| = 0
+TC pose compare at step 200 (3.2 s): max |dworld| = 0
+TC pose compare at step 250 (4 s): max |dworld| = 0
+TC pose compare at step 300 (4.8 s): max |dworld| = 0
+TC pose compare at step 400 (6.4 s): max |dworld| = 0
+TC shared RNG identical after 400 ticks (3760766167)
+TC node worlds identical to the old owner at every compared time
+course_archive_identity site=gb_cold_sources code=GB bytes=4088586 stock=1
+track_animation_started course=GB row=4 mcf=windmill tick=1 by=race_start
+GB pose compare at step 1 (0.016 s): max |dworld| = 0
+GB pose compare at step 30 (0.48 s): max |dworld| = 0
+GB pose compare at step 61 (0.976 s): max |dworld| = 0
+track_animation_started course=GB row=1 mcf=Defensegate tick=62 by=trigger16
+track_animation_started course=GB row=3 mcf=Defensegate2 tick=62 by=trigger17
+GB pose compare at step 62 (0.992 s): max |dworld| = 0
+GB pose compare at step 63 (1.008 s): max |dworld| = 0
+GB pose compare at step 80 (1.28 s): max |dworld| = 0
+GB pose compare at step 100 (1.6 s): max |dworld| = 0
+GB pose compare at step 150 (2.4 s): max |dworld| = 0
+GB pose compare at step 200 (3.2 s): max |dworld| = 0
+GB pose compare at step 250 (4 s): max |dworld| = 0
+GB pose compare at step 300 (4.8 s): max |dworld| = 0
+GB pose compare at step 400 (6.4 s): max |dworld| = 0
+GB shared RNG identical after 400 ticks (3760766167)
+GB node worlds identical to the old owner at every compared time
+GB visual spheres identical to the old leaf
+course_archive_identity site=mc_cold_sources code=MC bytes=3822171 stock=1
+track_animation_started course=MC row=2 mcf=ray15 tick=1 by=race_start
+track_animation_started course=MC row=3 mcf=ray2 tick=1 by=race_start
+track_animation_started course=MC row=4 mcf=ray3 tick=1 by=race_start
+track_animation_started course=MC row=5 mcf=ray4 tick=1 by=race_start
+track_animation_started course=MC row=6 mcf=ray5 tick=1 by=race_start
+track_animation_started course=MC row=7 mcf=ray6 tick=1 by=race_start
+track_animation_started course=MC row=8 mcf=ray7 tick=1 by=race_start
+track_animation_started course=MC row=9 mcf=ray8 tick=1 by=race_start
+track_animation_started course=MC row=10 mcf=ray10 tick=1 by=race_start
+track_animation_started course=MC row=11 mcf=ray11 tick=1 by=race_start
+track_animation_started course=MC row=12 mcf=ray12 tick=1 by=race_start
+track_animation_started course=MC row=13 mcf=ray13 tick=1 by=race_start
+track_animation_started course=MC row=14 mcf=ray14 tick=1 by=race_start
+MC pose compare at step 1 (0.016 s): max |dworld| = 0
+MC pose compare at step 30 (0.48 s): max |dworld| = 0
+MC pose compare at step 61 (0.976 s): max |dworld| = 0
+track_animation_started course=MC row=1 mcf=zbreak1floor tick=62 by=trigger21
+MC pose compare at step 62 (0.992 s): max |dworld| = 0
+MC pose compare at step 63 (1.008 s): max |dworld| = 0
+MC pose compare at step 80 (1.28 s): max |dworld| = 0
+MC pose compare at step 100 (1.6 s): max |dworld| = 0
+MC pose compare at step 150 (2.4 s): max |dworld| = 0
+MC pose compare at step 200 (3.2 s): max |dworld| = 0
+MC pose compare at step 250 (4 s): max |dworld| = 0
+MC pose compare at step 300 (4.8 s): max |dworld| = 0
+MC pose compare at step 400 (6.4 s): max |dworld| = 0
+MC shared RNG identical after 400 ticks (3760766167)
+MC node worlds identical to the old owner at every compared time
+MC visual spheres identical to the old leaf
+failures=0

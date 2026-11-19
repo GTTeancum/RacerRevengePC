@@ -74,6 +74,8 @@ public:
   if(!ready_||i>=live_)throw std::runtime_error("SC trigger source not ready");return sources_.at(i);
  }
  const sc_cold_sources50LA::Owner* coldSource()const noexcept{return ready_?cold_.get():nullptr;}
+ // N64 hazard rows of the same TOB (PORT EXTENSION, NOT ORIGINAL; empty on stock).
+ const std::vector<rr::game::N64HazardRow50NH>& n64Rows()const noexcept{return authored_.n64Rows();}
  const std::vector<std::uint8_t>& originalTob()const{
   if(!ready_)throw std::runtime_error("SC trigger source not ready");return cold_->sourcesDecoded()->memberBytes[3];
  }

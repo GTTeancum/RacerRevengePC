@@ -1,5 +1,6 @@
 #pragma once
-#include "mc_animation_binding50mc.h"
+#include "track_animation_binding50an.h"
+#include "mc_collision_world50mc.h"
 #include "../../src/game/native_trigger_retirement50mc.h"
 #include <functional>
 namespace mc_query50MC {
@@ -31,7 +32,7 @@ class Binding final {
   return bank_&&!bank_->retired_&&bank_->sealed_&&bank_->count_>0&&bank_->count_<=8&&
    !bank_->visiting_&&!bank_->readBlocked_&&!bank_->visitDepth_&&!bank_->pendingToken_&&
    !bank_->sourceIssuer_&&!bank_->retirementVisit_&&!bank_->nativeFifoPins_&&
-   !bank_->mcAnimationVisit_&&!bank_->mcQueryActive_&&!bank_->gbAnimationVisit_&&!bank_->gbQueryActive_&&!bank_->gbQueryIssuer_;
+   !bank_->animationVisit_&&!bank_->mcQueryActive_&&!bank_->gbQueryActive_&&!bank_->gbQueryIssuer_;
  }
  bool contains(const void* address,std::size_t bytes)const noexcept {
   if(!bank_||!address||!bytes)return false;const auto first=reinterpret_cast<std::uintptr_t>(address);
@@ -47,12 +48,14 @@ class Binding final {
    if(first<base+span.bytes&&base<first+bytes)return false;}return true;
  }
  bool backing()const noexcept {
-  const auto* a=actions();if(!a||!bank_||bank_->mcQueryIssuer_!=this||bank_->mcAnimationBacking_.get()!=world_.get()||
+  const auto* a=actions();if(!a||!bank_||bank_->mcQueryIssuer_!=this||(bank_->animationBacking_&&bank_->animationBacking_.get()!=static_cast<const ::track_animation_world50AN::World*>(world_.get()))||
     a->queryBinding_!=this||a->group_.chance.raw!=chance_.raw||a->group_.chance.shared!=chance_.shared||a->group_.chance.clock!=chance_.clock||
     !disjoint(chance_.raw,sizeof(*chance_.raw))||!disjoint(chance_.shared,sizeof(*chance_.shared))||!disjoint(chance_.clock,sizeof(*chance_.clock))||!contains(main_,sizeof *main_)||!contains(secondary_,sizeof *secondary_)||
     !contains(node_,sizeof *node_)||!disjoint(a,sizeof *a)||!disjoint(this,sizeof *this)||
-    !world_->storage_||!world_->storage_->get()||world_->candidates_.size()!=111)return false;
-  for(std::size_t i=0;i<21;++i){const auto& c=world_->candidates_[89+i];
+    !world_->storage_||!world_->storage_->get()||world_->candidates_.size()!=world_->totalCandidates()||
+    a->group_.triggerCount!=world_->triggerCount_)return false;
+  // Live trigger candidates follow the ground prefix (capacity-sized trigger store).
+  for(std::size_t i=0;i<a->group_.triggerCount;++i){const auto& c=world_->candidates_[mc_collision_world50MC::sourceCandidates+i];
    if(c.nativeTriggersMC!=&a->group_||c.nativeTriggerIndex!=i||
      c.candidate.collision.filter.identity!=a->group_.triggers[i].collider.identity||
      a->group_.triggers[i].collider.identity!=mc_trigger_actions50MC::firstTriggerIdentity+i)return false;}
@@ -63,10 +66,10 @@ class Binding final {
   if(c.phase==P::Idle)return !c.group&&!c.hooks&&!c.querySerial&&!c.triggerCollider&&!c.otherCollider&&
    !c.nextAction&&!c.actionCount&&!c.dispatchCounted;
   if(!everIssued_||!c.querySerial||c.querySerial>serial_||c.querySerial!=a.group_.querySerial||
-    c.group!=&a.group_||c.hooks!=&a.group_.actions||c.triggerIndex>=21||c.colliderIndex>=a.group_.colliders.size()||
+    c.group!=&a.group_||c.hooks!=&a.group_.actions||c.triggerIndex>=a.group_.triggerCount||c.colliderIndex>=a.group_.colliders.size()||
     c.triggerCollider!=a.group_.triggers[c.triggerIndex].collider.identity||
     c.otherCollider!=a.group_.colliders[c.colliderIndex].identity||
-    c.actionCount!=a.source_->source(c.triggerIndex).actionCount||c.candidateOrdinal>=111)return false;
+    c.actionCount!=a.source_->source(c.triggerIndex).actionCount||c.candidateOrdinal>=world_->totalCandidates())return false;
   if(c.phase==P::Complete)return c.nextAction==c.actionCount&&(!(a.group_.triggers[c.triggerIndex].flags1B8&2u)||c.dispatchCounted)&&a.group_.lastContact.status==g::SourceTriggerContactStatus50MC::Complete;
   const bool absent=g::trigger_entry50IN_detail::find(a.group_.triggers[c.triggerIndex].collider,c.otherCollider)==a.group_.triggers[c.triggerIndex].collider.highWaterD0&&
    g::trigger_entry50IN_detail::find(a.group_.colliders[c.colliderIndex],c.triggerCollider)==a.group_.colliders[c.colliderIndex].highWaterD0;
@@ -86,14 +89,14 @@ public:
   std::shared_ptr<mc_navigation50MC::Owner> navigation,
   const std::uint32_t& mainIdentity,const std::uint32_t& secondaryIdentity,std::uint32_t& nodeC80,
   std::uint32_t playerPrefixCount34,g::VehicleFrameState49W& actualFrame,g::SharedRandomOwner50ID& actualRandom,g::HostMonotonicClock50ID& actualClock)noexcept {
-  if(!thread()||bank_||world_||fenced_||bank.mcQueryIssuer_||bank.gbQueryIssuer_||bank.gbQueryActive_||bank.gbAnimationIssuer_||bank.gbAnimationBacking_||!world||!world->geometryReady()||!world->actualIdle()||
+  if(!thread()||bank_||world_||fenced_||bank.mcQueryIssuer_||bank.gbQueryIssuer_||bank.gbQueryActive_||(bank.animationBacking_&&bank.animationBacking_.get()!=static_cast<const ::track_animation_world50AN::World*>(world.get()))||!world||!world->geometryReady()||!world->actualIdle()||
     !navigation||!navigation->runtimeReady()||!navigation->map().sameWorld(world->storage_->get()->world))return false;
   chance_={&actualFrame.noiseOwner().sharedRandomState,&actualRandom,&actualClock};
   bank_=&bank;world_=std::move(world);navigation_=std::move(navigation);main_=&mainIdentity;secondary_=&secondaryIdentity;node_=&nodeC80;
   const auto undo=[&](){bank_=nullptr;world_.reset();navigation_.reset();main_=secondary_=nullptr;node_=nullptr;chance_={};return false;};
-  auto& a=*actions();if(!idleBank()||bank.mcAnimationBlocked_||a.queryBinding_||a.ready_||
+  auto& a=*actions();if(!idleBank()||bank.animationBlocked_||a.queryBinding_||a.ready_||
     !contains(main_,sizeof *main_)||!contains(secondary_,sizeof *secondary_)||!contains(node_,sizeof *node_)||
-    !disjoint(&a,sizeof a)||!disjoint(this,sizeof *this)||!disjoint(chance_.raw,sizeof(*chance_.raw))||!disjoint(chance_.shared,sizeof(*chance_.shared))||!disjoint(chance_.clock,sizeof(*chance_.clock))||bank.mcAnimationBacking_.get()!=world_.get())return undo();
+    !disjoint(&a,sizeof a)||!disjoint(this,sizeof *this)||!disjoint(chance_.raw,sizeof(*chance_.raw))||!disjoint(chance_.shared,sizeof(*chance_.shared))||!disjoint(chance_.clock,sizeof(*chance_.clock))||(bank.animationBacking_&&bank.animationBacking_.get()!=static_cast<const ::track_animation_world50AN::World*>(world_.get())))return undo();
   try{mainRead_=bank.bindRead(mainIdentity);secondaryRead_=bank.bindRead(secondaryIdentity);
    std::array<mc_trigger_actions50MC::RacerIdentities,8> identities{};
    for(std::size_t i=0;i<bank.count();++i)identities[i]={bank.read(i,mainRead_),bank.read(i,secondaryRead_)};
@@ -117,7 +120,7 @@ public:
  // actual Bank visit is held by its caller and cannot restore during this loan.
  template<class Operation>bool query(std::size_t peer,bool secondary,Operation&& operation)noexcept {
   if(!ready()||active_||peer>=bank_->count_||bank_->mcQueryActive_||bank_->visitDepth_!=1||bank_->currentSlot_!=peer||
-    bank_->pendingToken_||bank_->retirementVisit_||bank_->mcAnimationVisit_||bank_->mcAnimationBlocked_||
+    bank_->pendingToken_||bank_->retirementVisit_||bank_->animationVisit_||bank_->animationBlocked_||
     serial_==std::numeric_limits<std::uint64_t>::max())return false;
   auto borrow=world_->query();if(!borrow)return false;auto* storage=borrow.storage();auto& a=*actions();
   const auto collider=secondary?*secondary_:*main_;
@@ -162,7 +165,7 @@ public:
   const auto reject=[&](TerminalStatus status){terminal_.status=status;return false;};
   if(!thread()||!fenced_||!backing()||world_->phase_!=mc_collision_world50MC::Phase::Retiring||!idleBank()||active_||!world_->actualIdle())return reject(TerminalStatus::Backing);
   auto& a=*actions();auto& s=*world_->storage_->get();
-  if(!a.queryIdle()||!a.animationRetired()||bank_->mcAnimationIssuer_||!navigation_||!navigation_->close())return reject(TerminalStatus::ExternalBorrower);
+  if(!a.queryIdle()||!world_->animationLaneDetached()||bank_->animationIssuer_||!navigation_||!navigation_->close())return reject(TerminalStatus::ExternalBorrower);
   if(world_->structuralBorrows_||world_->worldBorrows_.leases)return reject(TerminalStatus::ExternalBorrower);
   bank_->mcTerminalBlocked_=true;
   // Bounded internal all-peer retirement sweep, including stopped peers.
@@ -172,15 +175,15 @@ public:
    if(!bank_->visitAll([&](std::size_t peer){terminal_.owner=peer;
     if(s.queue.count||*main_!=a.racers_[peer].main690||*secondary_!=a.racers_[peer].secondary||
       a.group_.colliders[peer*2].identity!=*main_||a.group_.colliders[peer*2+1].identity!=*secondary_)return false;
-    for(const auto& member:world_->animationMemberships_)if(member&&(member->state.attached||member->state.object))return false;
+    if(!world_->animationLaneDetached())return false;
     //Every racer query row in the one world (idempotent across peers; the
     //shared rows are not banked, so the first peer's sweep detaches them all).
     if(!s.detachAllRows())return false;
-    for(std::size_t i=0;i<21;++i){auto& member=world_->triggerMemberships_[i];if(!member)return false;
+    for(std::size_t i=0;i<world_->triggerCount_;++i){auto& member=world_->triggerMemberships_[i];if(!member)return false;
      if(member->state.attached&&member->state.object!=90+i)return false;
      const auto r=g::removeLiveZoneMembership50EN(s.lifecycle,s.world,member->state,s.membershipWork);
      if(r.status!=g::LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;}
-    for(std::size_t i=111;i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
+    for(std::size_t i=world_->totalCandidates();i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
     terminal_.completedPeers|=static_cast<std::uint16_t>(1u<<peer);return true;
    }))return reject(TerminalStatus::Peer);
   }catch(...){return reject(TerminalStatus::Peer);}

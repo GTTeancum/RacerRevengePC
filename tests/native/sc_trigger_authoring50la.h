@@ -1,6 +1,8 @@
 #pragma once
 #include "sc_cold_sources50la.h"
 #include "../../src/game/native_trigger_group50ga.h"
+#include "../../src/game/native_trigger_capacity50tg.h"
+#include "../../src/game/n64_track_hazards50nh.h"
 #include <array>
 #include <iostream>
 #include <charconv>
@@ -11,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace sc_trigger_authoring50LA {
 namespace a=rr::assets;
@@ -23,9 +26,12 @@ namespace a=rr::assets;
 // The live count is the TOB's own NumberOfTriggers (absent block or 0 = no
 // triggers). Each native trigger group then bounds the live set by ITS own
 // capacity (GA's 13, native_trigger_group50ga.h) and refuses a larger one.
-// This is the ONE place the reader's capacities are defined.
-inline constexpr std::size_t count=22;
-inline constexpr std::size_t maxActions=5;
+// N64 hazard rows (TriggerN with N64Volume; PORT EXTENSION, NOT ORIGINAL) are
+// bounded separately by N64HazardLimits50NH::rows (n64_track_hazards50nh.h).
+// The capacities are defined once in native_trigger_capacity50tg.h (shared with
+// the capacity-sized native trigger groups); this reader references them.
+inline constexpr std::size_t count=rr::game::nativeTriggerCapacity50TG;
+inline constexpr std::size_t maxActions=rr::game::nativeTriggerActionSlots50TG;
 inline constexpr std::size_t stockCount=9; // SC's stock count (receipt only)
 // Authoring values only. No geometry kernel, transform, collider, C80 lease,
 // action callback, native Entity ID or source-manager PLAYER resolution.
@@ -66,10 +72,29 @@ struct Source {
  const a::ParameterBlock48F* originalTrigger=nullptr;
  const a::ParameterBlock48F* originalAction=nullptr; // action 1
 };
+// The original's own action types (resolver 1B5E70 -> 2DBB60). A type in this
+// list that the port does not implement is a port gap (refused, named as such);
+// any other name is unknown to the original, which asserts on it (2DB760 ->
+// 2DBAE4 "CreateActionClass undefined trigger type", 2DC16C "Error in .toy:
+// Undefined ActionType requested in Trigger%dAction%d.", then `break`). With its
+// SuppressAssert switch the original skips such an action: no callback, not
+// counted ("Read %d Action(s) for Trigger%d out of a total of %d."). The port
+// keeps the shipped behaviour: the race load is refused with that message.
+inline bool originalActionType(const std::string& t)noexcept{
+ static constexpr const char* names[]={"Animation","ResetAnimation","HideAnimation","EnableTrigger",
+  "AnimTexmapTrigger","Sound","PhysicsObject","Scoring","ShaderPass","Particles",
+  "Shortcut","CameraShake","LostAI","PodSound"};
+ for(const char* n:names)if(t==n)return true;
+ return false;
+}
 class Owner final {
  std::shared_ptr<const sc_cold_sources50LA::Owner> source_;
  std::array<Source,count> sources_{};
  std::size_t live_=0;
+ // N64 hazard rows (TriggerN with N64Volume; PORT EXTENSION, NOT ORIGINAL):
+ // read by the N64 reader and kept out of the Revenge rows above, so no
+ // Revenge chain sees them. Bounded by N64HazardLimits50NH::rows.
+ std::vector<rr::game::N64HazardRow50NH> n64Rows_;
  bool attempted_=false,decoded_=false;
  static void need(bool value,const char* reason){if(!value)throw std::runtime_error(reason);}
  static const a::ParameterBlock48F& block(const a::ParameterDocument48F& p,const std::string& name){
@@ -136,10 +161,26 @@ public:
    for(const auto& b:p.blocks)if(b.name=="triggers"){need(!triggers,"duplicate trigger TOB block");triggers=&b;}
    const auto* authoredCount=triggers?optional(*triggers,"numberoftriggers"):nullptr;
    const std::uint32_t n=authoredCount?integer(*authoredCount):0;
-   need(n<=count,"NumberOfTriggers exceeds the native trigger group");
-   std::array<Source,count> next{};std::string kinds;
+   need(n<=count+rr::game::N64HazardLimits50NH::rows,"NumberOfTriggers exceeds the trigger reader");
+   std::array<Source,count> next{};std::string kinds;std::size_t revenge=0;
+   std::vector<rr::game::N64HazardRow50NH> n64;
    for(std::size_t i=0;i<n;++i){d.trigger=i+1;
-    const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);auto& out=next[i];
+    const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);
+    // PORT EXTENSION, NOT ORIGINAL: an N64 row (N64Volume) goes to the N64
+    // reader and its own capacity; no Revenge slot is used for it.
+    if(rr::game::isN64HazardTrigger50NH(b)){
+     need(n64.size()<rr::game::N64HazardLimits50NH::rows,"N64 trigger rows exceed the N64 hazard owner");
+     rr::game::N64HazardRow50NH row;std::string why;
+     if(!rr::game::readN64HazardRow50NH(p,b,static_cast<std::uint32_t>(i+1),row,why))
+      throw std::runtime_error("N64 trigger row: "+why);
+     const auto z=integer(field(b,"zone"));need(z>=1&&z<=zoneCount,"trigger zone outside the world");
+     if(i)kinds+=',';
+     kinds+=row.actions[0].kind==rr::game::N64HazardKind50NH::explodePod?"N64ExplodePod":
+         row.actions[0].kind==rr::game::N64HazardKind50NH::breakObject?"N64BreakObject":"N64AnimationToggle";
+     n64.push_back(std::move(row));continue;
+    }
+    need(revenge<count,"Revenge trigger rows exceed the native trigger group");
+    auto& out=next[revenge++];
     if(const auto* name=optional(b,"name"))out.name=*name;
     out.sourceZoneOrdinal=integer(field(b,"zone"));
     need(out.sourceZoneOrdinal>=1&&out.sourceZoneOrdinal<=zoneCount,"trigger zone outside the world");
@@ -168,7 +209,10 @@ public:
      if(k)kinds+='+';
      if(const auto* once=optional(action,"onetimeonly"))act.authoredOneTimeOnly=boolean(*once);
      if(type=="LostAI"){
-      const auto target=integer158B30(field(action,"targetnodeindex"));
+      // 1B5A78 -> 158B30 default 0: an omitted TargetNodeIndex reads node 0
+      // (stock TB trigger 15 authors only the misspelled TargetNodeIndex135).
+      const auto* targetText=optional(action,"targetnodeindex");
+      const auto target=targetText?integer158B30(*targetText):0;
       need(target>=0,"LostAI target below node 0");
       act.kind=ActionKind::LostAI;act.targetAiNodeIndex=static_cast<std::uint32_t>(target);
       need(act.targetAiNodeIndex<aiNodeBound,"LostAI target outside the AI spline");
@@ -196,7 +240,17 @@ public:
       act.kind=ActionKind::Particles;act.emitterNumber=integer(field(action,"emitternumber"));
       act.instanceNumber=integer(field(action,"instancenumber"));act.turnOn=boolean(field(action,"turnon"));
       need(act.emitterNumber>=1&&act.instanceNumber>=1,"Particles action emitter/instance number");
-     }else need(false,"trigger action type other than LostAI/Animation/PodSound/Sound/Particles is not supported natively");
+     }else if(rr::game::isN64HazardActionType50NH(type)){
+      // PORT EXTENSION: these types exist only on N64 rows.
+      need(false,"ExplodePod/BreakObject/AnimationToggle need N64Volume on their TriggerN row");
+     }else if(originalActionType(type)){
+      // FLAG stand-in: an original action the port has not implemented yet.
+      throw std::runtime_error("original trigger action "+type+" is not implemented natively ("+label+"action"+std::to_string(k+1)+")");
+     }else{
+      // Original: assertion and debug break (see originalActionType).
+      throw std::runtime_error("Error in .toy: Undefined ActionType requested in Trigger"+std::to_string(i+1)+
+          "Action"+std::to_string(k+1)+". ("+type+")");
+     }
      kinds+=kindName(act.kind);
     }
     // Action-1 mirror kept for the LostAI-only consumers.
@@ -206,8 +260,10 @@ public:
     out.resetDefault1B5A60=out.authoredReset.value_or(false);out.originalTrigger=&b;
    }
    // One line per trigger set: count and action kinds (stock equality check).
-   std::cerr<<"course_triggers site="<<(site?site:"?")<<" count="<<n<<" kinds="<<(n?kinds:std::string("-"))<<"\n";
-   live_=n;
+   // Stock: no N64 row, so count = NumberOfTriggers and the line is byte-identical.
+   std::cerr<<"course_triggers site="<<(site?site:"?")<<" count="<<revenge<<" kinds="<<(n?kinds:std::string("-"))<<"\n";
+   if(!n64.empty())std::cerr<<"course_triggers_n64 site="<<(site?site:"?")<<" rows="<<n64.size()<<"\n";
+   live_=revenge;n64Rows_=std::move(n64);
    sources_=std::move(next);decoded_=true;return true;
   }catch(const std::exception& e){
    std::cerr<<"course_triggers site="<<(site?site:"?")<<" trigger="<<d.trigger<<" refused: "<<e.what()<<"\n";
@@ -235,5 +291,8 @@ public:
  // Live prefix [0,liveCount()) of a capacity-sized store.
  const std::array<Source,count>* sources()const noexcept{return decoded_?&sources_:nullptr;}
  std::size_t liveCount()const noexcept{return decoded_?live_:0;}
+ // N64 hazard rows of the same TOB (empty on every stock course). PORT EXTENSION.
+ const std::vector<rr::game::N64HazardRow50NH>& n64Rows()const noexcept{
+  static const std::vector<rr::game::N64HazardRow50NH> none;return decoded_?n64Rows_:none;}
 };
 } // namespace sc_trigger_authoring50LA

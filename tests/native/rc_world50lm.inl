@@ -31,28 +31,9 @@ inline bool clamp(const a::MaterialFields48E& value,const char* name){
     shared::need(text.empty()||text=="0"||text=="1","Unsupported original RC texture wrap mode");
     return text=="1";
 }
+// One IPUM PST framing for every course (course_world_texture50st.h).
 inline a::detail::OriginalIpumMipExtent50LA framePst(const Bytes& source,std::uint32_t& mipIndex){
-    const auto range=[&](std::size_t at,std::size_t n){return at<=source.size()&&n<=source.size()-at;};
-    const auto word=[&](std::size_t at){shared::need(range(at,4),"Truncated original RC IPUM PST");return shared::u32(source.data()+at);};
-    const auto dimension=[](std::uint32_t n){return n>=16&&n<=1024&&!(n&(n-1));};
-    shared::need(source.size()<=8u*1024u*1024u&&word(0)==1&&word(4)==2&&word(8)>=1&&word(8)<=5,
-        "Original RC IPUM PST header rejected");
-    const auto count=word(8);std::size_t at=12;std::uint32_t priorW=0,priorH=0;
-    a::detail::OriginalIpumMipExtent50LA largest;
-    for(std::uint32_t i=0;i<count;++i){
-        shared::need(range(at,20),"Original RC IPUM mip header extent");
-        const auto h=word(at),w=word(at+4),bytes=word(at+16);const auto p=at+20;
-        shared::need(dimension(w)&&dimension(h)&&!word(at+8)&&!word(at+12)&&
-            (!i||(w==priorW*2&&h==priorH*2))&&bytes>=25&&range(p,bytes),"Original RC IPUM mip extent/order");
-        shared::need(!std::memcmp(source.data()+p,"ipum",4)&&word(p+4)==bytes-8&&
-            (std::uint32_t(source[p+8])|(std::uint32_t(source[p+9])<<8))==w&&
-            (std::uint32_t(source[p+10])|(std::uint32_t(source[p+11])<<8))==h&&
-            word(p+12)==1&&source[p+16]==0,"Original RC IPUM frame header");
-        constexpr std::uint8_t end[]{0,0,1,0xb0,0,0,1,0xb1};
-        shared::need(!std::memcmp(source.data()+p+bytes-8,end,8),"Original RC IPUM terminators");
-        largest={w,h,at,p,bytes};at=p+bytes;priorW=w;priorH=h;
-    }
-    shared::need(at==source.size(),"Original RC IPUM PST trailing bytes");mipIndex=count-1;return largest;
+    return course_world_texture50ST::framePst("RC",source,mipIndex);
 }
 // Native regression outputs observed in the genuine parent cold run. These
 // are not independent decoder or original-hardware pixel evidence.
@@ -85,14 +66,6 @@ inline constexpr NativeOutputPin nativeOutputPins[]={
 {"TEXTURES/PLANTTOP02.TGA","618bb0cca7f95193a43708bb0438734aca844eef2acd2b9e3dbefd0a21d44dd9","00148dec1e94638cb9114eaf778796cbc16e790fb3dc1d2832958eb3159c6a50"},
 {"TEXTURES/GARGOYLEFACE.PST","a6e8af21befe0a4e39e2ba6a3272a8eb1f66e9f923a0b268fbcaf4dbe48b710a","1714be905f0a034e00a488ed9293125588e36fc73c3a29c195cbd8512ab6fc03"},
 };
-inline void checkNativeOutput(const std::string& member,const Bytes& source,const Bytes& output){
-    const auto normalized=key(member);
-    for(const auto& pin:nativeOutputPins)if(normalized==pin.member){
-        shared::need(shared::sha256(source)==pin.sourceSha&&shared::sha256(output)==pin.outputSha,
-            "Original RC native regression output differs");return;
-    }
-    shared::need(false,"Original RC native regression output pin missing");
-}
 inline const SourceImage* sourceImage(const std::string& member){
     const auto name=key(member);const SourceImage* found=nullptr;
     for(const auto& entry:sourceImages)if(key(entry.member)==name){
@@ -100,19 +73,36 @@ inline const SourceImage* sourceImage(const std::string& member){
     }
     return found;
 }
+// Common course rule (course_world_texture50st.h): a stock pin is the stock
+// identity of a member NAME; it applies only when the bytes under that name
+// are its stock bytes, otherwise it is a receipt and the image is admitted
+// from its own data like any new name. image() logs; the cold loader asks
+// again without logging.
+inline const SourceImage* matchedSourceImage(const std::string& member,const Bytes& source,
+    const std::string& sourceSha,bool logReceipt=true){
+    return course_world_texture50ST::matchedPin(sourceImage(member),key(member),source,sourceSha,logReceipt);
+}
 inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
     const auto text=field(value,"animatedMapInitialFrame");if(text.empty())return 0;
     std::uint32_t result=0;const auto parsed=std::from_chars(text.data(),text.data()+text.size(),result);
     shared::need(parsed.ec==std::errc{}&&parsed.ptr==text.data()+text.size()&&result<64,
         "Original RC ATM initial frame syntax/extent");return result;
 }
-// Decode only supplied original bytes. The optional output records whether an
-// already retained independent image hash was available and checked. Ordinary
-// image hashes are recorded after decoding, never used to select pixel data.
+// Decode only supplied original bytes, through the one common decode: kind,
+// frame count, extent and mip come from the image's own data and the ATM
+// frame from the material. Stock source, decoded-output and native regression
+// pins are receipts (compared and logged, never used to choose or refuse).
+// independentlyPinned: an independent decoded-output pin named these exact
+// bytes and matched. receipt (optional): the per-image receipt for the loader's tally.
 inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& mipIndex,
-    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0){
+    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,
+    std::uint32_t authoredFrame=course_world_texture50ST::noAuthoredFrame,
+    course_world_texture50ST::Receipt* receipt=nullptr){
+    namespace cwt=course_world_texture50ST;
     shared::need(source.size()>=12&&source.size()<=8u*1024u*1024u,"Original RC texture source extent");
-    const auto name=key(member);const auto* pin=sourceImage(name);
+    const auto name=key(member);const auto sourceSha=shared::sha256(source);
+    cwt::Receipt r;r.listed=sourceImage(name)!=nullptr;
+    const auto* pin=matchedSourceImage(name,source,sourceSha);r.stockBytes=pin!=nullptr;
     const source_texture50fc_fixture::detail::Entry* outputPin=nullptr;
     for(const auto& entry:exceptionalImages)if(key(entry.member)==name){
         shared::need(!outputPin,"Ambiguous original RC decoded image pin");outputPin=&entry;
@@ -121,83 +111,30 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
         if(outputPin)shared::need(std::string(outputPin->outputSha256)==entry.outputSha256,"RC independent pixel pin disagreement");
         outputPin=&entry;
     }
-    // No pin: decoded and admitted with its runtime identity (counted by the loader). Pins still verify exactly.
-    const auto sourceSha=shared::sha256(source);
-    if(pin)shared::need(source.size()==pin->sourceBytes&&sourceSha==pin->sourceSha256,
-        "Original RC static image source identity differs");
-    if(outputPin)shared::need(source.size()==outputPin->sourceBytes&&sourceSha==outputPin->sourceSha256,
-        "Original RC exceptional image source identity differs");
-    // Stand-in: TGA conversion still requires its exact pin (no common TGA path yet).
-    if(name.ends_with(".TGA")){
-        shared::need(pin&&pin->kind==3&&pin->mipIndex==0&&pin->frameCount==1&&pin->initialFrame==0,
-            "Original RC TGA exact source profile");
-        using Convert=a::detail::OriginalTgaConversion50LA;
-        a::TextureMip48E image;image.width=pin->width;image.height=pin->height;
-        const auto depth=source[16];
-        if(depth==24){
-            Bytes rgb;std::vector<std::uint16_t> words(std::size_t(pin->width)*pin->height);
-            shared::need(Convert::read24_29EA90(source,pin->width,pin->height,rgb)&&
-                Convert::convert1555_16C0D0(rgb,pin->width,pin->height,words),"Original RC BGR24 conversion");
-            image.rgba.resize(words.size()*4);
-            for(std::size_t i=0;i<words.size();++i){const auto word=words[i];
-                image.rgba[4*i]=static_cast<std::uint8_t>((word&31u)<<3);
-                image.rgba[4*i+1]=static_cast<std::uint8_t>(((word>>5)&31u)<<3);
-                image.rgba[4*i+2]=static_cast<std::uint8_t>(((word>>10)&31u)<<3);
-                image.rgba[4*i+3]=255; // Exact inherited TEXA255/255,AEM0 for these four authenticated consumers.
-            }
-        }else shared::need(depth==32&&Convert::read32_29EE40(source,pin->width,pin->height,image.rgba),
-            "Original RC BGRA32 source-alpha conversion");
-        Bytes output;shared::need(a::encodeTextureLevel48E(image,output,error),"Original RC TGA native framing");
-        checkNativeOutput(member,source,output);
-        animated=false;mipIndex=0;if(independentlyPinned)*independentlyPinned=false;return output;
+    if(outputPin&&!(source.size()==outputPin->sourceBytes&&sourceSha==outputPin->sourceSha256)){
+        course_archive_receipt50CI::memberReceipt("decoded_image_pin",name,source,0,0,
+            outputPin->sourceBytes,outputPin->sourceSha256);
+        outputPin=nullptr;
     }
-    animated=name.ends_with(".ATM");
-    shared::need(animated||name.ends_with(".PST"),"Unsupported original RC image extension");
-    shared::need(!animated||(source.size()>=24&&(!pin||pin->initialFrame<pin->frameCount)),
-        "Original RC ATM lacks its exact frame selection");
-    const auto frameIndex=pin?pin->initialFrame:authoredFrame; // unpinned ATM: the frame the material authors
-    const auto kind=shared::u32(source.data()+(animated?16:4));
-    if(pin)shared::need(kind==pin->kind,"Original RC source image kind differs");
-    Bytes output;
-    if(kind==2){
-        a::detail::OriginalIpumMipExtent50LA mip;
-        if(animated){
-            std::vector<a::detail::OriginalIpumFrameExtent50LA> frames;std::size_t bad=0;
-            shared::need(a::detail::frameOriginalIpumAtm50LA(source,frames,bad)&&
-                (!pin||frames.size()==pin->frameCount)&&frameIndex<frames.size(),
-                "Original RC IPUM ATM framing failed at "+std::to_string(bad));
-            const auto& frame=frames[frameIndex];mipIndex=frame.count-1;mip=frame.mips[mipIndex];
-        }else mip=framePst(source,mipIndex);
-        a::TextureMip48E decoded;decoded.width=mip.width;decoded.height=mip.height;std::string why;
-        shared::need(a::decodeOriginalIpuRgba(source.data()+mip.payload,mip.bytes,mip.width,mip.height,decoded.rgba,why),
-            "Original RC IPUM decode: "+why);
-        shared::need(a::encodeTextureLevel48E(decoded,output,error),"Original RC IPUM output framing: "+error.code);
-    }else{
-        shared::need(kind==0||kind==1,"Original RC indexed texture kind");Bytes pst;
-        if(animated){
-            a::OriginalUiAtm50KG frames;
-            shared::need(a::splitOriginalUiAtm50KG(source.data(),source.size(),frames,error)&&
-                (!pin||frames.frames.size()==pin->frameCount)&&frameIndex<frames.frames.size(),
-                "Original RC indexed ATM framing: "+error.code);
-            const auto& frame=frames.frames[frameIndex];
-            pst.assign(source.begin()+frame.pstOffset,source.begin()+frame.pstOffset+frame.pstBytes);
-        }
-        a::Texture48E decoded;
-        shared::need(a::decodeTexture48E(animated?pst:source,decoded,error)&&!decoded.mips.empty(),
-            "Original RC indexed PST decode: "+error.code);
-        mipIndex=static_cast<std::uint32_t>(decoded.mips.size()-1);output=std::move(decoded.base_rrtex);
+    // Without a material (dynamic-material callbacks) stock bytes keep their
+    // stock material's frame; anything else starts at frame 0.
+    const auto frame=authoredFrame!=cwt::noAuthoredFrame?authoredFrame:pin?pin->initialFrame:0u;
+    cwt::Shape shape;auto output=cwt::decode("RC",name,source,frame,shape,error);
+    if(pin)r.shapeMatch=cwt::compareShape("RC",name,*pin,shape);
+    bool independent=false;
+    if(outputPin){
+        ++r.outputPins;
+        independent=cwt::compareOutput("RC",name,"decoded_output_pin",outputPin->outputSha256,output,true,
+            outputPin->width,outputPin->height,outputPin->mipIndex,&shape);
+        r.outputMatches+=independent;
     }
-    std::uint32_t w=0,h=0,expectedMip=mipIndex;
-    if(pin){w=pin->width;h=pin->height;expectedMip=pin->mipIndex;}
-    else if(outputPin){w=outputPin->width;h=outputPin->height;expectedMip=outputPin->mipIndex;}
-    else shared::need(wma50CM::decodedExtent(output,w,h),"Unpinned original image decoded framing"); // runtime identity
-    shared::need(mipIndex==expectedMip&&output.size()==std::size_t(w)*h*4+16&&
-        !std::memcmp(output.data(),"RRTEX001",8)&&shared::u32(output.data()+8)==w&&shared::u32(output.data()+12)==h,
-        "Original RC decoded image source framing differs");
-    if(outputPin)shared::need(mipIndex==outputPin->mipIndex&&w==outputPin->width&&h==outputPin->height&&
-        shared::sha256(output)==outputPin->outputSha256,"Original RC independently pinned decoded image differs");
-    if(!outputPin)checkNativeOutput(member,source,output);
-    if(independentlyPinned)*independentlyPinned=outputPin!=nullptr;
+    else for(const auto& native:nativeOutputPins)if(name==key(native.member)&&sourceSha==native.sourceSha){
+        // Native regression output observed on the stock disc: receipt only.
+        ++r.outputPins;r.outputMatches+=cwt::compareOutput("RC",name,"native_output_pin",native.outputSha,output);break;
+    }
+    mipIndex=shape.mipIndex;animated=shape.animated;
+    if(independentlyPinned)*independentlyPinned=independent;
+    if(receipt)*receipt=r;
     return output;
 }
 // The retained original byte buffer alone does not authenticate mutable parsed
@@ -340,6 +277,10 @@ public:
             for(std::size_t i=0;i<archive.entries().size();++i)
                 shared::need(next->entries.emplace(detail::key(archive.entries()[i].name),i).second,"Ambiguous original RC member");
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
+            // Stock pin per admitted texture (only when its bytes are the stock bytes) and the
+            // per-load texture receipt line (course_world_texture50st.h).
+            std::map<std::string,const detail::SourceImage*> texturePins;
+            course_world_texture50ST::Tally textureTally;
             std::vector<Bytes> images;
             std::vector<a::MaterialTextureSlotInput50EA> slots;
             constexpr std::uint64_t textureBase=assetIdentity<<48;
@@ -376,15 +317,19 @@ public:
                         texture=next->entry("textures\\"+stem+extension);if(texture)break;
                     }
                     shared::need(texture,"Original RC required texture absent: "+map.name);
-                    const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
+                    const auto textureKey=detail::key(texture->name);
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
-                        "Original RC material/ATM initial frame differs");
+                    // A static ATM draws one authored frame: single-pass materials only (capability, not a pin).
+                    if(animated)shared::need(authored.passes.size()==1,"Original RC static ATM material pass count");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
-                        std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
+                        // Stock pin only for stock bytes (course_world_texture50st.h); differing bytes: receipt, logged by image().
+                        const auto* pin=detail::matchedSourceImage(textureKey,bytes,shared::sha256(bytes),false);
+                        texturePins.emplace(textureKey,pin);
+                        std::uint32_t mip=0;bool decodedAnimated=false,independent=false;course_world_texture50ST::Receipt receipt;
+                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields),&receipt);
+                        textureTally.add(receipt);
                         shared::need(decodedAnimated==animated,"Original RC texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
                         shared::need(index<wma::maxWorldImages&&image.size()>=16,"RC original texture bank bound");
@@ -401,6 +346,10 @@ public:
                         if(independent)++d.independentlyPinnedImages;else ++d.runtimeIdentityImages;
                         found=textureIndices.emplace(textureKey,index).first;
                     }
+                    // Material/ATM initial frame vs. the stock pin of the same stock bytes: receipt only.
+                    if(animated){const auto pinned=texturePins.find(textureKey);
+                        if(pinned!=texturePins.end()&&pinned->second)course_world_texture50ST::frameReceipt("RC",textureKey,
+                            detail::initialFrame(pass.fields),pinned->second->initialFrame);}
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
                     shared::need(index<wma::maxWorldSelections,"Original RC authored pass count bound");
                     const auto& image=next->textures[found->second];tm::Selection selected;
@@ -533,6 +482,7 @@ public:
                 next->mesh.vertices.size()==expectedVertices&&next->mesh.indices.size()==expectedIndices&&images.size()==expectedImages&&
                 next->normals.size()==next->mesh.vertices.size()&&
                 next->crystalSources.size()==4&&next->crystalPlacements.size()==79&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages;
+            textureTally.log("RC");
             wma::closureReceipt("RC",stockClosure,d.materials,d.selections,next->spans.size(),images.size(),next->mesh.vertices.size());
             shared::need(wma::closureBounds(d.scenes,d.placements,d.collisionOnly,d.surfaces,world.instances.size(),
                 d.materials,d.selections,d.secondPasses,next->spans.size(),next->mesh.vertices.size(),next->mesh.indices.size(),

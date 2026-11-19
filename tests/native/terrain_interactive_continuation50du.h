@@ -50,9 +50,7 @@ namespace original_course_targets50KX { class ColdLoadRequest; }
 namespace phase_timing50GK { struct Interval; }
 namespace race_mode1_host50ID { struct Effects; }
 namespace render_diagnostics50GQ { struct Interval; }
-namespace sa_animated_world { class Owner; struct Diagnostic; }
-namespace tb_door_binding50TB { struct Diagnostic; }
-namespace tc_gate_visibility50TC { struct Diagnostic; }
+namespace track_animation_binding50AN { class Binding; struct Diagnostic; }
 namespace track_session_assets50IG { struct SessionAssets; }
 namespace windows_capture50LD { class Run; }
 namespace rr::game {
@@ -356,12 +354,18 @@ struct Context final {
     using freshTerrainProbeType = const rr::game::VehicleTerrainProbe50FP;
     freshTerrainProbeType& freshTerrainProbe;
     BorrowedCall<void()> fulfillDynamicMusicCall;
-    using gaAnimatedMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_animated_world::ownerCount>;
-    gaAnimatedMembershipType& gaAnimatedMembership;
-    using gaAnimatedWorldType = std::unique_ptr<ga_animated_world::Owner>;
-    gaAnimatedWorldType& gaAnimatedWorld;
-    using gaAnimationDiagnosticType = ga_animated_world::Diagnostic;
-    gaAnimationDiagnosticType& gaAnimationDiagnostic;
+    using trackAnimationMembershipType = std::vector<std::unique_ptr<track_runtime_storage50IG::Membership>>;
+    trackAnimationMembershipType& trackAnimationMembership;
+    using trackAnimationsType = std::shared_ptr<track_animation_runtime50AN::Owner>;
+    trackAnimationsType& trackAnimations;
+    using trackAnimationBindingType = std::unique_ptr<track_animation_binding50AN::Binding>;
+    trackAnimationBindingType& trackAnimationBinding;
+    using trackAnimationBindingDiagnosticType = track_animation_binding50AN::Diagnostic;
+    trackAnimationBindingDiagnosticType& trackAnimationBindingDiagnostic;
+    using trackAnimationPrefixArmedType = bool;
+    trackAnimationPrefixArmedType& trackAnimationPrefixArmed;
+    using trackAnimationDiagnosticType = track_animation_runtime50AN::Diagnostic;
+    trackAnimationDiagnosticType& trackAnimationDiagnostic;
     using gaGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
     gaGateAudioType& gaGateAudio;
     using gaOriginalDiscType = const bool;
@@ -379,12 +383,6 @@ struct Context final {
     gbAiMetadataType& gbAiMetadata;
     using gbAiViewType = rr::game::TrackNavigationView50GB;
     gbAiViewType& gbAiView;
-    using gbAnimationBindingType = std::unique_ptr<gb_animation_binding50GB::Binding>;
-    gbAnimationBindingType& gbAnimationBinding;
-    using gbAnimationBindingDiagnosticType = gb_animation_binding50GB::Diagnostic;
-    gbAnimationBindingDiagnosticType& gbAnimationBindingDiagnostic;
-    using gbAnimationRuntimeType = std::shared_ptr<gb_animation_runtime50GB::Owner>;
-    gbAnimationRuntimeType& gbAnimationRuntime;
     using gbColdSourcesType = std::shared_ptr<const gb_cold_sources50LA::Owner>;
     gbColdSourcesType& gbColdSources;
     using gbCollisionCleanupDoneType = bool;
@@ -436,12 +434,6 @@ struct Context final {
     gbTriggerActionsType& gbTriggerActions;
     using gbWorldBorrowType = std::optional<gb_collision_world50GB::Owner::Borrow>;
     gbWorldBorrowType& gbWorldBorrow;
-    using gcAnimatedMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_animated_world50IG::ownerCount>;
-    gcAnimatedMembershipType& gcAnimatedMembership;
-    using gcAnimatedWorldType = std::unique_ptr<gc_animated_world50IG::Owner>;
-    gcAnimatedWorldType& gcAnimatedWorld;
-    using gcAnimationDiagnosticType = gc_animated_world50IG::Diagnostic;
-    gcAnimationDiagnosticType& gcAnimationDiagnostic;
     using gcDrawLightsType = std::array<rr::game::NativeGcSelectedLightsCandidate,rr::game::defaultHostRaceRacers50HT>;
     gcDrawLightsType& gcDrawLights;
     using gcGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
@@ -600,12 +592,6 @@ struct Context final {
     mcAiMetadataType& mcAiMetadata;
     using mcAiViewType = rr::game::TrackNavigationView50MC;
     mcAiViewType& mcAiView;
-    using mcAnimationBindingType = std::unique_ptr<mc_animation_binding50MC::Binding>;
-    mcAnimationBindingType& mcAnimationBinding;
-    using mcAnimationBindingDiagnosticType = mc_animation_binding50MC::Diagnostic;
-    mcAnimationBindingDiagnosticType& mcAnimationBindingDiagnostic;
-    using mcAnimationRuntimeType = std::shared_ptr<mc_animation_runtime50MC::Owner>;
-    mcAnimationRuntimeType& mcAnimationRuntime;
     using mcColdSourcesType = std::shared_ptr<const mc_cold_sources50LA::Owner>;
     mcColdSourcesType& mcColdSources;
     using mcCollisionCleanupDoneType = bool;
@@ -886,6 +872,13 @@ struct Context final {
     raFreshProbeType& raFreshProbe;
     using raRuntimeType = std::shared_ptr<ra_cold_aggregate50LA::Owner::NativeRuntimeView>;
     raRuntimeType& raRuntime;
+    // PORT STAND-IN (common-path rule): retires RA's private end-candidate
+    // query producer, whose service closures each hold the actual
+    // OwnershipBridge. Defined by the setup (the bridge's friend); the race
+    // end calls it before the counted world close, as 1A6840 releases every
+    // race-owned service before the World at race+74 (1A69A8..1A69C4).
+    using retireRaEndCandidateProducerType = std::function<bool()>;
+    retireRaEndCandidateProducerType& retireRaEndCandidateProducer;
     using raWorldType = std::shared_ptr<ra_cold_aggregate50LA::Owner>;
     raWorldType& raWorld;
     using raceAudioType = std::unique_ptr<race_audio50HQ::Owner>;
@@ -1008,10 +1001,6 @@ struct Context final {
     BorrowedCall<bool() noexcept> retireTbAudioOwnersCall;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saAnimatedWorldType = std::unique_ptr<sa_animated_world::Owner>;
-    saAnimatedWorldType& saAnimatedWorld;
-    using saAnimationDiagnosticType = sa_animated_world::Diagnostic;
-    saAnimationDiagnosticType& saAnimationDiagnostic;
     using saOriginalDiscType = const bool;
     saOriginalDiscType& saOriginalDisc;
     using saOriginalWorldType = std::shared_ptr<sa_original_world50LM::Owner>;
@@ -1173,16 +1162,6 @@ struct Context final {
     tbCollisionCleanupDoneType& tbCollisionCleanupDone;
     using tbCollisionWorldType = std::shared_ptr<tb_collision_world50TB::Owner>;
     tbCollisionWorldType& tbCollisionWorld;
-    using tbDoorBindingType = std::unique_ptr<tb_door_binding50TB::Binding>;
-    tbDoorBindingType& tbDoorBinding;
-    using tbDoorBindingDiagnosticType = tb_door_binding50TB::Diagnostic;
-    tbDoorBindingDiagnosticType& tbDoorBindingDiagnostic;
-    using tbDoorDiagnosticType = tb_door_runtime50TB::Diagnostic;
-    tbDoorDiagnosticType& tbDoorDiagnostic;
-    using tbDoorPrefixArmedType = bool;
-    tbDoorPrefixArmedType& tbDoorPrefixArmed;
-    using tbDoorRuntimeType = std::shared_ptr<tb_door_runtime50TB::Owner>;
-    tbDoorRuntimeType& tbDoorRuntime;
     using tbLightOwnerType = std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner>;
     tbLightOwnerType& tbLightOwner;
     using tbMapMetadataType = const rr::game::AiTrackMetadataView50TB;
@@ -1210,16 +1189,6 @@ struct Context final {
     tcCollisionCleanupDoneType& tcCollisionCleanupDone;
     using tcCollisionWorldType = std::shared_ptr<tc_collision_world50TC::Owner>;
     tcCollisionWorldType& tcCollisionWorld;
-    using tcGateDiagnosticType = tc_gate_runtime50TC::Diagnostic;
-    tcGateDiagnosticType& tcGateDiagnostic;
-    using tcGatePrefixArmedType = bool;
-    tcGatePrefixArmedType& tcGatePrefixArmed;
-    using tcGateRuntimeType = std::shared_ptr<tc_gate_runtime50TC::Owner>;
-    tcGateRuntimeType& tcGateRuntime;
-    using tcGateVisibilityType = std::unique_ptr<tc_gate_visibility50TC::Binding>;
-    tcGateVisibilityType& tcGateVisibility;
-    using tcGateVisibilityDiagnosticType = tc_gate_visibility50TC::Diagnostic;
-    tcGateVisibilityDiagnosticType& tcGateVisibilityDiagnostic;
     using tcGlobalSoundType = std::shared_ptr<tc_global_sound50TC::Owner>;
     tcGlobalSoundType& tcGlobalSound;
     using tcLightOwnerType = std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner>;

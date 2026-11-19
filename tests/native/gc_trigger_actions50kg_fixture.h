@@ -1,6 +1,6 @@
 #pragma once
 #include "gc_trigger_authoring50in_fixture.h"
-#include "gc_animated_world50ig_fixture.h"
+#include "track_animation_runtime50an.h"
 #include "gc_gate_audio50in_fixture.h"
 #include "../../src/game/trigger_entry50in.h"
 #include "../../src/game/native_trigger_group50ga.h"
@@ -37,7 +37,7 @@ struct Counters {
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
  const gc_trigger_authoring50IN::Owner* source_=nullptr;
- gc_animated_world50IG::Owner* animation_=nullptr;
+ track_animation_runtime50AN::Control* animation_=nullptr; // the common track-animation owner (101170 fire)
  gc_gate_audio50IN::Owner* sound_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
@@ -64,7 +64,7 @@ class Owner final {
    case gc_trigger_authoring50IN::Action::LostAI:
     return !action.reset&&action.targetNodeIndex<originalAiNodeCount_&&((c&1u)||lease_->nodeC80);
    case gc_trigger_authoring50IN::Action::Animation:
-    return animation_->ready()&&action.animationIndex<gc_animated_world50IG::ownerCount;
+    return animation_->ready()&&action.animationIndex<animation_->rowCount();
    case gc_trigger_authoring50IN::Action::PodSound:{
     const auto decision=g::triggerPodSoundAdmission50IN(true,
       {action.position,action.minDistance,action.maxDistance},lease_->listenerPositions,lease_->listenerCount);
@@ -93,7 +93,7 @@ class Owner final {
     counters_.lostAiWrites+=result.changedRacers;break;
    }
    case gc_trigger_authoring50IN::Action::Animation:
-    if(animation_->activateSequence(action.animationIndex))++counters_.animationActivations;
+    if(animation_->fire(action.animationIndex,static_cast<std::uint32_t>(t+1)))++counters_.animationActivations;
     else actionFailed_=group_.actionsFailed=true;
     break;
    case gc_trigger_authoring50IN::Action::PodSound:{
@@ -116,7 +116,7 @@ class Owner final {
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
- bool prepare(const gc_trigger_authoring50IN::Owner& source,gc_animated_world50IG::Owner& animation,
+ bool prepare(const gc_trigger_authoring50IN::Owner& source,track_animation_runtime50AN::Control& animation,
      const std::array<RacerIdentities,racers>& identities,std::uint32_t aiNodeCount,
      gc_gate_audio50IN::Owner* sound,bool explicitlyMuted,
      std::uint32_t playerPrefixCount34,std::size_t racerCount=racers)noexcept {

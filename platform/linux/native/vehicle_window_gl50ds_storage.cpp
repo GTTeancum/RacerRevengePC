@@ -180,6 +180,8 @@ bool VehicleWindowGl50DS::Storage::completeMcParticleAttempt(VehicleWindowDiagno
         std::array<bool,mc_particle_attachments50MC::placementCount> submitted{};
         for(std::size_t i=0;i<submitted.size();++i){
             const auto association=mcParticleWindow->representative_[i];
+            // A placement slot the live emitter table does not use stays unsubmitted.
+            if(association>=mc_particle_attachments50MC::associationCount)continue;
             const auto count=mcParticleWindow->attachments_->spanCount(association);
             const auto* spans=mcParticleWindow->attachments_->spanIndices(association);
             if(!count||!spans)return fail(d,VehicleWindowError50DS::frame,"MC source instance has no authenticated spans");

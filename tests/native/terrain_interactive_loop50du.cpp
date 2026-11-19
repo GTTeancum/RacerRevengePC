@@ -14,6 +14,7 @@
 #include "../../src/game/ps2_float_mode50la.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/native_test_undertrack50ut.h"
+#include "../../src/game/n64_track_hazards_runtime50nh.h"
 #include "../../src/game/collision_mesh_admission50cc.h"
 #include "../../src/game/original_projected_shadow50ps.h"
 #include <algorithm>
@@ -25,6 +26,7 @@
 #include <functional>
 #include <xmmintrin.h>
 #include "terrain_interactive_loop50du.h"
+#include "ga_trigger_actions_fixture.h"
 #include "original_race_f8_native_bars50la.h"
 #include "original_results_native_frame50la.h"
 #include "original_results_roster_read50la.h"
@@ -43,6 +45,30 @@ namespace interactive_loop50DU {
 namespace recovery50FI=checkpoint_recovery50fi_fixture;
 using NativeRacerFramePart=interactive_frame50DU::Part;
 namespace {
+// Logs-only Results replay frame timing (diagnostic, no behaviour): wall ms
+// per replay-frame segment, avg/worst per 120 frames, one line per window.
+struct ReplayFrameTiming50PD {
+ static constexpr unsigned count=12;
+ static constexpr const char* names[count]{"pre_replay","fade_in","playback","pose","wreck_dispatch",
+     "debris_effects","scene_child","world_animations","camera_child","results_update_capture","end_entry","audio"};
+ double sum[count]{},worst[count]{};unsigned frames=0;
+ std::chrono::steady_clock::time_point last{};
+ void begin(std::chrono::steady_clock::time_point frameStart,bool frameStarted)noexcept{
+  last=std::chrono::steady_clock::now();
+  lap(0,frameStarted?std::chrono::duration<double,std::milli>(last-frameStart).count():0.0);
+ }
+ void lap(unsigned index,double ms)noexcept{if(index<count){sum[index]+=ms;if(ms>worst[index])worst[index]=ms;}}
+ void lap(unsigned index)noexcept{const auto t=std::chrono::steady_clock::now();
+  lap(index,std::chrono::duration<double,std::milli>(t-last).count());last=t;}
+ void end(const char* track)noexcept{
+  if(++frames<120u)return;
+  std::cerr<<"replay_frame_ms track="<<(track?track:"")<<" frames="<<frames;
+  for(unsigned i=0;i<count;++i)std::cerr<<' '<<names[i]<<'='<<sum[i]/frames<<'/'<<worst[i];
+  std::cerr<<" (avg/worst)\n";
+  *this={};
+ }
+};
+ReplayFrameTiming50PD replayFrameTiming50PD;
 std::uint64_t replayFrames50PD=0;bool replayCameraReported50PD=false;std::uint32_t replayRecordLogged50PD=0,replayResultsPC50PD=0xffffffffu; //Results replay log cadence.
 // Start overlay display log cadence: one line per lit change, per overlay owner.
 const void* startOverlayLogOwner50HU=nullptr;std::uint32_t startOverlayLoggedLit50HU=0xffffffffu;
@@ -631,6 +657,32 @@ void Context::run() {
       test.fired=true;rr::game::nativeTestUndertrackPending50UT[static_cast<std::size_t>(test.slot)]=true;
       std::cerr<<"test_undertrack due slot="<<test.slot<<" race_seconds="<<race.raceSeconds<<'\n';
      }
+   }
+   if(raceEnabled&&race.phase==race_session50HM::Phase::Racing&&rr::game::n64HazardRuntime50NH.active()){
+    // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): the N64
+    // hazards' race clock (door guard timers, debris effect fade) and the N64
+    // respawn after a column wreck (AfterDestroy = Respawn). Revenge has no
+    // respawn: this sequence of its own routines is new. After RespawnDelay s
+    // of destroyed state the racer gets the 228110 restore as 229F80 applies it
+    // here (state40 = 0, damage 7D0..7DC = 0, C00..C06 = 0, its wreck pieces
+    // leave the world); its next physics step drops it into the 228BBC ->
+    // 2255B0 reset onto the line. NOT REPRESENTED (flagged, open): the limp's
+    // cockpit tether rebind (838/joint) is not undone (Restart rebuilds it),
+    // the stopped engine loops are not restarted, and no respawn invincibility
+    // window (N64 RESPAWN_INVINC) is applied.
+    rr::game::n64HazardRuntime50NH.advance(race.raceSeconds);
+    for(std::size_t slot=0;slot<racerBank.count()&&slot<rr::game::nativeDestroyedRacers50PD.size();++slot){
+     if(!rr::game::n64HazardRuntime50NH.respawnDue(slot,rr::game::nativeDestroyedRacers50PD[slot].destroyed,race.raceSeconds))continue;
+     std::uint32_t state=0;
+     require50DU(racerBank.visit(slot,[&](){
+      auto& record=rr::game::nativeDestroyedRacers50PD[slot];state=s.bodies.main.vehicleState40;
+      s.bodies.main.vehicleState40=0u;record={};
+      s.fields.damage7D0=s.fields.damage7D4=s.fields.damage7D8=s.fields.damage7DC=0.f;
+      std::memset(s.packedC00,0,sizeof s.packedC00);return true;}),"N64 respawn 228110 restore rejected");
+     const auto removed=native_wreck_debris50PD::removeRacers(1u<<slot);
+     std::cerr<<"n64_respawn restore slot="<<slot<<" state40_was="<<state<<" debris_removed="<<removed<<'\n';
+     rr::game::n64HazardRuntime50NH.respawnRestored(slot,race.raceSeconds);
+    }
    }
    if(!originalUiActive){
     // Revoke frontend-only button/stick/hold admission while another owner
@@ -1534,6 +1586,7 @@ void Context::run() {
        // racer posed from race78 (racer +3C = 1 skips its own update), then
        // the camera and world children as in an ordinary race tick.
        const char* why=nullptr;
+       auto& replayTiming=replayFrameTiming50PD;replayTiming.begin(frameHitch50DU.start,frameHitch50DU.started);
        // 1A7BD0..1A7C18 of this race update: the restart left race1B0 bit3
        // set; the canonical fade-in prefix requests and services the fade.
        {const auto fade=originalMainApplication.advanceConsumedSessionFadeIn1A7BD0(*sourceCameraSession);
@@ -1541,6 +1594,7 @@ void Context::run() {
         if(static_cast<unsigned>(fade.status)!=reportedFade){reportedFade=static_cast<unsigned>(fade.status);
          std::cerr<<"race_replay fade_in status="<<reportedFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec
              <<" covered="<<sourceCameraSession->endingVideoCovered()<<'\n';}}
+       replayTiming.lap(1);
        require50DU(replay.step(.016f,false,why),why?why:"race78 playback step rejected");
        if(replay.ended()){
         require50DU(!common.restartWorld||common.restartWorld(why),why?why:"replay loop world restart rejected");
@@ -1550,11 +1604,13 @@ void Context::run() {
         require50DU(sourceCameraSession->enterResultsReplayCamera1ACE14(),"1A8204 replay-loop TV camera request rejected");
         std::cerr<<"race_replay loop="<<replay.stats().loops<<'\n';
        }
+       replayTiming.lap(2);
        {std::size_t poseSlot=racerBank.count();const auto rejectedBefore=replay.stats().rejected;
         const bool posed=racerBank.visitAll([&](std::size_t slot){poseSlot=slot;return replay.apply(slot,s,x.bindings);});
         if(!posed)std::cerr<<"race_replay pose_rejected slot="<<poseSlot<<" rejected_delta="<<(replay.stats().rejected-rejectedBefore)
             <<" why="<<(replay.stats().lastRejection?replay.stats().lastRejection:"")<<'\n';
         require50DU(posed,replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");}
+       replayTiming.lap(3);
        // 228620 with +3C != 0: +40 == 0 and a nonzero played +44 re-runs that
        // handler (228914..2289B0); a racer in 1/2 whose +44 differs takes the
        // same dispatch (228A94..228B2C); states 3/4 never re-dispatch (228764).
@@ -1565,6 +1621,7 @@ void Context::run() {
                <<" skipped=limp_in_replay\n";return true;}
            return advanceFramePart(slot,static_cast<NativeRacerFramePart>(static_cast<unsigned>(NativeRacerFramePart::Replay44_1)+state44-1u),
                .016f,60.f);}),"228914 replay wreck dispatch rejected");
+       replayTiming.lap(4);
        // The wreck world in a replay frame, as at a race world boundary.
        racerBank.visit(0,[&](){native_wreck_debris50PD::step(.016f,s.noiseOwner().sharedRandomState);});
        if(rr::game::nativeRacerDestroyed50PD(0)&&!native_wreck_debris50PD::cameraViewBound(0)){
@@ -1575,11 +1632,15 @@ void Context::run() {
        }
        native_wreck_debris50PD::updateCameraView();
        native_wreck_effects50PD::step(.016f);
+       replayTiming.lap(5);
        const auto frame=++sourceCameraTick;
        const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
+       replayTiming.lap(6);
        advanceWorldAnimations();advanceNativeGcWater();advanceRcTrackParticles();advanceTbTrackParticles();
+       replayTiming.lap(7);
        const auto cameraChild=scene.status==sourceCamera::Status::sceneChildComplete?
            sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::replayPose):scene;
+       replayTiming.lap(8);
        if(cameraChild.status==sourceCamera::Status::framePublished){
         publishSourceCameraFog();
         // The Results update (1C8AE0) and its draw capture follow this
@@ -1595,6 +1656,7 @@ void Context::run() {
          replayResultsPC50PD=resultsUpdate.sourcePC;
         }
        }
+       replayTiming.lap(9);
        // 1A7B40 re-enters 1A7DD0..1AB520 every update; 1AB5B0 reads +20C.
        {rr::game::OriginalRaceEndEntryDiagnostic50LA ack;
         originalMainApplication.continueConsumedRaceEndEntry1A7DD0(ack);
@@ -1646,6 +1708,7 @@ void Context::run() {
           std::cerr<<"race_ack request queued screen="<<destination.screen<<'\n';
          }else std::cerr<<"race_ack receiver_unavailable route="<<rr::game::originalRaceAckRouteName50PD(destination.route)<<'\n';
         }}
+       replayTiming.lap(10);
        // The race keeps its audio world running behind the Results (music,
        // announcer, UI feedback, pending fades), as the completed-scene hold.
        if(audioEnabled){
@@ -1661,6 +1724,7 @@ void Context::run() {
         if(!mixed)std::cerr<<"race_replay audio_error="<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';
         require50DU(mixed,"native Results replay audio step failed");
        }
+       replayTiming.lap(11);replayTiming.end(rr::platform::hostTrackCode50IM(selectedTrack));
        ++replayFrames50PD;
        if(replayFrames50PD<=3||replayFrames50PD%120==0||cameraChild.status!=sourceCamera::Status::framePublished){
         const auto& pose=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
@@ -1983,11 +2047,36 @@ void Context::run() {
         const bool bound=replay.bind(race,traits.data(),count,why);
         std::cerr<<"race_replay bind="<<bound<<" racers="<<count<<" why="<<(why?why:"")<<'\n';
         if(!bound)common.fallback=true;
-        common.restartWorld=[](const char*& reason){
+        // Scene::Reset 2702E0 (Scene vtable +0x74), called by the original at
+        // 1AC980 (1AC8E0 Results restart, after 161F60) and 1A81A4 (1A8158
+        // replay loop): 101D10 ResetAll of every track animation + 101B20
+        // re-stop of every Animation-action target, then trigger manager +0x80
+        // (2DCC70: every trigger's fired bit 0x8 cleared). Every course; the
+        // rows' collision is refreshed by the next world service and their
+        // visual by the next prepareDraw. PORT STAND-IN (flagged): the trigger
+        // half covers the common trigger chain only (the per-course chains keep
+        // their state); 27C330 (Scene+0x3D4) and the Particles-action emitter
+        // reset of 2702E0 are not carried here. Pause "Restart Race" in the port
+        // rebuilds the whole session, so its owners start in this same state.
+        auto sceneReset2702E0=[this](const char* site,const char*& reason)->bool{
+         std::size_t rows=0,triggers=0;
+         // The lane route (track_animation_binding50an.h) republishes every row's visual and
+         // collision membership after the reset; the static route's next world service does.
+         if(trackAnimationBinding){track_animation_binding50AN::Diagnostic resetDiagnostic;
+          if(!trackAnimationBinding->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
+          rows=trackAnimations?trackAnimations->rowCount():0;}
+         else if(trackAnimations){track_animation_runtime50AN::Diagnostic resetDiagnostic;
+          if(!trackAnimations->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
+          rows=trackAnimations->rowCount();}
+         if(gaTriggerActions)triggers=gaTriggerActions->raceReset();
+         std::cerr<<"track_animation_race_reset course="<<(trackAnimations?trackAnimations->label():std::string("-"))
+             <<" rows="<<rows<<" common_triggers="<<triggers<<" at="<<site<<'\n';
+         return true;};
+        common.restartWorld=[sceneReset2702E0](const char*& reason){
          // TA's world has no RA trigger list or physics index: its native
-         // world restart is the particle/animation clear below.
-         reason=nullptr;native_wreck_effects50PD::reset();return true;};
-        common.beginReplay=[this,unwreckReplayRacers229F80](const char*& reason){
+         // world restart is the particle/animation clear below, then 2702E0.
+         reason=nullptr;native_wreck_effects50PD::reset();return sceneReset2702E0("1A81A4",reason);};
+        common.beginReplay=[this,unwreckReplayRacers229F80,sceneReset2702E0](const char*& reason){
          replayFrames50PD=0;replayCameraReported50PD=false;
          // The original race no longer opens its Pause once finished
          // (1A7CDC). Retire the host Pause drawing so Results' own 14D440
@@ -2008,6 +2097,7 @@ void Context::run() {
           std::cerr<<"race_replay tv_camera present="<<sourceCameraSession->replayTvPresent()<<'\n';
           // 1AC8E0's particle reset 161F60, then every racer 3C = 1 and 229F80.
           native_wreck_effects50PD::reset();
+          if(!sceneReset2702E0("1AC980",reason))return false;
           unwreckReplayRacers229F80("1AB520");
          }
          const auto& owned=originalMainApplication.sourceRace28COwner_;
@@ -3022,27 +3112,20 @@ void Context::run() {
      renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
      renderFrame.selectedLights=&gcDrawLights[0];
     }
-    if(gcAnimatedWorld){
-     require50DU(gcDynamicWindow.bindFrame(renderFrame,*gcAnimatedWorld),"original GC dynamic frame publication failed");
-     require50DU(gcAtm.bindFrame(renderFrame),"original GC ATM frame selection rejected");
-    }
-    if(gaAnimatedWorld)require50DU(gaDynamicWindow.bindFrame(renderFrame,*gaAnimatedWorld),"original GA dynamic frame publication failed");
-    if(isTcTrack)require50DU(tcGateRuntime&&tcDynamicWindow.bindFrame(renderFrame,*tcGateRuntime),"TC actual gate dynamic frame publication failed");
-    if(isTbTrack)require50DU(tbDoorRuntime&&tbDynamicWindow.bindFrame(renderFrame,*tbDoorRuntime),"TB actual door dynamic frame publication failed");
+    // The one track-animation window: project the rows that moved (original 241280 draws from
+    // the node worlds the steps left), then publish the course's one dynamic mesh.
+    if(trackAnimations){track_animation_runtime50AN::Diagnostic drawDiagnostic;
+     require50DU(trackAnimations->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"track animation draw projection rejected":drawDiagnostic.message.c_str());
+     require50DU(trackAnimationWindow.bindFrame(renderFrame),"track animation dynamic frame publication failed");}
+    if(gcAtm.loaded())require50DU(gcAtm.bindFrame(renderFrame),"original GC ATM frame selection rejected");
     // Animated-world visual vertices are drawing work (original 241280 at
     // draw time): project them once per shown frame, after however many
     // catch-up steps ran, from the node worlds those steps left. Keyed on
     // "this course's animated world has a CPU-projected mesh", which today is
     // MC and GB; GC/GA/SA/TB/TC still project inside their step (port
     // stand-in, to retire the same way).
-    if(mcAnimationRuntime){mc_animation_runtime50MC::Diagnostic drawDiagnostic;
-     require50DU(mcAnimationRuntime->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"MC animated draw projection rejected":drawDiagnostic.message.c_str());}
-    if(gbAnimationRuntime){gb_animation_runtime50GB::Diagnostic drawDiagnostic;
-     require50DU(gbAnimationRuntime->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"GB animated draw projection rejected":drawDiagnostic.message.c_str());}
-    if(isMcTrack)require50DU(mcAnimationRuntime&&mcDynamicWindow.bindFrame(renderFrame,*mcAnimationRuntime),"MC actual14-animation dynamic frame publication rejected");
-    if(isGbTrack)require50DU(gbAnimationRuntime&&gbDynamicWindow.bindFrame(renderFrame,*gbAnimationRuntime),"GB actual four-animation dynamic frame publication failed");
+    // GB dynamic frame exists exactly with its animation owners (TOB [Animations]).
     if(gaAtm.loaded())require50DU(gaAtm.bindFrame(renderFrame),"original GA ATM frame selection rejected");
-    if(saAnimatedWorld)require50DU(saDynamicWindow.bindFrame(renderFrame,*saAnimatedWorld),"SA actual dynamic frame publication failed");
     if(maSaAtm.loaded())require50DU(maSaAtm.bindFrame(renderFrame),"MA/SA actual ATM frame selection rejected");
     if(mbAtm.loaded())require50DU(mbAtm.bindFrame(renderFrame),"MB actual ATM frame selection rejected");
     if(scAtm.loaded())require50DU(scAtm.bindFrame(renderFrame),"SC actual ATM frame selection rejected");
@@ -3417,7 +3500,8 @@ void Context::run() {
          <<" numeric_status="<<static_cast<unsigned>(mcParticleRenderDiagnostic.status)
          <<" numeric_pc="<<mcParticleRenderDiagnostic.sourcePC<<" particles="<<mcParticleRenderDiagnostic.particles
          <<" quads="<<mcParticleRenderDiagnostic.quads<<" runs="<<mcParticleRenderDiagnostic.runs<<'\n';
-    }else     if(isGbTrack){
+    }else     if(isGbTrack&&gbParticleRender){
+     // GB's emitter draw owners exist exactly when the TOB authors emitters.
      require50DU(sourceCameraSession&&gbParticleWindow&&gbParticleRender,"GB actual current particle draw owners unavailable");
      gb_particle_visual50GB::Diagnostic materialDiagnostic;
      bool materialCallbackEntered=false,rendererCallbackEntered=false;
@@ -3806,11 +3890,13 @@ void Context::run() {
          <<" overflow="<<renderDiagnostics.overflow<<'\n';
      renderDiagnostics.resetInterval();
     }
-    if(gcAnimatedWorld)std::cerr<<"GC WORLD RUNTIME: accepted_service_steps="<<gcAnimatedWorldSteps
+    if(trackAnimations)for(std::size_t row=0;row<trackAnimations->rowCount();++row)
+     std::cerr<<"track_animation_state course="<<trackAnimations->label()<<" row="<<(row+1)<<" steps="<<trackAnimationSteps
+         <<" active="<<(trackAnimations->state(row).active90.empty()?0:int(trackAnimations->state(row).active90[0]))
+         <<" stopped="<<trackAnimations->state(row).stopped10<<" time="<<trackAnimations->state(row).time34
+         <<" started="<<trackAnimations->state(row).everStarted<<" by_trigger="<<trackAnimations->state(row).startedByTrigger<<'\n';
+    if(gcTriggerActions)std::cerr<<"GC WORLD RUNTIME: accepted_service_steps="<<trackAnimationSteps
         <<" source_application_ms="<<reportedApplicationAnimation.current230
-        <<" windmill_source_time="<<gcAnimatedWorld->state(1).sequence.current34
-        <<" opening_active="<<gcAnimatedWorld->state(0).sequence.active90
-        <<" opening_source_time="<<gcAnimatedWorld->state(0).sequence.current34
         <<" gate_native_policy="<<gcNativeGate
         <<" trigger_ready="<<bool(gcTriggerActions&&gcTriggerActions->ready())
         <<" gate_fired="<<bool(gcTriggerActions&&(gcTriggerActions->state(gc_trigger_authoring50IN::gate).flags1B8&8u))

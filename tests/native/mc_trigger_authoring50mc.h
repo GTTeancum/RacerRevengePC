@@ -1,55 +1,90 @@
 #pragma once
 #include "mc_scene_authoring50mc.h"
+#include "course_trigger_sources50ct.h"
+// MC trigger sources: read from MC's own held TOB by the common trigger reader
+// (course_trigger_sources50ct.h -> sc_trigger_authoring50la.h), the reader the
+// original uses for every course. Capacity store (nativeTriggerCapacity50TG)
+// with the TOB's own live count; 0 authored = no trigger state. The stock
+// values (21 triggers, 20 LostAI + bridge Animation, targets, 14 box + 7
+// sphere, percent spellings, TOB identity) are receipts. RandomTriggerPercent
+// reads the integer prefix (158B30: "99.996002" -> 99), as the reader does.
 namespace mc_trigger_authoring50MC {
 namespace a=rr::assets;namespace g=rr::game;namespace detail=mc_scene_authoring50MC::detail;
-inline constexpr std::size_t count=21;
+inline constexpr std::size_t capacity=course_trigger_sources50CT::capacity;
+inline constexpr std::size_t stockCount=21; // receipt only
 enum class Action {LostAI,Animation};
 struct Source {
  const a::ParameterBlock48F* original=nullptr;const a::ParameterBlock48F* actionOriginal=nullptr;
- const std::string* name=nullptr;const std::string* authoredRandomTriggerText=nullptr;
+ const std::string* name=nullptr;
  std::uint32_t sourceOrdinal=0,zone=0,actionCount=1,shapeType=5,targetNodeIndex=0,animationIndex=0;
  g::Vector3_48C position{},boxHalf{};float radius=0,yaw=0,pitch=0,roll=0,authoredRandomTriggerPercent=100;
  std::int32_t randomTriggerPercent=100;bool startEnabled=true,oneTimeOnly=false,ignorePlayer=false;
  std::optional<bool> authoredStartEnabled,authoredReset,authoredActionOneTimeOnly;
  bool effectiveReset1B5A60=false;Action action=Action::LostAI;
- // Box orientation remains authored Euler data. No std::sin approximation,
- // source-libm transform, coarse sphere or collision admission is fabricated.
+ // Box orientation remains authored Euler data; the native shape6 projection
+ // is mc_trigger_geometry50mc.h's (same policy as TB/MA).
 };
-class Owner final:public mc_scene_authoring50MC::OwnerBase<Source,count> {
+inline constexpr course_trigger_sources50CT::Stock stock{"MC","tracks\\mc.tob",nullptr,0,
+ "7070700a884c24a98a0a89d4ea58e61e34f9a89e19af3ca239779c56c0dd14b0",186642,stockCount};
+class Owner final {
+ std::shared_ptr<const mc_cold_sources50LA::Owner> cold_;
+ course_trigger_sources50CT::Owner reader_;
+ std::array<Source,capacity> source_{};std::size_t live_=0;
+ const std::thread::id thread_=std::this_thread::get_id();bool attempted_=false,ready_=false;
 public:
+ Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
+ Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
+ ~Owner(){if(thread_!=std::this_thread::get_id())std::terminate();}
+ // Fixed capacity records (this owner and the common reader's projection);
+ // the TOB stays in the cold source; labels/filenames are bounded strings.
+ static constexpr std::size_t maximumAdditionalPayloadBytes()noexcept{
+  return sizeof(Owner)+sizeof(std::array<Source,capacity>)+2u*capacity*(3u+sc_trigger_authoring50LA::maxActions)*64u+4096u;
+ }
+ static constexpr std::size_t retainedPayloadBytes()noexcept{return sizeof(Owner);}
  bool decode(std::shared_ptr<const mc_cold_sources50LA::Owner> cold,std::size_t available,std::string& error){
-  return prepare(std::move(cold),available,error,[](const a::ParameterDocument48F& p,std::array<Source,count>& next){
-   using namespace detail;
-   need(integer(field(block(p,"triggers"),"numberoftriggers"))==count,"MC trigger count");
-   constexpr std::uint32_t targets[20]={157,158,37,159,160,161,152,61,64,62,168,112,163,115,164,166,167,164,166,158};
-   std::size_t boxes=0,spheres=0;
-   for(std::size_t i=0;i<count;++i){auto& s=next[i];const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);
-    s.original=&b;s.sourceOrdinal=i+1;s.zone=integer(field(b,"zone"));s.position=vector(field(b,"position"));
-    need(integer(field(b,"numberofactions"))==1&&s.zone>=1&&s.zone<=28,"MC trigger zone/action count");
-    s.name=optional(b,"name");s.oneTimeOnly=detail::boolean(field(b,"onetimeonly"));
-    if(const auto* v=optional(b,"startenabled")){s.authoredStartEnabled=detail::boolean(*v);s.startEnabled=*s.authoredStartEnabled;}
-    if(const auto* v=optional(b,"ignoretrigger")){need(*v=="PLAYER","MC ignore selector");s.ignorePlayer=true;}
-    s.authoredRandomTriggerText=&field(b,"randomtriggerpercent");s.authoredRandomTriggerPercent=number(*s.authoredRandomTriggerText);
-    // 2DBE9C ->158B30 ->158920 ->30AE70/30AC38 consumes the integer
-    // prefix and ignores endptr. Exact MC spellings allow bounded projection.
-    const auto& probability=*s.authoredRandomTriggerText;
-    need(probability=="99.996002"||probability=="100.000000"||probability=="50","MC probability spelling");
-    s.randomTriggerPercent=probability=="99.996002"?99:probability=="50"?50:100;
-    if(const auto* v=optional(b,"box")){++boxes;s.shapeType=6;s.boxHalf=vector(*v);
-     need(!optional(b,"radius"),"MC box/sphere conflict");s.yaw=number(field(b,"yaw"));s.pitch=number(field(b,"pitch"));s.roll=number(field(b,"roll"));
-     for(unsigned axis=0;axis<3;++axis)need(s.boxHalf.v[axis]>0,"MC positive box half");
-    }else{++spheres;s.radius=number(field(b,"radius"));need(s.radius>0&&!optional(b,"yaw")&&!optional(b,"pitch")&&!optional(b,"roll"),"MC sphere authoring");}
-    need(s.startEnabled&&s.oneTimeOnly==(i==20)&&s.ignorePlayer==(i<19)&&!optional(b,"parent")&&!optional(b,"attachtosoultree"),"MC trigger source flags");
-    const auto& action=block(p,label+"action1");s.actionOriginal=&action;
-    need(!optional(action,"reset"),"MC Reset is absent");
-    if(i<20){need(field(action,"actiontype")=="LostAI"&&action.fields.size()==2,"MC LostAI action");s.targetNodeIndex=integer(field(action,"targetnodeindex"));
-     need(s.targetNodeIndex==targets[i]&&s.targetNodeIndex<173,"MC actual AI target");
-    }else{s.action=Action::Animation;need(field(action,"actiontype")=="Animation"&&integer(field(action,"animationnumber"))==1&&action.fields.size()==3,"MC bridge animation action");
-     s.authoredActionOneTimeOnly=detail::boolean(field(action,"onetimeonly"));need(*s.authoredActionOneTimeOnly,"MC retained unused action once field");}
+  if(thread_!=std::this_thread::get_id()){error="MC authoring thread mismatch";return false;}
+  if(attempted_){error="MC authoring requires a fresh lifetime";return false;}attempted_=true;
+  if(available>32u*1024u*1024u||available<maximumAdditionalPayloadBytes()){
+   error="MC authoring reservation exceeds remaining allowance";return false;}
+  try{using namespace detail;
+   need(bool(cold),"MC cold source absent");const auto& p=detail::document(*cold);
+   // MC chain: LostAI (no pose Reset), Animation, the trigger-chance roll;
+   // no AI ignore list, no PodSound/Sound/Particles (refused).
+   course_trigger_sources50CT::Support support;support.randomPercent=true;
+   if(!reader_.load(p,cold->originalTob(),stock,cold->world().zones.size(),cold->ai().count(),error,support))return false;
+   std::array<Source,capacity> next{};const auto live=reader_.liveCount();
+   for(std::size_t i=0;i<live;++i){const auto& in=reader_.source(i);auto& s=next[i];
+    s.original=in.original;s.sourceOrdinal=in.sourceOrdinal;s.zone=in.zone;s.position=in.sphere.center;
+    s.name=in.original?optional(*in.original,"name"):nullptr;s.oneTimeOnly=in.oneTimeOnly;s.startEnabled=in.startEnabled;
+    if(in.startEnabledAuthored)s.authoredStartEnabled=in.startEnabled;
+    s.ignorePlayer=in.ignorePlayer;s.randomTriggerPercent=in.randomTriggerPercent;
+    if(const auto* v=in.original?optional(*in.original,"randomtriggerpercent"):nullptr)s.authoredRandomTriggerPercent=number(*v);
+    s.shapeType=in.shapeType;s.yaw=in.yaw;s.pitch=in.pitch;s.roll=in.roll;
+    if(in.shapeType==6)s.boxHalf=in.box.half;else s.radius=in.sphere.radius;
+    // PORT STAND-IN (flagged): the MC native action owner implements one
+    // action per trigger (every stock MC trigger authors one); more refuse.
+    need(in.actionCount==1,"MC trigger with more than one action is not supported natively");
+    s.actionCount=in.actionCount;const auto& ia=in.actions[0];s.actionOriginal=ia.original;
+    s.authoredActionOneTimeOnly=ia.authoredOneTimeOnly;
+    if(ia.readerKind==sc_trigger_authoring50LA::ActionKind::LostAI){
+     s.action=Action::LostAI;s.targetNodeIndex=ia.targetNodeIndex;s.authoredReset=ia.authoredReset;
+     s.effectiveReset1B5A60=ia.authoredReset.value_or(false); // 1B5A60 default 0
+    }else if(ia.readerKind==sc_trigger_authoring50LA::ActionKind::Animation){
+     s.action=Action::Animation;s.animationIndex=ia.animationIndex;
+    }else need(false,"MC trigger action kind outside the MC native chain");
    }
-   need(boxes==14&&spheres==7,"MC exact trigger shape counts");
-  });
+   source_=std::move(next);live_=live;cold_=std::move(cold);ready_=true;error.clear();return true;
+  }catch(const std::exception& e){error=e.what();return false;}
  }
  bool decode(std::shared_ptr<const mc_cold_sources50LA::Owner> cold,std::string& error){return decode(std::move(cold),maximumAdditionalPayloadBytes(),error);}
+ bool ready()const noexcept{return thread_==std::this_thread::get_id()&&ready_&&cold_&&cold_->ready();}
+ std::size_t liveCount()const noexcept{return ready()?live_:0;}
+ const Source& source(std::size_t i)const{
+  if(!ready()||i>=live_)throw std::runtime_error("MC trigger source outside the live prefix");return source_[i];
+ }
+ bool authors(Action kind)const noexcept{
+  for(std::size_t i=0;i<liveCount();++i)if(source_[i].action==kind)return true;return false;
+ }
+ const mc_cold_sources50LA::Owner* coldSource()const noexcept{return ready()?cold_.get():nullptr;}
 };
 }

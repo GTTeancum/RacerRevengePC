@@ -6,6 +6,7 @@
 #include "../../src/game/original_track_environment50rc.h"
 #include "material_alpha50gx_fixture.h"
 #include "source_texture50fc_fixture.h"
+#include "course_world_texture50st.h"
 
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_ipu_decoder.h"

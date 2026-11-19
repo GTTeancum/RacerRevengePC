@@ -145,7 +145,7 @@ class Owner final {
     if(std::fegetround()!=FE_TONEAREST||s.serial==std::numeric_limits<std::uint64_t>::max())return S::arithmetic;
     const auto& manager=*runtime_->manager_;const auto count=manager.particleCount();
     if(!manager.prepared()||count>originalGcParticleCapacity50KG||
-       manager.emitterRegistryReservation().registeredEmitters!=mc_particle_source50MC::descriptorCount+(vehicles_?vehicles_->registeredProducerCount():0))return S::manager;
+       manager.emitterRegistryReservation().registeredEmitters!=runtime_->emitterCount()+(vehicles_?vehicles_->registeredProducerCount():0))return S::manager;
     if(!viewport.prepared||!viewport.matricesReady||!viewport.sessionGeneration||!viewport.sceneKey||
        viewport.fullWidth204!=640||viewport.fullHeight208!=448||viewport.x1E0||viewport.y1E4||
        viewport.width1E8!=640||viewport.height1EC!=448||viewport.zoom328!=1||viewport.zoom32C!=1||
@@ -181,7 +181,7 @@ class Owner final {
     for(std::size_t i=0;i<count;++i){
         const auto* p=manager.particleAt(i);
         if(!p||!p->ownerId)return S::frame;
-        if(p->ownerId>mc_particle_source50MC::descriptorCount){if(!vehicles_||!vehicles_->matchesParticle(*p))return S::frame;}else{
+        if(p->ownerId>runtime_->emitterCount()){if(!vehicles_||!vehicles_->matchesParticle(*p))return S::frame;}else{
         const auto& definition=runtime_->source_->definitionForDescriptor(p->ownerId-1u);
         const auto* emitter=manager.emitter(p->ownerId);const auto* group=manager.group(definition.particleGroup1B8);
         if(!emitter||emitter->particleGroup!=definition.particleGroup1B8||!group||p->frame<group->first||p->frame>group->last||
@@ -192,7 +192,7 @@ class Owner final {
             // inclusive152 endpoint. No synthesized frame, clamp or simulation
             // mutation; preserve all source-owner/flags checks above.
             const auto* emitter=manager.emitter(p->ownerId);
-            if(p->ownerId<=mc_particle_source50MC::descriptorCount&&p->frame==152&&
+            if(p->ownerId<=runtime_->emitterCount()&&p->frame==152&&
                emitter&&emitter->particleGroup==9&&runtime_->source_->definitionForDescriptor(p->ownerId-1u).kind==mc_particle_source50MC::Kind::Fire8){
                 ++diagnostic.skippedAuthoredFrame152;continue;
             }

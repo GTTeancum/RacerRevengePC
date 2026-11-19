@@ -362,7 +362,7 @@ struct Owner::Storage {
         std::array<ZoneRegistration50CJ,maximumRacers+2u> tc{};
         bool useTc=false;
         std::vector<ZoneRegistration50CJ> ra;
-        void resize(std::size_t count){if(!useTc&&count>original.size())ra.resize(count);}
+        void resize(std::size_t count){if(useTc&&count>tc.size())useTc=false;if(!useTc&&count>original.size())ra.resize(count);}
         ZoneRegistration50CJ* data()noexcept{return useTc?tc.data():(ra.empty()?original.data():ra.data());}
         const ZoneRegistration50CJ* data()const noexcept{return useTc?tc.data():(ra.empty()?original.data():ra.data());}
         std::size_t size()const noexcept{return useTc?tc.size():(ra.empty()?original.size():ra.size());}
@@ -384,41 +384,23 @@ struct Owner::Storage {
     const OriginalApplicationEntities50LA* staticApplication=nullptr;
     bool staticAccess=false;
     bool staticRegistrationComplete=false;
-    const ::tc_gate_visibility50TC::Binding* tcGateOwner=nullptr;
-    const LiveZoneMembership50EN* tcGateMembership=nullptr;
-    bool tcGateAccess=false,tcGateComplete=false;
-    struct TbDoorState {
-        const ::tb_door_binding50TB::Binding* owner=nullptr;
-        const LiveZoneMembership50EN* membership=nullptr;
-        bool access=false,complete=false;
-    } tbDoor;
-    struct GbAnimationState {
+    // ONE visual-zone lane for the track's animation rows (every course; the
+    // count is the course's [Animations] rows, planTrackAnimationRows). Row k is
+    // registration animationBase()+k / object animationBase()+1+k.
+    struct AnimationLane {
         struct Row {
-            const ::gb_animation_binding50GB::Binding* owner=nullptr;
+            const ::track_animation_binding50AN::Binding* owner=nullptr;
             const LiveZoneMembership50EN* membership=nullptr;
             bool access=false,complete=false;
         };
-        std::array<Row,4> rows{};
+        std::vector<Row> rows;
         bool claimed()const noexcept{for(const auto& r:rows)if(r.owner)return true;return false;}
         bool active()const noexcept{for(const auto& r:rows)if(r.access)return true;return false;}
         bool busy()const noexcept{for(const auto& r:rows)if(r.access||(r.owner&&!r.complete))return true;return false;}
     };
-    std::unique_ptr<GbAnimationState> gbAnimations;
-    struct McAnimationState {
-        struct Row {
-            const ::mc_animation_binding50MC::Binding* owner=nullptr;
-            const LiveZoneMembership50EN* membership=nullptr;
-            bool access=false,complete=false;
-        };
-        std::array<Row,14> rows{};
-        bool claimed()const noexcept{for(const auto& r:rows)if(r.owner)return true;return false;}
-        bool active()const noexcept{for(const auto& r:rows)if(r.access)return true;return false;}
-        bool busy()const noexcept{for(const auto& r:rows)if(r.access||(r.owner&&!r.complete))return true;return false;}
-    };
-    std::unique_ptr<McAnimationState> mcAnimations;
+    std::unique_ptr<AnimationLane> animations;
     bool staticBusy()const noexcept{return activeMcParticleLight||(gbTimed&&gbTimed->activeGbParticleLight)||staticAccess||(staticOwner&&!staticRegistrationComplete)||
-        tcGateAccess||(tcGateOwner&&!tcGateComplete)||tbDoor.access||(tbDoor.owner&&!tbDoor.complete)||
-        (mcAnimations&&mcAnimations->busy())||(gbAnimations&&gbAnimations->busy());}
+        (animations&&animations->busy());}
     struct RaFlareIdentity {
         const ::ra_pod_scene50LA::Owner* world=nullptr;
         const OriginalWreckComponent50LA* entity=nullptr;
@@ -437,11 +419,12 @@ struct Owner::Storage {
         for(std::size_t i=0;i<raFlareCount;++i)if(raFlareAt(i).entity==entity)return &raFlareAt(i);
         return nullptr;
     }
-    std::size_t identityCount()const noexcept{return racerCount+1u+staticModels.size()+raFlareCount+((scene==Scene::tc||scene==Scene::tb)?1u:scene==Scene::gb?4u:scene==Scene::mc?14u:0u);}
+    std::size_t animationBase()const noexcept{return racerCount+1u+staticModels.size()+raFlareCount;}
+    std::size_t identityCount()const noexcept{return animationBase()+(animations?animations->rows.size():0u);}
     bool disjointStaticBacking(const std::uint32_t* field)const noexcept {
-        if(mcAnimations&&!disjointResetField(field,mcAnimations.get(),sizeof(*mcAnimations)))return false;
+        if(animations&&(!disjointResetField(field,animations.get(),sizeof(*animations))||
+           (!animations->rows.empty()&&!disjointResetField(field,animations->rows.data(),animations->rows.size()*sizeof(AnimationLane::Row)))))return false;
         if(mcTopology&&!disjointResetField(field,mcTopology.get(),sizeof(*mcTopology)))return false;
-        if(gbAnimations&&!disjointResetField(field,gbAnimations.get(),sizeof(*gbAnimations)))return false;
         if((legacyTopology&&!disjointResetField(field,legacyTopology.get(),sizeof(*legacyTopology)))||
            (scTopology&&!disjointResetField(field,scTopology.get(),sizeof(*scTopology)))||
            (tcTopology&&!disjointResetField(field,tcTopology.get(),sizeof(*tcTopology))))return false;
@@ -1004,8 +987,8 @@ Owner::~Owner(){
     if(storage_&&storage_->gbTimed&&storage_->gbTimed->activeGbParticleLight)std::terminate();
     if(storage_)for(std::uint32_t slot=0;slot<storage_->racerCount;++slot)
         if(storage_->vehicles[slot].sourceResetBound)std::terminate();
-    if(storage_&&(storage_->raFlareCount||storage_->staticOwner||storage_->sceneOwner||storage_->tcGateOwner||storage_->tbDoor.owner||
-        (storage_->mcAnimations&&storage_->mcAnimations->claimed())||(storage_->gbAnimations&&storage_->gbAnimations->claimed())))std::terminate();
+    if(storage_&&(storage_->raFlareCount||storage_->staticOwner||storage_->sceneOwner||
+        (storage_->animations&&storage_->animations->claimed())))std::terminate();
     if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
     if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
     if(storage_&&storage_->activeReset)endResetVisibility(*const_cast<ResetVisibilityLease*>(storage_->activeReset));
@@ -1193,13 +1176,14 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         next->renderAuthoringReady=true;
         if(scene==Scene::ra){next->staticModels.resize(w.instances.size(),nullptr);
             next->staticSelection.resize(w.instances.size());}
-        if(scene==Scene::mc)next->mcAnimations=std::make_unique<Storage::McAnimationState>();
-        if(scene==Scene::gb)next->gbAnimations=std::make_unique<Storage::GbAnimationState>();
+        // The course's animation rows (planned from its [Animations] table; 0 = no lane).
+        if(plannedAnimationRows_){next->animations=std::make_unique<Storage::AnimationLane>();
+            next->animations->rows.resize(plannedAnimationRows_);}
         next->registrations.useTc=scene==Scene::tc;
         next->registrations.resize(next->identityCount());
-        if(scene==Scene::gb&&next->registrations.ra.capacity()>maximumRacers+5u)
-            return fail(d,Status::allocation,0x28e8a0);
-        if(scene==Scene::tb&&next->registrations.ra.capacity()>maximumRacers+2u)
+        // The reservation (trackAnimationStorageReservationBytes) covers exactly
+        // the planned identities; a larger allocation is refused.
+        if(next->animations&&next->registrations.ra.capacity()>maximumRacers+1u+next->staticModels.size()+plannedAnimationRows_)
             return fail(d,Status::allocation,0x28e8a0);
         const ZoneLifecycleStorage50CL lifeStorage{next->registries.data(),next->registries.size(),
             next->registrations.data(),next->registrations.size(),
@@ -2192,211 +2176,75 @@ const original_world_environment50KG::SpatialBounds* Owner::sceneBounds534(const
 #include "original_ra_native_static_draw50la.inl"
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
-bool Owner::bindTcGateOwner(const ::tc_gate_visibility50TC::Binding* owner,const LiveZoneMembership50EN* membership)noexcept {
- if(!owner||!membership||!storage_||invalidated_||storage_->scene!=Scene::tc)return false;
- auto& o=*storage_;
- if(o.tcGateOwner||o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
+// One visual-zone lane for the track's animation rows (replaces the TB door,
+// TC gate, GB four and MC fourteen copies: the same checks, rows from the data,
+// no zone/portal-count pins).
+bool Owner::planTrackAnimationRows(std::size_t rows)noexcept {
+ if(storage_||invalidated_||rows>maximumTrackAnimationRows)return false;
+ plannedAnimationRows_=rows;return true;
+}
+std::size_t Owner::trackAnimationRows()const noexcept{return storage_&&storage_->animations?storage_->animations->rows.size():0u;}
+std::size_t Owner::trackAnimationStorageReservationBytes(std::size_t rows)noexcept {
+ // Lane pointer/padding, the lane and its rows, and the full registration
+ // payload at the existing eight-racer maximum plus the planned rows.
+ if(rows>maximumTrackAnimationRows)return std::numeric_limits<std::size_t>::max();
+ return sizeof(std::unique_ptr<Storage::AnimationLane>)+2u*alignof(Storage)+sizeof(Storage::AnimationLane)+
+        rows*sizeof(Storage::AnimationLane::Row)+(maximumRacers+1u+rows)*sizeof(ZoneRegistration50CJ);
+}
+bool Owner::bindTrackAnimationRow(const ::track_animation_binding50AN::Binding* owner,std::size_t index,
+ const LiveZoneMembership50EN* membership)noexcept {
+ if(!owner||!membership||!storage_||invalidated_||!storage_->animations||index>=storage_->animations->rows.size())return false;
+ auto& o=*storage_;auto& lane=*o.animations;
+ if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||o.staticAccess||(o.staticOwner&&!o.staticRegistrationComplete)||
+    lane.active()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
     membership->attached||membership->object||o.visibility.lifecycle.objectCount!=o.identityCount())return false;
- const auto& registration=o.registrations[o.racerCount+1u];
+ auto& row=lane.rows[index];if(row.owner||row.membership)return false;
+ // Rows are claimed in table order by one Binding.
+ for(std::size_t i=0;i<lane.rows.size();++i){const auto& prior=lane.rows[i];
+  if((i<index&&prior.owner!=owner)||(i>index&&prior.owner))return false;}
+ const auto& registration=o.registrations[o.animationBase()+index];
  if(registration.owner||registration.slot||registration.encodedObject)return false;
- o.tcGateOwner=owner;o.tcGateMembership=membership;o.tcGateComplete=false;return true;
+ row.owner=owner;row.membership=membership;row.complete=false;return true;
 }
-bool Owner::beginTcGateAccess(const ::tc_gate_visibility50TC::Binding* owner,ResetVisibilityWorld50EY*& world,
- LiveZoneWorkspace50EN*& workspace,CollectionRef50BX& object)noexcept {
+bool Owner::beginTrackAnimationAccess(const ::track_animation_binding50AN::Binding* owner,std::size_t index,
+ ResetVisibilityWorld50EY*& world,LiveZoneWorkspace50EN*& workspace,CollectionRef50BX& object)noexcept {
  world=nullptr;workspace=nullptr;object=0;
- if(!owner||!storage_||invalidated_||storage_->scene!=Scene::tc)return false;
- auto& o=*storage_;
- if(o.tcGateOwner!=owner||o.tcGateAccess||o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return false;
- o.tcGateAccess=true;o.tcGateComplete=false;world=&o.visibility;workspace=&o.workspace;object=o.racerCount+2u;return true;
-}
-void Owner::endTcGateAccess(const ::tc_gate_visibility50TC::Binding* owner)noexcept {
- if(storage_&&owner&&storage_->tcGateOwner==owner)storage_->tcGateAccess=false;
-}
-bool Owner::commitTcGateOwner(const ::tc_gate_visibility50TC::Binding* owner)noexcept {
- if(!storage_||!owner||storage_->tcGateOwner!=owner||!storage_->tcGateAccess||!storage_->tcGateMembership)return false;
- auto& o=*storage_;const auto& m=*o.tcGateMembership;const auto& r=o.registrations[o.racerCount+1u];
- if(!m.attached||m.object!=o.racerCount+2u||m.method!=ZoneMethod50CL::Second||!r.owner)return false;
- o.tcGateComplete=true;return true;
-}
-bool Owner::releaseTcGateOwner(const ::tc_gate_visibility50TC::Binding* owner)noexcept {
- if(!storage_||!owner||storage_->tcGateOwner!=owner)return false;auto& o=*storage_;
- if(o.tcGateAccess||o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    !o.tcGateMembership||o.tcGateMembership->attached||o.tcGateMembership->object)return false;
- const auto& r=o.registrations[o.racerCount+1u];if(r.owner||r.slot||r.encodedObject)return false;
- o.tcGateOwner=nullptr;o.tcGateMembership=nullptr;o.tcGateComplete=false;return true;
-}
-bool Owner::currentTcGateOwner(const ::tc_gate_visibility50TC::Binding* owner)const noexcept {
- return storage_&&!invalidated_&&owner&&storage_->scene==Scene::tc&&storage_->tcGateOwner==owner&&
-  storage_->tcGateComplete&&!storage_->tcGateAccess&&storage_->tcGateMembership&&storage_->tcGateMembership->attached;
-}
-}
-
-namespace rr::game::original_gc_gameplay_lighting_candidate {
-std::size_t Owner::tbDoorStorageReservationBytes()noexcept {
- // Common fields plus a padding bound, and full actual10-record vector payload
- // when eight racers need more than the unchanged nine inline legacy records.
- return sizeof(Storage::TbDoorState)+2u*alignof(Storage)+
-        (maximumRacers+2u)*sizeof(ZoneRegistration50CJ);
-}
-bool Owner::bindTbDoorOwner(const ::tb_door_binding50TB::Binding* owner,const LiveZoneMembership50EN* membership)noexcept {
- if(!owner||!membership||!storage_||invalidated_||storage_->scene!=Scene::tb)return false;
- auto& o=*storage_;
- if(o.world.zones.size()!=10||o.world.portals.size()!=11||!o.legacyTopology||o.scTopology||o.tcTopology||
-    o.tbDoor.owner||o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    membership->attached||membership->object||o.visibility.lifecycle.objectCount!=o.identityCount())return false;
- const auto& registration=o.registrations[o.racerCount+1u];
- if(registration.owner||registration.slot||registration.encodedObject)return false;
- o.tbDoor.owner=owner;o.tbDoor.membership=membership;o.tbDoor.complete=false;return true;
-}
-bool Owner::beginTbDoorAccess(const ::tb_door_binding50TB::Binding* owner,ResetVisibilityWorld50EY*& world,
- LiveZoneWorkspace50EN*& workspace,CollectionRef50BX& object)noexcept {
- world=nullptr;workspace=nullptr;object=0;
- if(!owner||!storage_||invalidated_||storage_->scene!=Scene::tb)return false;
- auto& o=*storage_;
- if(o.tbDoor.owner!=owner||o.tbDoor.access||o.staticAccess||o.tcGateAccess||
+ if(!owner||!storage_||invalidated_||!storage_->animations||index>=storage_->animations->rows.size())return false;
+ auto& o=*storage_;auto& lane=*o.animations;
+ if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||lane.rows[index].owner!=owner||lane.active()||o.staticAccess||
     o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return false;
- o.tbDoor.access=true;o.tbDoor.complete=false;world=&o.visibility;workspace=&o.workspace;object=o.racerCount+2u;return true;
+ auto& row=lane.rows[index];row.access=true;row.complete=false;
+ world=&o.visibility;workspace=&o.workspace;object=static_cast<CollectionRef50BX>(o.animationBase()+1u+index);return true;
 }
-void Owner::endTbDoorAccess(const ::tb_door_binding50TB::Binding* owner)noexcept {
- if(storage_&&owner&&storage_->tbDoor.owner==owner)storage_->tbDoor.access=false;
+void Owner::endTrackAnimationAccess(const ::track_animation_binding50AN::Binding* owner,std::size_t index)noexcept {
+ if(storage_&&owner&&storage_->animations&&index<storage_->animations->rows.size()&&storage_->animations->rows[index].owner==owner)
+  storage_->animations->rows[index].access=false;
 }
-bool Owner::commitTbDoorOwner(const ::tb_door_binding50TB::Binding* owner)noexcept {
- if(!storage_||!owner||storage_->tbDoor.owner!=owner||!storage_->tbDoor.access||!storage_->tbDoor.membership)return false;
- auto& o=*storage_;const auto& m=*o.tbDoor.membership;const auto& r=o.registrations[o.racerCount+1u];
- if(!m.attached||m.object!=o.racerCount+2u||m.method!=ZoneMethod50CL::Second||!r.owner)return false;
- o.tbDoor.complete=true;return true;
-}
-bool Owner::releaseTbDoorOwner(const ::tb_door_binding50TB::Binding* owner)noexcept {
- if(!storage_||!owner||storage_->tbDoor.owner!=owner)return false;auto& o=*storage_;
- if(o.tbDoor.access||o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    !o.tbDoor.membership||o.tbDoor.membership->attached||o.tbDoor.membership->object)return false;
- const auto& r=o.registrations[o.racerCount+1u];if(r.owner||r.slot||r.encodedObject)return false;
- o.tbDoor={};return true;
-}
-bool Owner::currentTbDoorOwner(const ::tb_door_binding50TB::Binding* owner)const noexcept {
- return storage_&&!invalidated_&&owner&&storage_->scene==Scene::tb&&storage_->tbDoor.owner==owner&&
-  storage_->tbDoor.complete&&!storage_->tbDoor.access&&storage_->tbDoor.membership&&storage_->tbDoor.membership->attached;
-}
-}
-
-namespace rr::game::original_gc_gameplay_lighting_candidate {
-std::size_t Owner::gbAnimationStorageReservationBytes()noexcept {
- // Honest common pointer/padding delta, GB-only four-row state, and the full
- // thirteen-record registration payload at the existing eight-racer maximum.
- return sizeof(std::unique_ptr<Storage::GbAnimationState>)+2u*alignof(Storage)+
-        sizeof(Storage::GbAnimationState)+(maximumRacers+5u)*sizeof(ZoneRegistration50CJ);
-}
-bool Owner::bindGbAnimationOwner(const ::gb_animation_binding50GB::Binding* owner,std::size_t index,
- const LiveZoneMembership50EN* membership)noexcept {
- if(!owner||!membership||index>=4||!storage_||invalidated_||storage_->scene!=Scene::gb)return false;
- auto& o=*storage_;
- if((o.gbTimed&&o.gbTimed->activeGbParticleLight)||!o.gbAnimations||o.world.zones.size()!=13||o.world.portals.size()!=17||!o.legacyTopology||o.scTopology||o.tcTopology||
-    o.staticAccess||(o.staticOwner&&!o.staticRegistrationComplete)||o.tcGateAccess||o.tcGateOwner||o.tbDoor.owner||
-    o.gbAnimations->active()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    membership->attached||membership->object||o.visibility.lifecycle.objectCount!=o.identityCount())return false;
- auto& row=o.gbAnimations->rows[index];if(row.owner||row.membership)return false;
- // Selected native pre-staging claims authentic owner0..3 in source order.
- // Existing incomplete rows of this SAME Binding do not block the next row.
- for(std::size_t i=0;i<4;++i){const auto& prior=o.gbAnimations->rows[i];
-  if((i<index&&prior.owner!=owner)||(i>index&&prior.owner))return false;}
- const auto& registration=o.registrations[o.racerCount+1u+index];
- if(registration.owner||registration.slot||registration.encodedObject)return false;
- row.owner=owner;row.membership=membership;row.complete=false;return true;
-}
-bool Owner::beginGbAnimationAccess(const ::gb_animation_binding50GB::Binding* owner,std::size_t index,
- ResetVisibilityWorld50EY*& world,LiveZoneWorkspace50EN*& workspace,CollectionRef50BX& object)noexcept {
- world=nullptr;workspace=nullptr;object=0;
- if(!owner||index>=4||!storage_||invalidated_||storage_->scene!=Scene::gb)return false;
- auto& o=*storage_;
- if((o.gbTimed&&o.gbTimed->activeGbParticleLight)||!o.gbAnimations||o.gbAnimations->rows[index].owner!=owner||o.gbAnimations->active()||o.staticAccess||
-    o.tcGateAccess||o.tbDoor.access||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return false;
- auto& row=o.gbAnimations->rows[index];row.access=true;row.complete=false;
- world=&o.visibility;workspace=&o.workspace;object=o.racerCount+2u+static_cast<CollectionRef50BX>(index);return true;
-}
-void Owner::endGbAnimationAccess(const ::gb_animation_binding50GB::Binding* owner,std::size_t index)noexcept {
- if(storage_&&owner&&index<4&&storage_->gbAnimations&&storage_->gbAnimations->rows[index].owner==owner)
-  storage_->gbAnimations->rows[index].access=false;
-}
-bool Owner::commitGbAnimationOwner(const ::gb_animation_binding50GB::Binding* owner,std::size_t index)noexcept {
- if(!storage_||invalidated_||storage_->scene!=Scene::gb||!owner||index>=4||!storage_->gbAnimations)return false;
- auto& o=*storage_;auto& row=o.gbAnimations->rows[index];
- if((o.gbTimed&&o.gbTimed->activeGbParticleLight)||row.owner!=owner||!row.access||!row.membership)return false;
- const auto& m=*row.membership;const auto& r=o.registrations[o.racerCount+1u+index];
- const auto object=o.racerCount+2u+static_cast<CollectionRef50BX>(index);
- if(!m.attached||m.object!=object||m.method!=ZoneMethod50CL::Second||!r.owner||!m.storage.entries||!m.storage.capacity)return false;
- const auto& primary=m.storage.entries[0].registration;
- if(primary.owner!=r.owner||primary.slot!=r.slot||primary.encodedObject!=r.encodedObject||r.encodedObject!=(object<<2u))return false;
- row.complete=true;return true;
-}
-bool Owner::releaseGbAnimationOwner(const ::gb_animation_binding50GB::Binding* owner,std::size_t index)noexcept {
- if(!storage_||!owner||index>=4||!storage_->gbAnimations)return false;auto& o=*storage_;
- auto& row=o.gbAnimations->rows[index];
- if((o.gbTimed&&o.gbTimed->activeGbParticleLight)||row.owner!=owner||o.gbAnimations->active()||o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    !row.membership||row.membership->attached||row.membership->object)return false;
- const auto& r=o.registrations[o.racerCount+1u+index];if(r.owner||r.slot||r.encodedObject)return false;
- row={};return true;
-}
-bool Owner::currentGbAnimationOwner(const ::gb_animation_binding50GB::Binding* owner,std::size_t index)const noexcept {
- if(!storage_||invalidated_||!owner||index>=4||storage_->scene!=Scene::gb||!storage_->gbAnimations)return false;
- const auto& o=*storage_;const auto& row=o.gbAnimations->rows[index];
- return row.owner==owner&&row.complete&&!o.gbAnimations->active()&&row.membership&&row.membership->attached&&
-  row.membership->object==o.racerCount+2u+index;
-}
-bool Owner::bindMcAnimationOwner(const ::mc_animation_binding50MC::Binding* owner,std::size_t index,
- const LiveZoneMembership50EN* membership)noexcept {
- if(!owner||!membership||index>=14||!storage_||invalidated_||storage_->scene!=Scene::mc)return false;
- auto& o=*storage_;
- if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||!o.mcAnimations||o.world.zones.size()!=28||o.world.portals.size()!=28||!o.mcTopology||o.legacyTopology||o.scTopology||o.tcTopology||
-    o.staticAccess||(o.staticOwner&&!o.staticRegistrationComplete)||o.tcGateAccess||o.tcGateOwner||o.tbDoor.owner||
-    o.mcAnimations->active()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
-    membership->attached||membership->object||o.visibility.lifecycle.objectCount!=o.identityCount())return false;
- auto& row=o.mcAnimations->rows[index];if(row.owner||row.membership)return false;
- // Selected native pre-staging claims authentic owner0..3 in source order.
- // Existing incomplete rows of this SAME Binding do not block the next row.
- for(std::size_t i=0;i<14;++i){const auto& prior=o.mcAnimations->rows[i];
-  if((i<index&&prior.owner!=owner)||(i>index&&prior.owner))return false;}
- const auto& registration=o.registrations[o.racerCount+1u+index];
- if(registration.owner||registration.slot||registration.encodedObject)return false;
- row.owner=owner;row.membership=membership;row.complete=false;return true;
-}
-bool Owner::beginMcAnimationAccess(const ::mc_animation_binding50MC::Binding* owner,std::size_t index,
- ResetVisibilityWorld50EY*& world,LiveZoneWorkspace50EN*& workspace,CollectionRef50BX& object)noexcept {
- world=nullptr;workspace=nullptr;object=0;
- if(!owner||index>=14||!storage_||invalidated_||storage_->scene!=Scene::mc)return false;
- auto& o=*storage_;
- if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||!o.mcAnimations||o.mcAnimations->rows[index].owner!=owner||o.mcAnimations->active()||o.staticAccess||
-    o.tcGateAccess||o.tbDoor.access||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return false;
- auto& row=o.mcAnimations->rows[index];row.access=true;row.complete=false;
- world=&o.visibility;workspace=&o.workspace;object=o.racerCount+2u+static_cast<CollectionRef50BX>(index);return true;
-}
-void Owner::endMcAnimationAccess(const ::mc_animation_binding50MC::Binding* owner,std::size_t index)noexcept {
- if(storage_&&owner&&index<14&&storage_->mcAnimations&&storage_->mcAnimations->rows[index].owner==owner)
-  storage_->mcAnimations->rows[index].access=false;
-}
-bool Owner::commitMcAnimationOwner(const ::mc_animation_binding50MC::Binding* owner,std::size_t index)noexcept {
- if(!storage_||invalidated_||storage_->scene!=Scene::mc||!owner||index>=14||!storage_->mcAnimations)return false;
- auto& o=*storage_;auto& row=o.mcAnimations->rows[index];
+bool Owner::commitTrackAnimationRow(const ::track_animation_binding50AN::Binding* owner,std::size_t index)noexcept {
+ if(!storage_||invalidated_||!owner||!storage_->animations||index>=storage_->animations->rows.size())return false;
+ auto& o=*storage_;auto& row=o.animations->rows[index];
  if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||row.owner!=owner||!row.access||!row.membership)return false;
- const auto& m=*row.membership;const auto& r=o.registrations[o.racerCount+1u+index];
- const auto object=o.racerCount+2u+static_cast<CollectionRef50BX>(index);
+ const auto& m=*row.membership;const auto& r=o.registrations[o.animationBase()+index];
+ const auto object=static_cast<CollectionRef50BX>(o.animationBase()+1u+index);
  if(!m.attached||m.object!=object||m.method!=ZoneMethod50CL::Second||!r.owner||!m.storage.entries||!m.storage.capacity)return false;
  const auto& primary=m.storage.entries[0].registration;
  if(primary.owner!=r.owner||primary.slot!=r.slot||primary.encodedObject!=r.encodedObject||r.encodedObject!=(object<<2u))return false;
  row.complete=true;return true;
 }
-bool Owner::releaseMcAnimationOwner(const ::mc_animation_binding50MC::Binding* owner,std::size_t index)noexcept {
- if(!storage_||!owner||index>=14||!storage_->mcAnimations)return false;auto& o=*storage_;
- auto& row=o.mcAnimations->rows[index];
- if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||row.owner!=owner||o.mcAnimations->active()||o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
+bool Owner::releaseTrackAnimationRow(const ::track_animation_binding50AN::Binding* owner,std::size_t index)noexcept {
+ if(!storage_||!owner||!storage_->animations||index>=storage_->animations->rows.size())return false;auto& o=*storage_;
+ auto& row=o.animations->rows[index];
+ if(o.activeMcParticleLight||(o.gbTimed&&o.gbTimed->activeGbParticleLight)||row.owner!=owner||o.animations->active()||o.staticAccess||
+    o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||
     !row.membership||row.membership->attached||row.membership->object)return false;
- const auto& r=o.registrations[o.racerCount+1u+index];if(r.owner||r.slot||r.encodedObject)return false;
+ const auto& r=o.registrations[o.animationBase()+index];if(r.owner||r.slot||r.encodedObject)return false;
  row={};return true;
 }
-bool Owner::currentMcAnimationOwner(const ::mc_animation_binding50MC::Binding* owner,std::size_t index)const noexcept {
- if(!storage_||invalidated_||!owner||index>=14||storage_->scene!=Scene::mc||!storage_->mcAnimations)return false;
- const auto& o=*storage_;const auto& row=o.mcAnimations->rows[index];
- return row.owner==owner&&row.complete&&!o.mcAnimations->active()&&row.membership&&row.membership->attached&&
-  row.membership->object==o.racerCount+2u+index;
+bool Owner::currentTrackAnimationRow(const ::track_animation_binding50AN::Binding* owner,std::size_t index)const noexcept {
+ if(!storage_||invalidated_||!owner||!storage_->animations||index>=storage_->animations->rows.size())return false;
+ const auto& o=*storage_;const auto& row=o.animations->rows[index];
+ return row.owner==owner&&row.complete&&!o.animations->active()&&row.membership&&row.membership->attached&&
+  row.membership->object==o.animationBase()+1u+index;
 }
 }
 
@@ -2494,16 +2342,17 @@ bool Owner::queryMcZoneLight(std::uint32_t zone,const std::array<float,3>& posit
  // Value query only, not a live membership/renderer receipt. Same real portal links and float ordering.
  return o.selectAuthoredZones(zone,nullptr,position,out,d);
 }
-std::size_t Owner::mcAnimationStorageReservationBytes()noexcept{
- return sizeof(Storage::McAnimationState)+sizeof(Storage::McTopologyStorage)+
-   (maximumRacers+15u)*sizeof(ZoneRegistration50CJ);
+std::size_t Owner::mcTopologyStorageReservationBytes()noexcept{
+ // MC's topology backing; its animation rows are charged by trackAnimationStorageReservationBytes.
+ return sizeof(Storage::McTopologyStorage);
 }
 }
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 std::size_t Owner::mcRetainedPayloadBytes()const noexcept {
  if(!mcSourceIdentity())return 0;
- const auto& o=*storage_;std::size_t n=sizeof(Owner)+sizeof(Storage)+sizeof(Storage::McTopologyStorage)+sizeof(Storage::McAnimationState);
+ const auto& o=*storage_;std::size_t n=sizeof(Owner)+sizeof(Storage)+sizeof(Storage::McTopologyStorage)+
+  (o.animations?sizeof(Storage::AnimationLane)+o.animations->rows.capacity()*sizeof(Storage::AnimationLane::Row):0u);
  auto add=[&](std::size_t x){n=x>std::numeric_limits<std::size_t>::max()-n?std::numeric_limits<std::size_t>::max():n+x;};
  auto vector=[&](const auto& v){using T=typename std::decay_t<decltype(v)>::value_type;if(v.capacity()>std::numeric_limits<std::size_t>::max()/sizeof(T))n=std::numeric_limits<std::size_t>::max();else add(v.capacity()*sizeof(T));};
  auto text=[&](const auto& t){add(t.capacity());add(1);};

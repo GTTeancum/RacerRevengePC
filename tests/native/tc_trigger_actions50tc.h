@@ -1,6 +1,6 @@
 #pragma once
 #include "tc_trigger_authoring50tc.h"
-#include "tc_gate_runtime50tc.h"
+#include "track_animation_runtime50an.h"
 #include "tc_global_sound50tc.h"
 #include "../../src/game/native_trigger_group50tc.h"
 #include "../../src/game/trigger_sphere50in.h"
@@ -21,7 +21,7 @@ struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0,animationActivat
 enum class Status {Complete,Unprepared,Input,Service,Action};
 class Owner final {
  std::shared_ptr<const tc_trigger_authoring50TC::Owner> source_;
- std::shared_ptr<tc_gate_runtime50TC::Owner> gate_;
+ std::shared_ptr<track_animation_runtime50AN::Owner> gate_; // the common track-animation runtime
  std::shared_ptr<tc_global_sound50TC::Owner> sounds_;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
@@ -39,7 +39,7 @@ class Owner final {
   const auto& call=event.source;
   if(!ready()||terminal_!=Status::Complete||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
-  if(t>=tc_trigger_authoring50TC::count||c>=group_.colliders.size())return false;
+  if(t>=source_->liveCount()||t>=group_.triggerCount||c>=group_.colliders.size())return false;
   const auto& trigger=source_->source(t);if(call.actionIndex>=trigger.actionCount)return false;
   if(!call.entering)return servicing_&&!lease_&&!group_.queryActive&&event.querySerial==0;
   if(servicing_||!lease_||!group_.queryActive||!event.querySerial||event.querySerial!=group_.querySerial||
@@ -48,8 +48,11 @@ class Owner final {
   const auto& action=trigger.actions[call.actionIndex];
   if(action.kind==tc_trigger_authoring50TC::Action::LostAI)
    return !action.authoredReset&&!action.effectiveReset1B5A60&&action.targetNodeIndex<source_->coldSource()->ai().count()&&((c&1u)||lease_->nodeC80);
-  if(action.kind==tc_trigger_authoring50TC::Action::Animation)return t==tc_trigger_authoring50TC::gate&&call.actionIndex==0&&gate_->ready()&&action.animationIndex==0;
-  return t==tc_trigger_authoring50TC::gate&&sounds_->readyFor(*source_,call.actionIndex);
+  // The common track-animation runtime holds every row the TOB's [Animations] loads.
+  if(action.kind==tc_trigger_authoring50TC::Action::Animation)return gate_&&gate_->ready()&&action.animationIndex<gate_->rowCount();
+  // The global Sound owner serves the trigger that authors the Sounds.
+  return action.kind==tc_trigger_authoring50TC::Action::Sound&&sounds_&&
+   t==source_->firstTriggerWith(tc_trigger_authoring50TC::Action::Sound)&&sounds_->readyFor(*source_,call.actionIndex);
  }
  g::SourceTriggerActionResult50TC resume(const g::SourceTriggerActionCall50TC& event)noexcept {
   using A=g::SourceTriggerActionStatus50TC;const auto& call=event.source;
@@ -62,7 +65,7 @@ class Owner final {
     return {A::Complete,0x1b27c0u,0xc80u};
    }
    if(action.kind==tc_trigger_authoring50TC::Action::Animation){
-    if(!gate_->activateSequence(action.animationIndex)){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
+    if(!gate_->fire(action.animationIndex,static_cast<std::uint32_t>(call.triggerCollider-firstTriggerIdentity+1))){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
     increment(counters_.animationActivations);return {A::Complete,0x101170u,0x90u};
    }
    if(!sounds_->playEntering(*source_,call.actionIndex,action,error_)){fail(Status::Action);return {A::Blocked,0x102920u,0x210u};}
@@ -104,26 +107,41 @@ public:
  // Cold setup publishes only stable source/group backing. It cannot admit a
  // query until real arena collider identities are bound after Bank visits.
  bool prepare(std::shared_ptr<const tc_trigger_authoring50TC::Owner> source,
-     std::shared_ptr<tc_gate_runtime50TC::Owner> gate,std::shared_ptr<tc_global_sound50TC::Owner> sounds)noexcept {
+     std::shared_ptr<track_animation_runtime50AN::Owner> gate,std::shared_ptr<tc_global_sound50TC::Owner> sounds)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource()||source->coldSource()->ai().count()!=293||
-     !gate||!gate->ready()||gate->coldSource()!=source->coldSource()||!sounds||!sounds->readyFor(*source,1)||!sounds->readyFor(*source,2))return false;
-  for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
-   if(authored.actionCount!=(i==tc_trigger_authoring50TC::gate?3u:1u)||authored.randomTriggerPercent!=100)return false;
+  // Owners are required by the authored action kinds: the gate animation owner
+  // for an Animation action, the global Sound owner for Sound actions (each of
+  // its authored Sound actions must be one it serves). 0 triggers = empty group.
+  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource())return false;
+  const bool animation=source->authors(tc_trigger_authoring50TC::Action::Animation);
+  const bool sound=source->authors(tc_trigger_authoring50TC::Action::Sound);
+  if((animation&&!gate)||(gate&&!gate->ready())||(sound&&!sounds))return false;
+  const auto live=source->liveCount();if(live>group_.triggers.size())return false;
+  for(std::size_t i=0;i<live;++i){const auto& authored=source->source(i);
+   for(std::uint32_t k=0;k<authored.actionCount;++k)if(authored.actions[k].kind==tc_trigger_authoring50TC::Action::Sound&&
+      (i!=source->firstTriggerWith(tc_trigger_authoring50TC::Action::Sound)||!sounds->readyFor(*source,k)))return false;
+  }
+  for(std::size_t i=0;i<live;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
+   // TC chain has no trigger-chance roll: RandomTriggerPercent 100 only.
+   if(!authored.actionCount||authored.actionCount>g::nativeTriggerActionSlots50TG||authored.randomTriggerPercent!=100)return false;
    state.flags29=authored.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(authored.oneTimeOnly?4u:0u));
    state.randomTriggerPercent90=100;state.callbackCount98=authored.actionCount;
    state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
-  source_=std::move(source);gate_=std::move(gate);sounds_=std::move(sounds);group_.actions=hooks();sourcePrepared_=true;return true;
+  group_.triggerCount=live;
+  source_=std::move(source);gate_=std::move(gate);if(sound)sounds_=std::move(sounds);group_.actions=hooks();sourcePrepared_=true;return true;
  }
  bool bindRacerIdentities(const std::array<RacerIdentities,racers>& identities,
      std::uint32_t actualPlayerPrefixCount34,std::size_t racerCount=racers)noexcept {
   if(bindAttempted_||!sourcePrepared_||!preparedSourceFor(*source_)||ready_||lease_||servicing_)return false;bindAttempted_=true;
-  if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount||!sounds_->readyFor(*source_,1)||!sounds_->readyFor(*source_,2))return false;
+  if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount)return false;
+  if(sounds_){const auto t=source_->firstTriggerWith(tc_trigger_authoring50TC::Action::Sound);
+   for(std::uint32_t k=0;t<source_->liveCount()&&k<source_->source(t).actionCount;++k)
+    if(source_->source(t).actions[k].kind==tc_trigger_authoring50TC::Action::Sound&&!sounds_->readyFor(*source_,k))return false;}
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+tc_trigger_authoring50TC::count))return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+group_.triggerCount))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
   // Staging contains only scalar/contact records. The published group address
@@ -131,7 +149,7 @@ public:
   auto next=group_;
   if(!next.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
-  for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i)if(source_->source(i).ignorePlayer){
+  for(std::size_t i=0;i<group_.triggerCount;++i)if(source_->source(i).ignorePlayer){
    next.ignoreColliderCount[i]=actualPlayerPrefixCount34;
    for(std::size_t j=0;j<actualPlayerPrefixCount34;++j)next.ignoreColliders[i][j]=identities[j].main690;
   }
@@ -139,7 +157,9 @@ public:
   racers_=identities;racerCount_=racerCount;group_=std::move(next);ready_=true;return true;
  }
  bool preparedSourceFor(const tc_trigger_authoring50TC::Owner& source)const noexcept {
-  return sourcePrepared_&&thread_==std::this_thread::get_id()&&source_.get()==&source&&source.ready()&&gate_&&gate_->ready()&&sounds_&&sounds_->prepared();
+  return sourcePrepared_&&thread_==std::this_thread::get_id()&&source_.get()==&source&&source.ready()&&
+   (gate_?gate_->ready():!source.authors(tc_trigger_authoring50TC::Action::Animation))&&
+   (sounds_?sounds_->prepared():!source.authors(tc_trigger_authoring50TC::Action::Sound));
  }
  const tc_global_sound50TC::Owner* soundOwner()const noexcept{return sounds_.get();}
  const tc_trigger_authoring50TC::Owner* sourceOwner()const noexcept{return source_.get();}
@@ -162,7 +182,7 @@ public:
   if(lease_||servicing_||group_.queryActive||terminal_!=Status::Complete)return terminal_==Status::Complete?fail(Status::Input):terminal_;
   if(!g::validNativeTriggerGroup50TC(group_))return fail(Status::Input);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
-  for(std::size_t t=0;t<tc_trigger_authoring50TC::count;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
+  for(std::size_t t=0;t<group_.triggerCount;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
@@ -189,10 +209,11 @@ public:
   return Status::Complete;
  }
  g::NativeTriggerGroup50TC& nativeGroup()noexcept{return group_;}
- const g::TriggerEntryState50IN& state(std::size_t i)const{return group_.triggers.at(i);}
+ const g::TriggerEntryState50IN& state(std::size_t i)const{if(i>=group_.triggerCount)throw std::out_of_range("TC trigger state outside the live prefix");return group_.triggers[i];}
+ std::size_t triggerCount()const noexcept{return group_.triggerCount;}
  const Counters& counters()const noexcept{return counters_;}
  const std::string& lastError()const noexcept{return error_;}
  Status status()const noexcept{return terminal_;}
- bool ready()const noexcept{return ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&gate_&&gate_->ready()&&sounds_&&sounds_->prepared();}
+ bool ready()const noexcept{return ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&(!gate_||gate_->ready())&&(!sounds_||sounds_->prepared());}
 };
 }

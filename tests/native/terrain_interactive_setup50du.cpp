@@ -53,9 +53,8 @@
 #include "mb_static_model_params_fixture.h"
 #include "mb_collision_world50mb.h"
 #include "mb_source_trigger50mb.h"
-#include "tb_door_binding50tb.h"
+#include "track_animation_binding50an.h"
 #include "tb_cold_visibility50tb.h"
-#include "tc_gate_visibility50tc.h"
 #include "tc_cold_visibility50tc.h"
 #include "native_cold_model_retirement50lh.h"
 #include "ra_native_session50la.h"
@@ -78,9 +77,8 @@
 #include "ma_trigger_candidates_fixture.h"
 #include "sc_trigger_candidates_fixture.h"
 #include "sa_trigger_candidates_fixture.h"
-#include "gc_animated_candidates50ig_fixture.h"
+#include "track_animation_candidates50an.h"
 #include "gc_trigger_candidates50kg_fixture.h"
-#include "ga_animated_candidates_fixture.h"
 #include "ga_trigger_candidates_fixture.h"
 #include "terrain_interactive_storage50du.h"
 #include "runtime_allocation_counter50fl.h"
@@ -238,9 +236,12 @@ SessionExit50DU Context::run() {
  auto& freshMainProbe=this->freshMainProbe;
  auto& freshProbe100=this->freshProbe100;
  auto& freshTerrainProbe=this->freshTerrainProbe;
- auto& gaAnimatedMembership=this->gaAnimatedMembership;
- auto& gaAnimatedWorld=this->gaAnimatedWorld;
- auto& gaAnimationDiagnostic=this->gaAnimationDiagnostic;
+ auto& trackAnimationMembership=this->trackAnimationMembership;
+ auto& trackAnimations=this->trackAnimations;
+ auto& trackAnimationBinding=this->trackAnimationBinding;
+ auto& trackAnimationBindingDiagnostic=this->trackAnimationBindingDiagnostic;
+ auto& trackAnimationPrefixArmed=this->trackAnimationPrefixArmed;
+ auto& trackAnimationDiagnostic=this->trackAnimationDiagnostic;
  auto& gaOriginalDisc=this->gaOriginalDisc;
  auto& gaOriginalWorld=this->gaOriginalWorld;
  auto& gaTriggerActions=this->gaTriggerActions;
@@ -249,9 +250,6 @@ SessionExit50DU Context::run() {
  auto& gaTriggerMembership=this->gaTriggerMembership;
  auto& gbAiMetadata=this->gbAiMetadata;
  auto& gbAiView=this->gbAiView;
- auto& gbAnimationBinding=this->gbAnimationBinding;
- auto& gbAnimationBindingDiagnostic=this->gbAnimationBindingDiagnostic;
- auto& gbAnimationRuntime=this->gbAnimationRuntime;
  auto& gbColdSources=this->gbColdSources;
  auto& gbCollisionWorld=this->gbCollisionWorld;
  auto& gbFogOwner=this->gbFogOwner;
@@ -280,9 +278,6 @@ SessionExit50DU Context::run() {
  auto& gbTriggerActions=this->gbTriggerActions;
  auto& gbTriggerAuthoring=this->gbTriggerAuthoring;
  auto& gbWorldBorrow=this->gbWorldBorrow;
- auto& gcAnimatedMembership=this->gcAnimatedMembership;
- auto& gcAnimatedWorld=this->gcAnimatedWorld;
- auto& gcAnimationDiagnostic=this->gcAnimationDiagnostic;
  auto& gcNativeGate=this->gcNativeGate;
  auto& gcNativeWorldSelected=this->gcNativeWorldSelected;
  auto& gcOriginalDisc=this->gcOriginalDisc;
@@ -339,9 +334,6 @@ SessionExit50DU Context::run() {
  auto& mcAdditionalPayloadReserved=this->mcAdditionalPayloadReserved;
  auto& mcAiMetadata=this->mcAiMetadata;
  auto& mcAiView=this->mcAiView;
- auto& mcAnimationBinding=this->mcAnimationBinding;
- auto& mcAnimationBindingDiagnostic=this->mcAnimationBindingDiagnostic;
- auto& mcAnimationRuntime=this->mcAnimationRuntime;
  auto& mcColdSources=this->mcColdSources;
  auto& mcCollisionWorld=this->mcCollisionWorld;
  auto& mcFogOwner=this->mcFogOwner;
@@ -465,8 +457,6 @@ SessionExit50DU Context::run() {
  auto& resetLifecycle=this->resetLifecycle;
  auto& response=this->response;
  auto& s=this->s;
- auto& saAnimatedWorld=this->saAnimatedWorld;
- auto& saAnimationDiagnostic=this->saAnimationDiagnostic;
  auto& saOriginalDisc=this->saOriginalDisc;
  auto& saOriginalWorld=this->saOriginalWorld;
  auto& saTriggerActions=this->saTriggerActions;
@@ -518,11 +508,6 @@ SessionExit50DU Context::run() {
  auto& tbAiView=this->tbAiView;
  auto& tbColdSources=this->tbColdSources;
  auto& tbCollisionWorld=this->tbCollisionWorld;
- auto& tbDoorBinding=this->tbDoorBinding;
- auto& tbDoorBindingDiagnostic=this->tbDoorBindingDiagnostic;
- auto& tbDoorDiagnostic=this->tbDoorDiagnostic;
- auto& tbDoorPrefixArmed=this->tbDoorPrefixArmed;
- auto& tbDoorRuntime=this->tbDoorRuntime;
  auto& tbLightOwner=this->tbLightOwner;
  auto& tbLiveAudioPrepared=this->tbLiveAudioPrepared;
  auto& tbMapMetadata=this->tbMapMetadata;
@@ -539,11 +524,6 @@ SessionExit50DU Context::run() {
  auto& tcAiView=this->tcAiView;
  auto& tcColdSources=this->tcColdSources;
  auto& tcCollisionWorld=this->tcCollisionWorld;
- auto& tcGateDiagnostic=this->tcGateDiagnostic;
- auto& tcGatePrefixArmed=this->tcGatePrefixArmed;
- auto& tcGateRuntime=this->tcGateRuntime;
- auto& tcGateVisibility=this->tcGateVisibility;
- auto& tcGateVisibilityDiagnostic=this->tcGateVisibilityDiagnostic;
  auto& tcGlobalSound=this->tcGlobalSound;
  auto& tcLightOwner=this->tcLightOwner;
  auto& tcLiveAudioPrepared=this->tcLiveAudioPrepared;
@@ -574,7 +554,7 @@ SessionExit50DU Context::run() {
  rr::game::CollisionAdmissionScope50CC collisionAdmissionScope50CC;
  // The actual guards remain early; these views have no destructor action.
  struct ArmedFlagView { bool& armed; };
- ArmedFlagView tbDoorPrefixGuard{tbDoorPrefixArmed},tcGatePrefixGuard{tcGatePrefixArmed};
+ ArmedFlagView trackAnimationPrefixGuard{trackAnimationPrefixArmed};
  const auto srays=secondaryPairCapacity;
  std::vector<SpringCumulativePair48N> sip(srays),ssp(srays),sdp(srays);std::vector<Type2PairMetadata49X> sim(srays),ssm(srays),sdm(srays);
  std::vector<TerrainCandidateEffects48J> sse(candidates.size()),sde(candidates.size());std::vector<Type2WorkItem49X> ss(stackCount+secondaryQueryResource.maxDepth);
@@ -716,7 +696,7 @@ SessionExit50DU Context::run() {
   };
   if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
-  for(std::size_t i=0;i<21;++i){auto* member=mcWorldBorrow->triggerMembership(i);
+  for(std::size_t i=0;i<mcWorldBorrow->triggerCount();++i){auto* member=mcWorldBorrow->triggerMembership(i);
    if(!member||!remove(member->state,static_cast<CollectionRef50BX>(90+i)))return false;}
   return true;
  };
@@ -735,8 +715,9 @@ SessionExit50DU Context::run() {
   };
   if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
-  for(std::size_t i=0;i<18;++i){auto* member=gbWorldBorrow->triggerMembership(i);
-   if(!member||!remove(member->state,static_cast<CollectionRef50BX>(616+i)))return false;}
+  // Live trigger memberships (stock 18 at objects 616..633).
+  for(std::size_t i=0;i<gbWorldBorrow->triggerCount();++i){auto* member=gbWorldBorrow->triggerMembership(i);
+   if(!member||!remove(member->state,static_cast<CollectionRef50BX>(gbCollisionWorld->sourceCount()+1+i)))return false;}
   return true;
  };
  struct GbCurrentCollisionGuard {
@@ -755,7 +736,7 @@ SessionExit50DU Context::run() {
   };
   if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
-  for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
+  for(std::size_t i=0;i<tbWorldBorrow->triggerCount();++i){
    auto* membership=tbWorldBorrow->triggerMembership(i);
    if(!membership||!remove(membership->state,static_cast<CollectionRef50BX>(tb_collision_world50TB::sourceCandidates+i+1)))return false;
   }
@@ -776,7 +757,7 @@ SessionExit50DU Context::run() {
   };
   if(!removeCurrentQueryRows(remove))return false;
   s.shape.registrationE0=0;
-  for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){
+  for(std::size_t i=0;i<tcWorldBorrow->triggerCount();++i){
    auto* membership=tcWorldBorrow->triggerMembership(i);
    if(!membership||!remove(membership->state,static_cast<CollectionRef50BX>(tc_collision_world50TC::sourceCandidates+i+1)))return false;
   }
@@ -1261,7 +1242,9 @@ SessionExit50DU Context::run() {
    const bool prepared=rcPositionalAudio->prepare(rcColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"RC positional audio preparation rejected":audioError.c_str());
-   require50DU(originalAiAudio->registerResultsWorldSound26D070(rcPositionalAudio->resultsWorldTransport26D070()),
+   // Absent soul-tree sounds in the AUB = no positional owner (common reader).
+   if(!rcPositionalAudio->authored()){require50DU(rcPositionalAudio->close(),"RC absent positional owner close rejected");rcPositionalAudio.reset();}
+   else require50DU(originalAiAudio->registerResultsWorldSound26D070(rcPositionalAudio->resultsWorldTransport26D070()),
        "RC positional audio Results stop registration rejected");
   }
   if(isTbTrack){
@@ -1273,11 +1256,13 @@ SessionExit50DU Context::run() {
        "TB positional audio requires the same retained trigger/material/cold source");
    tbPositionalAudio=std::make_unique<tb_positional_sound50TB::Owner>();
    // prepare checks every actual128..151 slot is inactive and unbound before
-   // registering all97 descriptors with this same mixer and World4D8 owner.
+   // registering the AUB's live descriptors with this same mixer and World4D8 owner.
    const bool prepared=tbPositionalAudio->prepare(tbColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"TB positional audio preparation rejected":audioError.c_str());
-   require50DU(originalAiAudio->registerResultsWorldSound26D070(tbPositionalAudio->resultsWorldTransport26D070()),
+   // Absent soul-tree sounds in the AUB = no positional owner (common reader).
+   if(!tbPositionalAudio->authored()){require50DU(tbPositionalAudio->close(),"TB absent positional owner close rejected");tbPositionalAudio.reset();}
+   else require50DU(originalAiAudio->registerResultsWorldSound26D070(tbPositionalAudio->resultsWorldTransport26D070()),
        "TB positional audio Results stop registration rejected");
    // The door PodSound (voice126) is a World4D8 one-shot the Results stop covers too.
    require50DU(tbPodSound&&originalAiAudio->registerResultsWorldSound26D070(*tbPodSound),
@@ -1290,32 +1275,48 @@ SessionExit50DU Context::run() {
        "MC positional audio requires actual same-source material/mixer/groups/mode owners");
    mcPositionalAudio=std::make_unique<mc_positional_sound50MC::Owner>();
    const bool prepared=mcPositionalAudio->prepare(mcColdSources,audioRoot,*materialMixer,*audioGroups,audioError);
-   require50DU(prepared&&mcPositionalAudio->uses(*materialMixer,*audioGroups),
+   require50DU(prepared&&(!mcPositionalAudio->authored()||mcPositionalAudio->uses(*materialMixer,*audioGroups)),
        audioError.empty()?"MC positional audio preparation rejected":audioError.c_str());
-   require50DU(originalAiAudio->registerResultsWorldSound26D070(mcPositionalAudio->resultsWorldTransport26D070()),
-       "MC positional audio Results stop registration rejected");
-   reserveMcAudioPayload(mcPositionalAudio->retainedPayloadBytes(),
-       "MC actual positional audio retained payload exceeds remaining ledger");
+   // Absent soul-tree sounds in the AUB = no positional owner (common reader).
+   if(!mcPositionalAudio->authored()){require50DU(mcPositionalAudio->close(),"MC absent positional owner close rejected");mcPositionalAudio.reset();}
+   else{
+    require50DU(originalAiAudio->registerResultsWorldSound26D070(mcPositionalAudio->resultsWorldTransport26D070()),
+        "MC positional audio Results stop registration rejected");
+    reserveMcAudioPayload(mcPositionalAudio->retainedPayloadBytes(),
+        "MC actual positional audio retained payload exceeds remaining ledger");
+   }
   }
   if(isGbTrack){
+   // The PodSound owner exists exactly when a trigger authors one (stock: the door).
    require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&gbLiveAudioPrepared&&
-       gbColdSources&&gbColdSources->ready()&&gbPodSound&&gbPodSound->prepared()&&
-       gbPodSound->sourceIdentity()==gbTriggerAuthoring.get()&&
-       gbPodSound->sourceIdentity()->coldSource()==gbColdSources.get()&&
+       gbColdSources&&gbColdSources->ready()&&gbTriggerAuthoring&&gbTriggerAuthoring->coldSource()==gbColdSources.get()&&
+       gbTriggerAuthoring->authorsPodSound()==bool(gbPodSound)&&
+       (!gbPodSound||(gbPodSound->prepared()&&gbPodSound->sourceIdentity()==gbTriggerAuthoring.get()&&
+        gbPodSound->sourceIdentity()->coldSource()==gbColdSources.get()))&&
        materialAudio->gbSourceIdentity()==gbColdSources.get(),
        "GB positional audio requires the same retained trigger/material/cold source");
-   gbPositionalAudio=std::make_unique<gb_positional_sound50GB::Owner>();
-   // prepare checks every actual128..151 slot is inactive and unbound before
-   // registering all49 descriptors with this same mixer and World4D8 owner.
-   const bool prepared=gbPositionalAudio->prepare(gbColdSources,*materialAudio,audioRoot,
-       *materialMixer,*audioGroups,audioError);
-   require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
-   require50DU(originalAiAudio->registerResultsWorldSound26D070(gbPositionalAudio->resultsWorldTransport26D070()),
-       "GB positional audio Results stop registration rejected");
+   // Positional / ambient owner exactly when the AUB authors SoulTree or
+   // ambient sounds (common reader; stock 49 + 4 is a receipt); absent = none.
+   std::size_t soulTreeSounds=0,ambientSounds=0;
+   require50DU(gb_positional_sound50GB::Owner::authoredSounds(*gbColdSources,soulTreeSounds,ambientSounds,audioError),
+       audioError.empty()?"GB course AUB sound counts rejected":audioError.c_str());
+   std::cerr<<"gb_course_owner owner=positional_sound present="<<(soulTreeSounds||ambientSounds?1:0)
+       <<" soultree="<<soulTreeSounds<<" ambient="<<ambientSounds<<" stock="<<(soulTreeSounds==49&&ambientSounds==4?1:0)<<'\n';
+   if(soulTreeSounds||ambientSounds){
+    gbPositionalAudio=std::make_unique<gb_positional_sound50GB::Owner>();
+    // prepare checks every actual128..151 slot is inactive and unbound before
+    // registering all49 descriptors with this same mixer and World4D8 owner.
+    const bool prepared=gbPositionalAudio->prepare(gbColdSources,*materialAudio,audioRoot,
+        *materialMixer,*audioGroups,audioError);
+    require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
+    // Ambient rows only (no SoulTree sound): nothing to transport, no owner.
+    if(!gbPositionalAudio->authored()){require50DU(gbPositionalAudio->close(),"GB absent positional owner close rejected");gbPositionalAudio.reset();}
+    else require50DU(originalAiAudio->registerResultsWorldSound26D070(gbPositionalAudio->resultsWorldTransport26D070()),
+        "GB positional audio Results stop registration rejected");
+   }
    // The door PodSound (voice126) is a World4D8 one-shot the Results stop covers too.
-   require50DU(gbPodSound&&originalAiAudio->registerResultsWorldSound26D070(*gbPodSound),
+   if(gbPodSound)require50DU(originalAiAudio->registerResultsWorldSound26D070(*gbPodSound),
        "GB door sound Results stop registration rejected");
-   std::cerr<<"gb_native_audio ambient_rows=4 ambient_scheduling=unsupported positional_rows=49 native_transport_slots=24\n";
   }
   if(isTcTrack&&originalAiAudioEnabled){
    // TC's two trigger Sounds (voices126-127, World4D8) for the Results stop.
@@ -1644,25 +1645,23 @@ SessionExit50DU Context::run() {
    std::cerr<<" UnsupportedLinkRemoval";
   std::cerr<<'\n';return false;
  };
- if(gcAnimatedWorld)for(std::size_t i=0;i<gcAnimatedMembership.size();++i){
-  auto& membership=*gcAnimatedMembership[i];const auto bounds=gc_animated_candidates50IG::bounds(*gcAnimatedWorld,i);
-  const auto ref=static_cast<CollectionRef50BX>(animatedCandidateFirst+i+1);
+ // Common track-animation rows with collision (candidate k = collisionRows()[k]).
+ // Static-candidate route only: the lane route (TB/TC/GB/MC worlds) publishes its rows through
+ // the common binding (track_animation_binding50an.h), not through this storage.
+ const auto trackAnimationRows=trackAnimations&&!trackAnimationBinding?track_animation_candidates50AN::collisionRows(*trackAnimations):std::vector<std::size_t>{};
+ require50DU(trackAnimationRows.size()==trackAnimationMembership.size(),"track animation membership count differs from its collision rows");
+ for(std::size_t k=0;k<trackAnimationRows.size();++k){const auto row=trackAnimationRows[k];
+  auto& membership=*trackAnimationMembership[k];const auto bounds=track_animation_candidates50AN::bounds(*trackAnimations,row);
+  const auto ref=static_cast<CollectionRef50BX>(animatedCandidateFirst+k+1);
   //2D93F0 ->120070(method2,radius0), then2D94B0 ->120230 after cold pose.
   require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
-      membership.storage(),ref,gcAnimatedWorld->source(i).startingZone,ZoneMethod50CL::Second,0.f,
-      bounds,membershipWork),"GC original animation initial attachment"),"GC original animation zone attachment failed");
+      membership.storage(),ref,track_animation_candidates50AN::authoredZone(*trackAnimations,row),ZoneMethod50CL::Second,0.f,
+      bounds,membershipWork),"track animation initial attachment"),"track animation zone attachment failed");
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
-      bounds,membershipWork),"GC original animation cold update"),"GC original animation cold membership failed");
- }
- if(gaAnimatedWorld)for(std::size_t i=0;i<gaAnimatedMembership.size();++i){
-  auto& membership=*gaAnimatedMembership[i];const auto bounds=ga_animated_candidates::bounds(*gaAnimatedWorld,i);
-  const auto ref=static_cast<CollectionRef50BX>(animatedCandidateFirst+i+1);
-  //2D93F0 ->120070(method2,radius0), then2D94B0 ->120230 after cold pose.
-  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
-      membership.storage(),ref,gaAnimatedWorld->source(i).startingZone,ZoneMethod50CL::Second,0.f,
-      bounds,membershipWork),"GA original animation initial attachment"),"GA original animation zone attachment failed");
-  require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
-      bounds,membershipWork),"GA original animation cold update"),"GA original animation cold membership failed");
+      bounds,membershipWork),"track animation cold update"),"track animation cold membership failed");
+  trackAnimations->mutableState(row).collisionDirty=false;
+  std::cerr<<"track_animation_collision course="<<trackAnimations->label()<<" row="<<(row+1)
+      <<" registered=1 candidate="<<(animatedCandidateFirst+k)<<" zone="<<track_animation_candidates50AN::authoredZone(*trackAnimations,row)<<'\n';
  }
  if(gaTriggerAuthoring)for(std::size_t i=0;i<gaTriggerAuthoring->liveCount();++i){
   auto& membership=*gaTriggerMembership[i];const auto& authored=gaTriggerAuthoring->source(i);
@@ -1715,24 +1714,28 @@ SessionExit50DU Context::run() {
       bounds,membershipWork),"GC authored trigger cold update"),"GC trigger cold membership failed");
  }
  auto refreshAnimatedCandidates=[&](){
-  if(gcAnimatedWorld){
-  gc_animated_candidates50IG::sync(*gcAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
-  for(std::size_t i=0;i<gcAnimatedMembership.size();++i){
-   const auto bounds=gc_animated_candidates50IG::bounds(*gcAnimatedWorld,i);
-   const auto result=updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,gcAnimatedMembership[i]->state,bounds,membershipWork);
-   if(!reportMembership(result,"GC original animation live update"))return false;
-   const auto index=animatedCandidateFirst+i;auto& mirror=movementCandidates[index].collision;
-   mirror.geometry.worldMatrix=candidates[index].candidate.collision.geometry.worldMatrix;
-   mirror.sphere=candidates[index].candidate.collision.sphere;
-  }
-  }
-  if(gaAnimatedWorld){
-  ga_animated_candidates::sync(*gaAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
-  for(std::size_t i=0;i<gaAnimatedMembership.size();++i){
-   const auto bounds=ga_animated_candidates::bounds(*gaAnimatedWorld,i);
-   const auto result=updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,gaAnimatedMembership[i]->state,bounds,membershipWork);
-   if(!reportMembership(result,"GA original animation live update"))return false;
-   const auto index=animatedCandidateFirst+i;auto& mirror=movementCandidates[index].collision;
+  if(trackAnimations&&!trackAnimationBinding){
+  // 11AD80 / 120230 refresh of every collision row; a row hidden with its collision off
+  // (PORT EXTENSION (b), N64 data only) leaves the zone registry until it is shown again.
+  track_animation_candidates50AN::sync(*trackAnimations,candidates.data(),candidates.size(),animatedCandidateFirst);
+  for(std::size_t k=0;k<trackAnimationRows.size();++k){const auto row=trackAnimationRows[k];
+   auto& state=trackAnimations->mutableState(row);auto& membership=*trackAnimationMembership[k];
+   const auto bounds=track_animation_candidates50AN::bounds(*trackAnimations,row);
+   if(!state.collisionWanted){
+    if(membership.state.attached&&!reportMembership(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,membershipWork),
+       "track animation collision unregister"))return false;
+   }else if(!membership.state.attached){
+    if(!reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,membership.storage(),
+       static_cast<CollectionRef50BX>(animatedCandidateFirst+k+1),track_animation_candidates50AN::authoredZone(*trackAnimations,row),
+       ZoneMethod50CL::Second,0.f,bounds,membershipWork),"track animation collision re-register"))return false;
+   }else{
+    // PORT STAND-IN (flagged): 11ADC0/11AD20 re-home a wrapped looping row that left its
+    // StartingZone; the ordinary membership update carries it (no stock row leaves its zone).
+    const auto result=updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,bounds,membershipWork);
+    if(!reportMembership(result,"track animation live update"))return false;
+   }
+   state.collisionDirty=false;state.rehomePending=false;
+   const auto index=animatedCandidateFirst+k;auto& mirror=movementCandidates[index].collision;
    mirror.geometry.worldMatrix=candidates[index].candidate.collision.geometry.worldMatrix;
    mirror.sphere=candidates[index].candidate.collision.sphere;
   }
@@ -1823,7 +1826,8 @@ SessionExit50DU Context::run() {
    const auto& group=gcTriggerActions->nativeGroup();const auto& actions=gcTriggerActions->counters();
    reportedGcTriggerDispatches=group.dispatches;
    std::cerr<<"GC WORLD ACTION: dispatches="<<group.dispatches<<" lost_ai_writes="<<actions.lostAiWrites
-       <<" opening_active="<<gcAnimatedWorld->state(0).sequence.active90
+       <<" opening_active="<<(trackAnimations&&trackAnimations->rowCount()&&!trackAnimations->state(0).active90.empty()?
+           int(trackAnimations->state(0).active90[0]):-1)
        <<" sound_starts="<<actions.soundStarts<<" sound_culled="<<actions.soundCulled
        <<" policy=native_swept_type2_segments\n";
   }
@@ -2021,7 +2025,7 @@ SessionExit50DU Context::run() {
   producer->owner=runtime;producer->storage=&trackStorage;
   producer->bodyRegistry=&dynamicRegistry; //Actual Context lifetime; no fresh identity namespace.
   producer->run=[&](EndQueryBridge::EndCandidateResult& out){
-   if(!endCandidateProducer||!endCandidateProducer->inCall||gcAnimatedWorld||gaAnimatedWorld||
+   if(!endCandidateProducer||!endCandidateProducer->inCall||(trackAnimations&&!trackAnimationRows.empty())||
       zoneQueue.count||!sourceFollowQueries||
       prepareSearchView50BT(registry,registrationBlocks,2,registrationView)!=SearchStorageStatus50BS::Complete||
       !projectRegistered())return;
@@ -2340,6 +2344,30 @@ SessionExit50DU Context::run() {
   endCandidateProducer=ownedEndCandidateProducer.get();
   runtime->endCandidateProducer_=endCandidateProducer;
  }
+ // Race teardown order (1A6840): every race-owned service is released before
+ // the World at race+74 (1A69A8..1A69C4), then the course archive (132BD0 at
+ // 1A6A50). This producer is such a service: its closures (limited, contact,
+ // sharedRun, directPod, terrainLimited, springResponse) each hold the actual
+ // OwnershipBridge, which kept runtime_owners at 7 at the world close. Called
+ // after the Bank backing retired (no visit can reach it). A producer still in
+ // a call or holding a result borrow is refused, not destroyed.
+ // PORT STAND-IN (common-path rule): only RA builds this producer.
+ std::function<bool()> retireRaEndCandidateProducer=[&]()->bool{
+  //Borrow (no copy): a copied pointer would itself count as an owner.
+  const auto* bridge=raWorld&&raWorld->runtimeQueries_?&raWorld->runtimeQueries_:nullptr;
+  const long before=bridge?bridge->use_count():0;
+  const bool present=bool(ownedEndCandidateProducer);
+  if(present&&(ownedEndCandidateProducer->inCall||ownedEndCandidateProducer->nativeLimitedResultBorrow.borrowed())){
+   std::cerr<<"ra_end_producer_retire_refused in_call="<<int(ownedEndCandidateProducer->inCall)<<'\n';
+   return false;
+  }
+  endCandidateProducer=nullptr;ownedEndCandidateProducer.reset();
+  const long after=bridge?bridge->use_count():0;
+  const bool revoked=!(bridge&&(*bridge)->endCandidateProducer_);
+  std::cerr<<"ra_end_producer_retired present="<<int(present)<<" runtime_owners_before="<<before
+      <<" runtime_owners_after="<<after<<" bridge_producer_revoked="<<int(revoked)<<'\n';
+  return revoked;
+ };
  auto commitCandidateEffects=[&](const std::vector<TerrainCandidateEffects48J>&changed){
   if(!registeredCount)return true;
   if(changed.size()<registeredCount)return false;
@@ -3263,9 +3291,12 @@ SessionExit50DU Context::run() {
   .freshProbe100=freshProbe100,
   .freshTerrainProbe=freshTerrainProbe,
   .fulfillDynamicMusicCall=interactive_frame50DU::BorrowedCall<void()>{fulfillDynamicMusic},
-  .gaAnimatedMembership=gaAnimatedMembership,
-  .gaAnimatedWorld=gaAnimatedWorld,
-  .gaAnimationDiagnostic=gaAnimationDiagnostic,
+  .trackAnimationMembership=trackAnimationMembership,
+  .trackAnimations=trackAnimations,
+  .trackAnimationBinding=trackAnimationBinding,
+  .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
+  .trackAnimationPrefixArmed=trackAnimationPrefixGuard.armed,
+  .trackAnimationDiagnostic=trackAnimationDiagnostic,
   .gaGateAudio=gaGateAudio,
   .gaOriginalDisc=gaOriginalDisc,
   .gaOriginalWorld=gaOriginalWorld,
@@ -3275,9 +3306,6 @@ SessionExit50DU Context::run() {
   .gatherRegisteredCall=interactive_frame50DU::BorrowedCall<bool()>{gatherRegistered},
   .gbAiMetadata=gbAiMetadata,
   .gbAiView=gbAiView,
-  .gbAnimationBinding=gbAnimationBinding,
-  .gbAnimationBindingDiagnostic=gbAnimationBindingDiagnostic,
-  .gbAnimationRuntime=gbAnimationRuntime,
   .gbColdSources=gbColdSources,
   .gbCollisionCleanupDone=gbCollisionCleanupDone,
   .gbCollisionWorld=gbCollisionWorld,
@@ -3304,9 +3332,6 @@ SessionExit50DU Context::run() {
   .gbTrackParticles=gbTrackParticles,
   .gbTriggerActions=gbTriggerActions,
   .gbWorldBorrow=gbWorldBorrow,
-  .gcAnimatedMembership=gcAnimatedMembership,
-  .gcAnimatedWorld=gcAnimatedWorld,
-  .gcAnimationDiagnostic=gcAnimationDiagnostic,
   .gcDrawLights=gcDrawLights,
   .gcGateAudio=gcGateAudio,
   .gcGraphicsSequence=gcGraphicsSequence,
@@ -3386,9 +3411,6 @@ SessionExit50DU Context::run() {
   .mcAdditionalPayloadReserved=mcAdditionalPayloadReserved,
   .mcAiMetadata=mcAiMetadata,
   .mcAiView=mcAiView,
-  .mcAnimationBinding=mcAnimationBinding,
-  .mcAnimationBindingDiagnostic=mcAnimationBindingDiagnostic,
-  .mcAnimationRuntime=mcAnimationRuntime,
   .mcColdSources=mcColdSources,
   .mcCollisionCleanupDone=mcCollisionCleanupDone,
   .mcCollisionWorld=mcCollisionWorld,
@@ -3532,6 +3554,7 @@ SessionExit50DU Context::run() {
   .raDiagnostic=raDiagnostic,
   .raFreshProbe=raFreshProbe,
   .raRuntime=raRuntime,
+  .retireRaEndCandidateProducer=retireRaEndCandidateProducer,
   .raWorld=raWorld,
   .raceAudio=raceAudio,
   .raceEnabled=raceEnabled,
@@ -3601,8 +3624,6 @@ SessionExit50DU Context::run() {
   .retireRcAudioOwnersCall=interactive_frame50DU::BorrowedCall<bool() noexcept>{retireRcAudioOwners},
   .retireTbAudioOwnersCall=interactive_frame50DU::BorrowedCall<bool() noexcept>{retireTbAudioOwners},
   .s=s,
-  .saAnimatedWorld=saAnimatedWorld,
-  .saAnimationDiagnostic=saAnimationDiagnostic,
   .saOriginalDisc=saOriginalDisc,
   .saOriginalWorld=saOriginalWorld,
   .saTriggerActions=saTriggerActions,
@@ -3687,11 +3708,6 @@ SessionExit50DU Context::run() {
   .tbColdSources=tbColdSources,
   .tbCollisionCleanupDone=tbCollisionCleanupDone,
   .tbCollisionWorld=tbCollisionWorld,
-  .tbDoorBinding=tbDoorBinding,
-  .tbDoorBindingDiagnostic=tbDoorBindingDiagnostic,
-  .tbDoorDiagnostic=tbDoorDiagnostic,
-  .tbDoorPrefixArmed=tbDoorPrefixGuard.armed,
-  .tbDoorRuntime=tbDoorRuntime,
   .tbLightOwner=tbLightOwner,
   .tbMapMetadata=tbMapMetadata,
   .tbMapView=tbMapView,
@@ -3706,11 +3722,6 @@ SessionExit50DU Context::run() {
   .tcColdSources=tcColdSources,
   .tcCollisionCleanupDone=tcCollisionCleanupDone,
   .tcCollisionWorld=tcCollisionWorld,
-  .tcGateDiagnostic=tcGateDiagnostic,
-  .tcGatePrefixArmed=tcGatePrefixGuard.armed,
-  .tcGateRuntime=tcGateRuntime,
-  .tcGateVisibility=tcGateVisibility,
-  .tcGateVisibilityDiagnostic=tcGateVisibilityDiagnostic,
   .tcGlobalSound=tcGlobalSound,
   .tcLightOwner=tcLightOwner,
   .tcMapMetadata=tcMapMetadata,

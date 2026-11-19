@@ -2,7 +2,7 @@
 #include "ga_trigger_authoring_fixture.h"
 #include "course_trigger_sources50ct.h"
 #include "../../src/game/native_trigger_box_geometry50ma.h"
-#include "ga_animated_world_fixture.h"
+#include "track_animation_runtime50an.h"
 #include "gc_gate_audio50in_fixture.h"
 #include "../../src/game/trigger_entry50in.h"
 #include "../../src/game/native_trigger_group50ga.h"
@@ -10,6 +10,8 @@
 #include "../../src/game/type2_resource49x.h"
 #include "../../src/game/trigger_actions50in.h"
 #include <array>
+#include <iostream>
+#include <string>
 
 // Source action/lifecycle owner only. This file DOES NOT supply the missing
 // original type2 -> sphere5 geometric entry backend. The collector may bind
@@ -36,7 +38,7 @@ struct Counters {
 enum class Status {Complete,Unprepared,Input,IgnoredPlayer,Entry,Action,Service};
 class Owner final {
  const course_trigger_sources50CT::Owner* source_=nullptr;
- ga_animated_world::Owner* animation_=nullptr;
+ track_animation_runtime50AN::Control* animation_=nullptr; // the common track-animation owner (101170 fire)
  gc_gate_audio50IN::Owner* sound_=nullptr;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
@@ -63,7 +65,7 @@ class Owner final {
    case ga_trigger_authoring::Action::LostAI:
     return !action.reset&&action.targetNodeIndex<originalAiNodeCount_&&((c&1u)||lease_->nodeC80);
    case ga_trigger_authoring::Action::Animation:
-    return animation_&&animation_->ready()&&action.animationIndex<ga_animated_world::ownerCount;
+    return animation_&&animation_->ready()&&action.animationIndex<animation_->rowCount();
    case ga_trigger_authoring::Action::PodSound:{
     const auto decision=g::triggerPodSoundAdmission50IN(true,
       {action.position,action.minDistance,action.maxDistance},lease_->listenerPositions,lease_->listenerCount);
@@ -92,7 +94,7 @@ class Owner final {
     counters_.lostAiWrites+=result.changedRacers;break;
    }
    case ga_trigger_authoring::Action::Animation:
-    if(animation_&&animation_->activateSequence(action.animationIndex))++counters_.animationActivations;
+    if(animation_&&animation_->fire(action.animationIndex,static_cast<std::uint32_t>(t+1)))++counters_.animationActivations;
     else actionFailed_=group_.actionsFailed=true;
     break;
    case ga_trigger_authoring::Action::PodSound:{
@@ -112,13 +114,34 @@ class Owner final {
    [](void* p,const g::TriggerActionCall50IN& c)noexcept{static_cast<Owner*>(p)->apply(c);}};
  }
  Status fail(Status s)noexcept {if(terminal_==Status::Complete)terminal_=s;return terminal_;}
+ std::string label_="??",error_;
+ bool refuse(const std::string& why)noexcept {
+  try{error_=why;std::cerr<<"course_triggers_common course="<<label_<<" refused: "<<why<<'\n';}catch(...){}return false;}
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
+ // The one common trigger-action owner for every course on the common trigger
+ // chain (GA, TA; the name is GA's for history). Call before prepare: label =
+ // the course code for log lines; chance = the application's shared RNG
+ // (2A00A0), required exactly when the data authors a RandomTriggerPercent
+ // other than 100.
+ bool bindChance(const char* label,const g::OriginalTriggerChance50MC& chance)noexcept {
+  if(ready_)return false;try{label_=label?label:"??";}catch(...){return false;}
+  group_.chance=chance;return true;
+ }
+ const std::string& error()const noexcept{return error_;}
+ // Scene::Reset 2702E0 -> trigger manager slot +0x80 (2DCC70): clear bit 0x8
+ // (fired) in +0x1B8 of every trigger, nothing else (enable bits, chance
+ // touched bits and contact lists are left as they are). Returns the count.
+ std::size_t raceReset()noexcept {
+  if(!ready_)return 0;
+  for(auto& state:group_.triggers)state.flags1B8=static_cast<std::uint8_t>(state.flags1B8&~0x8u);
+  return group_.triggers.size();
+ }
  // Sources come from the course's own TOB (course_trigger_sources50ct.h).
  // animation may be null exactly when the data authors no Animation action;
  // sound is required exactly when it authors a PodSound action.
- bool prepare(const course_trigger_sources50CT::Owner& source,ga_animated_world::Owner* animation,
+ bool prepare(const course_trigger_sources50CT::Owner& source,track_animation_runtime50AN::Control* animation,
      const std::array<RacerIdentities,racers>& identities,std::uint32_t aiNodeCount,
      gc_gate_audio50IN::Owner* sound,bool explicitlyMuted,
      std::uint32_t playerPrefixCount34=1u,std::size_t racerCount=racers)noexcept {
@@ -129,38 +152,61 @@ public:
   const bool animated=source.authors(ga_trigger_authoring::Action::Animation);
   const bool sounded=source.authors(ga_trigger_authoring::Action::PodSound);
   if(ready_||!source.ready()||!live||(animated&&(!animation||!animation->ready()))||!aiNodeCount||!racerCount||racerCount>racers||playerPrefixCount34>racerCount||
-     (sounded&&!explicitlyMuted&&(!sound||!sound->available()||!sound->ready())))return false;
-  if(!group_.triggers.setCount(live))return false;
+     (sounded&&!explicitlyMuted&&(!sound||!sound->available()||!sound->ready())))return refuse("trigger owner admission (source, animation owner, AI spline, roster or PodSound voice)");
+  if(!group_.triggers.setCount(live))return refuse("live trigger count exceeds the native trigger group");
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+group_.triggers.size()))return false;
-   for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+group_.triggers.size()))return refuse("racer collider identity rejected");
+   for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return refuse("duplicate racer collider identity");
   }
-  for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);
-   if(authored.randomTriggerPercent!=100||!authored.actionCount||authored.actionCount>2)return false;
+  std::array<bool,course_trigger_sources50CT::capacity> carried{};std::size_t chanced=0,notCarried=0;
+  for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);carried[i]=true;
+   if(!authored.actionCount||authored.actionCount>2)return refuse("trigger"+std::to_string(i+1)+" action count outside 1..2");
+   if(authored.randomTriggerPercent<0||authored.randomTriggerPercent>100)return refuse("trigger"+std::to_string(i+1)+" RandomTriggerPercent outside 0..100");
+   if(authored.randomTriggerPercent!=100){
+    if(!group_.chance.bound())return refuse("trigger"+std::to_string(i+1)+" RandomTriggerPercent needs the shared RNG binding (bindChance)");
+    ++chanced;
+   }
    // Every action target must exist in the loaded data: LostAI inside the live
    // AI spline, Animation inside the animated owners.
    for(std::uint32_t k=0;k<authored.actionCount;++k){const auto& action=authored.actions[k];
-    if(action.kind==ga_trigger_authoring::Action::LostAI&&(action.reset||action.targetNodeIndex>=aiNodeCount))return false;
-    if(action.kind==ga_trigger_authoring::Action::Animation&&action.animationIndex>=ga_animated_world::ownerCount)return false;
+    if(action.kind==ga_trigger_authoring::Action::LostAI&&action.targetNodeIndex>=aiNodeCount)
+     return refuse("trigger"+std::to_string(i+1)+" LostAI target outside the live AI spline");
+    if(action.kind==ga_trigger_authoring::Action::Animation&&action.animationIndex>=animation->rowCount())
+     return refuse("trigger"+std::to_string(i+1)+" Animation names a row the course does not author");
+    // PORT STAND-IN (flagged): LostAI Reset (the pose reset half of 1B27C0)
+    // is not implemented on this chain. Stock data: the trigger stays
+    // registered but disabled and is logged as not carried. Other data: refused.
+    if(action.kind==ga_trigger_authoring::Action::LostAI&&action.reset){
+     if(!source.stockTob())return refuse("trigger"+std::to_string(i+1)+" LostAI Reset is not supported natively (PORT STAND-IN)");
+     if(carried[i]){carried[i]=false;++notCarried;
+      std::cerr<<"course_trigger_not_carried course="<<label_<<" trigger="<<(i+1)<<" kind=LostAI reason=Reset"
+          " PORT STAND-IN: LostAI pose reset not implemented natively; trigger registered disabled\n";}
+    }
    }
   }
   source_=&source;animation_=animation;racers_=identities;racerCount_=racerCount;originalAiNodeCount_=aiNodeCount;playerPrefixCount34_=playerPrefixCount34;sound_=sound;muted_=explicitlyMuted;
-  if(!group_.colliders.setCount(racerCount*2))return false;
+  if(!group_.colliders.setCount(racerCount*2))return refuse("racer collider store");
   for(std::size_t i=0;i<racerCount*2;++i)group_.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);auto& state=group_.triggers[i];
-   state.flags29=authored.startEnabled?3u:0u;
+   state.flags29=authored.startEnabled&&carried[i]?3u:0u;
    state.flags1B8=static_cast<std::uint8_t>(3u|(authored.oneTimeOnly?4u:0u));
    state.randomTriggerPercent90=authored.randomTriggerPercent;
    state.callbackCount98=authored.actionCount;state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
   ready_=true;group_.actions=hooks();group_.ready=true;
-  for(std::size_t i=0;i<group_.triggers.size();++i)if(source.source(i).ignorePlayer){
-   group_.ignoreColliderCount[i]=playerPrefixCount34_;
-   for(std::size_t j=0;j<playerPrefixCount34_;++j)group_.ignoreColliders[i][j]=identities[j].main690;
+  // 2DC630: PLAYER = the source manager+34 prefix, AI = the rest of the roster.
+  for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);std::size_t n=0;
+   for(std::size_t j=0;j<racerCount_;++j){const bool player=j<playerPrefixCount34_;
+    if((player&&authored.ignorePlayer)||(!player&&authored.ignoreAi))group_.ignoreColliders[i][n++]=identities[j].main690;}
+   group_.ignoreColliderCount[i]=n;
   }
-  return g::validNativeTriggerGroup50GA(group_);
+  std::size_t admitsAnimations=0;for(std::size_t i=0;i<live;++i)if(!source.source(i).ignoreAnimations)++admitsAnimations;
+  std::cerr<<"course_triggers_common course="<<label_<<" triggers="<<live<<" carried="<<(live-notCarried)<<" not_carried="<<notCarried
+      <<" chance_triggers="<<chanced<<" animation_actions="<<(animated?1:0)<<" stock="<<(source.stockTob()?1:0)
+      <<" animation_subjects_not_carried="<<admitsAnimations<<'\n';
+  return g::validNativeTriggerGroup50GA(group_)||refuse("native trigger group validation");
  }
  // This is NOT a geometric query entry point. Call only after the declared
  // backend and collection/category/identity/reciprocal filters admit a real

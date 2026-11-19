@@ -1,6 +1,7 @@
 // Original publication scope and its local owners; no root-only hooks/readers.
 #include "../../src/assets/dlc_files50dl.h"
 #include "native_last_failure50pd.h"
+#include "course_world_texture50st.h"
 #include "course_cut_identity50ci.h"
 #include "native_course_archive_release50pd.h"
 #include "native_wreck_debris_gpu50pd.h"
@@ -23,8 +24,7 @@
 #include "mc_particle_cold50mc.h"
 #include "mc_query50mc.h"
 #include "rc_crystal50rc.h"
-#include "tb_door_binding50tb.h"
-#include "tc_gate_visibility50tc.h"
+#include "track_animation_binding50an.h"
 #include "ra_source_camera_factory50la.h"
 #include "ra_native_session50la.h"
 #include "native_ta_particle_cold50la_fixture.h"
@@ -272,18 +272,17 @@ void Context::run() {
  auto& finishManualInputTicks=this->finishManualInputTicks;
  const auto& finishTaRoot=this->finishTaRootCall;
  const auto& finishTaRootWithResults=this->finishTaRootWithResultsCall;
- auto& gaAnimatedWorld=this->gaAnimatedWorld;
+ auto& trackAnimations=this->trackAnimations;
+ auto& trackAnimationBinding=this->trackAnimationBinding;
  auto& gaAtm=this->gaAtm;
- auto& gaDynamicWindow=this->gaDynamicWindow;
+ auto& trackAnimationWindow=this->trackAnimationWindow;
  auto& gaOriginalWorld=this->gaOriginalWorld;
  auto& gaTriggerActions=this->gaTriggerActions;
  auto& gameplayBinder=this->gameplayBinder;
  auto& gameplayBinderEnabled=this->gameplayBinderEnabled;
  auto& gameplayBinderTemplates=this->gameplayBinderTemplates;
- auto& gbAnimationRuntime=this->gbAnimationRuntime;
  auto& gbAtm=this->gbAtm;
  auto& gbColdSources=this->gbColdSources;
- auto& gbDynamicWindow=this->gbDynamicWindow;
  auto& gbFogOwner=this->gbFogOwner;
  auto& gbLightOwner=this->gbLightOwner;
  auto& gbMapView=this->gbMapView;
@@ -299,11 +298,9 @@ void Context::run() {
  const auto& gbRemainingPayloadBytes=this->gbRemainingPayloadBytesCall;
  auto& gbSourceCameraAssets=this->gbSourceCameraAssets;
  auto& gbTrackParticles=this->gbTrackParticles;
- auto& gcAnimatedWorld=this->gcAnimatedWorld;
- auto& gcAnimatedWorldSteps=this->gcAnimatedWorldSteps;
+ auto& trackAnimationSteps=this->trackAnimationSteps;
  auto& gcAtm=this->gcAtm;
  auto& gcDrawLights=this->gcDrawLights;
- auto& gcDynamicWindow=this->gcDynamicWindow;
  auto& gcGateAudio=this->gcGateAudio;
  auto& gcGraphicsSequence=this->gcGraphicsSequence;
  auto& gcLightDiagnostic=this->gcLightDiagnostic;
@@ -363,10 +360,8 @@ void Context::run() {
  auto& mbMapView=this->mbMapView;
  auto& mbOriginalWorld=this->mbOriginalWorld;
  auto& mbRace=this->mbRace;
- auto& mcAnimationRuntime=this->mcAnimationRuntime;
  auto& mcAtm=this->mcAtm;
  auto& mcColdSources=this->mcColdSources;
- auto& mcDynamicWindow=this->mcDynamicWindow;
  auto& mcFogOwner=this->mcFogOwner;
  auto& mcLightOwner=this->mcLightOwner;
  auto& mcMapView=this->mcMapView;
@@ -536,8 +531,6 @@ void Context::run() {
  auto& restartRequested=this->restartRequested;
  auto& returnOriginalMainRequested=this->returnOriginalMainRequested;
  auto& s=this->s;
- auto& saAnimatedWorld=this->saAnimatedWorld;
- auto& saDynamicWindow=this->saDynamicWindow;
  auto& saOriginalDisc=this->saOriginalDisc;
  auto& saOriginalWorld=this->saOriginalWorld;
  auto& saTriggerActions=this->saTriggerActions;
@@ -640,9 +633,6 @@ void Context::run() {
  auto& tbAtm=this->tbAtm;
  auto& tbColdSources=this->tbColdSources;
  auto& tbCollisionWorld=this->tbCollisionWorld;
- auto& tbDoorBinding=this->tbDoorBinding;
- auto& tbDoorRuntime=this->tbDoorRuntime;
- auto& tbDynamicWindow=this->tbDynamicWindow;
  auto& tbLightOwner=this->tbLightOwner;
  auto& tbMapView=this->tbMapView;
  auto& tbOriginalDisc=this->tbOriginalDisc;
@@ -659,9 +649,6 @@ void Context::run() {
  auto& tcAtm=this->tcAtm;
  auto& tcColdSources=this->tcColdSources;
  auto& tcCollisionWorld=this->tcCollisionWorld;
- auto& tcDynamicWindow=this->tcDynamicWindow;
- auto& tcGateRuntime=this->tcGateRuntime;
- auto& tcGateVisibility=this->tcGateVisibility;
  auto& tcGlobalSound=this->tcGlobalSound;
  auto& tcMapView=this->tcMapView;
  auto& tcOriginalDisc=this->tcOriginalDisc;
@@ -1172,7 +1159,12 @@ void Context::run() {
    const bool atmLoaded=scAtm.loadSource(trackSession->archive,trackSource,*scOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"SC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(isGbTrack){
+  // GB's particle Window and numeric renderer exist exactly with its emitter
+  // owners (TOB [ParticleEmitters]); the shared particle pool and fog always.
+  if(isGbTrack)require50DU(gbOriginalWorld&&gbTrackParticles&&gbTrackParticles->prepared()&&gbFogOwner&&gbFogOwner->ready()&&
+      bool(gbParticleRuntime)==bool(gbParticleAttachments)&&bool(gbParticleRuntime)==bool(gbParticleAuthoring),
+      "GB actual canonical source, particle pool and fog missing before Window preparation");
+  if(isGbTrack&&gbParticleRuntime){
    require50DU(gbOriginalWorld&&gbParticleRuntime&&gbParticleRuntime->sourceStaged()&&gbParticleAttachments&&
        gbTrackParticles&&gbTrackParticles->prepared()&&gbFogOwner&&gbFogOwner->ready()&&trackMaterialRequest.canonicalDomain,
        "GB actual canonical source, 67 emitters and fog missing before Window preparation");
@@ -1266,7 +1258,7 @@ void Context::run() {
    if(!atmLoaded)atmRefused("TC",animationDiagnostic.message);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"TC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
-  if(gcAnimatedWorld){
+  if(isGcTrack){ // PORT STAND-IN (flagged): GC's own ATM owner (was keyed on its animated world)
    gc_atm_animation_fixture::Diagnostic atmDiagnostic{};
    const bool gcAtmLoaded=gcOriginalWorld?gcAtm.loadSource(trackSession->archive,*gcOriginalWorld,atmDiagnostic):
        gcAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic);
@@ -1429,8 +1421,7 @@ void Context::run() {
     // queued authenticated cold-load plan; it is never marked world-ready.
     if(isGcTrack&&(!gcNativeWorldSelected||!gcTriggerActions||!gcTriggerActions->ready()||
        !gcGateAudio||!gcGateAudio->available()||gcGateAudio->failed()||
-       !nativeGcWater||!nativeGcWater->prepared()||!gcAnimatedWorld||!gcAnimatedWorld->ready()||
-       !gcDynamicWindow.loaded()||!gcDynamicWindow.ownsResources()||!gcAtm.loaded()||!gcAtm.ownsResources()||
+       !nativeGcWater||!nativeGcWater->prepared()||!gcAtm.loaded()||!gcAtm.ownsResources()||
        !gcParticleMaterials.loaded()||!gcParticleMaterials.ownsResources()))return false;
     if(isRaTrack&&(!raWorld||raWorld->terminalFailure()||!raWorld->coldStaticWorld()||
        !raWorld->skyAssets()||!raSession||!sourceCameraSession||!sourceCameraSession->ready()))return false;
@@ -1438,8 +1429,9 @@ void Context::run() {
     // data authors it. Animated owner + dynamic window when [Animations] has
     // animations, trigger actions when NumberOfTriggers > 0, ATM when the
     // world's materials name an ATM texture.
-    if(isSaTrack&&((saAnimatedWorld&&(!saAnimatedWorld->ready()||!saDynamicWindow.loaded()||
-       !saDynamicWindow.ownsResources()))||(saTriggerActions&&!saTriggerActions->ready())||
+    // Every course: the common track-animation owner is ready with its window when present.
+    if(trackAnimations&&(!trackAnimations->ready()||!trackAnimationWindow.loaded()||!trackAnimationWindow.ownsResources()))return false;
+    if(isSaTrack&&((saTriggerActions&&!saTriggerActions->ready())||
        (worldAuthorsAnimatedTextures50DU(saOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
     if(isMaTrack&&((maTriggerActions&&!maTriggerActions->ready())||
        (worldAuthorsAnimatedTextures50DU(maOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
@@ -1458,17 +1450,19 @@ void Context::run() {
        tbCollisionWorld->coldSource()!=tbColdSources.get()||tbWorldBorrow->world()!=&liveWorld||
        !tbTriggerActions||tbWorldBorrow->actions()!=tbTriggerActions.get()||!tbTriggerActions->ready()||
        tbTriggerActions->status()!=tb_trigger_actions50TB::Status::Complete||
-       !tbPodSound||!tbPodSound->prepared()||!tbDoorRuntime||!tbDoorRuntime->ready()||
-       !tbDoorBinding||!tbDoorBinding->ready()||!tbDoorBinding->ownsRegistration()||
-       tbDoorBinding->runtimeOwner()!=tbDoorRuntime.get()||tbDoorBinding->lightingOwner()!=tbLightOwner.get()||
+       !tbPodSound||!tbPodSound->prepared()||
+       // Track animations exactly when the TOB authors them, through the common binding.
+       (trackAnimations&&(!trackAnimationBinding||!trackAnimationBinding->ready()||
+        trackAnimationBinding->runtimeOwner()!=trackAnimations.get()||trackAnimationBinding->lightingOwner()!=tbLightOwner.get()))||
        !tbMapView.runtimeValid()||!tbAiView.runtimeValid()||tbMapView.count()!=270||tbAiView.count()!=269||
        !tbMapView.sameOwner(tbAiView)||!tbMapView.sameWorld(liveWorld)||!tbAiView.sameWorld(liveWorld)||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(tcOriginalDisc&&(!humanOriginalHud||!tcColdSources||!tcCollisionWorld||!tcWorldBorrow||
        tcCollisionWorld->coldSource()!=tcColdSources.get()||tcWorldBorrow->world()!=&liveWorld||
        !tcTriggerActions||!tcTriggerActions->ready()||tcTriggerActions->status()!=tc_trigger_actions50TC::Status::Complete||
-       !tcGlobalSound||!tcGlobalSound->prepared()||!tcGateRuntime||!tcGateRuntime->ready()||
-       !tcGateVisibility||!tcGateVisibility->ready()||!tcGateVisibility->ownsRegistration()||
+       !tcGlobalSound||!tcGlobalSound->prepared()||
+       (trackAnimations&&(!trackAnimationBinding||!trackAnimationBinding->ready()||
+        trackAnimationBinding->runtimeOwner()!=trackAnimations.get()||trackAnimationBinding->lightingOwner()!=&gcLightOwner))||
        !tcMapView.runtimeValid()||!tcAiView.runtimeValid()||tcMapView.count()!=268||tcAiView.count()!=293||
        !tcMapView.sameWorld(liveWorld)||!tcAiView.sameWorld(liveWorld)||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
@@ -1481,18 +1475,24 @@ void Context::run() {
        navigationMap->track.count!=scColdSources->sourcesDecoded()->map.track.count||
        navigationAI->track.count!=scColdSources->sourcesDecoded()->ai.track.count||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
-    if(isGbTrack&&(!gbParticleAuthoring||!gbParticleAuthoring->ready()||!gbParticleAttachments||!gbParticleAttachments->sourceGraphReady()||
-       !gbTrackParticles||!gbTrackParticles->prepared()||!gbParticleRuntime||!gbParticleRuntime->sourceStaged()||
-       !gbParticleRender||!gbParticleRender->ready()||gbParticleRender->runtimeOwner()!=gbParticleRuntime.get()||
-       gbParticleRender->windowOwner()!=gbParticleWindow.get()||!gbParticleWindow||!gbParticleWindow->ready()||
+    // SC's readiness rule: each owner is checked exactly when the data
+    // authored it. GB always: the particle pool and the fog owner. With
+    // emitters (stock GB's stock-shaped owners, 67 registered emitters): the
+    // complete emitter chain. Without: no emitter owner and none registered.
+    if(isGbTrack&&(!gbTrackParticles||!gbTrackParticles->prepared()||!gbTrackParticles->particles()||
        !gbFogOwner||!gbFogOwner->ready()||gbFogOwner->sourceOwner()!=gbColdSources.get()||
-       !gbTrackParticles->particles()||gbTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=67u))return false;
+       (gbParticleRuntime?(!gbParticleAuthoring||!gbParticleAuthoring->ready()||!gbParticleAttachments||!gbParticleAttachments->sourceGraphReady()||
+        !gbParticleRuntime->sourceStaged()||
+        !gbParticleRender||!gbParticleRender->ready()||gbParticleRender->runtimeOwner()!=gbParticleRuntime.get()||
+        gbParticleRender->windowOwner()!=gbParticleWindow.get()||!gbParticleWindow||!gbParticleWindow->ready()||
+        gbTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=67u):
+        (gbParticleAuthoring||gbParticleAttachments||gbParticleRender||gbParticleWindow))))return false;
     if(isMcTrack&&(!mcParticleSource||!mcParticleSource->ready()||!mcParticleAttachments||!mcParticleAttachments->sourceGraphReady()||
        !mcTrackParticles||!mcTrackParticles->prepared()||!mcParticleRuntime||!mcParticleRuntime->sourceStaged()||
        !mcParticleRender||!mcParticleRender->ready()||mcParticleRender->runtimeOwner()!=mcParticleRuntime.get()||
        mcParticleRender->windowOwner()!=mcParticleWindow.get()||!mcParticleWindow||!mcParticleWindow->ready()||
        !mcFogOwner||!mcFogOwner->ready()||mcFogOwner->sourceOwner()!=mcColdSources.get()||
-       !mcTrackParticles->particles()||mcTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=40u+(mcParticleVehicles?mcParticleVehicles->registeredProducerCount():0u)))return false;
+       !mcTrackParticles->particles()||mcTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=mcParticleRuntime->emitterCount()+(mcParticleVehicles?mcParticleVehicles->registeredProducerCount():0u)))return false;
     if(isRcTrack&&(!rcParticleAuthoring||!rcParticleAuthoring->ready()||!rcParticleAttachments||!rcParticleAttachments->ready()||
        !rcTrackParticles||!rcTrackParticles->prepared()||!rcParticleRuntime||!rcParticleRuntime->active()||!rcParticleRender||
        rcParticleRuntime->sourceOwner()!=rcParticleAuthoring.get()||rcParticleRuntime->attachmentOwner()!=rcParticleAttachments.get()||
@@ -1510,8 +1510,7 @@ void Context::run() {
     if(taOriginalDisc&&(!humanOriginalHud||!taOriginalWorld||!taOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(isGaTrack&&(!humanOriginalHud||!gaOriginalWorld||!gaOriginalWorld->loaded()||
-       (gaAnimatedWorld&&(!gaAnimatedWorld->ready()||!gaDynamicWindow.loaded()||
-       !gaDynamicWindow.ownsResources()))||(gaTriggerActions&&!gaTriggerActions->ready())||
+       (gaTriggerActions&&!gaTriggerActions->ready())||
        (worldAuthorsAnimatedTextures50DU(gaOriginalWorld.get())?(!gaAtm.loaded()||!gaAtm.ownsResources()):gaAtm.loaded())))return false;
     for(std::size_t slot=0;slot<racerBank.count();++slot){
      if(!racerBank.active(slot)||!racerRigs[slot]||!racerCollisions[slot]||!racerVisuals[slot]||!racerCables[slot]||
@@ -1706,6 +1705,7 @@ void Context::run() {
        uvDiagnostic.message.empty()?"common track UV animation owner rejected":uvDiagnostic.message.c_str());
    trackUvAnimation.log(std::cerr);
   }
+  std::size_t authoredAa1Spans=0; // spans drawn with the authored AA1 coverage (TB/RC)
   trackBindings.reserve(trackSpans->size());
   for(const auto& span:*trackSpans){
    platform::VehicleWindowTrackSpan50DS binding{};
@@ -1740,43 +1740,18 @@ void Context::run() {
            originalMainApplication.materialRuntime,alpha):
        material_alpha50gx_fixture::select(sourceSelection,alpha);
    require50DU(alphaSelected,"selected-track material alpha policy mismatch");
-   // Preserve the exact owned TB CROWD AA1 demand in the native span.
-   // The authenticated source key and explicit field gate this one material.
-   if(isTbTrack&&pod_materials50ed_fixture::detail::normalized(sourceSelection.materialName)=="CROWD"){
-    require50DU(sourceSelection.track==track_source_fixture::Track::tb&&sourceSelection.assetIdentity==0x5442ull&&
-        sourceSelection.slot==1&&sourceSelection.pass==1&&sourceSelection.passCount==1&&
-        sourceSelection.materialKey=="2367f573cb30ca975777a7f4ac5473f2006d091c63e9e0b3346bbdbfec01d5b8"&&
-        pod_materials50ed_fixture::detail::normalized(sourceSelection.program)=="PRELITCOMPRESSED"&&
-        pod_materials50ed_fixture::detail::normalized(sourceSelection.textureName)=="CROWD",
-        "TB CROWD coverage source identity differs");
-    bool sourceAa1=false;
-    for(const auto& field:sourceSelection.sourcePassFields.at("authored"))
-     if(pod_materials50ed_fixture::detail::normalized(field.at("name").get<std::string>())=="ONEPASSANTIALIASINGONOFF"){
-      require50DU(!sourceAa1&&field.at("value").is_string()&&field.at("value").get<std::string>()=="1",
-          "TB CROWD explicit AA1 field differs");
-      sourceAa1=true;
-     }
-    require50DU(sourceAa1,"TB CROWD authored AA1 field missing");
-    binding.nativeCoverage=platform::NativeTrackCoverage50DS::fourSampleAa1;
-   }
-   // Preserve the exact owned RC CROWD AA1 demand in the native span.
-   // The authenticated source key and explicit field gate this one material.
-   if(isRcTrack&&pod_materials50ed_fixture::detail::normalized(sourceSelection.materialName)=="CROWD"){
-    require50DU(sourceSelection.track==track_source_fixture::Track::rc&&sourceSelection.assetIdentity==0x5243ull&&
-        sourceSelection.slot==1&&sourceSelection.pass==1&&sourceSelection.passCount==1&&
-        sourceSelection.materialKey=="2367f573cb30ca975777a7f4ac5473f2006d091c63e9e0b3346bbdbfec01d5b8"&&
-        pod_materials50ed_fixture::detail::normalized(sourceSelection.program)=="PRELITCOMPRESSED"&&
-        pod_materials50ed_fixture::detail::normalized(sourceSelection.textureName)=="CROWD",
-        "RC CROWD coverage source identity differs");
-    bool sourceAa1=false;
-    for(const auto& field:sourceSelection.sourcePassFields.at("authored"))
-     if(pod_materials50ed_fixture::detail::normalized(field.at("name").get<std::string>())=="ONEPASSANTIALIASINGONOFF"){
-      require50DU(!sourceAa1&&field.at("value").is_string()&&field.at("value").get<std::string>()=="1",
-          "RC CROWD explicit AA1 field differs");
-      sourceAa1=true;
-     }
-    require50DU(sourceAa1,"RC CROWD authored AA1 field missing");
-    binding.nativeCoverage=platform::NativeTrackCoverage50DS::fourSampleAa1;
+   // Native AA1 coverage from the pass's own authored onePassAntialiasingOnOff
+   // field (any material, any texture name; was: the material named CROWD with
+   // the stock PSM SHA). PORT STAND-IN (flagged, course-gated as before): applied
+   // on the TB and RC worlds only, where the port already drew AA1. TA, TC, MA,
+   // MB, MC, SA and SC also author the field on their crowd/camdroid materials
+   // and do not get AA1 yet; widening it to every course is a visual change for
+   // those courses and is left to the builder.
+   if(isTbTrack||isRcTrack){
+    bool aa1Valid=true;
+    const bool aa1=course_world_texture50ST::authoredOnePassAa1(sourceSelection.sourcePassFields,aa1Valid);
+    require50DU(aa1Valid,"selected-track authored onePassAntialiasingOnOff value unsupported");
+    if(aa1){binding.nativeCoverage=platform::NativeTrackCoverage50DS::fourSampleAa1;++authoredAa1Spans;}
    }
    using AlphaBlend=material_alpha50gx_fixture::Blend;
    binding.material.blend=alpha.blend==AlphaBlend::additive?
@@ -1822,6 +1797,8 @@ void Context::run() {
    for(const auto& b:trackBindings)if(b.material.sourceColorStreamAbsent){
     ++absent;if(b.material.blend!=platform::VehicleWindowBlend50DS::opaque)++absentBlended;}
    std::cerr<<"track_source_color_absent spans="<<absent<<" blended="<<absentBlended
+       <<" of="<<trackBindings.size()<<"\n";
+   if(isTbTrack||isRcTrack)std::cerr<<"track_authored_aa1 site="<<(isTbTrack?"TB":"RC")<<" spans="<<authoredAa1Spans
        <<" of="<<trackBindings.size()<<"\n";
   }
   }else{
@@ -1956,45 +1933,15 @@ void Context::run() {
      std::cerr<<"water_surface_cold ready="<<water<<' '<<waterLog<<'\n';
     }else if(waterRuntime)std::cerr<<"water_surface_cold ready=0 runtime_resources_unbound\n";}
   }
-  if(gcAnimatedWorld){
-   require50DU(gcDynamicWindow.createGpu(textureRequest,*gcAnimatedWorld,textureDiagnostic),"original GC dynamic texture upload failed");
-   require50DU(gcDynamicWindow.bindRequest(renderRequest,*gcAnimatedWorld),"original GC dynamic renderer publication failed");
+  // The one track-animation window (every course with an owner).
+  if(trackAnimations){
+   require50DU(trackAnimationWindow.createGpu(textureRequest,gameplayBinderTemplates,originalMainApplication.materialRuntime,textureDiagnostic),
+       "track animation dynamic texture upload failed");
+   require50DU(trackAnimationWindow.bindRequest(renderRequest),"track animation dynamic renderer publication failed");
+  }
+  if(gcAtm.loaded()){
    require50DU(gcAtm.createGpu(textureRequest,textureDiagnostic),"original GC ATM GPU bank rejected");
    require50DU(gcAtm.bindRequest(renderRequest),"original GC ATM render binding rejected");
-  }
-  if(gaAnimatedWorld){
-   require50DU(gaDynamicWindow.createGpu(textureRequest,*gaAnimatedWorld,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"original GA dynamic texture upload failed");
-   require50DU(gaDynamicWindow.bindRequest(renderRequest,*gaAnimatedWorld),"original GA dynamic renderer publication failed");
-  }
-  if(isTcTrack){
-   require50DU(tcGateRuntime&&tcGateRuntime->ready()&&tcDynamicWindow.loaded(),"TC actual gate source unavailable before GPU creation");
-   require50DU(tcDynamicWindow.createGpu(textureRequest,*tcGateRuntime,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"TC actual gate texture upload failed");
-   require50DU(tcDynamicWindow.bindRequest(renderRequest,*tcGateRuntime),"TC actual gate renderer publication failed");
-  }
-  if(isTbTrack){
-   require50DU(tbDoorRuntime&&tbDoorRuntime->ready()&&tbDynamicWindow.loaded(),"TB actual door source unavailable before GPU creation");
-   require50DU(tbDynamicWindow.createGpu(textureRequest,*tbDoorRuntime,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"TB actual door texture upload failed");
-   require50DU(tbDynamicWindow.bindRequest(renderRequest,*tbDoorRuntime),"TB actual door renderer publication failed");
-  }
-  if(isGbTrack){
-   require50DU(gbAnimationRuntime&&gbAnimationRuntime->ready()&&gbDynamicWindow.loaded(),"GB actual four-animation source unavailable before GPU creation");
-   require50DU(gbDynamicWindow.createGpu(textureRequest,*gbAnimationRuntime,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"GB actual four-animation texture upload failed");
-   require50DU(gbDynamicWindow.bindRequest(renderRequest,*gbAnimationRuntime),"GB actual four-animation renderer publication failed");
-  }
-  if(isMcTrack){
-   require50DU(mcAnimationRuntime&&mcAnimationRuntime->ready()&&mcDynamicWindow.loaded(),"MC actual fourteen-animation source unavailable before GPU creation");
-   require50DU(mcDynamicWindow.createGpu(textureRequest,*mcAnimationRuntime,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"MC actual fourteen-animation texture upload failed");
-   require50DU(mcDynamicWindow.bindRequest(renderRequest,*mcAnimationRuntime),"MC actual fourteen-animation renderer publication failed");
-  }
-  if(saAnimatedWorld){
-   require50DU(saDynamicWindow.createGpu(textureRequest,*saAnimatedWorld,gameplayBinderTemplates,
-       originalMainApplication.materialRuntime,textureDiagnostic),"SA actual dynamic texture upload failed");
-   require50DU(saDynamicWindow.bindRequest(renderRequest,*saAnimatedWorld),"SA actual dynamic renderer binding failed");
   }
   if(maSaAtm.loaded()){
    require50DU(maSaAtm.createGpu(textureRequest,textureDiagnostic),"MA/SA actual ATM GPU bank rejected");
@@ -2024,7 +1971,7 @@ void Context::run() {
    require50DU(rcAtm.createGpu(textureRequest,textureDiagnostic),"RC actual ATM GPU bank rejected");
    require50DU(rcAtm.bindRequest(renderRequest),"RC actual ATM renderer binding rejected");
   }
-  if(isGbTrack){
+  if(isGbTrack&&gbParticleRuntime){
    const platform::MaterialTextureSampler50EB sampler{platform::MaterialTextureFilter50EB::linear,
        platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat};
    auto request=textureRequest;request.samplers=&sampler;request.samplerCount=1;
@@ -2067,7 +2014,8 @@ void Context::run() {
    // Only real Window creation may publish the renderer association. The
    // aggregate/Bank issuer can now open genuine queries, without requiring
    // an earlier positive particle span or fabricated first-draw receipt.
-   require50DU(gbParticleRender&&gbParticleRender->ready()&&gbQueryBinding&&
+   // The particle renderer leg exists exactly with the emitter owners.
+   require50DU(bool(gbParticleRender)==bool(gbParticleRuntime)&&(!gbParticleRender||gbParticleRender->ready())&&gbQueryBinding&&
        gbQueryBinding->activateRenderer(gbParticleRender),"GB actual final renderer/query admission rejected");
    require50DU(gbQueryBinding->commitListeners(nullptr,0),"GB initial empty listener commit rejected");
    if(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized)activateColdRace();
@@ -2075,8 +2023,8 @@ void Context::run() {
   if(isGaTrack){
    // Actual cold owner/GPU state after successful renderer creation. No
    // fabricated trigger hits or rendered-frame counts enter this receipt.
-   std::cerr<<"ga_native_ready dynamic_ready="<<(gaAnimatedWorld&&gaAnimatedWorld->ready())
-       <<" dynamic_loaded="<<gaDynamicWindow.loaded()<<" dynamic_gpu="<<gaDynamicWindow.ownsResources()
+   std::cerr<<"ga_native_ready dynamic_ready="<<(trackAnimations&&trackAnimations->ready())
+       <<" dynamic_loaded="<<trackAnimationWindow.loaded()<<" dynamic_gpu="<<trackAnimationWindow.ownsResources()
        <<" trigger_ready="<<(gaTriggerActions&&gaTriggerActions->ready())
        <<" atm_loaded="<<gaAtm.loaded()<<" atm_gpu="<<gaAtm.ownsResources()
        <<" atm_bindings="<<renderRequest.trackAnimationCount
@@ -2138,7 +2086,7 @@ void Context::run() {
     const auto camBytes=std::filesystem::file_size(rr::assets::dlc50DL::host(path));
     require50DU(camBytes&&camBytes<=gbRemainingPayloadBytes(),"GB selected CAM exceeds remaining payload");
     reserveGbAdditionalPayload(static_cast<std::size_t>(camBytes),"GB retained CAM exceeds remaining payload");
-    reserveGbAdditionalPayload(4u*20617u,"GB retained TOB authentication scratch exceeds remaining payload");
+    reserveGbAdditionalPayload(4u*gbColdSources->originalTob().size(),"GB retained TOB authentication scratch exceeds remaining payload");
     sourceCameraAssets.loadGb(*trackSession,playerPodId,racerRigs[0]->phy,gbColdSources);
     require50DU(sourceCameraAssets.cam.size()==camBytes&&sourceCameraAssets.cam.capacity()<=camBytes&&
         sourceCameraAssets.tob.empty()&&sourceCameraAssets.inputs.tob==gbColdSources->originalTob().data(),
@@ -2466,7 +2414,7 @@ void Context::run() {
    if(gcNativeWorldSelected){
     require50DU(gcTriggerActions&&gcTriggerActions->ready()&&gcGateAudio&&gcGateAudio->available()&&
         !gcGateAudio->failed()&&originalAiAudioEnabled&&nativeGcWater&&nativeGcWater->prepared()&&
-        gcAnimatedWorld&&gcAnimatedWorld->ready()&&gcDynamicWindow.loaded()&&gcDynamicWindow.ownsResources()&&
+        trackAnimations&&trackAnimations->ready()&&trackAnimationWindow.loaded()&&trackAnimationWindow.ownsResources()&&
         gcAtm.loaded()&&gcAtm.ownsResources()&&gcParticleMaterials.loaded()&&gcParticleMaterials.ownsResources()&&
         sourceCameraSession->ready(),"GC actual native-world provider ownership is incomplete");
     std::cerr<<"gc_native_ready trigger_count="<<gcTriggerActions->nativeGroup().triggers.size()
@@ -3194,22 +3142,12 @@ void Context::run() {
    .sourcePositionStatsHud=sourcePositionStatsHud,
    .sourcePositionStatsResources=sourcePositionStatsResources,
    .gcParticleRender=gcParticleRender,
-   .gcAnimatedWorld=gcAnimatedWorld,
-   .gcDynamicWindow=gcDynamicWindow,
+   .trackAnimations=trackAnimations,
+   .trackAnimationBinding=trackAnimationBinding,
+   .gaTriggerActions=gaTriggerActions,
+   .trackAnimationWindow=trackAnimationWindow,
    .gcAtm=gcAtm,
-   .gaAnimatedWorld=gaAnimatedWorld,
-   .gaDynamicWindow=gaDynamicWindow,
-   .tcGateRuntime=tcGateRuntime,
-   .tcDynamicWindow=tcDynamicWindow,
-   .tbDoorRuntime=tbDoorRuntime,
-   .tbDynamicWindow=tbDynamicWindow,
-   .mcAnimationRuntime=mcAnimationRuntime,
-   .mcDynamicWindow=mcDynamicWindow,
-   .gbAnimationRuntime=gbAnimationRuntime,
-   .gbDynamicWindow=gbDynamicWindow,
    .gaAtm=gaAtm,
-   .saAnimatedWorld=saAnimatedWorld,
-   .saDynamicWindow=saDynamicWindow,
    .maSaAtm=maSaAtm,
    .mbAtm=mbAtm,
    .scAtm=scAtm,
@@ -3258,7 +3196,7 @@ void Context::run() {
    .trackBaseline=trackBaseline,
    .lastAllAiStatusNs=lastAllAiStatusNs,
    .reportOriginalAiFleet=interactive_frame50DU::BorrowedCall<void(const char*)>{reportOriginalAiFleet},
-   .gcAnimatedWorldSteps=gcAnimatedWorldSteps,
+   .trackAnimationSteps=trackAnimationSteps,
    .gcNativeGate=gcNativeGate,
    .boostButtonCode=boostButtonCode,
    .powerslideButtonCode=powerslideButtonCode,

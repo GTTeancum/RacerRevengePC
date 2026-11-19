@@ -59,7 +59,8 @@ Vector3_48C inverseDirection(const ReadyBodyBasis48D& b,const Vector3_48C& v,Ari
 }
 void calculateForce(Arithmetic& f,const AeroMotionPrefix48E& motion,
     const AeroParameters48E& p,const AeroInput48E& in,const AeroState48E& state,
-    float up,bool firstTimer,bool secondTimer,bool tilted,AeroForcePrefix48E& out) noexcept {
+    float up,bool firstTimer,bool secondTimer,bool tilted,AeroForcePrefix48E& out,
+    bool zeroGFlight=false) noexcept {
     const auto& v=motion.velocity;const float speed=motion.speed,pitch=motion.pitch;
     const float factor=motion.factor,signedFactor=motion.signedFactor,speed2=motion.speedSquared;
     const float steeringScale=in.fullSteeringE0 ? 1.0f:.5f;
@@ -81,6 +82,20 @@ void calculateForce(Arithmetic& f,const AeroMotionPrefix48E& motion,
     auto& force=out.localForce;auto& torque=out.directTorque;
     force.v[0]=f.add(f.mul(factor,f.mul(p.velocityDamping130.v[0],v.v[0])),f.mul(lateral,v.v[0]));
     force.v[1]=f.add(f.mul(speed2,f.mul(p.lift6c,pitch)),f.mul(factor,f.mul(p.velocityDamping130.v[1],v.v[1])));
+    // PORT EXTENSION, NOT ORIGINAL (zero-g flight only; native_zero_gravity50zg.h,
+    // vehicle_aero_untilted50zg.h). N64 ApplyTraction (0x80068D04, every frame,
+    // every pod, also in ZON) swings the whole velocity toward the nose in 3D,
+    // so travel off the nose is removed at one rate in every direction across
+    // it. Revenge removes only the sideways part (this force's x row); the part
+    // along the pod's up is normally carried by the repulsor and gravity, which
+    // zero-g switches off, and every stock pod authors Lift 0 with a zero 130
+    // damping vector, so in flight nothing at all acted on it: a pod kept any
+    // up/down drift off its nose (and, once rolled, any sideways drift in the
+    // world) and missed the racing line (Vengeance SC: 3 AI exploded on the
+    // room wall below the tunnel mouth, 100-170 ft under the line). The same
+    // side-slip coefficient this step already selected (the pod's own
+    // SideSlipSideForce, or the powerslide blend) now acts on the up slip too.
+    if(zeroGFlight)force.v[1]=f.add(force.v[1],f.mul(lateral,v.v[1]));
     float z=f.add(extraDrag,f.mul(factor,f.mul(p.velocityDamping130.v[2],v.v[2])));
     z=f.sub(z,f.mul(signedFactor,f.mul(p.driveDragF8,f.add(in.driveE4,in.driveE8))));
     z=f.sub(z,f.mul(signedFactor,f.mul(p.brakeDragFc,in.brakeEc)));
@@ -139,7 +154,7 @@ bool applyAerodynamicsWith50ZG(const AeroState48E& previous,const AeroParameters
     result.state.lowSpeedDc=speed<50;
     AeroForcePrefix48E forces{};
     calculateForce(f,{v,speed,pitch,factor,signedFactor,speed2},p,in,result.state,
-        up,firstTimer,secondTimer,tilted,forces);
+        up,firstTimer,secondTimer,tilted,forces,!allowTilt);
     result.localForce=forces.localForce;result.directTorque=forces.directTorque;
     const auto& force=result.localForce;const auto& torque=result.directTorque;
     const auto worldForce=transform(basis,force,f);

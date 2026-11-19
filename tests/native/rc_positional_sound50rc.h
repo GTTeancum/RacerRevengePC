@@ -4,6 +4,7 @@
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
 #include "../../src/game/original_ai_aural.h"
+#include "positional_sound_rows50sr.h"
 #include <algorithm>
 #include <array>
 #include <cfenv>
@@ -13,7 +14,7 @@
 
 namespace rc_positional_sound50RC {
 namespace a=rr::assets;namespace g=rr::game;namespace p=rr::platform;
-inline constexpr std::size_t descriptorCount=120,firstVoice=236,voiceCount=28;
+inline constexpr std::size_t descriptorCapacity=a::soulTreeSoundCapacity50SR,firstVoice=236,voiceCount=28;
 static_assert(firstVoice==p::originalMaterialFirstVoice50HD+16);
 static_assert(firstVoice+voiceCount==p::originalMaterialFirstVoice50HD+p::originalMaterialRowsPerRacer50HD);
 struct Descriptor {
@@ -21,24 +22,29 @@ struct Descriptor {
  float nearDistance=0,farDistance=0,triggerDistance=20,chance=100;
  bool loop=false,oneShot=false,resetWhenInaudible=false;
 };
+// Stock values of this slot: receipts only (positional_sound_rows50sr.h).
+inline constexpr positional_sound_rows50SR::Stock stock{"RC","tracks\\rc.aub",47432u,"8b34867bb6e76e1ddce72ac65c6c4548068d52d30a53b4ca08af87bfe3ca1851",120u,13u};
 struct State {bool played=false,randomAttempted=false;int slot=-1;};
 struct Receipt {bool complete=false;std::size_t eligible=0,started=0,stopped=0,controlled=0,deferred=0,randomDraws=0;};
-// Native fixed-position adapter for the exact original RC SoulTree family.
-// The 120 source descriptors are distinct from the 28 exclusive transport slots.
+// Native fixed-position adapter for the course AUB's SoulTree list (the common
+// reader's live rows; stock RC authors 120), distinct from the exclusive transport slots.
+// The material rows are not admission pins: a material owner that grew into
+// this pool is refused by the pool-conflict check below.
 // Native policy: retain active eligible sounds, then use the lowest free slot
 // in authored descriptor order; never steal an active sound. Deferred rows do
 // not draw RNG or change played/random latches. No source hardware parity claim.
 class Owner final {
  std::shared_ptr<const rc_cold_sources50LA::Owner> source_;
  a::AudioBank50HC bank_;
- std::array<Descriptor,descriptorCount> rows_{};
- std::array<p::AudioClip50HD,descriptorCount> clips_{};
- std::array<State,descriptorCount> states_{};
+ std::array<Descriptor,descriptorCapacity> rows_{};
+ std::array<p::AudioClip50HD,descriptorCapacity> clips_{};
+ std::array<State,descriptorCapacity> states_{};
  std::array<int,voiceCount> assigned_{};
  p::LogicalAudioOwner logical_;
  p::AudioMixer50HD* mixer_=nullptr;p::RaceAudioGroups50IC* groups_=nullptr;
  std::thread::id thread_=std::this_thread::get_id();std::uint64_t epoch_=0;
- bool attempted_=false,ready_=false,blocked_=false,closed_=false;
+ bool attempted_=false,ready_=false,blocked_=false,closed_=false,authored_=false;
+ std::size_t count_=0; // live descriptors rows_[0,count_) from the common AUB reader
  static const std::string* field(const a::ParameterBlock48F& b,const char* key){
   const std::string* result=nullptr;for(const auto& f:b.fields)if(f.name==key){if(result)throw std::runtime_error("RC duplicate sound field");result=&f.value;}return result;
  }
@@ -72,40 +78,29 @@ public:
   if(attempted_){error="RC positional sound requires fresh owner";return false;}attempted_=true;
   try{
    d::need(thread_==std::this_thread::get_id()&&source&&source->ready()&&material.prepared()&&
-      material.rcSourceIdentity()==source.get()&&material.collisionRowCount()==8&&material.driveRowCount()==8,
-      "RC positional sound requires actual same-source8/8 material owner");
+      material.rcSourceIdentity()==source.get(),
+      "RC positional sound requires the actual same-source material owner");
    d::need(groups.uses(mixer)&&mixer.count()==p::audioMaximumVoices50HD&&mixer.originalSoundMode50KG(),
       "RC actual mode/mixer/groups unavailable");
    for(std::size_t i=0;i<voiceCount;++i)d::need(!mixer.active(firstVoice+i)&&!mixer.hasVoiceGroupGain50IC(firstVoice+i)&&
       groups.binding(firstVoice+i)==g::RaceAudioGroup50IC::Unrepresented&&groups.canBind(firstVoice+i,g::RaceAudioGroup50IC::World4D8),
       "RC positional pool conflicts with actual owner");
+   // ONE AUB reader for every course (original 0x279910 / 0x2793A0 /
+   // 0x2787B0); the stock AUB identity and counts are receipts.
    std::vector<std::uint8_t> raw;a::DecodeError48C de;
-   d::need(source->extractMember("tracks\\rc.aub",raw,de,47432)&&raw.size()==47432&&
-      d::sha256(raw)=="8b34867bb6e76e1ddce72ac65c6c4548068d52d30a53b4ca08af87bfe3ca1851","RC positional source identity rejected");
-   a::ParameterDocument48F doc;d::need(a::decodeParameters48F(raw,doc,de),"RC positional authoring rejected");
+   const bool aub=source->extractMember("tracks\\rc.aub",raw,de,positional_sound_rows50SR::maximumAubBytes);
    std::vector<a::AudioRequest50HC> requests;
-   for(std::size_t i=0;i<descriptorCount;++i){
-    const auto name="soultreesound"+std::to_string(i+1);const a::ParameterBlock48F* b=nullptr;
-    for(const auto& candidate:doc.blocks)if(candidate.name==name){d::need(!b,"RC duplicate positional section");b=&candidate;}
-    d::need(b&&!field(*b,"attachtoobject")&&!flag(*b,"force2d")&&!flag(*b,"stereo"),"RC fixed mono source role rejected");
-    auto& row=rows_[i];const auto* resource=field(*b,"soundresourcefile");const auto* position=field(*b,"position");
-    d::need(resource&&position,"RC positional resource/position missing");row.name=*resource;
-    for(auto& c:row.name)if(c=='\\')c='/';row.name+=".vag";
-    std::size_t begin=0;for(unsigned axis=0;axis<3;++axis){const auto end=position->find(',',begin);
-     d::need((axis<2)==(end!=std::string::npos),"RC position shape rejected");const auto last=end==std::string::npos?position->size():end;
-     d::need(a::parseTrackNumber50AD(position->data()+begin,last-begin,row.position[axis])&&std::isfinite(row.position[axis]),"RC position scalar rejected");begin=last+1;}
-    row.loop=flag(*b,"looping");row.oneShot=flag(*b,"oneshot");row.resetWhenInaudible=flag(*b,"resetwheninaudible");
-    row.nearDistance=number(*b,"mindistance",0);row.farDistance=number(*b,"maxdistance",0);
-    row.triggerDistance=number(*b,"oneshotdistance",20);row.chance=number(*b,"randomtriggerpercent",100);
-    d::need(row.nearDistance>=0&&row.nearDistance<row.farDistance&&row.triggerDistance>=0&&row.chance>=0&&row.chance<=100,"RC positional ranges rejected");
-    auto found=std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==row.name;});
-    if(found==requests.end())requests.push_back({row.name,row.loop,false,false});else d::need(found->loop==row.loop,"RC PCM delivery flags conflict");
-   }
-   d::need(requests.size()==13&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"RC positional PCM bank rejected");
-   for(std::size_t i=0;i<descriptorCount;++i){const auto* clip=bank_.find(rows_[i].name);
-    d::need(clip&&rc_audio_originals50RC::authentic(*clip),"RC actual positional PCM unavailable");const auto& pcm=clip->pcm;
+   count_=positional_sound_rows50SR::project(aub?&raw:nullptr,stock,rows_,requests);
+   // Absent data = no positional owner: nothing is bound; the caller drops it.
+   if(!count_){source_=std::move(source);error.clear();return true;}
+   d::need(count_<=rows_.size()&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"RC positional PCM bank rejected");
+   std::size_t stockClips=0;for(const auto& clip:bank_.clips)stockClips+=rc_audio_originals50RC::authentic(clip);
+   std::cerr<<"positional_pcm site=positional_RC clips="<<bank_.clips.size()<<" stock="<<(stockClips==bank_.clips.size()?1:0)<<"\n";
+   for(std::size_t i=0;i<count_;++i){const auto* clip=bank_.find(rows_[i].name);
+    d::need(clip,"RC actual positional PCM unavailable");const auto& pcm=clip->pcm;
     clips_[i]={pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,pcm.hasEmbeddedLoop?pcm.loopStart:0,pcm.hasEmbeddedLoop?pcm.loopEnd:0};
     d::need(p::AudioMixer50HD::validClip(clips_[i]),"RC positional PCM invalid");}
+   authored_=true;
    source_=std::move(source);mixer_=&mixer;groups_=&groups;epoch_=mixer.groupEpoch50IC();
    d::need(logical_.bind(mixer,firstVoice,voiceCount)&&groups.bindRange(firstVoice,voiceCount,g::RaceAudioGroup50IC::World4D8),"RC actual positional transport bind rejected");
    // Each reusable transport is registered with actual PCM. No playback starts
@@ -114,11 +109,14 @@ public:
    ready_=true;error.clear();return true;
   }catch(const std::exception& e){blocked_=true;error=e.what();return false;}
  }
+ // False when the AUB authors no soul-tree sound: no owner (caller drops it).
+ bool authored()const noexcept{return authored_;}
+ std::size_t descriptorCount()const noexcept{return count_;}
  bool ready()const noexcept{return ready_&&!blocked_&&!closed_&&current();}
  // This owner's World4D8 transport, for the Results 26D070 typed stop claim only.
  p::LogicalAudioOwner& resultsWorldTransport26D070()noexcept{return logical_;}
  const rc_cold_sources50LA::Owner* sourceIdentity()const noexcept{return source_.get();}
- const std::array<Descriptor,descriptorCount>& descriptors()const noexcept{return rows_;}
+ const std::array<Descriptor,descriptorCapacity>& descriptors()const noexcept{return rows_;}
  const a::AudioBank50HC& bank()const noexcept{return bank_;}
  Receipt service(const g::OriginalAiAudioListener* listeners,std::size_t count,
      g::CoupledNoiseContext49M& shared)noexcept;
@@ -142,10 +140,10 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
  // the actual World4D8 mixer layer also pauses the retained playback cursors.
  if(*paused){r.complete=true;return r;}
  auto fail=[&](){blocked_=true;return r;};
- std::array<float,descriptorCount> distances{};std::array<std::size_t,descriptorCount> nearest{};
- std::array<bool,descriptorCount> eligible{};
+ std::array<float,descriptorCapacity> distances{};std::array<std::size_t,descriptorCapacity> nearest{};
+ std::array<bool,descriptorCapacity> eligible{};
  // Actual291350 shape: evaluate every descriptor before starting/stopping any.
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];auto& state=states_[i];
   float best=std::numeric_limits<float>::max();
   for(std::size_t l=0;l<count;++l){const float d=distance(row.position[0],row.position[2],listeners[l].position[0],listeners[l].position[2]);
    if(!std::isfinite(d))return fail();if(d<best){best=d;nearest[i]=l;}}
@@ -154,14 +152,14 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   else if(row.oneShot){if(row.resetWhenInaudible)state.played=false;state.randomAttempted=false;}
  }
  // Release completed/ineligible actual transport before deterministic admission.
- for(std::size_t i=0;i<descriptorCount;++i){auto& state=states_[i];if(state.slot<0)continue;
+ for(std::size_t i=0;i<count_;++i){auto& state=states_[i];if(state.slot<0)continue;
   auto* sound=logical_.sound(static_cast<std::size_t>(state.slot));if(!sound)return fail();
   const bool playing=logical_.active(*sound);
   // Foreign playback is never treated as a free owned transport.
   if(mixer_->active(firstVoice+static_cast<std::size_t>(state.slot))&&!playing)return fail();
   if(!eligible[i]||!playing){if(!eligible[i]&&playing)state.randomAttempted=false;if(!release(i,r))return fail();}
  }
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];auto& state=states_[i];
   if(!eligible[i]||state.slot>=0||(row.oneShot&&state.played))continue;
   // A latched unsuccessful random attempt does not create a playback.
   if(row.chance<100&&state.randomAttempted)continue;
@@ -179,7 +177,7 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   if(started.status!=g::AiLogicalSoundStatus::complete||!started.sourceReturned)return fail();
   sound->volume38=100;assigned_[slot]=static_cast<int>(i);state.slot=static_cast<int>(slot);++r.started;
  }
- for(std::size_t i=0;i<descriptorCount;++i){const auto& row=rows_[i];const auto& state=states_[i];
+ for(std::size_t i=0;i<count_;++i){const auto& row=rows_[i];const auto& state=states_[i];
   if(state.slot<0||!count||!(distances[i]<row.farDistance))continue;
   auto* sound=logical_.sound(static_cast<std::size_t>(state.slot));if(!sound||!logical_.active(*sound))return fail();
   const auto& listener=listeners[nearest[i]];const float d=distances[i];

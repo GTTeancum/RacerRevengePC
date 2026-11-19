@@ -1,5 +1,6 @@
 #pragma once
 #include "terrain_interactive_loop_providers50du.h"
+namespace ga_trigger_actions { class Owner; }
 
 namespace interactive_loop50DU {
 namespace platform=rr::platform;
@@ -582,38 +583,18 @@ struct Context final {
     sourcePositionStatsResourcesType& sourcePositionStatsResources;
     using gcParticleRenderType = OriginalGcParticleRenderOwner50KG;
     gcParticleRenderType& gcParticleRender;
-    using gcAnimatedWorldType = std::unique_ptr<gc_animated_world50IG::Owner>;
-    gcAnimatedWorldType& gcAnimatedWorld;
-    using gcDynamicWindowType = gc_dynamic_window50IG::Owner;
-    gcDynamicWindowType& gcDynamicWindow;
+    using trackAnimationsType = std::shared_ptr<track_animation_runtime50AN::Owner>;
+    trackAnimationsType& trackAnimations;
+    using trackAnimationBindingType = std::unique_ptr<track_animation_binding50AN::Binding>;
+    trackAnimationBindingType& trackAnimationBinding;
+    using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;  // the common trigger chain
+    gaTriggerActionsType& gaTriggerActions;
+    using trackAnimationWindowType = track_animation_window50AN::Owner;
+    trackAnimationWindowType& trackAnimationWindow;
     using gcAtmType = gc_atm_window_fixture::Owner;
     gcAtmType& gcAtm;
-    using gaAnimatedWorldType = std::unique_ptr<ga_animated_world::Owner>;
-    gaAnimatedWorldType& gaAnimatedWorld;
-    using gaDynamicWindowType = ga_dynamic_window::Owner;
-    gaDynamicWindowType& gaDynamicWindow;
-    using tcGateRuntimeType = std::shared_ptr<tc_gate_runtime50TC::Owner>;
-    tcGateRuntimeType& tcGateRuntime;
-    using tcDynamicWindowType = tc_dynamic_window50TC::Owner;
-    tcDynamicWindowType& tcDynamicWindow;
-    using tbDoorRuntimeType = std::shared_ptr<tb_door_runtime50TB::Owner>;
-    tbDoorRuntimeType& tbDoorRuntime;
-    using tbDynamicWindowType = tb_dynamic_window50TB::Owner;
-    tbDynamicWindowType& tbDynamicWindow;
-    using mcAnimationRuntimeType = std::shared_ptr<mc_animation_runtime50MC::Owner>;
-    mcAnimationRuntimeType& mcAnimationRuntime;
-    using mcDynamicWindowType = mc_dynamic_window50MC::Owner;
-    mcDynamicWindowType& mcDynamicWindow;
-    using gbAnimationRuntimeType = std::shared_ptr<gb_animation_runtime50GB::Owner>;
-    gbAnimationRuntimeType& gbAnimationRuntime;
-    using gbDynamicWindowType = gb_dynamic_window50GB::Owner;
-    gbDynamicWindowType& gbDynamicWindow;
     using gaAtmType = ga_atm_window_fixture::Owner;
     gaAtmType& gaAtm;
-    using saAnimatedWorldType = std::unique_ptr<sa_animated_world::Owner>;
-    saAnimatedWorldType& saAnimatedWorld;
-    using saDynamicWindowType = sa_dynamic_window::Owner;
-    saDynamicWindowType& saDynamicWindow;
     using maSaAtmType = ma_sa_atm_window_fixture::Owner;
     maSaAtmType& maSaAtm;
     using mbAtmType = mb_atm_window_fixture::Owner;
@@ -708,8 +689,8 @@ struct Context final {
     using lastAllAiStatusNsType = std::uint64_t;
     lastAllAiStatusNsType& lastAllAiStatusNs;
     BorrowedCall<void(const char*)> reportOriginalAiFleet;
-    using gcAnimatedWorldStepsType = std::uint64_t;
-    gcAnimatedWorldStepsType& gcAnimatedWorldSteps;
+    using trackAnimationStepsType = std::uint64_t;
+    trackAnimationStepsType& trackAnimationSteps;
     using gcNativeGateType = const bool;
     gcNativeGateType& gcNativeGate;
     using boostButtonCodeType = const std::uint32_t;

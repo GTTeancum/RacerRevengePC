@@ -1,11 +1,39 @@
 #pragma once
 #include "trigger_entry50in.h"
+#include "native_trigger_capacity50tg.h"
 #include <array>
 #include <cstdint>
 #include <limits>
 namespace rr::game {
-// Distinct exact GB storage; existing GA, TC, TB and generic callback bounds are untouched.
-inline constexpr std::size_t nativeTriggerCount50GB=18,nativeTriggerColliderCount50GB=16;
+// Distinct GB storage; existing GA, TC, TB and generic callback bounds are untouched.
+// Capacity store with a live count (common course rule): the course TOB's own
+// NumberOfTriggers selects the live prefix while cold. Capacity and action
+// slots are the common trigger reader's, defined once in
+// native_trigger_capacity50tg.h (no copy here). Stock GB authors 18 triggers.
+inline constexpr std::size_t nativeTriggerCapacity50GB=nativeTriggerCapacity50TG,
+    nativeTriggerActionCapacity50GB=nativeTriggerActionSlots50TG,
+    nativeTriggerColliderCount50GB=16;
+// Zero authored triggers = no trigger state selected (count 0): the group then
+// carries only the racers' colliders, queries run and nothing can dispatch.
+class NativeTriggerStates50GB final {
+ std::array<TriggerEntryState50IN,nativeTriggerCapacity50GB> storage_{};
+ std::size_t count_=0;
+ bool selected_=false;
+public:
+ bool setCount(std::size_t count)noexcept {
+  if(selected_||!count||count>storage_.size())return false;
+  // Cold selection only; a started owner cannot discard reciprocal state.
+  for(const auto& s:storage_)if(s.collider.identity||s.collider.highWaterD0||s.callbackCount98)return false;
+  count_=count;selected_=true;return true;
+ }
+ std::size_t size()const noexcept{return count_;}
+ auto begin()noexcept{return storage_.begin();}
+ auto end()noexcept{return storage_.begin()+count_;}
+ auto begin()const noexcept{return storage_.begin();}
+ auto end()const noexcept{return storage_.begin()+count_;}
+ TriggerEntryState50IN& operator[](std::size_t i)noexcept{return storage_[i];}
+ const TriggerEntryState50IN& operator[](std::size_t i)const noexcept{return storage_[i];}
+};
 struct NativeTriggerGroup50GB;
 struct SourceTriggerActionCall50GB {
     TriggerActionCall50IN source{};
@@ -48,11 +76,11 @@ struct SourceTriggerContactReceipt50GB {
     SourceTriggerActionResult50GB action{};
 };
 struct NativeTriggerGroup50GB {
- std::array<TriggerEntryState50IN,nativeTriggerCount50GB> triggers{};
+ NativeTriggerStates50GB triggers{};
  TriggerColliderStorage50IN<nativeTriggerColliderCount50GB> colliders{};
- std::array<std::uint32_t,nativeTriggerCount50GB> ignoreCollider{};
- std::array<std::array<std::uint32_t,8>,nativeTriggerCount50GB> ignoreColliders{};
- std::array<std::size_t,nativeTriggerCount50GB> ignoreColliderCount{};
+ std::array<std::uint32_t,nativeTriggerCapacity50GB> ignoreCollider{};
+ std::array<std::array<std::uint32_t,8>,nativeTriggerCapacity50GB> ignoreColliders{};
+ std::array<std::size_t,nativeTriggerCapacity50GB> ignoreColliderCount{};
  SourceTriggerActionHooks50GB actions{};
  SourceTriggerContactState50GB contact{};
  SourceTriggerContactReceipt50GB lastContact{};
@@ -74,7 +102,9 @@ inline bool validNativeTriggerStorage50GB(const NativeTriggerGroup50GB& group)no
   for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
  }
  for(std::size_t i=0;i<group.triggers.size();++i){const auto& state=group.triggers[i];
-  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90!=100||state.callbackCount98!=(i==15?2u:i==17?5u:1u))return false;
+  // Action count from the course TOB (1..5 slots); stock GB: 2 on trigger 16, 5 on 18, else 1.
+  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90!=100||
+     !state.callbackCount98||state.callbackCount98>nativeTriggerActionCapacity50GB)return false;
   if(nativeTriggerCollider50GB(group,state.collider.identity)!=group.colliders.size())return false;
   for(std::size_t j=0;j<i;++j)if(state.collider.identity==group.triggers[j].collider.identity)return false;
   if(group.ignoreCollider[i]&&nativeTriggerCollider50GB(group,group.ignoreCollider[i])==group.colliders.size())return false;

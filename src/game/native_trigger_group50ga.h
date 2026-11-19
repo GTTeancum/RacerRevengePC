@@ -1,5 +1,6 @@
 #pragma once
 #include "trigger_entry50in.h"
+#include "original_trigger_chance50mc.h"
 #include <array>
 #include <stdexcept>
 
@@ -42,8 +43,13 @@ struct NativeTriggerGroup50GA {
  std::array<std::array<std::uint32_t,8>,nativeTriggerCapacity50GA> ignoreColliders{};
  std::array<std::size_t,nativeTriggerCapacity50GA> ignoreColliderCount{};
  TriggerActionHooks50IN actions{};
+ // RandomTriggerPercent other than 100 (2A00A0's 2A013C..230 draw on the one
+ // application RNG 308030, the same lazy seed/range slots as MC's chain). Bound
+ // only by an owner whose data authors such a trigger; unbound = every trigger
+ // must be 100, as before.
+ OriginalTriggerChance50MC chance{};
  bool ready=false,actionsFailed=false;
- std::uint64_t contacts=0,dispatches=0;
+ std::uint64_t contacts=0,dispatches=0,chanceDraws=0;
 };
 inline std::size_t nativeTriggerCollider50GA(const NativeTriggerGroup50GA& group,std::uint32_t id)noexcept {
  for(std::size_t i=0;i<group.colliders.size();++i)if(group.colliders[i].identity==id)return i;
@@ -58,7 +64,8 @@ inline bool validNativeTriggerStorage50GA(const NativeTriggerGroup50GA& group)no
   for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
  }
  for(std::size_t i=0;i<group.triggers.size();++i){const auto& state=group.triggers[i];
-  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90!=100||!state.callbackCount98||state.callbackCount98>2)return false;
+  if(!trigger_entry50IN_detail::valid(state)||(state.randomTriggerPercent90!=100&&!group.chance.bound())||
+     !state.callbackCount98||state.callbackCount98>2)return false;
   if(nativeTriggerCollider50GA(group,state.collider.identity)!=group.colliders.size())return false;
   for(std::size_t j=0;j<i;++j)if(state.collider.identity==group.triggers[j].collider.identity)return false;
   if(group.ignoreCollider[i]&&nativeTriggerCollider50GA(group,group.ignoreCollider[i])==group.colliders.size())return false;
@@ -107,7 +114,19 @@ inline TriggerEntryReceipt50IN dispatchNativeTriggerContact50GA(NativeTriggerGro
  if(index==group.colliders.size())return result;
  if(!nativeTriggerPairAllowed50GA(group,trigger,collider)){result.status=TriggerEntryStatus50IN::Complete;return result;}
  if(group.contacts!=~std::uint64_t{0})++group.contacts;
- result=triggerContact50IN(group.triggers[trigger],group.colliders[index],group.actions);
+ // 2A00A0: an enabled, admissible contact on a trigger below 100 percent that
+ // was not touched in the previous interval (0x20) draws once from the shared
+ // RNG before the chance test (same order as triggerContact50IN's own gate).
+ // The draw is taken first here; a later Capacity/ActionInput failure is
+ // terminal for the chain, so the advanced RNG is never replayed.
+ std::int32_t percent=0;
+ {const auto& s=group.triggers[trigger];const auto touched=static_cast<std::uint8_t>(s.flags1B8|0x10u);
+  if((s.flags29&1u)&&!((touched&4u)&&(touched&8u))&&s.randomTriggerPercent90!=100&&!(touched&0x20u)){
+   OriginalTriggerChanceReceipt50MC drawn{};
+   if(!drawOriginalTriggerChance50MC(group.chance,drawn)){result.status=TriggerEntryStatus50IN::RandomInput;return result;}
+   percent=drawn.percent;if(group.chanceDraws!=~std::uint64_t{0})++group.chanceDraws;
+  }}
+ result=triggerContact50IN(group.triggers[trigger],group.colliders[index],group.actions,percent);
  if(result.callbacks&&group.dispatches!=~std::uint64_t{0})++group.dispatches;
  // Preserve fired/actions/membership prefixes on downstream failure. Never
  // retry a committed event or fabricate callback success after mixer failure.

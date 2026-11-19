@@ -688,7 +688,8 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
                 if(receipt.status!=SourceTriggerContactStatus50GB::Complete)return Status::UnsupportedScope;
             }else if(candidate.nativeTriggers){
                 const auto receipt=dispatchNativeTriggerContact50GA(*candidate.nativeTriggers,candidate.nativeTriggerIndex,query.filter->identity);
-                if(receipt.status!=TriggerEntryStatus50IN::Complete||receipt.randomConsumed)return Status::UnsupportedScope;
+                // A consumed chance draw is admitted only for a group bound to the shared RNG (2A00A0).
+                if(receipt.status!=TriggerEntryStatus50IN::Complete||(receipt.randomConsumed&&!candidate.nativeTriggers->chance.bound()))return Status::UnsupportedScope;
             }else{
                 const auto receipt=dispatchGateContact50KG(*candidate.gate,query.filter->identity);
                 if(receipt.status==GateTriggerStatus50KG::ActionCallbackFailed)return Status::UnsupportedScope;

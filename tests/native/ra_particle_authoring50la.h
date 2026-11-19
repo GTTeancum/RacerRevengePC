@@ -1,5 +1,7 @@
 #pragma once
 #include "ra_cold_sources50la.h"
+#include "course_archive_receipt50ci.h"
+#include "../../src/assets/original_particle_emitters50pe.h"
 #include "../../src/game/original_gc_fire_emission50kg.h"
 #include "../../src/game/original_application_entities50la.h"
 #include "../../src/assets/original_standard_archive_provider50la.h"
@@ -171,23 +173,36 @@ public:
                 {"particle\\demoprt.prt",9210,"d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f"},
                 {"particle\\demoprt.psm",5022,"ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1"},
                 {"particle\\demoprt.pst",132124,"e01d9c314d4c8c31e9d1e56cbbf4573e722c3ce1965e1daddfbeb33844b82bb6"}};
-            for(std::size_t i=0;i<5;++i)need(a::extractResMember48C(s->archive,pins[i].name,bytes_[i],d.decode,pins[i].bytes)&&
+            // The TOB is read by name (its stock identity is a receipt). The EMT
+            // and atlas pins stay: the RA loader replay (ra_particle_loader50la.inl,
+            // 15DEF0) is the RA-route stand-in (REFUSALS RA-8/RA-17, CR2).
+            need(a::extractResMember48C(s->archive,pins[0].name,bytes_[0],d.decode,512u*1024u)&&!bytes_[0].empty(),"RA TOB member missing");
+            course_archive_receipt50CI::memberReceipt("particles_RA",pins[0].name,bytes_[0],0,0,pins[0].bytes,pins[0].sha);
+            for(std::size_t i=1;i<5;++i)need(a::extractResMember48C(s->archive,pins[i].name,bytes_[i],d.decode,pins[i].bytes)&&
                 bytes_[i].size()==pins[i].bytes&&pod_materials50ed_fixture::detail::sha256(bytes_[i])==pins[i].sha,"RA particle exact member identity");
             need(a::decodeParameters48F(bytes_[0],tob_,d.decode),"RA original TOB syntax");
-            need(field(block(tob_,"particleemitters"),"numberofemitters")=="4","RA emitter count");
-            for(std::size_t i=0;i<4;++i){
-                auto& out=attachments_[i];out.soulTree="FireP0t0"+std::to_string(i+1)+".slt";
-                const auto& b=block(tob_,"particleemitter"+std::to_string(i+1));
-                need(field(b,"attachtosoultree")==out.soulTree&&field(b,"emitterfilename")=="rafire.emt"&&
-                     field(b,"numberofinstances")=="1"&&field(b,"offsetfromsoultree")=="0.0,15.0,0.0"&&
-                     field(b,"startingzone")=="1"&&field(b,"typeid")=="8","RA attachment authoring");
+            // ONE common emitter reader (27DE00/27C600/27C7B0).
+            namespace pe=rr::assets::particle_emitters50PE;pe::Table table;
+            need(pe::read(tob_,"RA",table),"RA emitter table rejected by the common reader");
+            course_archive_receipt50CI::countReceipt("particles_RA","emitters",table.live,4);
+            // PORT STAND-IN (flagged): the RA native emitter route holds four
+            // attached one-instance Fire8 emitters of one rafire.emt definition
+            // (the loader replay is pinned to that file); other tables refuse.
+            need(table.live==attachments_.size(),"PORT STAND-IN: RA native emitter route implements exactly four emitters");
+            for(std::size_t i=0;i<table.live;++i){const auto& e=table.rows[i];auto& out=attachments_[i];
+                need(e.loaded()&&e.attached&&e.typeId==8&&e.instances==1&&e.childObject=="NONE"&&e.startOn!=0&&
+                     pe::detail::sameNoCase(e.filename,"rafire.emt")&&e.positionOrOffset==std::array<float,3>{{0,15,0}},
+                     "PORT STAND-IN: RA native emitter route implements attached rafire.emt Fire8 emitters at offset 0,15,0");
+                need(e.startingZone>=1&&static_cast<std::size_t>(e.startingZone)<=s->world.zones.size(),"RA emitter zone outside the world");
+                out.soulTree=e.attachToSoulTree;out.zone=static_cast<std::uint32_t>(e.startingZone);out.type=8;out.instances=1;
                 std::size_t matches=0;
                 for(std::size_t j=0;j<s->world.instances.size();++j){const auto& instance=s->world.instances[j];
                     need(instance.parameter_block<s->world.parameters.blocks.size(),"RA SCB block bounds");
                     const auto* slt=optional(s->world.parameters.blocks[instance.parameter_block],"slt");
                     if(slt&&*slt==out.soulTree){++matches;out.worldInstance=j;out.ordinal=instance.ordinal;
-                        need(instance.zone==1&&instance.ordinal==366+i&&
-                            instance.geometry_member=="geometry\\firep0t0"+std::to_string(i+1)+".psg","RA exact SoulTree placement");}}
+                        // Old pins (zone 1, ordinal 366+i, firep0t0N.psg): receipts.
+                        if(instance.zone!=1||instance.ordinal!=366+i||instance.geometry_member!="geometry\\firep0t0"+std::to_string(i+1)+".psg")
+                            std::cerr<<"course_count site=particles_RA attachment="<<i<<" ordinal="<<instance.ordinal<<" stock_placement=0\n";}}
                 need(matches==1,"RA unique authored SoulTree match");
             }
             need(readDefinition(d),"RA original EMT fields/defaults");

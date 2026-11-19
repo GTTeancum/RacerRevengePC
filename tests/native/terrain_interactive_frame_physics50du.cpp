@@ -30,6 +30,8 @@
 #include "roster_pod_contact50pc.h"
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
+#include "../../src/game/n64_track_hazards_runtime50nh.h"
+#include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/vehicle_frame_surface50st.h"
 #include <algorithm>
 #include <limits>
@@ -71,9 +73,24 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  // prior point is cleared to the shared sentinel as 216A30 does after it
  // places a pod (219D90 then copies the current point: zero-length sweep).
  // Writes stay inside this racer's own frame state (s); nothing else moves.
- if(actualRacerSlot<rr::game::nativeTestUndertrackPending50UT.size()&&
-    rr::game::nativeTestUndertrackPending50UT[actualRacerSlot]){
-  rr::game::nativeTestUndertrackPending50UT[actualRacerSlot]=false;
+ // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): the N64
+ // respawn after a column wreck places the restored racer on the line through
+ // the same 228BBC -> 2255B0 under-track reset the original runs for every
+ // racer, reached by this same drop. Only when this racer's reset owner exists
+ // (human: the course's human owner; AI: original recovery + original AI);
+ // otherwise the racer stays restored where it was (logged).
+ bool n64RespawnDrop=rr::game::n64HazardRuntime50NH.takePlacement(actualRacerSlot);
+ if(n64RespawnDrop){
+  const bool human=s.fields.vehicle58==0u;
+  const bool owned=human?(humanCourseEnabled&&actualRacerSlot==0u):(originalRecoveryEnabled&&originalAiEnabled);
+  std::cerr<<"n64_respawn placement slot="<<actualRacerSlot<<" human="<<human<<" via="<<(owned?"228BBC_2255B0":"none")
+      <<" frame="<<completedFrames<<'\n';
+  if(!owned)n64RespawnDrop=false;
+ }
+ const bool testUndertrackDrop=actualRacerSlot<rr::game::nativeTestUndertrackPending50UT.size()&&
+     rr::game::nativeTestUndertrackPending50UT[actualRacerSlot];
+ if(testUndertrackDrop||n64RespawnDrop){
+  if(testUndertrackDrop)rr::game::nativeTestUndertrackPending50UT[actualRacerSlot]=false;
   const auto& life=x.bindings.lifecycle;
   const SceneGraph49P graph{s.nodes,s.sceneNodeCount};
   require50DU(validVehicleSceneCount49W(s,x.bindings)&&validateSceneGraph49P(graph)&&
@@ -82,7 +99,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
       refreshSceneWorld49P(graph,life.main190),"test undertrack drop requires the racer's scene forest");
   const float fromY=s.nodes[static_cast<std::uint32_t>(life.main190)].world100.v[13];
   const float step=rr::game::nativeTestUndertrackY50UT-99.f-fromY;
-  std::cerr<<"test_undertrack armed slot="<<actualRacerSlot<<" frame="<<completedFrames<<" from_y="<<fromY<<'\n';
+  std::cerr<<(testUndertrackDrop?"test_undertrack armed":"n64_respawn drop")<<" slot="<<actualRacerSlot<<" frame="<<completedFrames<<" from_y="<<fromY<<'\n';
   const SceneDisplacement49P down{{0.f,step,0.f,0.f}};
   for(const auto node:{life.main190,life.physical19C,life.hidden198}){
    if(node==SceneNodeIndex49P::none||static_cast<std::uint32_t>(node)>=s.sceneNodeCount||
@@ -119,6 +136,12 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   zg.speed=s.bodies.main.cachedSpeed34;
   zg.finished=(s.fields.impactFlagsCD8&1u)!=0u;
   zg.dt=s.bodies.main.schedule.factorPerSubstep;
+  {// Logs only (zero_gravity sample): travel against the pod's own axes.
+   const auto main190=static_cast<std::uint32_t>(x.bindings.lifecycle.main190);
+   if(main190<s.sceneNodeCount){const auto& w=s.nodes[main190].world100.v;zg.haveMotion=true;
+    for(unsigned i=0;i<3;++i){zg.velocity[i]=s.bodies.main.components.root.body.velocity.v[i];
+     zg.right[i]=w[i];zg.up[i]=w[4+i];zg.forward[i]=w[8+i];}}
+  }
   zeroGravityScope.emplace(rr::game::zeroGravity50ZG.prepareStep(actualRacerSlot,zg));
  }
 
@@ -580,6 +603,43 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
        rr::game::zeroGravity50ZG.humanLeanBound()?-s.bodies.main.controls.player.raw.values[2]:0.f,
        rr::game::zeroGravity50ZG.tilt(0),w[0],w[1],w[2],w[8],w[9],w[10],s.bodies.main.cachedSpeed34);
   }
+ }
+ // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): N64 track
+ // hazards after this racer's completed step. Inert (no call cost beyond the
+ // test) unless the course's TOB carried N64 rows or the test switch is set.
+ if(rr::game::n64HazardRuntime50NH.active()){
+  rr::game::N64HazardRuntime50NH::StepInput hz{};
+  auto& st=hz.step;st.slot=actualRacerSlot;st.human=s.fields.vehicle58==0u;
+  const auto state40=s.bodies.main.vehicleState40;
+  const bool limping=actualRacerSlot<rr::game::nativeDestroyedRacers50PD.size()&&rr::game::nativeDestroyedRacers50PD[actualRacerSlot].limping;
+  st.alive=state40==0u&&!limping;
+  st.notAliveReason=(state40==1u||state40==2u||limping)?"limping":"dead";
+  for(unsigned i=0;i<3;++i)st.current[i]=s.bodies.main.components.root.body.position.v[i];
+  st.speed=s.bodies.main.cachedSpeed34;
+  st.lap=lapContinuity.state.vehicleCC8; // [I] CC8 = laps completed (N64 +0x78 lap 0/1/2)
+  // Carrier owners (N64 0x800665A4: the surface under the pod). Flight: the
+  // floor under the line (every owner of the .nft surface, else the zero-g
+  // line owner); otherwise this step's collected static owners.
+  std::array<std::uint32_t,64> carriers{};std::size_t carrierCount=0;
+  hz.flight=rr::game::zeroGravityStepIs50ZG(rr::game::ZeroGravityMode50ZG::Flight);
+  if(hz.flight){
+   const auto& floor=rr::game::zeroGravity50ZG.floorTable();
+   const auto* list=floor.lastValid(actualRacerSlot)?floor.owners(floor.lastSurface(actualRacerSlot)):nullptr;
+   if(floor.lastValid(actualRacerSlot)){if(list)for(const auto o:*list)if(carrierCount<carriers.size())carriers[carrierCount++]=o;}
+   else if(const auto o=rr::game::zeroGravity50ZG.stepLineOwner(actualRacerSlot);o!=rr::game::noSurfaceOwner50ST)carriers[carrierCount++]=o;
+  }else{
+   const auto& terrain=terrainResult.terrain;
+   const auto count=std::min<std::uint32_t>(terrain.collectedCount,static_cast<std::uint32_t>(terrain.collectedIdentities.size()));
+   for(std::uint32_t i=0;i<count&&carrierCount<carriers.size();++i){
+    const auto o=rr::game::surfaceRules50ST.ownerOfIdentity(terrain.collectedIdentities[i]);
+    if(o!=rr::game::noSurfaceOwner50ST)carriers[carrierCount++]=o;}
+  }
+  st.groundOwners=carriers.data();st.groundOwnerCount=carrierCount;
+  hz.boosting=boostState.vehicle64!=0u; // [I] Revenge boost word for N64 WAS_BOOSTING
+  hz.dt=s.bodies.main.schedule.factorPerSubstep;
+  const auto main190=static_cast<std::uint32_t>(x.bindings.lifecycle.main190);
+  if(main190<s.sceneNodeCount){const auto& w=s.nodes[main190].world100.v;hz.forward[0]=w[8];hz.forward[1]=w[9];hz.forward[2]=w[10];}
+  rr::game::n64HazardRuntime50NH.afterStep(hz);
  }
  zeroGravityScope.reset();
  addCounter50DU(completedFrames);

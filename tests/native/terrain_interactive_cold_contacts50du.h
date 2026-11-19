@@ -27,8 +27,8 @@ struct ContactsContext final {
     dynamicRacer60Type& dynamicRacer60;
     using dynamicRegistryType = native_dynamic_contact50IW::Registry;
     dynamicRegistryType& dynamicRegistry;
-    using gaAnimatedWorldType = std::unique_ptr<ga_animated_world::Owner>;
-    gaAnimatedWorldType& gaAnimatedWorld;
+    using trackAnimationsType = std::shared_ptr<track_animation_runtime50AN::Owner>;
+    trackAnimationsType& trackAnimations;
     using gaGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
     gaGateAudioType& gaGateAudio;
     using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
@@ -41,8 +41,6 @@ struct ContactsContext final {
     gbNavigationOwnerType& gbNavigationOwner;
     using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;
     gbQueryBindingType& gbQueryBinding;
-    using gcAnimatedWorldType = std::unique_ptr<gc_animated_world50IG::Owner>;
-    gcAnimatedWorldType& gcAnimatedWorld;
     using gcGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
     gcGateAudioType& gcGateAudio;
     using gcGraphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;

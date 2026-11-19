@@ -1,0 +1,59 @@
+﻿.\work\scratch\145g-ta\ta_trigger_check.exe : course_archive_identity site=triggers_TA code=TA bytes=3334562 stock=1
+At line:1 char:385
++ ... dfe2681b2d; .\work\scratch\145g-ta\ta_trigger_check.exe "C:\Games\Sta ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (course_archive_...3334562 stock=1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+course_triggers site=TA count=13 
+kinds=LostAI,LostAI,Animation,Animation,LostAI,LostAI,LostAI,LostAI,LostAI,LostAI,LostAI,LostAI,LostAI
+OK   TA trigger reader: 
+OK   TA live triggers = 13 (got 13)
+OK   TA TOB is the stock receipt
+  trigger1 name=lefttunnel zone=2 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 16)
+  trigger2 name=righttunnel zone=2 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 104)
+  trigger3 name=(none) zone=5 shape=sphere percent=40 ignore_player=0 ignore_ai=0 ignore_animations=0 one_time=0 action1=Animation(row 1)
+  trigger4 name=(none2) zone=5 shape=sphere percent=40 ignore_player=0 ignore_ai=0 ignore_animations=0 one_time=0 action1=Animation(row 2)
+  trigger5 name=steppingstone1 zone=5 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 27)
+  trigger6 name=bones zone=7 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 145)
+  trigger7 name=leftofbones zone=7 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 63)
+  trigger8 name=steppingstone2 zone=5 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 32)
+  trigger9 name=steppingstone3 zone=5 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 33)
+  trigger10 name=steppingstone4 zone=5 shape=sphere percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 34)
+  trigger11 name=SteppingStone5 zone=5 shape=box percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 34)
+  trigger12 name=SteppingStone4 zone=5 shape=box percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 31)
+  trigger13 name=SteppingStone0 zone=5 shape=box percent=100 ignore_player=1 ignore_ai=0 ignore_animations=0 one_time=0 action1=LostAI(node 30, Reset)
+OK   trigger3 Animation row 1, 40 percent, ignores nothing
+OK   trigger4 Animation row 2, 40 percent, ignores nothing
+OK   trigger13 authors LostAI Reset
+OK   TA archive decode
+OK   TA TOB member
+OK   TA TOB decode
+OK   TA animation source: 
+OK   TA animation runtime: 
+OK   TA 2 rows, both Animation-action targets
+OK   bindChance
+course_trigger_not_carried course=TA trigger=13 kind=LostAI reason=Reset PORT STAND-IN: LostAI pose reset not 
+implemented natively; trigger registered disabled
+course_triggers_common course=TA triggers=13 carried=12 not_carried=1 chance_triggers=2 animation_actions=1 stock=1 
+animation_subjects_not_carried=13
+OK   common owner prepare: 
+OK   trigger13 (LostAI Reset) registered disabled (not carried)
+OK   triggers 3/4 enabled at 40 percent
+OK   ignore lists: triggers 3/4 none, trigger1 the player
+  chance: 826/2000 admitted (41.3 percent), draws=2000
+OK   trigger3 admits about 40 percent of first contacts, one shared-RNG draw each
+OK   draw = 308030 LCG step and 2A013C percent
+OK   triggers 3 and 4 fire (by chance) and call Control::fire
+track_animation_started course=TA row=1 mcf=xsailbarge tick=1 by=trigger3
+track_animation_started course=TA row=2 mcf=x_sab tick=1 by=trigger4
+OK   barges started by trigger3 / trigger4
+OK   barge 1 sailing (time > 0)
+OK   raceReset (101D10 + 101B20): 
+OK   trigger manager 2DCC70 over 13 triggers
+OK   fired bits cleared
+  after reset row1: stopped=1 time=0.0001 active=0 saved=0
+  after reset row2: stopped=1 time=0.0001 active=0 saved=0
+OK   both barges stopped at their start pose waiting for their triggers again
+OK   barges still waiting after 60 ticks
+ALL OK 0

@@ -2,7 +2,9 @@
 #include "gb_cold_sources50la.h"
 #include "ga_trigger_authoring_fixture.h"
 #include "sc_trigger_authoring50la.h"
+#include "../../src/game/native_trigger_group50gb.h"
 #include <array>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -10,7 +12,20 @@
 
 namespace gb_trigger_authoring50GB {
 namespace a=rr::assets;namespace g=rr::game;namespace detail=ga_trigger_authoring::detail;
-inline constexpr std::size_t count=18,lostCount=15,door=15,secondAnimation=16,particles=17;
+namespace common=sc_trigger_authoring50LA;
+// Capacity store (common course rule): the common trigger reader's capacity
+// and action slots, defined once in src\game\native_trigger_capacity50tg.h;
+// the GB native group is sized to the same store. The live count is the TOB's
+// own NumberOfTriggers (absent [Triggers] or 0 = no triggers).
+inline constexpr std::size_t capacity=g::nativeTriggerCapacity50TG,maxActions=g::nativeTriggerActionSlots50TG;
+static_assert(capacity==common::count&&maxActions==common::maxActions&&
+    capacity==g::nativeTriggerCapacity50GB&&maxActions==g::nativeTriggerActionCapacity50GB,
+    "GB native trigger group must hold the common trigger reader's store");
+// Stock GB trigger set (18 triggers: 15 LostAI branches, door 16, gate 17,
+// fireworks 18). Receipts only, EXCEPT as the trigger indices of GB's
+// stock-shaped Animation / PodSound / Particles destination owners, which
+// exist only for the stock TOB (PORT STAND-IN, flagged below).
+inline constexpr std::size_t stockCount=18,lostCount=15,door=15,secondAnimation=16,particles=17;
 inline constexpr std::size_t tobBytes=20617;
 inline constexpr const char* tobSha="96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1";
 enum class Action {LostAI,Animation,PodSound,Particles};
@@ -36,12 +51,14 @@ struct Source {
  Ignore ignore=Ignore::None;std::int32_t randomTriggerPercent=100;
  std::optional<bool> authoredStartEnabled;std::optional<float> authoredRandomTriggerPercent;
  std::optional<std::string> authoredIgnoreTrigger;
- std::array<ActionSource,5> actions{};const a::ParameterBlock48F* original=nullptr;
+ std::array<ActionSource,maxActions> actions{};const a::ParameterBlock48F* original=nullptr;
 };
-// Exact immutable source projection. No callback, collider/query identity,
-// live animation, emission state or C80 authority is manufactured here.
+// Immutable source projection of the course TOB's own trigger set, read by the
+// common trigger reader. No callback, collider/query identity, live animation,
+// emission state or C80 authority is manufactured here.
 class Owner final {
- std::shared_ptr<const gb_cold_sources50LA::Owner> cold_;std::array<Source,count> source_{};
+ std::shared_ptr<const gb_cold_sources50LA::Owner> cold_;std::array<Source,capacity> source_{};
+ std::size_t live_=0;bool stockTob_=false,animationActions_=false,podSoundActions_=false,particleActions_=false;
  const std::thread::id thread_=std::this_thread::get_id();bool attempted_=false,ready_=false;
  static void add(std::size_t& n,std::size_t x)noexcept {
   n=x>std::numeric_limits<std::size_t>::max()-n?std::numeric_limits<std::size_t>::max():n+x;
@@ -56,7 +73,10 @@ public:
  static constexpr std::size_t maximumAdditionalPayloadBytes()noexcept {
   // Both staged/retained string sets, actual short labels, SHA copy/padding
   // scratch and diagnostics. Shared original source remains separately owned.
-  return sizeof(Owner)+sizeof(std::array<Source,count>)+2u*128u*64u+18u*64u+1024u+4u*(tobBytes+64u);
+  // Sized by the store capacity; the TOB scratch term keeps the stock-TOB
+  // estimate (decode scratch belongs to the cold source's own reservation).
+  return sizeof(Owner)+sizeof(std::array<Source,capacity>)+2u*128u*64u+capacity*64u+1024u+4u*(tobBytes+64u)+
+   sizeof(common::Owner);
  }
  bool decode(std::shared_ptr<const gb_cold_sources50LA::Owner> cold,
      std::size_t availableAdditionalCpuPayloadBytes,Diagnostic& d){
@@ -70,73 +90,82 @@ public:
    return fail(d,Status::Capacity,"GB trigger preparation exceeds remaining source allowance");
   try{using namespace detail;
    need(cold&&cold->ready(),"GB trigger source requires actual cold owner");
-   // The common trigger reader reads the course's own TOB first (one log line
+   // The common trigger reader reads the course's own TOB (one log line
    // "course_triggers site=GB count=N kinds=..."; stock: 18 triggers).
-   {sc_trigger_authoring50LA::Owner reader;sc_trigger_authoring50LA::Owner::Diagnostic common{};
-    const bool read=reader.decode(cold->triggerParameters(),cold->world().zones.size(),cold->ai().count(),"GB",common);
-    const bool stockTob=cold->originalTob().size()==tobBytes&&pod_materials50ed_fixture::detail::sha256(cold->originalTob())==tobSha;
-    if(!stockTob)std::cerr<<"course_member_identity site=gb_triggers member=tracks\\gb.tob bytes="<<cold->originalTob().size()<<" stock=0\n";
-    // PORT STAND-IN (flagged): GB's native trigger, animation, particle and
-    // PodSound owners (gb_trigger_actions50gb.h, gb_collision_world50gb.h and
-    // the GB application route) implement the stock GB set only; a non-stock
-    // TOB is refused here, readable or not, until GB joins the common route's
-    // owners (absent = none). The reader above already reads it.
-    need(stockTob,read?"GB course archive TOB is not the stock TOB: GB trigger/animation/particle owners read the stock set only (needs the GB route on the common owners)":
-     "GB course archive TOB rejected by the common trigger reader (see course_triggers line)");}
-   need(cold->world().zones.size()==13&&cold->world().portals.size()==17&&cold->ai().count()==257,
-    "GB stock trigger set requires the stock world/AI extents");
-   const auto& p=cold->triggerParameters();need(!p.preservesDuplicateLabels&&p.blocks.size()==70&&p.original_bytes==cold->originalTob()&&
-    integer(field(block(p,"triggers"),"numberoftriggers"))==count,"GB original trigger document/count");
-   constexpr std::uint32_t targets[lostCount]={189,240,30,253,40,196,46,247,49,85,206,111,228,234,151};
-   constexpr std::uint32_t zones[count]={4,4,4,4,4,4,4,4,4,6,6,9,9,12,12,2,2,1};
-   constexpr const char* names[lostCount]={"Branch1Right","Branch1Middle","Branch1Left","Branch2Left","Branch2Right","Branch3Right","Branch3Left","Branch4Right","Branch4Left","Branch5Right","Branch5Left","Branch6Right","Branch6Left","Branch7Left","Branch7Right"};
-   std::array<Source,count> next{};
-   for(std::size_t i=0;i<count;++i){d.ordinal=i+1;auto& s=next[i];const auto label="trigger"+std::to_string(i+1);const auto& b=block(p,label);
-    s.original=&b;s.sourceOrdinal=static_cast<std::uint32_t>(i+1);s.zone=integer(field(b,"zone"));
-    s.actionCount=integer(field(b,"numberofactions"));s.sphere.center=vector(field(b,"position"));s.sphere.radius=number(field(b,"radius"));
-    s.oneTimeOnly=boolean(field(b,"onetimeonly"));if(const auto* n=optional(b,"name"))s.name=*n;
-    if(const auto* v=optional(b,"startenabled")){s.authoredStartEnabled=boolean(*v);s.startEnabled=*s.authoredStartEnabled;}
-    if(const auto* v=optional(b,"randomtriggerpercent")){s.authoredRandomTriggerPercent=number(*v);need(*s.authoredRandomTriggerPercent==100.f,"GB exact trigger percent");}
-    if(const auto* v=optional(b,"ignoretrigger")){s.authoredIgnoreTrigger=*v;
-     if(*v=="PLAYER")s.ignore=Ignore::Player;else{need(*v=="AI","GB actual ignore selector");s.ignore=Ignore::AI;}}
-    need(s.zone==zones[i]&&s.actionCount==(i==door?2u:i==particles?5u:1u)&&s.oneTimeOnly==(i>=door)&&
-     s.startEnabled==(i!=5&&i!=6)&&s.ignore==(i<lostCount?Ignore::Player:i==particles?Ignore::AI:Ignore::None)&&
-     !optional(b,"parent")&&!optional(b,"attachtosoultree")&&!optional(b,"box")&&!optional(b,"yaw")&&
-     !optional(b,"pitch")&&!optional(b,"roll")&&std::isfinite(s.sphere.radius)&&s.sphere.radius>0.f,
-     "GB exact sphere state/attachment fields");
-    if(i<lostCount){need(s.name==names[i]&&s.authoredStartEnabled&&s.authoredRandomTriggerPercent&&s.authoredIgnoreTrigger&&b.fields.size()==9,
-      "GB authored LostAI activation fields");}
-    else need(s.name.empty()&&!s.authoredStartEnabled&&!s.authoredRandomTriggerPercent&&b.fields.size()==(i==particles?6u:5u),
-      "GB actual special trigger defaults");
-    for(std::size_t j=0;j<s.actionCount;++j){auto& action=s.actions[j];const auto& b=block(p,label+"action"+std::to_string(j+1));action.original=&b;
-     if(const auto* once=optional(b,"onetimeonly"))action.authoredOneTimeOnly=boolean(*once);
-     if(i<lostCount){
-      need(j==0&&b.fields.size()==2&&field(b,"actiontype")=="LostAI"&&!optional(b,"reset"),"GB actual LostAI action");
-      action.authoredTargetNodeIndex=integer(field(b,"targetnodeindex"));action.targetNodeIndex=*action.authoredTargetNodeIndex;
-      need(action.targetNodeIndex==targets[i]&&action.targetNodeIndex<cold->ai().count(),"GB LostAI actual target bound");
-     }else if(i==particles){
-      need(field(b,"actiontype")=="Particles"&&b.fields.size()==5&&action.authoredOneTimeOnly==std::optional<bool>{true},"GB actual Particles action shape");
-      action.kind=Action::Particles;action.emitterNumber=integer(field(b,"emitternumber"));action.instanceNumber=integer(field(b,"instancenumber"));
-      action.turnOn=boolean(field(b,"turnon"));need(action.emitterNumber==8+j&&action.instanceNumber==1&&action.turnOn,"GB Particles exact ordered target");
-      action.emitterIndex=action.emitterNumber-1;action.instanceIndex=action.instanceNumber-1;
-      const auto& emitter=block(p,"particleemitter"+std::to_string(action.emitterNumber));
-      need(integer(field(emitter,"typeid"))==11&&integer(field(emitter,"numberofinstances"))==1&&
-       !boolean(field(emitter,"starton")),"GB Particles target is same disabled spark descriptor");
-     }else if(j==0){
-      need(field(b,"actiontype")=="Animation"&&b.fields.size()==3&&action.authoredOneTimeOnly==std::optional<bool>{true}&&
-       integer(field(b,"animationnumber"))==(i==door?1u:3u),"GB actual Animation action");
-      action.kind=Action::Animation;action.animationIndex=i==door?0u:2u;
-     }else{
-      need(i==door&&j==1&&field(b,"actiontype")=="PodSound"&&b.fields.size()==5,"GB original PodSound action shape");
-      action.kind=Action::PodSound;action.filename=field(b,"filename");action.soundPosition=vector(field(b,"position"));
-      action.minDistance=number(field(b,"mindistance"));action.maxDistance=number(field(b,"maxdistance"));
-      need(action.filename=="sfx\\race\\bigdoor.vag"&&action.soundPosition.v[0]==8012.f&&action.soundPosition.v[1]==2073.f&&
-       action.soundPosition.v[2]==15896.f&&action.minDistance==0.f&&action.maxDistance==2500.f,"GB own PodSound source identity");
+   auto reader=std::make_unique<common::Owner>();common::Owner::Diagnostic read{};
+   const auto& p=cold->triggerParameters();
+   need(reader->decode(p,cold->world().zones.size(),cold->ai().count(),"GB",read)&&reader->sources(),
+    "GB course archive TOB rejected by the common trigger reader (see course_triggers line)");
+   const bool stockTob=cold->originalTob().size()==tobBytes&&pod_materials50ed_fixture::detail::sha256(cold->originalTob())==tobSha;
+   if(!stockTob)std::cerr<<"course_member_identity site=gb_triggers member=tracks\\gb.tob bytes="<<cold->originalTob().size()<<" stock=0\n";
+   const auto live=reader->liveCount();
+   need(live<=capacity,"GB live trigger set exceeds the native trigger store");
+   std::array<Source,capacity> next{};bool animation=false,podSound=false,particle=false;
+   for(std::size_t i=0;i<live;++i){d.ordinal=i+1;const auto& in=(*reader->sources())[i];auto& s=next[i];
+    s.original=in.originalTrigger;s.sourceOrdinal=static_cast<std::uint32_t>(i+1);s.zone=in.sourceZoneOrdinal;
+    s.name=in.name;s.actionCount=in.actionCount;s.oneTimeOnly=in.oneTimeOnly;s.startEnabled=in.startEnabled;
+    if(in.startEnabledAuthored)s.authoredStartEnabled=in.startEnabled;
+    if(in.randomTriggerPercentAuthored)s.authoredRandomTriggerPercent=in.randomTriggerPercent;
+    // GB native group: sphere triggers at the authored 100 percent only (the
+    // source dispatcher draws no RNG). FLAG stand-in: a box trigger or another
+    // percent is refused here until the GB group joins the common geometry/RNG.
+    need(in.shape==common::Shape::sphere&&in.radius&&std::isfinite(*in.radius)&&*in.radius>0.f,
+     "GB native trigger group implements sphere triggers only (box trigger refused)");
+    need(in.randomTriggerPercent==100.f,"GB native trigger group implements RandomTriggerPercent 100 only");
+    s.randomTriggerPercent=100;s.shapeType=5;
+    for(unsigned k=0;k<3;++k)s.sphere.center.v[k]=in.position.values[k];s.sphere.radius=*in.radius;
+    if(in.ignoreTrigger){s.authoredIgnoreTrigger=*in.ignoreTrigger;
+     if(*in.ignoreTrigger=="PLAYER")s.ignore=Ignore::Player;
+     else{need(*in.ignoreTrigger=="AI","GB IgnoreTrigger other than PLAYER/AI");s.ignore=Ignore::AI;}}
+    need(s.actionCount>=1&&s.actionCount<=maxActions,"GB trigger action count outside the native action slots");
+    for(std::size_t j=0;j<s.actionCount;++j){const auto& x=in.actions[j];auto& action=s.actions[j];
+     action.original=x.original;action.authoredOneTimeOnly=x.authoredOneTimeOnly;
+     switch(x.kind){
+     case common::ActionKind::LostAI:
+      // Every LostAI Reset is absent/false in the native action (1B5A60 default 0).
+      need(!x.authoredReset||!*x.authoredReset,"GB LostAI Reset is not supported natively");
+      action.kind=Action::LostAI;action.authoredTargetNodeIndex=x.targetAiNodeIndex;action.targetNodeIndex=x.targetAiNodeIndex;
+      action.authoredReset=x.authoredReset;
+      need(action.targetNodeIndex<cold->ai().count(),"GB LostAI target outside the AI spline");break;
+     case common::ActionKind::Animation:
+      action.kind=Action::Animation;action.animationIndex=x.animationNumber-1u;animation=true;break;
+     case common::ActionKind::PodSound:
+      action.kind=Action::PodSound;action.filename=x.filename;
+      for(unsigned k=0;k<3;++k)action.soundPosition.v[k]=x.position.values[k];
+      action.minDistance=x.minDistance;action.maxDistance=x.maxDistance;podSound=true;break;
+     case common::ActionKind::Particles:
+      action.kind=Action::Particles;action.emitterNumber=x.emitterNumber;action.instanceNumber=x.instanceNumber;
+      action.turnOn=x.turnOn;action.emitterIndex=x.emitterNumber-1u;action.instanceIndex=x.instanceNumber-1u;particle=true;break;
+     default:
+      // FLAG stand-in: GB has no ordinary trigger Sound destination owner yet.
+      need(false,"GB trigger Sound action has no native GB destination owner");
      }
     }
    }
-   source_=std::move(next);cold_=std::move(cold);
+   // Animation actions go to the common track-animation player (any row the TOB
+   // loads). PORT STAND-IN (flagged): GB's PodSound and Particles destination
+   // owners (gb_pod_sound50gb.h, gb_particle_*50gb.h) implement the stock GB set
+   // only; a non-stock TOB whose triggers author those kinds is refused here
+   // until GB joins the common emitter / trigger-sound owners. LostAI and
+   // Animation triggers and an empty trigger set load from any TOB.
+   need(stockTob||(!podSound&&!particle),
+    "GB TOB triggers author PodSound/Particles actions: GB's destination owners read the stock set only (PORT STAND-IN until the common owners)");
+   if(stockTob){
+    // Stock receipt: the shipped 18-trigger shape (zones, LostAI targets, the
+    // door/gate/fireworks kinds). Logged only when it differs.
+    constexpr std::uint32_t targets[lostCount]={189,240,30,253,40,196,46,247,49,85,206,111,228,234,151};
+    constexpr std::uint32_t zones[stockCount]={4,4,4,4,4,4,4,4,4,6,6,9,9,12,12,2,2,1};
+    bool same=live==stockCount;
+    for(std::size_t i=0;same&&i<live;++i){const auto& s=next[i];
+     same=s.zone==zones[i]&&s.actionCount==(i==door?2u:i==particles?5u:1u)&&
+      (i>=lostCount||s.actions[0].targetNodeIndex==targets[i]);}
+    if(!same)std::cerr<<"course_count site=gb_triggers stock_shape=0\n";
+   }
+   source_=std::move(next);live_=live;stockTob_=stockTob;
+   animationActions_=animation;podSoundActions_=podSound;particleActions_=particle;cold_=std::move(cold);
    need(descriptorPayloadBytes()<=maximumAdditionalPayloadBytes(),"GB descriptor reservation exceeded");
+   std::cerr<<"gb_course_owner owner=triggers present="<<(live_?1:0)<<" count="<<live_<<" animation_actions="<<(animation?1:0)
+       <<" podsound_actions="<<(podSound?1:0)<<" particle_actions="<<(particle?1:0)<<" stock="<<(stockTob?1:0)<<'\n';
    ready_=true;d.status=Status::Ready;d.message.clear();d.retainedPayloadBytes=descriptorPayloadBytes();return true;
   }catch(const std::exception& e){return fail(d,Status::Authoring,e.what());}
    catch(...){return fail(d,Status::Authoring,"GB trigger authoring failed");}
@@ -147,7 +176,14 @@ public:
   Diagnostic d;const bool okay=decode(std::move(cold),maximumAdditionalPayloadBytes(),d);error=d.message;return okay;
  }
  bool ready()const noexcept{return thread_==std::this_thread::get_id()&&ready_&&cold_&&cold_->ready();}
- const Source& source(std::size_t i)const{if(!ready())throw std::runtime_error("GB trigger source unavailable");return source_.at(i);}
+ // Live prefix [0,liveCount()) of the capacity store.
+ std::size_t liveCount()const noexcept{return ready()?live_:0;}
+ bool stockTob()const noexcept{return ready()&&stockTob_;}
+ // Which destination kinds the authored triggers use (each needs its owner).
+ bool authorsAnimationActions()const noexcept{return ready()&&animationActions_;}
+ bool authorsPodSound()const noexcept{return ready()&&podSoundActions_;}
+ bool authorsParticleActions()const noexcept{return ready()&&particleActions_;}
+ const Source& source(std::size_t i)const{if(!ready()||i>=live_)throw std::runtime_error("GB trigger source unavailable");return source_[i];}
  const gb_cold_sources50LA::Owner* coldSource()const noexcept{return ready()?cold_.get():nullptr;}
  const std::vector<std::uint8_t>& originalTob()const{if(!ready())throw std::runtime_error("GB trigger source unavailable");return cold_->originalTob();}
  std::size_t descriptorPayloadBytes()const noexcept {

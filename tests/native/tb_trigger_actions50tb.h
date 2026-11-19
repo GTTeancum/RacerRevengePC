@@ -1,6 +1,6 @@
 #pragma once
 #include "tb_trigger_authoring50tb.h"
-#include "tb_door_runtime50tb.h"
+#include "track_animation_runtime50an.h"
 #include "tb_pod_sound50tb.h"
 #include "../../src/game/native_trigger_group50tb.h"
 #include "../../src/game/trigger_sphere50in.h"
@@ -23,7 +23,7 @@ struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0,animationActivat
 enum class Status {Complete,Unprepared,Input,Service,Action};
 class Owner final {
  std::shared_ptr<const tb_trigger_authoring50TB::Owner> source_;
- std::shared_ptr<tb_door_runtime50TB::Owner> door_;
+ std::shared_ptr<track_animation_runtime50AN::Owner> door_; // the common track-animation runtime
  std::shared_ptr<tb_pod_sound50TB::Owner> sounds_;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
@@ -41,7 +41,7 @@ class Owner final {
   const auto& call=event.source;
   if(!ready()||terminal_!=Status::Complete||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
-  if(t>=tb_trigger_authoring50TB::count||c>=group_.colliders.size())return false;
+  if(t>=source_->liveCount()||t>=group_.triggerCount||c>=group_.colliders.size())return false;
   const auto& trigger=source_->source(t);if(call.actionIndex>=trigger.actionCount)return false;
   if(!call.entering)return servicing_&&!lease_&&!group_.queryActive&&event.querySerial==0;
   if(servicing_||!lease_||!group_.queryActive||!event.querySerial||event.querySerial!=group_.querySerial||
@@ -50,9 +50,9 @@ class Owner final {
   const auto& action=trigger.actions[call.actionIndex];
   if(action.kind==tb_trigger_authoring50TB::Action::LostAI)
    return !action.authoredReset&&!action.effectiveReset1B5A60&&action.targetNodeIndex<source_->coldSource()->ai().count()&&((c&1u)||lease_->nodeC80);
-  if(action.kind==tb_trigger_authoring50TB::Action::Animation)return t==tb_trigger_authoring50TB::door&&call.actionIndex==0&&door_->ready()&&action.animationIndex==0;
-  return action.kind==tb_trigger_authoring50TB::Action::PodSound&&
-   t==tb_trigger_authoring50TB::door&&call.actionIndex==1&&
+  // The common track-animation runtime holds every row the TOB's [Animations] loads.
+  if(action.kind==tb_trigger_authoring50TB::Action::Animation)return door_&&door_->ready()&&action.animationIndex<door_->rowCount();
+  return action.kind==tb_trigger_authoring50TB::Action::PodSound&&sounds_&&
    lease_->listenerCount<=2&&(!lease_->listenerCount||lease_->listeners)&&
    sounds_->readyFor(*source_,call.actionIndex);
  }
@@ -67,7 +67,7 @@ class Owner final {
     return {A::Complete,0x1b27c0u,0xc80u};
    }
    if(action.kind==tb_trigger_authoring50TB::Action::Animation){
-    if(!door_->activateSequence(action.animationIndex)){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
+    if(!door_->fire(action.animationIndex,static_cast<std::uint32_t>(call.triggerCollider-firstTriggerIdentity+1))){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
     increment(counters_.animationActivations);return {A::Complete,0x101170u,0x90u};
    }
    const auto starts=sounds_->counters().starts;
@@ -115,26 +115,35 @@ public:
  // Cold setup publishes only stable source/group backing. It cannot admit a
  // query until real arena collider identities are bound after Bank visits.
  bool prepare(std::shared_ptr<const tb_trigger_authoring50TB::Owner> source,
-     std::shared_ptr<tb_door_runtime50TB::Owner> door,std::shared_ptr<tb_pod_sound50TB::Owner> sounds)noexcept {
+     std::shared_ptr<track_animation_runtime50AN::Owner> door,std::shared_ptr<tb_pod_sound50TB::Owner> sounds)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource()||source->coldSource()->ai().count()!=tb_cold_sources50LA::aiNodeCount||
-     !door||!door->stagedSourceReady()||door->coldSource()!=source->coldSource()||!sounds||!sounds->readyFor(*source,1))return false;
-  for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
-   if(authored.actionCount!=(i==tb_trigger_authoring50TB::door?2u:1u)||authored.randomTriggerPercent!=100)return false;
+  // Owners are required by the authored action kinds: the door animation owner
+  // when an Animation action is authored, the PodSound owner when a PodSound
+  // is. Zero authored triggers = an empty group (no trigger state).
+  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource())return false;
+  const bool animation=source->authors(tb_trigger_authoring50TB::Action::Animation);
+  const bool podSound=source->authors(tb_trigger_authoring50TB::Action::PodSound);
+  if((animation&&!door)||(door&&!door->ready())||
+     (podSound&&(!sounds||!sounds->readyFor(*source,1))))return false;
+  const auto live=source->liveCount();if(live>group_.triggers.size())return false;
+  for(std::size_t i=0;i<live;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
+   // TB chain has no trigger-chance roll: RandomTriggerPercent 100 only.
+   if(!authored.actionCount||authored.actionCount>g::nativeTriggerActionSlots50TG||authored.randomTriggerPercent!=100)return false;
    state.flags29=authored.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(authored.oneTimeOnly?4u:0u));
    state.randomTriggerPercent90=100;state.callbackCount98=authored.actionCount;
    state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
-  source_=std::move(source);door_=std::move(door);sounds_=std::move(sounds);group_.actions=hooks();sourcePrepared_=true;return true;
+  group_.triggerCount=live;
+  source_=std::move(source);door_=std::move(door);if(podSound)sounds_=std::move(sounds);group_.actions=hooks();sourcePrepared_=true;return true;
  }
  bool bindRacerIdentities(const std::array<RacerIdentities,racers>& identities,
      std::uint32_t actualPlayerPrefixCount34,std::size_t racerCount=racers)noexcept {
-  if(bindAttempted_||!sourcePrepared_||!preparedSourceFor(*source_)||!door_->ready()||ready_||lease_||servicing_)return false;bindAttempted_=true;
-  if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount||!sounds_->readyFor(*source_,1))return false;
+  if(bindAttempted_||!sourcePrepared_||!preparedSourceFor(*source_)||(door_&&!door_->ready())||ready_||lease_||servicing_)return false;bindAttempted_=true;
+  if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount||(sounds_&&!sounds_->readyFor(*source_,1)))return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+tb_trigger_authoring50TB::count))return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+group_.triggerCount))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
   // Staging contains only scalar/contact records. The published group address
@@ -142,7 +151,7 @@ public:
   auto next=group_;
   if(!next.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
-  for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i)if(source_->source(i).ignorePlayer){
+  for(std::size_t i=0;i<group_.triggerCount;++i)if(source_->source(i).ignorePlayer){
    next.ignoreColliderCount[i]=actualPlayerPrefixCount34;
    for(std::size_t j=0;j<actualPlayerPrefixCount34;++j)next.ignoreColliders[i][j]=identities[j].main690;
   }
@@ -151,10 +160,10 @@ public:
  }
  bool preparedSourceFor(const tb_trigger_authoring50TB::Owner& source)const noexcept {
   return sourcePrepared_&&thread_==std::this_thread::get_id()&&source_.get()==&source&&source.ready()&&
-   door_&&door_->stagedSourceReady()&&door_->coldSource()==source.coldSource()&&sounds_&&
-   sounds_->sourceIdentity()==&source&&sounds_->prepared();
+   (door_?door_->ready():!source.authors(tb_trigger_authoring50TB::Action::Animation))&&
+   (sounds_?sounds_->sourceIdentity()==&source&&sounds_->prepared():!source.authors(tb_trigger_authoring50TB::Action::PodSound));
  }
- const tb_door_runtime50TB::Owner* doorOwner()const noexcept{return door_.get();}
+ const track_animation_runtime50AN::Owner* doorOwner()const noexcept{return door_.get();}
  bool queryIdle()const noexcept{return thread_==std::this_thread::get_id()&&!lease_&&!servicing_&&!group_.queryActive;}
  const tb_pod_sound50TB::Owner* soundOwner()const noexcept{return sounds_.get();}
  const tb_trigger_authoring50TB::Owner* sourceOwner()const noexcept{return source_.get();}
@@ -177,7 +186,7 @@ public:
   if(lease_||servicing_||group_.queryActive||terminal_!=Status::Complete)return terminal_==Status::Complete?fail(Status::Input):terminal_;
   if(!g::validNativeTriggerGroup50TB(group_))return fail(Status::Input);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
-  for(std::size_t t=0;t<tb_trigger_authoring50TB::count;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
+  for(std::size_t t=0;t<group_.triggerCount;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
@@ -204,10 +213,11 @@ public:
   return Status::Complete;
  }
  g::NativeTriggerGroup50TB& nativeGroup()noexcept{return group_;}
- const g::TriggerEntryState50IN& state(std::size_t i)const{return group_.triggers.at(i);}
+ const g::TriggerEntryState50IN& state(std::size_t i)const{if(i>=group_.triggerCount)throw std::out_of_range("TB trigger state outside the live prefix");return group_.triggers[i];}
  const Counters& counters()const noexcept{return counters_;}
  const std::string& lastError()const noexcept{return error_;}
  Status status()const noexcept{return terminal_;}
- bool ready()const noexcept{return ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&door_&&door_->ready()&&sounds_&&sounds_->prepared();}
+ bool ready()const noexcept{return ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&(!door_||door_->ready())&&(!sounds_||sounds_->prepared());}
+ std::size_t triggerCount()const noexcept{return group_.triggerCount;}
 };
 }

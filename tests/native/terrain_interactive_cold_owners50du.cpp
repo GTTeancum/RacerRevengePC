@@ -15,8 +15,7 @@
 #include "original_consumed_ra_stage50du.h"
 #include "original_position_stats_prestage50la.h"
 #include "original_pause_cold_driver50la.h"
-#include "gb_animation_binding50gb.h"
-#include "mc_animation_binding50mc.h"
+#include "track_animation_binding50an.h"
 #include "mb_collision_world50mb.h"
 #include "sc_runtime_ground50la.h"
 #include "terrain_probe_authoring50fq_fixture.h"
@@ -85,11 +84,7 @@ void OwnersContext::run() {
   // Shared world (Stage B): every trigger/animated membership is the one
   // world's, so none is banked; the legacy layout banks them per racer copy.
   const bool bankWorldMemberships=!this->trackStorage.sharedLayout();
-  if(bankWorldMemberships)for(auto& membership:gcAnimatedMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(bankWorldMemberships)for(auto& membership:gaAnimatedMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:trackAnimationMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
@@ -125,7 +120,7 @@ void OwnersContext::run() {
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(isTcTrack&&bankWorldMemberships)for(std::size_t i=0;i<tc_trigger_authoring50TC::count;++i){
+  if(isTcTrack&&bankWorldMemberships)for(std::size_t i=0;i<tcWorldBorrow->triggerCount();++i){
    auto* membership=tcWorldBorrow->triggerMembership(i);
    require50DU(membership,"TC actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
@@ -137,31 +132,31 @@ void OwnersContext::run() {
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(isTbTrack&&bankWorldMemberships)for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
+  if(isTbTrack&&bankWorldMemberships)for(std::size_t i=0;i<tbWorldBorrow->triggerCount();++i){
    auto* membership=tbWorldBorrow->triggerMembership(i);
    require50DU(membership,"TB actual trigger membership backing missing");
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
   if(isMcTrack){
-   if(bankWorldMemberships)for(std::size_t i=0;i<21;++i){auto* membership=mcWorldBorrow->triggerMembership(i);
+   if(bankWorldMemberships)for(std::size_t i=0;i<mcWorldBorrow->triggerCount();++i){auto* membership=mcWorldBorrow->triggerMembership(i);
     require50DU(membership,"MC actual trigger membership backing missing");
     racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
     racerBank.elements(membership->entries.data(),membership->entries.size());}
-   const bool enrolled=mcAnimationBinding->enrollBank(racerBank,mcAnimationBindingDiagnostic);
-   require50DU(enrolled,mcAnimationBindingDiagnostic.message.empty()?"MC real complete Bank animation enrollment rejected":mcAnimationBindingDiagnostic.message.c_str());
   }else if(isGbTrack){
-   if(bankWorldMemberships)for(std::size_t i=0;i<18;++i){auto* membership=gbWorldBorrow->triggerMembership(i);
+   // Live trigger memberships (stock 18; 0 when the TOB authors none).
+   if(bankWorldMemberships)for(std::size_t i=0;i<gbWorldBorrow->triggerCount();++i){auto* membership=gbWorldBorrow->triggerMembership(i);
     require50DU(membership,"GB actual trigger membership backing missing");
     racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
     racerBank.elements(membership->entries.data(),membership->entries.size());}
-   const bool enrolled=gbAnimationBinding->enrollBank(racerBank,gbAnimationBindingDiagnostic);
-   require50DU(enrolled,gbAnimationBindingDiagnostic.message.empty()?"GB real complete Bank animation enrollment rejected":gbAnimationBindingDiagnostic.message.c_str());
   }
+  // Track-animation lane memberships (every course on the lane route): banked per racer in a
+  // legacy per-racer world, none in the shared world (track_animation_binding50an.h).
+  if(trackAnimationBinding){const bool enrolled=trackAnimationBinding->enrollBank(racerBank,trackAnimationBindingDiagnostic);
+   require50DU(enrolled,trackAnimationBindingDiagnostic.message.empty()?"track animation Bank enrollment rejected":trackAnimationBindingDiagnostic.message.c_str());}
   racerBank.seal(raceRacerCount);
-  if(isMcTrack){const bool activated=mcAnimationBinding->activateSealedBank(mcAnimationBindingDiagnostic);
-   require50DU(activated,mcAnimationBindingDiagnostic.message.empty()?"MC actual sealed eight-peer animation backing rejected":mcAnimationBindingDiagnostic.message.c_str());}else if(isGbTrack){const bool activated=gbAnimationBinding->activateSealedBank(gbAnimationBindingDiagnostic);
-   require50DU(activated,gbAnimationBindingDiagnostic.message.empty()?"GB actual sealed eight-peer animation backing rejected":gbAnimationBindingDiagnostic.message.c_str());}
+  if(trackAnimationBinding){const bool activated=trackAnimationBinding->activateSealedBank(trackAnimationBindingDiagnostic);
+   require50DU(activated,trackAnimationBindingDiagnostic.message.empty()?"track animation sealed Bank backing rejected":trackAnimationBindingDiagnostic.message.c_str());}
   if(originalAiEnabled){
    // Handles bind registered locations only. Actual values are read afresh
    // after every native step; no per-world peer cache or arena swap is used.

@@ -16,15 +16,14 @@ namespace mc_original_world50LM { class Owner; }
 namespace mc_trigger_authoring50MC { class Owner; }
 namespace mc_collision_world50MC { class Owner; }
 namespace mc_trigger_actions50MC { class Owner; }
-namespace mc_animation_source50MC { class Owner; }
 namespace mc_particle_attachments50MC { class Owner; }
 namespace mc_track_fog50MC { class Owner; }
 namespace mc_trigger_geometry50MC { class Owner; }
 namespace mc_particle_source50MC { class Owner; }
 namespace mc_navigation50MC { class Owner; struct Diagnostic; }
-namespace mc_animation_runtime50MC { class Owner; struct Diagnostic; }
+namespace track_animation_runtime50AN { class Owner; }
 namespace mc_particle_runtime50MC { class Owner; struct Diagnostic; }
-namespace mc_animation_binding50MC { class Binding; struct Diagnostic; }
+namespace track_animation_binding50AN { class Binding; struct Diagnostic; }
 
 namespace interactive_course_cold50DU {
 struct McColdPrefix {
@@ -46,11 +45,9 @@ struct McColdPrefix {
     mc_navigation50MC::Diagnostic& mcNavigationDiagnostic;
     std::shared_ptr<mc_trigger_authoring50MC::Owner>& mcTriggerAuthoring;
     std::shared_ptr<mc_trigger_geometry50MC::Owner>& mcTriggerGeometry;
-    std::shared_ptr<mc_animation_source50MC::Owner>& mcAnimationSource;
-    std::shared_ptr<mc_animation_runtime50MC::Owner>& mcAnimationRuntime;
-    mc_animation_runtime50MC::Diagnostic& mcAnimationDiagnostic;
-    std::unique_ptr<mc_animation_binding50MC::Binding>& mcAnimationBinding;
-    mc_animation_binding50MC::Diagnostic& mcAnimationBindingDiagnostic;
+    std::shared_ptr<track_animation_runtime50AN::Owner>& trackAnimations;
+    std::unique_ptr<track_animation_binding50AN::Binding>& trackAnimationBinding;
+    track_animation_binding50AN::Diagnostic& trackAnimationBindingDiagnostic;
     std::shared_ptr<mc_original_world50LM::Owner>& mcOriginalWorld;
     std::shared_ptr<mc_particle_source50MC::Owner>& mcParticleSource;
     std::size_t& mcExternalPayloadReservation;

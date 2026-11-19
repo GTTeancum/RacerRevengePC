@@ -22,6 +22,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -37,6 +38,8 @@ struct Support {
  bool reset=false;          // LostAI Reset TRUE (pose reset): MB's chain implements it
  bool ignoreAi=false;       // IgnoreTrigger AI
  bool randomPercent=false;  // RandomTriggerPercent other than 100
+ bool sound=false;          // ordinary Sound action (TC's chain implements it)
+ bool particles=false;      // Particles action (emitter switch)
 };
 struct ActionSource {
  Action kind=Action::LostAI;
@@ -45,6 +48,13 @@ struct ActionSource {
  g::Vector3_48C position{};
  float minDistance=0.f,maxDistance=0.f;
  std::string filename;
+ // Full reader kind (Sound / Particles have no ga Action value; `kind` keeps
+ // the ga mirror for the LostAI/Animation/PodSound chains).
+ sc_trigger_authoring50LA::ActionKind readerKind=sc_trigger_authoring50LA::ActionKind::LostAI;
+ std::optional<bool> authoredReset,authoredOneTimeOnly;
+ bool positional=false,isGlobalSound=false;            // Sound
+ std::uint32_t emitterNumber=0,instanceNumber=0;bool turnOn=true; // Particles (1-based)
+ const a::ParameterBlock48F* original=nullptr;          // borrowed from the decoded TOB
 };
 // One native trigger source shape for every course chain (MA, SA and GA used
 // three copies of it). shapeType 5 = sphere, 6 = box (sphere = coarse bound).
@@ -55,8 +65,14 @@ struct Source {
  g::NativeTriggerBox50MA box{};
  float yaw=0,pitch=0,roll=0;
  bool startEnabled=true,oneTimeOnly=false,ignorePlayer=false,ignoreAi=false,reset=false;
+ // 2DC630: strstr(IgnoreTrigger,"ANIMATIONS") -> slot +0xDC (animation subjects ignored).
+ bool ignoreAnimations=false;
  std::int32_t randomTriggerPercent=100;
  std::array<ActionSource,sc_trigger_authoring50LA::maxActions> actions{};
+ std::uint32_t sourceOrdinal=0;                         // 1-based TriggerN
+ bool startEnabledAuthored=false,randomTriggerPercentAuthored=false;
+ std::optional<std::string> ignoreTrigger;
+ const a::ParameterBlock48F* original=nullptr;          // borrowed from the decoded TOB
 };
 // Stock values of one course slot: receipts only.
 struct Stock {
@@ -68,10 +84,14 @@ struct Stock {
 class Owner final {
  std::vector<std::uint8_t> tob_;
  a::ParameterDocument48F document_;
+ // Document overload: the caller's decoded TOB (cold source) is borrowed and
+ // must outlive this owner; nothing is decoded or copied a second time.
+ const std::vector<std::uint8_t>* tobView_=nullptr;
  sc_trigger_authoring50LA::Owner reader_;
  std::array<Source,capacity> sources_{};
  std::size_t live_=0;std::uint32_t animations_=0;
  bool attempted_=false,ready_=false,stockTob_=false;
+ const char* code_="??";  // the Stock slot code (static string), for log lines
  static void need(bool value,const std::string& reason){if(!value)throw std::runtime_error(reason);}
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
@@ -82,7 +102,7 @@ public:
  bool load(const std::filesystem::path& archivePath,const Stock& stock,std::size_t zoneCount,
      std::uint32_t aiNodeBound,std::string& error,Support support={}){
   if(attempted_){error="course trigger owner requires a fresh stable lifetime";return false;}attempted_=true;
-  try{using namespace ga_trigger_authoring::detail;namespace f=pod_materials50ed_fixture::detail;
+  try{namespace f=pod_materials50ed_fixture::detail;
    const auto site=std::string("triggers_")+stock.code;
    f::Inputs input;input.capacity=course_archive_receipt50CI::maximumArchiveBytes();
    const auto bytes=input.read(archivePath,input.capacity);
@@ -94,11 +114,32 @@ public:
        stock.code+std::string(" trigger TOB member missing"));
    stockTob_=course_archive_receipt50CI::memberReceipt(site.c_str(),stock.tobMember,tob_,0,0,stock.tobBytes,stock.tobSha);
    need(a::decodeParameters48F(tob_,document_,why),stock.code+std::string(" trigger TOB rejected"));
+   code_=stock.code;project(document_,stock,zoneCount,aiNodeBound,support);error.clear();return true;
+  }catch(const std::exception& e){error=e.what();return false;}
+ }
+ // Document overload for a course whose cold source already holds the decoded
+ // TOB (TB, TC, MC, ...): the same reader and projection, no second archive
+ // read. `document` and `tob` must outlive this owner (borrowed).
+ bool load(const a::ParameterDocument48F& document,const std::vector<std::uint8_t>& tob,const Stock& stock,
+     std::size_t zoneCount,std::uint32_t aiNodeBound,std::string& error,Support support={}){
+  if(attempted_){error="course trigger owner requires a fresh stable lifetime";return false;}attempted_=true;
+  try{
+   const auto site=std::string("triggers_")+stock.code;
+   need(document.original_bytes==tob,stock.code+std::string(" trigger document is not the held TOB"));
+   stockTob_=course_archive_receipt50CI::memberReceipt(site.c_str(),stock.tobMember,tob,0,0,stock.tobBytes,stock.tobSha);
+   tobView_=&tob;code_=stock.code;project(document,stock,zoneCount,aiNodeBound,support);error.clear();return true;
+  }catch(const std::exception& e){error=e.what();return false;}
+ }
+private:
+ void project(const a::ParameterDocument48F& document,const Stock& stock,std::size_t zoneCount,
+     std::uint32_t aiNodeBound,const Support& support){
+  {using namespace ga_trigger_authoring::detail;
+   const auto site=std::string("triggers_")+stock.code;
    // [Animations] NumberOfAnimations of the same TOB (absent block = 0).
-   for(const auto& b:document_.blocks)if(b.name=="animations")
+   for(const auto& b:document.blocks)if(b.name=="animations")
     if(const auto* n=optional(b,"numberofanimations")){need(!animations_,stock.code+std::string(" duplicate [Animations]"));animations_=integer(*n);}
    sc_trigger_authoring50LA::Owner::Diagnostic diagnostic;
-   need(reader_.decode(document_,zoneCount,aiNodeBound,stock.code,diagnostic),
+   need(reader_.decode(document,zoneCount,aiNodeBound,stock.code,diagnostic),
        stock.code+std::string(" trigger authoring rejected (see course_triggers line)"));
    const auto* input2=reader_.sources();const auto live=reader_.liveCount();
    need(input2&&live<=capacity,stock.code+std::string(" trigger extent exceeds the native trigger group"));
@@ -112,15 +153,24 @@ public:
     // (parseTrackNumber50AD, SC) is the common one; unify when the chains merge.
     const auto& b=*raw.originalTrigger;
     s.name=raw.name;s.zone=raw.sourceZoneOrdinal;s.actionCount=raw.actionCount;
+    s.sourceOrdinal=static_cast<std::uint32_t>(i+1);s.original=raw.originalTrigger;
+    s.startEnabledAuthored=raw.startEnabledAuthored;s.randomTriggerPercentAuthored=raw.randomTriggerPercentAuthored;
+    s.ignoreTrigger=raw.ignoreTrigger;
     s.startEnabled=raw.startEnabled;s.oneTimeOnly=raw.oneTimeOnly;
     s.sphere.center=vector(field(b,"position"));
     // PORT STAND-IN (flagged): a native chain without a trigger-chance roll
     // or an AI ignore list refuses those authored values (Support).
     need(support.randomPercent||raw.randomTriggerPercent==100.f,label+"RandomTriggerPercent other than 100 is not supported natively");
     s.randomTriggerPercent=static_cast<std::int32_t>(raw.randomTriggerPercent);
-    if(raw.ignoreTrigger){
-     if(*raw.ignoreTrigger=="PLAYER")s.ignorePlayer=true;
-     else{need(support.ignoreAi&&*raw.ignoreTrigger=="AI",label+"IgnoreTrigger other than PLAYER is not supported natively");s.ignoreAi=true;}
+    // 2DC630 (strings 3C3D88/90/98): each of "PLAYER", "AI", "ANIMATIONS" found
+    // anywhere in the text (strstr) registers that ignore; a text matching none
+    // (TA's "ANIMATION") ignores nothing. Stock texts are exactly PLAYER/AI,
+    // so every other course reads as before.
+    if(raw.ignoreTrigger){const auto& text=*raw.ignoreTrigger;
+     s.ignorePlayer=text.find("PLAYER")!=std::string::npos;
+     s.ignoreAi=text.find("AI")!=std::string::npos;
+     s.ignoreAnimations=text.find("ANIMATIONS")!=std::string::npos;
+     need(support.ignoreAi||!s.ignoreAi,label+"IgnoreTrigger AI is not supported natively");
     }
     if(raw.shape==sc_trigger_authoring50LA::Shape::sphere){
      s.shapeType=5;s.sphere.radius=number(field(b,"radius"));need(s.sphere.radius>0.f,label+"sphere radius rejected");
@@ -134,6 +184,7 @@ public:
     }
     for(std::uint32_t k=0;k<raw.actionCount;++k){const auto& in=raw.actions[k];auto& out=s.actions[k];
      const auto& ab=*in.original;
+     out.readerKind=in.kind;out.original=in.original;out.authoredReset=in.authoredReset;out.authoredOneTimeOnly=in.authoredOneTimeOnly;
      switch(in.kind){
       case sc_trigger_authoring50LA::ActionKind::LostAI:
        out.kind=Action::LostAI;out.targetNodeIndex=in.targetAiNodeIndex;
@@ -149,22 +200,30 @@ public:
        out.kind=Action::PodSound;out.filename=in.filename;out.position=vector(field(ab,"position"));
        out.minDistance=number(field(ab,"mindistance"));out.maxDistance=number(field(ab,"maxdistance"));break;
       case sc_trigger_authoring50LA::ActionKind::Sound:
+       // PORT STAND-IN (flagged): a native chain without an ordinary Sound
+       // action owner (MA/SA/GA/MB) refuses it, not ignored (Support::sound).
+       need(support.sound,label+"Sound trigger action is not supported on this native chain");
+       out.filename=in.filename;out.positional=in.positional;out.isGlobalSound=in.isGlobalSound;break;
       case sc_trigger_authoring50LA::ActionKind::Particles:
-       // PORT STAND-IN (flagged): the MA/SA/GA/MB native chains have no
-       // ordinary Sound or Particles trigger action; refused, not ignored.
-       need(false,label+"Sound/Particles trigger action is not supported on this native chain");break;
+       // PORT STAND-IN (flagged): likewise for the emitter switch (Support::particles).
+       need(support.particles,label+"Particles trigger action is not supported on this native chain");
+       out.emitterNumber=in.emitterNumber;out.instanceNumber=in.instanceNumber;out.turnOn=in.turnOn;break;
      }
     }
     // Action-1 mirror for the LostAI-only chains (MA layout).
     if(s.actions[0].kind==Action::LostAI){s.targetNodeIndex=s.actions[0].targetNodeIndex;s.reset=s.actions[0].reset;}
    }
-   sources_=std::move(next);live_=live;ready_=true;error.clear();return true;
-  }catch(const std::exception& e){error=e.what();return false;}
+   sources_=std::move(next);live_=live;ready_=true;
+  }
  }
+public:
  bool ready()const noexcept{return ready_;}
+ // N64 hazard rows of the same TOB (PORT EXTENSION, NOT ORIGINAL; empty on stock).
+ const std::vector<g::N64HazardRow50NH>& n64Rows()const noexcept{return reader_.n64Rows();}
  // The TOB's own animation count, and whether the TOB is the stock bytes.
  std::uint32_t animationCount()const noexcept{return ready_?animations_:0;}
  bool stockTob()const noexcept{return ready_&&stockTob_;}
+ const char* code()const noexcept{return code_;}
  std::size_t liveCount()const noexcept{return ready_?live_:0;}
  // Bounds-checked against the live prefix, never the capacity tail.
  const Source& source(std::size_t i)const{
@@ -188,7 +247,15 @@ public:
   return any?h:0;
  }
  const std::vector<std::uint8_t>& originalTob()const{
-  if(!ready_)throw std::runtime_error("course trigger TOB owner not ready");return tob_;
+  if(!ready_)throw std::runtime_error("course trigger TOB owner not ready");return tobView_?*tobView_:tob_;
+ }
+ // Index of the first live trigger authoring an action of `kind` (reader
+ // kind), or liveCount() when none does. Owners of one-off action resources
+ // (door/gate animation, PodSound, Sound) find their trigger by data.
+ std::size_t firstTriggerWith(sc_trigger_authoring50LA::ActionKind kind)const noexcept{
+  for(std::size_t i=0;i<liveCount();++i)for(std::uint32_t k=0;k<sources_[i].actionCount;++k)
+   if(sources_[i].actions[k].readerKind==kind)return i;
+  return liveCount();
  }
 };
 // Stock receipts for the three slots on this path.
@@ -198,6 +265,16 @@ inline constexpr Stock stockSa{"SA","tracks\\sa.tob",sa_trigger_authoring::archi
  sa_trigger_authoring::tobSha,sa_trigger_authoring::tobBytes,sa_trigger_authoring::count};
 inline constexpr Stock stockGa{"GA","tracks\\ga.tob",watchtower_source_fixture::archiveSha,watchtower_source_fixture::archiveBytes,
  watchtower_source_fixture::objects.sha,watchtower_source_fixture::objects.bytes,ga_trigger_authoring::count};
+// TA (receipts only): stock TRACKS\TA.RES and its tracks\ta.tob, 13 triggers.
+inline constexpr Stock stockTa{"TA","tracks\\ta.tob","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",3334562,
+ "11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b",13887,13};
+// Receipt slot of a course on the common trigger chain (receipts only: the
+// archive is read and projected by the same rule whatever its bytes are).
+// nullptr = the course has no receipt slot on this chain.
+inline const Stock* commonChainStock(const char* code)noexcept{
+ if(!code)return nullptr;const std::string c=code;
+ if(c=="GA")return &stockGa;if(c=="TA")return &stockTa;return nullptr;
+}
 // MB (receipts only; values from the MB route's own stock pins).
 inline constexpr Stock stockMb{"MB","tracks\\mb.tob","6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",4421779,
  "f25f10fff204f124e5525ff2c4a7c1e72f9ce17476e1404d1932f6ab6e8c776d",19909,3};

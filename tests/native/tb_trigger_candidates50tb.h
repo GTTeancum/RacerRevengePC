@@ -8,14 +8,18 @@ inline std::size_t prepare(const tb_trigger_authoring50TB::Owner& source,
  tb_trigger_actions50TB::Owner& actions,std::vector<g::Type2StaticCandidate49X>& candidates,
  std::vector<track_runtime_storage50IG::Binding>& bindings,std::uint8_t tag,
  std::uint8_t flags31,std::uint8_t flagsF8){
- if(!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=320||candidates.size()!=bindings.size()||
-    candidates.size()>track_runtime_storage50IG::hardTerrainOwners-tb_trigger_authoring50TB::count)
-  throw std::runtime_error("TB native trigger actual320 COL prefix/source owner extent");
+ // Live authored triggers only (capacity store); the COL prefix is whatever
+ // the ground placed (stock 320 is the ground's receipt, not checked here).
+ const auto live=source.liveCount();
+ if(!source.ready()||!actions.preparedSourceFor(source)||candidates.size()!=bindings.size()||
+    candidates.size()>track_runtime_storage50IG::hardTerrainOwners||
+    live>track_runtime_storage50IG::hardTerrainOwners-candidates.size())
+  throw std::runtime_error("TB native trigger COL prefix/source owner extent");
  // Cold append only. The aggregate owns all real memberships and must finish
  // this relocation before Storage admission or any Bank enrollment.
- const auto first=candidates.size();candidates.resize(first+tb_trigger_authoring50TB::count);bindings.resize(candidates.size());
+ const auto first=candidates.size();candidates.resize(first+live);bindings.resize(candidates.size());
  for(std::size_t i=0;i<first;++i)bindings[i].candidate=&candidates[i];
- for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
+ for(std::size_t i=0;i<live;++i){const auto& authored=source.source(i);auto& target=candidates[first+i];
   target.shapeType=authored.shapeType;target.nativeTriggersTB=&actions.nativeGroup();target.nativeTriggerIndex=i;
   target.nativeTriggerBox=authored.box;
   auto& c=target.candidate.collision;c.shapeType=authored.shapeType;
@@ -42,4 +46,4 @@ inline g::LiveZoneBounds50EN bounds(const tb_trigger_authoring50TB::Source& sour
  for(unsigned n=0;n<3;++n)out.bounds.cachedCenter.v[n]=source.sphere.center.v[n];
  out.bounds.localCenter.v[3]=out.bounds.localHalf.v[3]=out.bounds.cachedCenter.v[3]=1.f;out.bounds.cachedRadius=source.sphere.radius;return out;
 }
-} // namespace tc_trigger_candidates50TC
+} // namespace tb_trigger_candidates50TB

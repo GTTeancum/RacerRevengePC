@@ -37,7 +37,7 @@ public:
   const float (&actualStep)[4],std::uint32_t& actualRandom,std::string& error){
   if(!ready()||slot!=initialized_||slot>=expectedRacers_){error="MC racer producer ordinal/lifetime";return false;}
   auto& manager=*cold_->particles();const auto before=manager.emitterRegistryReservation().registeredEmitters;
-  if(before!=40+registered_){error="MC unknown producer before source constructor";failed_=true;return false;}
+  if(before!=source_->emitterCount()+registered_){error="MC unknown producer before source constructor";failed_=true;return false;}
   auto& children=children_[slot];auto& racer=racers_[slot];
   const auto stop=[&](const char* message){error=message;failed_=true;return false;};
   if(!children.bindCold(authored_,effects,effectCount,bottomPair,manager).okay())return stop("MC actual preceding14/8 particle constructors rejected");
@@ -60,7 +60,7 @@ public:
  const mc_cold_sources50LA::Owner* coldSource()const noexcept{return ready()?source_->coldSource():nullptr;}
  const g::OriginalTrackParticleCold50LA* poolOwner()const noexcept{return ready()?cold_.get():nullptr;}
  bool matchesParticle(const g::OriginalGcParticle50KG& p)const noexcept{
-  if(!constructorsComplete()||p.ownerId<=40)return false;const auto& manager=*cold_->particles();
+  if(!constructorsComplete()||p.ownerId<=source_->emitterCount())return false;const auto& manager=*cold_->particles();
   const auto match=[&](std::uint32_t id,std::int32_t group,std::uint32_t flags,float frames,float gravity,float ground,float restitution){
    if(id!=p.ownerId)return false;const auto* row=manager.emitter(id);const auto* range=manager.group(group);
    return row&&range&&row->particleGroup==group&&row->framesPerSet==frames&&row->gravity==gravity&&row->bouncePlane==ground&&row->bounceFactor==restitution&&

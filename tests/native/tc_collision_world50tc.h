@@ -12,8 +12,10 @@
 namespace tc_collision_world50TC {
 namespace g=rr::game;
 namespace rt=track_runtime_storage50IG;
-inline constexpr std::size_t sourceCandidates=69,triggerCandidates=22,totalCandidates=91;
-static_assert(triggerCandidates==tc_trigger_authoring50TC::count);
+// Trigger candidates: the live authored count (capacity store, triggerCapacity
+// from the common reader); 0 authored = no trigger candidates/memberships.
+// The ground prefix and fixed tail keep their existing shape (not this round).
+inline constexpr std::size_t sourceCandidates=69,triggerCapacity=tc_trigger_authoring50TC::capacity;
 struct Payload {
  std::size_t sharedSource=0,ownerDescriptors=0,groundDescriptors=0;
  std::size_t candidateDescriptors=0,memberships=0,navigationReservation=0;
@@ -40,7 +42,9 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  std::vector<g::Type2StaticCandidate49X> candidates_;
  std::vector<track_static_candidates50IG::Radii> radii_;
  std::vector<rt::Binding> bindings_;
- std::array<std::unique_ptr<rt::Membership>,triggerCandidates> memberships_;
+ std::array<std::unique_ptr<rt::Membership>,triggerCapacity> memberships_;
+ std::size_t triggerCount_=0; // live authored triggers
+ std::size_t totalCandidates()const noexcept{return sourceCandidates+triggerCount_;}
  std::unique_ptr<rt::Owner> storage_;
  const std::thread::id thread_=std::this_thread::get_id();
  bool groundAttempted_=false,storageAttempted_=false;
@@ -55,7 +59,7 @@ class Owner final : public std::enable_shared_from_this<Owner> {
  }
  bool sameOwners()const noexcept {
   return thread()&&source_&&source_->ready()&&ground_&&ground_->coldSource()==source_.get()&&
-   actions_&&sounds_&&actions_->coldSource()==source_.get()&&actions_->soundOwner()==sounds_.get()&&
+   actions_&&actions_->coldSource()==source_.get()&&actions_->soundOwner()==sounds_.get()&&
    actions_->sourceOwner()&&actions_->sourceOwner()->coldSource()==source_.get();
  }
  bool idleForRetirement()const noexcept {
@@ -64,14 +68,14 @@ class Owner final : public std::enable_shared_from_this<Owner> {
   if(s.queue.count||!s.rowsDetached())return false; //every racer's query rows (shared world: all of them)
   // Root must retire its real racer/camera/recovery/wreck memberships first.
   // Their primary registration is in this same real lifecycle, not a copy.
-  for(std::size_t i=totalCandidates;i<s.registrations.size();++i){const auto& r=s.registrations[i];
+  for(std::size_t i=totalCandidates();i<s.registrations.size();++i){const auto& r=s.registrations[i];
    if(r.owner||r.slot||r.encodedObject)return false;
   }
   return true;
  }
  bool removeTriggers()noexcept {
   if(!storage_||!storage_->get())return true;auto& s=*storage_->get();
-  for(std::size_t i=0;i<triggerCandidates;++i)if(memberships_[i]){
+  for(std::size_t i=0;i<triggerCount_;++i)if(memberships_[i]){
    auto& state=memberships_[i]->state;
    const auto result=g::removeLiveZoneMembership50EN(s.lifecycle,s.world,state,s.membershipWork);
    if(result.status!=g::LiveZoneStatus50EN::Complete||state.attached||state.object)return false;
@@ -98,9 +102,9 @@ class Owner final : public std::enable_shared_from_this<Owner> {
    for(const auto& list:filter.identityLists)addElements<std::uint32_t>(p.candidateDescriptors,list.identities.capacity());
   }
   const auto memberCount=source_->world().portals.size()+1u;
-  addElements<rt::Membership>(p.memberships,triggerCandidates);
-  addElements<g::CollectionZoneLink50BX>(p.memberships,memberCount*triggerCandidates);
-  addElements<g::LiveZoneEntry50EN>(p.memberships,memberCount*triggerCandidates);
+  addElements<rt::Membership>(p.memberships,triggerCount_);
+  addElements<g::CollectionZoneLink50BX>(p.memberships,memberCount*triggerCount_);
+  addElements<g::LiveZoneEntry50EN>(p.memberships,memberCount*triggerCount_);
   p.navigationReservation=tc_navigation50TC::Owner::ownerBytes();
   add(p.navigationReservation,tc_navigation50TC::Owner::persistentPayloadBytes());
   add(p.navigationReservation,tc_navigation50TC::Owner::topologyScratchBytes());
@@ -134,7 +138,8 @@ public:
   std::span<const rt::Binding> bindingStorage()const noexcept {
    return *this?std::span<const rt::Binding>{owner_->bindings_}:std::span<const rt::Binding>{};
   }
-  rt::Membership* triggerMembership(std::size_t i)const noexcept{return *this&&i<triggerCandidates?owner_->memberships_[i].get():nullptr;}
+  rt::Membership* triggerMembership(std::size_t i)const noexcept{return *this&&i<owner_->triggerCount_?owner_->memberships_[i].get():nullptr;}
+  std::size_t triggerCount()const noexcept{return *this?owner_->triggerCount_:0;}
   tc_trigger_actions50TC::Owner* actions()const noexcept{return *this?owner_->actions_.get():nullptr;}
  };
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
@@ -160,18 +165,20 @@ public:
   try{
    d={};d.phase=phase_;
    need(actualApplication&&actualApplication->application10(),"TC aggregate requires actual live Application");
-   need(actions&&sounds&&actions->sourceOwner()&&actions->coldSource()==source_.get()&&
+   // The ordinary Sound owner exists exactly when the triggers author a Sound.
+   need(actions&&actions->sourceOwner()&&actions->coldSource()==source_.get()&&
        actions->soundOwner()==sounds.get()&&actions->preparedSourceFor(*actions->sourceOwner())&&
        !actions->nativeGroup().ready&&!actions->nativeGroup().queryActive,
        "TC aggregate same prepared cold source/Action/Sound required before racer identity binding");
    actions_=std::move(actions);sounds_=std::move(sounds);
+   triggerCount_=actions_->sourceOwner()->liveCount();need(triggerCount_<=triggerCapacity,"TC live triggers exceed the trigger capacity");
    need(sameOwners()&&ground_->ground()->owners.size()==sourceCandidates,"TC aggregate actual69 source prefix unavailable");
-   candidates_.reserve(totalCandidates);bindings_.reserve(totalCandidates);radii_.reserve(sourceCandidates);
+   candidates_.reserve(totalCandidates());bindings_.reserve(totalCandidates());radii_.reserve(sourceCandidates);
    track_static_candidates50IG::prepare(*ground_->ground(),names,candidates_,radii_,bindings_);
    need(tc_trigger_candidates50TC::prepare(*actions_->sourceOwner(),*actions_,candidates_,bindings_,
        names.collisionTypeTag,names.preservedFlags31,names.preservedFlagsF8)==sourceCandidates&&
-       candidates_.size()==totalCandidates&&bindings_.size()==totalCandidates,
-       "TC source69 plus trigger22 exact candidate join");
+       candidates_.size()==totalCandidates()&&bindings_.size()==totalCandidates(),
+       "TC source prefix plus live trigger candidate join");
    account(limits);d.payload=payload_;
    auto reduced=limits;reduced.coldPayloadBytes-=payload_.reservedBeforeStorage;
    phase_=Phase::Storage;d.phase=phase_;storage_=std::make_unique<rt::Owner>();
@@ -179,13 +186,13 @@ public:
     d.message=d.storage.message;return false;
    }
    auto& s=*storage_->get();
-   need(s.count.terrain==totalCandidates&&s.count.zones==25&&s.count.portals==26&&s.count.portalLinks==52&&s.count.membership==27,
+   need(s.count.terrain==totalCandidates()&&s.count.zones==25&&s.count.portals==26&&s.count.portalLinks==52&&s.count.membership==27,
        "TC real Storage source topology/counts changed");
    payload_.storageRequested=d.storage.requestedPayloadBytes;payload_.totalRequested=payload_.reservedBeforeStorage;
    add(payload_.totalRequested,payload_.storageRequested);need(payload_.totalRequested<=limits.coldPayloadBytes,"TC aggregate final Storage budget exceeded");
    d.payload=payload_;phase_=Phase::Memberships;d.phase=phase_;
-   for(auto& m:memberships_)m=std::make_unique<rt::Membership>(s.count.membership);
-   for(std::size_t i=0;i<triggerCandidates;++i){d.trigger=i;const auto& source=actions_->sourceOwner()->source(i);
+   for(std::size_t i=0;i<triggerCount_;++i)memberships_[i]=std::make_unique<rt::Membership>(s.count.membership);
+   for(std::size_t i=0;i<triggerCount_;++i){d.trigger=i;const auto& source=actions_->sourceOwner()->source(i);
     auto& member=*memberships_[i];const auto bounds=tc_trigger_candidates50TC::bounds(source);
     d.membership=g::attachLiveZoneMembership50EN(s.lifecycle,s.world,member.state,member.storage(),
         static_cast<g::CollectionRef50BX>(sourceCandidates+i+1u),source.zone,g::ZoneMethod50CL::First,0.f,bounds,s.membershipWork);

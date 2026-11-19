@@ -8,6 +8,7 @@
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_water_surface50ws.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
+#include "../../src/game/n64_track_hazards_runtime50nh.h"
 #include "../../src/game/native_chariot_rigid_mount50rm.h"
 #include "original_manager_fields.h"
 #include <functional>
@@ -64,9 +65,8 @@
 #include "mb_static_model_params_fixture.h"
 #include "mb_collision_world50mb.h"
 #include "mb_source_trigger50mb.h"
-#include "tb_door_binding50tb.h"
+#include "track_animation_binding50an.h"
 #include "tb_cold_visibility50tb.h"
-#include "tc_gate_visibility50tc.h"
 #include "tc_cold_visibility50tc.h"
 #include "native_cold_model_retirement50lh.h"
 #include "ra_native_session50la.h"
@@ -274,9 +274,12 @@ SessionExit50DU Context::run() {
  auto& freshProbe100=this->freshProbe100;
  auto& freshTerrainProbe=this->freshTerrainProbe;
  const auto& fulfillDynamicMusic=this->fulfillDynamicMusicCall;
- auto& gaAnimatedMembership=this->gaAnimatedMembership;
- auto& gaAnimatedWorld=this->gaAnimatedWorld;
- auto& gaAnimationDiagnostic=this->gaAnimationDiagnostic;
+ auto& trackAnimationMembership=this->trackAnimationMembership;
+ auto& trackAnimations=this->trackAnimations;
+ auto& trackAnimationBinding=this->trackAnimationBinding;
+ auto& trackAnimationBindingDiagnostic=this->trackAnimationBindingDiagnostic;
+ auto& trackAnimationPrefixArmed=this->trackAnimationPrefixArmed;
+ auto& trackAnimationDiagnostic=this->trackAnimationDiagnostic;
  auto& gaGateAudio=this->gaGateAudio;
  auto& gaOriginalDisc=this->gaOriginalDisc;
  auto& gaOriginalWorld=this->gaOriginalWorld;
@@ -286,9 +289,6 @@ SessionExit50DU Context::run() {
  const auto& gatherRegistered=this->gatherRegisteredCall;
  auto& gbAiMetadata=this->gbAiMetadata;
  auto& gbAiView=this->gbAiView;
- auto& gbAnimationBinding=this->gbAnimationBinding;
- auto& gbAnimationBindingDiagnostic=this->gbAnimationBindingDiagnostic;
- auto& gbAnimationRuntime=this->gbAnimationRuntime;
  auto& gbColdSources=this->gbColdSources;
  auto& gbCollisionCleanupDone=this->gbCollisionCleanupDone;
  auto& gbCollisionWorld=this->gbCollisionWorld;
@@ -312,9 +312,6 @@ SessionExit50DU Context::run() {
  auto& gbTrackParticles=this->gbTrackParticles;
  auto& gbTriggerActions=this->gbTriggerActions;
  auto& gbWorldBorrow=this->gbWorldBorrow;
- auto& gcAnimatedMembership=this->gcAnimatedMembership;
- auto& gcAnimatedWorld=this->gcAnimatedWorld;
- auto& gcAnimationDiagnostic=this->gcAnimationDiagnostic;
  auto& gcDrawLights=this->gcDrawLights;
  auto& gcGateAudio=this->gcGateAudio;
  auto& gcGraphicsSequence=this->gcGraphicsSequence;
@@ -425,9 +422,6 @@ SessionExit50DU Context::run() {
  auto& mcAdditionalPayloadReserved=this->mcAdditionalPayloadReserved;
  auto& mcAiMetadata=this->mcAiMetadata;
  auto& mcAiView=this->mcAiView;
- auto& mcAnimationBinding=this->mcAnimationBinding;
- auto& mcAnimationBindingDiagnostic=this->mcAnimationBindingDiagnostic;
- auto& mcAnimationRuntime=this->mcAnimationRuntime;
  auto& mcColdSources=this->mcColdSources;
  auto& mcCollisionCleanupDone=this->mcCollisionCleanupDone;
  auto& mcCollisionWorld=this->mcCollisionWorld;
@@ -571,6 +565,7 @@ SessionExit50DU Context::run() {
  auto& raDiagnostic=this->raDiagnostic;
  auto& raFreshProbe=this->raFreshProbe;
  auto& raRuntime=this->raRuntime;
+ auto& retireRaEndCandidateProducer=this->retireRaEndCandidateProducer;
  auto& raWorld=this->raWorld;
  auto& raceAudio=this->raceAudio;
  auto& raceEnabled=this->raceEnabled;
@@ -640,8 +635,6 @@ SessionExit50DU Context::run() {
  const auto& retireRcAudioOwners=this->retireRcAudioOwnersCall;
  const auto& retireTbAudioOwners=this->retireTbAudioOwnersCall;
  auto& s=this->s;
- auto& saAnimatedWorld=this->saAnimatedWorld;
- auto& saAnimationDiagnostic=this->saAnimationDiagnostic;
  auto& saOriginalDisc=this->saOriginalDisc;
  auto& saOriginalWorld=this->saOriginalWorld;
  auto& saTriggerActions=this->saTriggerActions;
@@ -726,11 +719,6 @@ SessionExit50DU Context::run() {
  auto& tbColdSources=this->tbColdSources;
  auto& tbCollisionCleanupDone=this->tbCollisionCleanupDone;
  auto& tbCollisionWorld=this->tbCollisionWorld;
- auto& tbDoorBinding=this->tbDoorBinding;
- auto& tbDoorBindingDiagnostic=this->tbDoorBindingDiagnostic;
- auto& tbDoorDiagnostic=this->tbDoorDiagnostic;
- auto& tbDoorPrefixArmed=this->tbDoorPrefixArmed;
- auto& tbDoorRuntime=this->tbDoorRuntime;
  auto& tbLightOwner=this->tbLightOwner;
  auto& tbMapMetadata=this->tbMapMetadata;
  auto& tbMapView=this->tbMapView;
@@ -745,11 +733,6 @@ SessionExit50DU Context::run() {
  auto& tcColdSources=this->tcColdSources;
  auto& tcCollisionCleanupDone=this->tcCollisionCleanupDone;
  auto& tcCollisionWorld=this->tcCollisionWorld;
- auto& tcGateDiagnostic=this->tcGateDiagnostic;
- auto& tcGatePrefixArmed=this->tcGatePrefixArmed;
- auto& tcGateRuntime=this->tcGateRuntime;
- auto& tcGateVisibility=this->tcGateVisibility;
- auto& tcGateVisibilityDiagnostic=this->tcGateVisibilityDiagnostic;
  auto& tcGlobalSound=this->tcGlobalSound;
  auto& tcLightOwner=this->tcLightOwner;
  auto& tcMapMetadata=this->tcMapMetadata;
@@ -793,7 +776,7 @@ SessionExit50DU Context::run() {
  auto sampleController=[&](bool advanceFeedback=false){sampleControllerView(advanceFeedback);};
  // Views of original prefix-guard flags only; original guard destructors remain in caller.
  struct ArmedFlagView { bool& armed; };
- ArmedFlagView tbDoorPrefixGuard{tbDoorPrefixArmed},tcGatePrefixGuard{tcGatePrefixArmed};
+ ArmedFlagView trackAnimationPrefixGuard{trackAnimationPrefixArmed};
  // Isolated two-phase seam. Prefix stops at the real body-child cut; suffix
  // retains the existing one-substep physical/query owners. The legacy wrapper
  // below remains for unchanged diagnostics until the root joins the real race
@@ -885,7 +868,7 @@ SessionExit50DU Context::run() {
  auto closeGbBankRegistries=[&]()noexcept->bool {try{
   if(!gbLightOwner||&gcLightOwner!=gbLightOwner.get())return false;
   if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return false;
-  if(gbAnimationBinding&&gbAnimationBinding->needsClose()&&!gbAnimationBinding->close(gbAnimationBindingDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(!nativeColdModelRetirement.close())return false;
   for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
    const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
@@ -914,7 +897,7 @@ SessionExit50DU Context::run() {
  auto closeMcBankRegistries=[&]()noexcept->bool {try{
   if(!mcLightOwner||&gcLightOwner!=mcLightOwner.get())return false;
   if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return false;
-  if(mcAnimationBinding&&mcAnimationBinding->needsClose()&&!mcAnimationBinding->close(mcAnimationBindingDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(!nativeColdModelRetirement.close())return false;
   for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
    const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
@@ -943,11 +926,10 @@ SessionExit50DU Context::run() {
  auto closeTbColdPrefix=[&]() noexcept -> bool {try{
   if(tbColdPrefixClosed)return true;
   if(!tbLightOwner||&gcLightOwner!=tbLightOwner.get())return false;
-  // Failed door work holds the lighting static-busy prefix. Before any7F0
-  // retirement, remove that exact registration while its backing still lives.
+  // Track-animation rows hold the lighting static-busy prefix. Before any 7F0
+  // retirement, remove those registrations while their backing still lives.
   // Here the early path has no GPU/camera; normal close has retired them above.
-  if(tbDoorBinding&&tbDoorBinding->needsClose()&&!tbDoorBinding->ready()&&
-     !tbDoorBinding->close(tbDoorBindingDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(!nativeColdModelRetirement.close())return false;
   // Slot count remains zero until seal succeeds. No racer lighting prefix can
   // exist before the actual serial installation loop below.
@@ -974,11 +956,10 @@ SessionExit50DU Context::run() {
  auto closeTcColdPrefix=[&]() noexcept -> bool {try{
   if(tcColdPrefixClosed)return true;
   if(!tcLightOwner||&gcLightOwner!=tcLightOwner.get())return false;
-  // Failed gate work holds the lighting static-busy prefix. Before any7F0
-  // retirement, remove that exact registration while its backing still lives.
+  // Track-animation rows hold the lighting static-busy prefix. Before any 7F0
+  // retirement, remove those registrations while their backing still lives.
   // Here the early path has no GPU/camera; normal close has retired them above.
-  if(tcGateVisibility&&tcGateVisibility->needsClose()&&!tcGateVisibility->ready()&&
-     !tcGateVisibility->close(tcGateVisibilityDiagnostic))return false;
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(!nativeColdModelRetirement.close())return false;
   // Slot count remains zero until seal succeeds. No racer lighting prefix can
   // exist before the actual serial installation loop below.
@@ -1436,6 +1417,13 @@ SessionExit50DU Context::run() {
  };
  auto rankOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   observeOriginalAiFleet(schedule);
+  // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): a racer
+  // waiting for its N64 respawn (column wreck, AfterDestroy = Respawn) is not
+  // retired by 1B06F4 (Revenge has no respawn; its retirement is permanent).
+  if(rr::game::n64HazardRuntime50NH.anyRespawnArmed())
+   for(std::size_t slot=0;slot<racerBank.count()&&slot<std::size(originalAiSession.rankInput);++slot)
+    if(rr::game::n64HazardRuntime50NH.respawnArmed(slot)&&!originalAiSession.rankInput[slot].retirementCD4)
+     originalAiSession.rankInput[slot].vehicleState40=0u;
   require50DU(native_ai50IV::rank(originalAiSession,racerBank.count()),"original AI source rank/remaining boundary");
   visitManagerRacers([&](std::size_t slot){
    //1B0700 is a write to the same canonical racer+C90+44 used by camera,
@@ -1791,8 +1779,9 @@ SessionExit50DU Context::run() {
          <<" listener_to_player_xz="<<std::sqrt(dx*dx+dz*dz)<<"\n";
     }
    }
-   if(isRcTrack){
-    require50DU(rcPositionalAudio&&rcPositionalAudio->ready()&&
+   // The positional owner exists exactly when the AUB authors soul-tree sounds.
+   if(isRcTrack&&rcPositionalAudio){
+    require50DU(rcPositionalAudio->ready()&&
         rcPositionalAudio->sourceIdentity()==rcColdSources.get(),
         "RC positional audio lost its actual retained source");
     // Actual committed selected-body listener, shared World4D8 and process RNG.
@@ -1800,8 +1789,9 @@ SessionExit50DU Context::run() {
     const auto positional=rcPositionalAudio->service(&listener,1,s.noiseOwner());
     require50DU(positional.complete,"RC positional audio service rejected");
    }
-   if(isTbTrack){
-    require50DU(tbPositionalAudio&&tbPositionalAudio->ready()&&
+   // The positional owner exists exactly when the AUB authors soul-tree sounds.
+   if(isTbTrack&&tbPositionalAudio){
+    require50DU(tbPositionalAudio->ready()&&
         tbPositionalAudio->sourceIdentity()==tbColdSources.get(),
         "TB positional audio lost its actual retained source");
     // Existing countdown/committed-world boundary, once before shared mix.
@@ -1809,8 +1799,9 @@ SessionExit50DU Context::run() {
     const auto positional=tbPositionalAudio->service(&listener,1,s.noiseOwner());
     require50DU(positional.complete,"TB positional audio service rejected");
    }
-   if(isGbTrack){
-    require50DU(gbPositionalAudio&&gbPositionalAudio->ready()&&
+   // GB positional / ambient owner exists exactly when the AUB authors sounds.
+   if(isGbTrack&&gbPositionalAudio){
+    require50DU(gbPositionalAudio->ready()&&
         gbPositionalAudio->sourceIdentity()==gbColdSources.get(),
         "GB positional audio lost its actual retained source");
     // Existing countdown/committed-world boundary, once before shared mix.
@@ -1818,8 +1809,9 @@ SessionExit50DU Context::run() {
     const auto positional=gbPositionalAudio->service(&listener,1,s.noiseOwner());
     require50DU(positional.complete,"GB positional audio service rejected");
    }
-   if(isMcTrack){
-    require50DU(mcPositionalAudio&&mcPositionalAudio->ready()&&
+   // The positional owner exists exactly when the AUB authors soul-tree sounds.
+   if(isMcTrack&&mcPositionalAudio){
+    require50DU(mcPositionalAudio->ready()&&
         mcPositionalAudio->sourceIdentity()==mcColdSources.get(),
         "MC positional audio lost its actual retained source");
     // Existing countdown/committed-world boundary, once before shared mix.
@@ -2029,17 +2021,16 @@ SessionExit50DU Context::run() {
    .freshMainProbe=freshMainProbe,
    .freshProbe100=freshProbe100,
    .freshTerrainProbe=freshTerrainProbe,
-   .gaAnimatedMembership=gaAnimatedMembership,
+   .trackAnimationMembership=trackAnimationMembership,
+   .trackAnimationBinding=trackAnimationBinding,
+   .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
    .gaTriggerMembership=gaTriggerMembership,
    .gbAiMetadata=gbAiMetadata,
    .gbAiView=gbAiView,
-   .gbAnimationBinding=gbAnimationBinding,
-   .gbAnimationBindingDiagnostic=gbAnimationBindingDiagnostic,
    .gbCollisionWorld=gbCollisionWorld,
    .gbMapMetadata=gbMapMetadata,
    .gbMapView=gbMapView,
    .gbWorldBorrow=gbWorldBorrow,
-   .gcAnimatedMembership=gcAnimatedMembership,
    .gcTriggerActions=gcTriggerActions,
    .gcTriggerMembership=gcTriggerMembership,
    .humanBaseUndertrack=humanBaseUndertrack,
@@ -2072,8 +2063,6 @@ SessionExit50DU Context::run() {
    .mbMapView=mbMapView,
    .mcAiMetadata=mcAiMetadata,
    .mcAiView=mcAiView,
-   .mcAnimationBinding=mcAnimationBinding,
-   .mcAnimationBindingDiagnostic=mcAnimationBindingDiagnostic,
    .mcCollisionWorld=mcCollisionWorld,
    .mcMapMetadata=mcMapMetadata,
    .mcMapView=mcMapView,
@@ -2296,14 +2285,13 @@ SessionExit50DU Context::run() {
    .dynamicContactEnabled=dynamicContactEnabled,
    .dynamicRacer60=dynamicRacer60,
    .dynamicRegistry=dynamicRegistry,
-   .gaAnimatedWorld=gaAnimatedWorld,
+   .trackAnimations=trackAnimations,
    .gaGateAudio=gaGateAudio,
    .gaTriggerActions=gaTriggerActions,
    .gaTriggerAuthoring=gaTriggerAuthoring,
    .gbCollisionWorld=gbCollisionWorld,
    .gbNavigationOwner=gbNavigationOwner,
    .gbQueryBinding=gbQueryBinding,
-   .gcAnimatedWorld=gcAnimatedWorld,
    .gcGateAudio=gcGateAudio,
    .gcGraphicsSequence=gcGraphicsSequence,
    .gcLightDiagnostic=gcLightDiagnostic,
@@ -2411,6 +2399,9 @@ SessionExit50DU Context::run() {
   native_common_results50PD::reset();native_race_replay50PD::owner().reset();
   rr::game::nativeTestDestroyPending50PD={};
   rr::game::nativeTestLimpResetArmed50PD=false;
+  // PORT EXTENSION (n64_track_hazards_runtime50nh.h): N64 'Load'/'RSet' - every
+  // hazard row as authored, nothing fired, no pending explode/damage/respawn.
+  rr::game::n64HazardRuntime50NH.raceReset();
   // Racer +50 (215A28) from each racer's own loaded PHY, and the 228110
   // restart restore check: a fresh race session must carry the cold-built
   // cockpit tether (anchors and length), not the one a limp rebound.
@@ -3059,13 +3050,7 @@ SessionExit50DU Context::run() {
  // owners still close before its real host; a later session reopens that host
  // only after cleanup, without replacing the application's Video identity.
 
- gc_dynamic_window50IG::Owner gcDynamicWindow;
- ga_dynamic_window::Owner gaDynamicWindow;
- tc_dynamic_window50TC::Owner tcDynamicWindow;
- tb_dynamic_window50TB::Owner tbDynamicWindow;
- gb_dynamic_window50GB::Owner gbDynamicWindow;
- mc_dynamic_window50MC::Owner mcDynamicWindow;
- sa_dynamic_window::Owner saDynamicWindow;
+ track_animation_window50AN::Owner trackAnimationWindow; // the common track-animation window
  gc_atm_window_fixture::Owner gcAtm;
  ga_atm_window_fixture::Owner gaAtm;
  ma_sa_atm_window_fixture::Owner maSaAtm;
@@ -3092,7 +3077,7 @@ SessionExit50DU Context::run() {
  if(gameplayBinderEnabled){
   // GA admits its ordinary session by its course world owner (animations are
   // data: absent [Animations] = no animated owner).
-  require50DU(((isGaTrack&&gaOriginalWorld)||(isGcTrack&&gcAnimatedWorld)||
+  require50DU(((isGaTrack&&gaOriginalWorld)||(isGcTrack&&trackAnimations)||
       (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(isSaTrack&&nativeSaSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||(isGbTrack&&nativeGbSelection)||(isMcTrack&&nativeMcSelection)||
       (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==raceRacerCount,
       "Binder requires an actual eight-racer authenticated ordinary session");
@@ -3121,70 +3106,31 @@ SessionExit50DU Context::run() {
       "actual GC shared-manager render allocation rejected");
  }
 
- if(gcAnimatedWorld){
-  gc_dynamic_materials_fixture::Diagnostic materialDiagnostic{};
-  // Finish each cold call before reading its diagnostic: function argument
-  // evaluation order must not select the fallback from a still-empty message.
-  const bool gcMaterialsLoaded=gcDynamicWindow.loadSource(trackSession->archive,*gcAnimatedWorld,materialDiagnostic);
-  if(!gcMaterialsLoaded)std::cerr<<"GC dynamic material load diagnostic material="<<materialDiagnostic.material
-      <<" source_code="<<materialDiagnostic.source.code<<" source_offset="<<materialDiagnostic.source.offset
-      <<" source_detail="<<materialDiagnostic.source.detail
-      <<" bank_error="<<static_cast<unsigned>(materialDiagnostic.bank.error)
-      <<" bank_texture="<<materialDiagnostic.bank.texture<<" bank_slot="<<materialDiagnostic.bank.slot
-      <<" bank_offset="<<materialDiagnostic.bank.byteOffset<<" bank_detail="<<materialDiagnostic.bank.parserMessage<<'\n';
-  require50DU(gcMaterialsLoaded,
-      materialDiagnostic.message.empty()?"original GC dynamic materials rejected":materialDiagnostic.message.c_str());
- }
- if(gaAnimatedWorld){
-  ga_dynamic_materials::Diagnostic materialDiagnostic{};
-  const bool loaded=gaDynamicWindow.loadSource(trackSession->archive,*gaAnimatedWorld,
-      ga_original_world50LH::decodeSourceTexture,materialDiagnostic);
-  if(!loaded)std::cerr<<"GA dynamic material load diagnostic material="<<materialDiagnostic.material
-      <<" source_code="<<materialDiagnostic.source.code<<" source_offset="<<materialDiagnostic.source.offset
-      <<" source_detail="<<materialDiagnostic.source.detail
-      <<" bank_error="<<static_cast<unsigned>(materialDiagnostic.bank.error)<<'\n';
-  require50DU(loaded,materialDiagnostic.message.empty()?"original GA dynamic materials rejected":materialDiagnostic.message.c_str());
-
- }
- if(saAnimatedWorld){
-  sa_dynamic_materials::Diagnostic diagnostic;
-  const bool loaded=saOriginalDisc?
-      saDynamicWindow.loadSource(trackSession->archive,*saAnimatedWorld,sa_original_world50LM::decodeSourceTexture,diagnostic):
-      saDynamicWindow.loadSource(trackSession->archive,*saAnimatedWorld,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"SA actual dynamic materials rejected":diagnostic.message.c_str());
- }
- if(isTcTrack){
-  require50DU(tcGateRuntime&&tcGateRuntime->ready(),"TC actual gate runtime absent before material preparation");
-  tc_dynamic_materials50TC::Diagnostic diagnostic;
-  const bool loaded=tcDynamicWindow.loadSource(tcGateRuntime,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"TC actual gate materials rejected":diagnostic.message.c_str());
- }
- if(isTbTrack){
-  require50DU(tbDoorRuntime&&tbDoorRuntime->ready(),"TB actual door runtime absent before material preparation");
-  tb_dynamic_materials50TB::Diagnostic diagnostic;
-  const bool loaded=tbDynamicWindow.loadSource(tbDoorRuntime,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"TB actual door materials rejected":diagnostic.message.c_str());
- }
- if(isGbTrack){
-  require50DU(gbAnimationRuntime&&gbAnimationRuntime->ready(),"GB actual four-animation runtime absent before material preparation");
-  gb_dynamic_materials50GB::Diagnostic diagnostic;
-  const bool loaded=gbDynamicWindow.loadSource(gbAnimationRuntime,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"GB actual four-animation materials rejected":diagnostic.message.c_str());
- }
- if(isMcTrack){
-  reserveMcAdditionalPayload(mc_dynamic_materials50MC::Owner::maximumPayloadReservation(),"MC dynamic source/material scratch exceeds remaining payload");
-  require50DU(mcAnimationRuntime&&mcAnimationRuntime->ready(),"MC actual fourteen-animation runtime absent before material preparation");
-  mc_dynamic_materials50MC::Diagnostic diagnostic;
-  const bool loaded=mcDynamicWindow.loadSource(mcAnimationRuntime,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"MC actual fourteen-animation materials rejected":diagnostic.message.c_str());
+ // Common track-animation window: the course's own PSM/PST for every span (absent owner = none).
+ // Its alpha policy needs the APPSTART DefaultMT owner even where the gameplay Binder is off.
+ if(trackAnimations){
+  if(!gameplayBinderEnabled){
+   gameplayBinderAppStart=originalMainApplication.appStart(runtime_asset_paths50LB::resolve("work/native/project/disc"));
+   rr::assets::OriginalUiMaterialDiagnostic50KG materialDiagnostic;
+   require50DU(gameplayBinderTemplates.load(*gameplayBinderAppStart,materialDiagnostic),
+       "track animation window: authentic DefaultMT owner rejected");
+  }
+  track_animation_materials50AN::Diagnostic materialDiagnostic{};
+  const bool loaded=trackAnimationWindow.loadSource(trackAnimations,trackAnimations->extract(),materialDiagnostic);
+  if(!loaded)std::cerr<<"track_animation_window course="<<trackAnimations->label()<<" refused: "<<materialDiagnostic.message
+      <<" span="<<materialDiagnostic.span<<" member="<<materialDiagnostic.member<<" source_code="<<materialDiagnostic.source.code<<'\n';
+  require50DU(loaded,materialDiagnostic.message.empty()?"track animation materials rejected":materialDiagnostic.message.c_str());
+  trackAnimations->releaseExtract();
+  std::cerr<<"track_animation_window course="<<trackAnimations->label()<<" spans="<<trackAnimations->spans().size()
+      <<" materials="<<trackAnimationWindow.materials().materialCount()<<" textures="<<trackAnimationWindow.materials().textureCount()<<'\n';
  }
  // One application publication survives frontend/race destruction. These
  // consumers only borrow its live view; no runSession-local clock authority.
  const auto sourceApplicationClock=originalMainApplication.animationClock();
- std::uint64_t gcAnimatedWorldSteps=0,gaAnimatedWorldSteps=0,saAnimatedWorldSteps=0,gbWorldServiceStep=0,mcWorldServiceStep=0;
+ std::uint64_t trackAnimationSteps=0,gbWorldServiceStep=0,mcWorldServiceStep=0;
  auto advanceWorldAnimations=[&](){
-  if(!isGbTrack&&!isMcTrack&&!tcGateRuntime&&!isRcTrack&&!tbDoorRuntime){
-  if(!gcAnimatedWorld&&!gaAnimatedWorld&&!saAnimatedWorld&&!gaAtm.loaded()&&!maSaAtm.loaded()&&!mbAtm.loaded()&&!scAtm.loaded()&&!tcAtm.loaded()&&!rcAtm.loaded()&&!tbAtm.loaded()&&!gameplayBinder.loaded())return;
+  if(!isGbTrack&&!isMcTrack&&!isRcTrack&&!trackAnimationBinding){
+  if(!trackAnimations&&!gaAtm.loaded()&&!maSaAtm.loaded()&&!mbAtm.loaded()&&!scAtm.loaded()&&!tcAtm.loaded()&&!rcAtm.loaded()&&!tbAtm.loaded()&&!gameplayBinder.loaded())return;
   }
   // Source1AAD98 registers the complete racer group before1B4A58's animation
   // service. Current HOST participant order stays explicit; world service runs
@@ -3195,20 +3141,30 @@ SessionExit50DU Context::run() {
   std::uint32_t sourceApplicationTimestamp=0;
   require50DU(originalMainApplication.sampleAnimationTimestamp(sourceApplicationTimestamp),
       "shared source application timestamp rejected");
-  if(isMcTrack){
-   const bool published=mcAnimationBinding&&mcAnimationBinding->service(.016f,sourceApplicationTimestamp,
-       s.noiseOwner().sharedRandomState,sessionRandom,s.animationShared.motion,mcAnimationBindingDiagnostic);
-   require50DU(published,mcAnimationBindingDiagnostic.message.c_str());
-  }
   if(isGbTrack){
    std::uint32_t actualPause=0;
    require50DU(sourceApplicationClock.readPause11C(actualPause),"GB actual world pause unavailable");
    require50DU(gbLightOwner&&gbLightOwner->serviceGbTimedLights(.016f,s.noiseOwner().sharedRandomState,
        actualPause!=0,gcLightDiagnostic),"GB actual timed light service rejected");
-   const bool animationPublished=gbAnimationBinding&&gbAnimationBinding->service(.016f,sourceApplicationTimestamp,
-       s.noiseOwner().sharedRandomState,sessionRandom,s.animationShared.motion,gbAnimationBindingDiagnostic);
-   require50DU(animationPublished,gbAnimationBindingDiagnostic.message.empty()?"GB actual four-animation world publication rejected":gbAnimationBindingDiagnostic.message.c_str());
-   const bool particlesAdvanced=gbParticleRender&&gbParticleRender->advance(.016f,gbParticleRuntimeDiagnostic);
+  }
+  // The ONE track-animation service (101860): no course test; absent owner = nothing to do.
+  // dt = the step's frame time (.016, the same object-system frame time every world child gets);
+  // after GB's timed lights and before every emitter service (the same shared-RNG order as the
+  // retired per-course services). The lane route publishes the moved rows' visual and collision
+  // memberships through the binding; the static route's collision refresh is the setup's.
+  if(trackAnimations){
+   std::uint32_t actualPause=0;
+   require50DU(sourceApplicationClock.readPause11C(actualPause),"track animation world pause unavailable");
+   const bool advanced=trackAnimationBinding?
+     trackAnimationBinding->service(.016f,actualPause!=0,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
+       sessionRandom,s.animationShared.motion,trackAnimationBindingDiagnostic):
+     trackAnimations->tick(.016f,actualPause!=0,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
+       sessionRandom,s.animationShared.motion,trackAnimationDiagnostic);
+   const auto& message=trackAnimationBinding?trackAnimationBindingDiagnostic.message:trackAnimationDiagnostic.message;
+   require50DU(advanced,message.empty()?"track animation world service rejected":message.c_str());
+  }
+  if(isGbTrack){
+   const bool particlesAdvanced=!gbParticleRuntime||(gbParticleRender&&gbParticleRender->advance(.016f,gbParticleRuntimeDiagnostic));
    require50DU(particlesAdvanced,gbParticleRuntimeDiagnostic.message.empty()?"GB actual shared manager and source-order emitter service rejected":gbParticleRuntimeDiagnostic.message.c_str());
    require50DU(gbWorldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&gbQueryBinding&&
        gbQueryBinding->serviceWorld(++gbWorldServiceStep),"GB actual trigger exit service rejected");
@@ -3216,33 +3172,6 @@ SessionExit50DU Context::run() {
   if(isMcTrack){
    const bool particlesAdvanced=mcParticleRender&&mcParticleRender->advance(.016f,mcParticleRuntimeDiagnostic);
    require50DU(particlesAdvanced,mcParticleRuntimeDiagnostic.message.empty()?"MC actual shared manager/source-order40 emitter service rejected":mcParticleRuntimeDiagnostic.message.c_str());
-  }
-  if(tbDoorRuntime){
-   const bool advanced=tbDoorRuntime->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
-       sessionRandom,s.animationShared.motion,tbDoorDiagnostic);
-   require50DU(advanced,tbDoorDiagnostic.message.empty()?"TB original door world service rejected":tbDoorDiagnostic.message.c_str());
-   const bool registered=tbDoorBinding&&tbDoorBinding->update(tbDoorBindingDiagnostic);
-   require50DU(registered,"TB actual visual/collision door update rejected");
-  }
-  if(tcGateRuntime){
-   const bool advanced=tcGateRuntime->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
-       sessionRandom,s.animationShared.motion,tcGateDiagnostic);
-   require50DU(advanced,tcGateDiagnostic.message.empty()?"TC original gate world service rejected":tcGateDiagnostic.message.c_str());
-   const bool registered=tcGateVisibility&&tcGateVisibility->update(tcGateVisibilityDiagnostic);
-   require50DU(registered,"TC actual101788 gate observer update rejected");
-  }
-  if(gcAnimatedWorld)require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
-      sessionRandom,s.animationShared.motion,gcAnimationDiagnostic),
-      gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
-  if(gaAnimatedWorld){
-   const bool advanced=gaAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
-       sessionRandom,s.animationShared.motion,gaAnimationDiagnostic);
-   require50DU(advanced,gaAnimationDiagnostic.message.empty()?"original GA world animation rejected":gaAnimationDiagnostic.message.c_str());
-  }
-  if(saAnimatedWorld){
-   const bool advanced=saAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
-       sessionRandom,s.animationShared.motion,saAnimationDiagnostic);
-   require50DU(advanced,saAnimationDiagnostic.message.empty()?"original SA world animation rejected":saAnimationDiagnostic.message.c_str());
   }
   if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
   if(gaAtm.loaded())require50DU(gaAtm.advance(sourceApplicationTimestamp),"original GA ATM time update rejected");
@@ -3278,9 +3207,7 @@ SessionExit50DU Context::run() {
   if(gaTriggerActions)require50DU(gaTriggerActions->serviceWorld()==ga_trigger_actions::Status::Complete,
       "GA original coarse trigger exit service rejected actual COL poses");
   require50DU(::allocations==before,"successful original world animation allocated C++ storage");
-  if(gcAnimatedWorld)++gcAnimatedWorldSteps;
-  if(gaAnimatedWorld)++gaAnimatedWorldSteps;
-  if(saAnimatedWorld)++saAnimatedWorldSteps;
+  if(trackAnimations)++trackAnimationSteps;
  };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  platform::MaterialTextureGl50EB specularGpuTextures50LA;
@@ -3591,24 +3518,13 @@ SessionExit50DU Context::run() {
   if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return closeRejected("gb_query_terminal_fence");
   if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return closeRejected("gb_real_renderer_borrow_retirement");
   if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return closeRejected("mc_real_renderer_borrow_retirement");
-  if(mcAnimationBinding&&mcAnimationBinding->needsClose()&&!mcAnimationBinding->close(mcAnimationBindingDiagnostic))
-   return closeRejected("mc_animation_membership_retirement");
-  if(gbAnimationBinding&&gbAnimationBinding->needsClose()&&!gbAnimationBinding->close(gbAnimationBindingDiagnostic))
-   return closeRejected("gb_actual_animation_membership_retirement");
+  // The track-animation binding retires its visual and collision memberships (every
+  // course on the lane route) before camera and racer cleanup; backing stays live.
+  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))
+   return closeRejected("track_animation_membership_retirement");
   // Stop new RC numerical/scheduling borrows on normal and setup-failure
   // cleanup, before Session racer prefixes or renderer/Window owners retire.
   if(rcParticleRuntime&&!rcParticleRuntime->quiesce())return closeRejected("rc_emitter_quiesce");
-  // A reached gate failure blocks ordinary lighting, including the camera's
-  // removal lease. Retire only that incomplete CPU observer before camera
-  // cleanup; actual root/window/runtime/lighting and GPU backing remain live.
-  // Binding.close rejects any still-active draw/camera/reset lease. No further
-  // renderer traversal is admitted once this terminal close has started.
-  if(tbDoorBinding&&tbDoorBinding->needsClose()&&!tbDoorBinding->ready()&&
-      !tbDoorBinding->close(tbDoorBindingDiagnostic))
-   return closeRejected("tb_incomplete_door_before_camera_retirement");
-  if(tcGateVisibility&&tcGateVisibility->needsClose()&&!tcGateVisibility->ready()&&
-      !tcGateVisibility->close(tcGateVisibilityDiagnostic))
-   return closeRejected("tc_incomplete_gate_before_camera_retirement");
   if(sourcePauseParentAttached){
    original_pause_observation50LA::Owner::Diagnostic pauseCloseDiagnostic;
    if(!sourcePauseObservation.closeNativeSpectatorMenuForShutdown(pauseCloseDiagnostic)){
@@ -3773,36 +3689,16 @@ SessionExit50DU Context::run() {
   sourceDamage.owner.reset();sourceDamage.pixels.reset();
   sourcePositionStatsRendering=false;sourcePositionStatsHud.reset();
   sourceSpeedBoostRendering=false;sourceSpeedBoost.owner.reset();sourceSpeedBoost.pixels.reset();
-  if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC dynamic texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
+  if(trackAnimationWindow.ownsResources()&&!trackAnimationWindow.close(textureDiagnostic)){
+   std::cerr<<"track animation texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("track animation texture cleanup failed");
   }
-  if(gcDynamicWindow.ownsResources())return closeRejected("if(gcDynamicWindow.ownsResources())");
-  if(gaDynamicWindow.ownsResources()&&!gaDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"GA dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GA dynamic texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
-  }
-  if(gaDynamicWindow.ownsResources())return closeRejected("if(gaDynamicWindow.ownsResources())");
-  if(tcDynamicWindow.ownsResources()&&!tcDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"TC gate texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
-   clean=closeAccumulated("TC gate texture cleanup failed");
-  }
-  if(tcDynamicWindow.ownsResources())return closeRejected("TC gate texture resources remain");
-  if(tbDynamicWindow.ownsResources()&&!tbDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"TB door texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
-   clean=closeAccumulated("TB door texture cleanup failed");
-  }
-  if(tbDynamicWindow.ownsResources())return closeRejected("TB door texture resources remain");
-  if(mcDynamicWindow.ownsResources()&&!mcDynamicWindow.close(textureDiagnostic))return closeRejected("mc_dynamic_texture_retirement");
+  if(trackAnimationWindow.ownsResources())return closeRejected("track animation texture resources remain");
   if(mcAtm.ownsResources()&&!mcAtm.close(textureDiagnostic))return closeRejected("mc_atm_texture_retirement");
-  if(gbDynamicWindow.ownsResources()&&!gbDynamicWindow.close(textureDiagnostic))return closeRejected("gb_dynamic_texture_retirement");
   if(gbAtm.ownsResources()&&!gbAtm.close(textureDiagnostic))return closeRejected("gb_atm_texture_retirement");
   if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
    std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
   if(gcAtm.ownsResources())return closeRejected("if(gcAtm.ownsResources())");
-  if(saDynamicWindow.ownsResources()&&!saDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"SA dynamic texture cleanup rejected\n";clean=closeAccumulated("std::cerr<<\"SA dynamic texture cleanup rejected\n\";clean=false;");
-  }
-  if(saDynamicWindow.ownsResources())return closeRejected("if(saDynamicWindow.ownsResources())");
   if(maSaAtm.ownsResources()&&!maSaAtm.close(textureDiagnostic)){
    std::cerr<<"MA/SA ATM texture cleanup rejected\n";clean=closeAccumulated("std::cerr<<\"MA/SA ATM texture cleanup rejected\n\";clean=false;");
   }
@@ -3949,18 +3845,14 @@ SessionExit50DU Context::run() {
    if(!closeMcColdPrefix())return closeRejected("mc_all_peer_terminal_contact_retirement");
   }
   if(isTbTrack){
-   // Camera/Follow, pool and model/GPU borrowers have actually retired above.
-   // Binding owns door337 retirement; this path removes only real query and
-   // trigger321..336 memberships, never a second removal of the door.
-   if(tbDoorBinding&&!tbDoorBinding->close(tbDoorBindingDiagnostic))
-    return closeRejected("tb_door_dual_membership_retirement");
+   // Camera/Follow, pool and model/GPU borrowers have actually retired above; the
+   // track-animation binding retired its memberships there. This path removes only
+   // real query and trigger memberships, never a second removal of an animation row.
    if(!closeTbColdPrefix())return closeRejected("tb_serial_visibility_collision_retirement");
   }
   if(isTcTrack){
    // Camera/Follow and every model/GPU borrower have actually closed above.
    if(!closeTcColdPrefix())return closeRejected("tc_serial_visibility_collision_retirement");
-   if(tcGateVisibility&&!tcGateVisibility->close(tcGateVisibilityDiagnostic))
-    return closeRejected("tc_gate_observer_retirement");
   }
   if(!closeRcBankCollision())return closeRejected("rc_serial_collision_retirement");
   if(!closeScTriggerMemberships())return closeRejected("sc_serial_trigger_membership_retirement");
@@ -3968,6 +3860,9 @@ SessionExit50DU Context::run() {
    // No frame, reader or model callback is invoked beyond this point. Destroy
    // actual snapshots before releasing the aggregate's runtime lifetime pin.
    if(!racerBank.retireNativeBacking())return closeRejected("if(!racerBank.retireNativeBacking())");
+   // 1A6840 order: race-owned services before the World (see setup).
+   if(retireRaEndCandidateProducer&&!retireRaEndCandidateProducer())
+    return closeRejected("ra_end_candidate_producer_retirement");
    sourcePauseTrack.reset();raRuntime.reset();
    if(!consumedRaStage.close())return closeRejected("if(!consumedRaStage.close())");
   }
@@ -4007,8 +3902,8 @@ SessionExit50DU Context::run() {
  mcColdPrefixGuard.armed=false;
  gbColdPrefixGuard.armed=false;
  mbColdPrefixGuard.armed=false;
- tcColdPrefixGuard.armed=false;tcGatePrefixGuard.armed=false;
- tbColdPrefixGuard.armed=false;tbDoorPrefixGuard.armed=false;
+ tcColdPrefixGuard.armed=false;
+ tbColdPrefixGuard.armed=false;trackAnimationPrefixGuard.armed=false;
  try {
   // Root-owned callback installation stays at its original publication point.
   const auto installHumanCameraInput50DU=[&](){
@@ -4278,18 +4173,17 @@ SessionExit50DU Context::run() {
    .finishManualInputTicks=finishManualInputTicks,
    .finishTaRootCall=interactive_frame50DU::BorrowedCall<bool()>{finishTaRoot},
    .finishTaRootWithResultsCall=interactive_frame50DU::BorrowedCall<bool()>{finishTaRootWithResults},
-   .gaAnimatedWorld=gaAnimatedWorld,
+   .trackAnimations=trackAnimations,
+   .trackAnimationBinding=trackAnimationBinding,
    .gaAtm=gaAtm,
-   .gaDynamicWindow=gaDynamicWindow,
+   .trackAnimationWindow=trackAnimationWindow,
    .gaOriginalWorld=gaOriginalWorld,
    .gaTriggerActions=gaTriggerActions,
    .gameplayBinder=gameplayBinder,
    .gameplayBinderEnabled=gameplayBinderEnabled,
    .gameplayBinderTemplates=gameplayBinderTemplates,
-   .gbAnimationRuntime=gbAnimationRuntime,
    .gbAtm=gbAtm,
    .gbColdSources=gbColdSources,
-   .gbDynamicWindow=gbDynamicWindow,
    .gbFogOwner=gbFogOwner,
    .gbLightOwner=gbLightOwner,
    .gbMapView=gbMapView,
@@ -4305,11 +4199,9 @@ SessionExit50DU Context::run() {
    .gbRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{gbRemainingPayloadBytes},
    .gbSourceCameraAssets=gbSourceCameraAssets,
    .gbTrackParticles=gbTrackParticles,
-   .gcAnimatedWorld=gcAnimatedWorld,
-   .gcAnimatedWorldSteps=gcAnimatedWorldSteps,
+   .trackAnimationSteps=trackAnimationSteps,
    .gcAtm=gcAtm,
    .gcDrawLights=gcDrawLights,
-   .gcDynamicWindow=gcDynamicWindow,
    .gcGateAudio=gcGateAudio,
    .gcGraphicsSequence=gcGraphicsSequence,
    .gcLightDiagnostic=gcLightDiagnostic,
@@ -4369,10 +4261,8 @@ SessionExit50DU Context::run() {
    .mbMapView=mbMapView,
    .mbOriginalWorld=mbOriginalWorld,
    .mbRace=mbRace,
-   .mcAnimationRuntime=mcAnimationRuntime,
    .mcAtm=mcAtm,
    .mcColdSources=mcColdSources,
-   .mcDynamicWindow=mcDynamicWindow,
    .mcFogOwner=mcFogOwner,
    .mcLightOwner=mcLightOwner,
    .mcMapView=mcMapView,
@@ -4542,8 +4432,6 @@ SessionExit50DU Context::run() {
    .restartRequested=restartRequested,
    .returnOriginalMainRequested=returnOriginalMainRequested,
    .s=s,
-   .saAnimatedWorld=saAnimatedWorld,
-   .saDynamicWindow=saDynamicWindow,
    .saOriginalDisc=saOriginalDisc,
    .saOriginalWorld=saOriginalWorld,
    .saTriggerActions=saTriggerActions,
@@ -4646,9 +4534,6 @@ SessionExit50DU Context::run() {
    .tbAtm=tbAtm,
    .tbColdSources=tbColdSources,
    .tbCollisionWorld=tbCollisionWorld,
-   .tbDoorBinding=tbDoorBinding,
-   .tbDoorRuntime=tbDoorRuntime,
-   .tbDynamicWindow=tbDynamicWindow,
    .tbLightOwner=tbLightOwner,
    .tbMapView=tbMapView,
    .tbOriginalDisc=tbOriginalDisc,
@@ -4665,9 +4550,6 @@ SessionExit50DU Context::run() {
    .tcAtm=tcAtm,
    .tcColdSources=tcColdSources,
    .tcCollisionWorld=tcCollisionWorld,
-   .tcDynamicWindow=tcDynamicWindow,
-   .tcGateRuntime=tcGateRuntime,
-   .tcGateVisibility=tcGateVisibility,
    .tcGlobalSound=tcGlobalSound,
    .tcMapView=tcMapView,
    .tcOriginalDisc=tcOriginalDisc,

@@ -1,6 +1,6 @@
 #pragma once
 #include "gb_trigger_authoring50gb.h"
-#include "gb_animation_runtime50gb.h"
+#include "track_animation_runtime50an.h"
 #include "gb_pod_sound50gb.h"
 #include "gb_particle_runtime50gb.h"
 #include "gb_particle_render50gb.h"
@@ -35,7 +35,7 @@ class Owner final {
  const ::gb_query50GB::Binding* queryBinding_=nullptr;
  bool retiring_=false;
  std::shared_ptr<const source::Owner> source_;
- std::shared_ptr<gb_animation_runtime50GB::Owner> animations_;
+ std::shared_ptr<track_animation_runtime50AN::Owner> animations_; // the common track-animation runtime
  std::shared_ptr<gb_pod_sound50GB::Owner> sounds_;
  std::shared_ptr<gb_particle_runtime50GB::Owner> particles_;
  std::array<RacerIdentities,racers> racers_{};
@@ -50,10 +50,12 @@ class Owner final {
  bool targetsBound_=false,servicing_=false,closed_=false;
  Counters counters_{};Status terminal_=Status::Complete;std::string error_;
  bool thread()const noexcept{return thread_==std::this_thread::get_id();}
- bool beginRendererQuery()noexcept{return renderer_&&renderer_->beginActionQuery(*this);}
- void endRendererQuery()noexcept{renderer_->endActionQuery(*this);}
- bool beginRendererService()noexcept{return renderer_&&renderer_->beginWorldService(*this);}
- void endRendererService()noexcept{renderer_->endWorldService(*this);}
+ // The particle renderer exists exactly when the course authors emitters
+ // (the GB particle owners); without one a query/service has no renderer leg.
+ bool beginRendererQuery()noexcept{return particles_?renderer_&&renderer_->beginActionQuery(*this):!renderer_;}
+ void endRendererQuery()noexcept{if(renderer_)renderer_->endActionQuery(*this);}
+ bool beginRendererService()noexcept{return particles_?renderer_&&renderer_->beginWorldService(*this):!renderer_;}
+ void endRendererService()noexcept{if(renderer_)renderer_->endWorldService(*this);}
  static void increment(std::uint64_t& v)noexcept{if(v!=~std::uint64_t{0})++v;}
  std::size_t colliderIndex(std::uint32_t id)const noexcept{return g::nativeTriggerCollider50GB(group_,id);}
  Status fail(Status status)noexcept {
@@ -63,11 +65,14 @@ class Owner final {
  }
  bool reject(Status status)noexcept{fail(status);return false;}
  static bool reservedIdentity(std::uint32_t id)noexcept {
-  return (id>=firstTriggerIdentity&&id<firstTriggerIdentity+source::count)||
-   (id>=firstTriggerModelIdentity&&id<firstTriggerModelIdentity+source::count)||
-   (id>=0x3e000000u&&id<0x3e000004u)||(id>=0x3f000000u&&id<0x3f000004u);
+  return (id>=firstTriggerIdentity&&id<firstTriggerIdentity+source::capacity)||
+   (id>=firstTriggerModelIdentity&&id<firstTriggerModelIdentity+source::capacity)||
+   (id>=track_animation_runtime50AN::firstCollisionIdentity&&id<track_animation_runtime50AN::firstCollisionIdentity+rr::assets::TrackAnimationLimits50AN{}.animations)||
+   (id>=track_animation_runtime50AN::firstModelIdentity&&id<track_animation_runtime50AN::firstModelIdentity+rr::assets::TrackAnimationLimits50AN{}.animations);
  }
  bool targetsCurrent()const noexcept {
+  // No Particles action authored: no spark targets are bound.
+  if(!source_||!source_->authorsParticleActions())return !particles_||!particles_->actions_;
   if(!particles_||!particles_->sourceStaged()||particles_->actions_!=this||
      particles_->group_!=&group_||particles_->actionBindings_!=5)return false;
   for(std::size_t i=0;i<5;++i){const auto& target=particles_->sparks_[i];
@@ -80,10 +85,10 @@ class Owner final {
  }
  bool structuralEvent(const g::SourceTriggerActionCall50GB& event,bool reached)const noexcept {
   const auto& call=event.source;
-  if(!source_||!preparedSourceFor(*source_)||!identitiesBound_||!group_.ready||particles_->visiting_||
+  if(!source_||!preparedSourceFor(*source_)||!identitiesBound_||!group_.ready||(particles_&&particles_->visiting_)||
      !g::validNativeTriggerGroup50GB(group_)||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
-  if(t>=source::count||c>=group_.colliders.size())return false;
+  if(t>=source_->liveCount()||t>=group_.triggers.size()||c>=group_.colliders.size())return false;
   const auto& authored=source_->source(t);
   if(call.actionIndex>=authored.actionCount||!authored.actions[call.actionIndex].original)return false;
   if(!call.entering)return servicing_&&!lease_&&!group_.queryActive&&event.querySerial==0&&
@@ -105,16 +110,20 @@ class Owner final {
   if(!call.entering)return true;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
   const auto& action=source_->source(t).actions[call.actionIndex];
+  // LostAI: any trigger/action slot the TOB authors (Reset absent/false).
   if(action.kind==source::Action::LostAI)
-   return t<source::lostCount&&call.actionIndex==0&&!action.authoredReset&&!action.effectiveReset1B5A60&&
+   return (!action.authoredReset||!*action.authoredReset)&&!action.effectiveReset1B5A60&&
     action.targetNodeIndex<source_->coldSource()->ai().count()&&((c&1u)||lease_->nodeC80);
+  // Animation: the common track-animation runtime holds every row the TOB's
+  // [Animations] loads. PORT STAND-IN (flagged): the PodSound/Particles
+  // destinations are GB's stock-shaped owners (stock TOB only,
+  // gb_trigger_authoring50gb.h), so these keep the stock trigger indices.
   if(action.kind==source::Action::Animation)
-   return call.actionIndex==0&&animations_->ready()&&
-    ((t==source::door&&action.animationIndex==0)||(t==source::secondAnimation&&action.animationIndex==2));
+   return animations_&&animations_->ready()&&action.animationIndex<animations_->rowCount();
   if(action.kind==source::Action::PodSound)
    return t==source::door&&call.actionIndex==1&&lease_->listenerCount<=2&&
-    (!lease_->listenerCount||lease_->listeners)&&sounds_->readyFor(*source_,call.actionIndex);
-  if(action.kind!=source::Action::Particles||t!=source::particles||call.actionIndex>=5)return false;
+    (!lease_->listenerCount||lease_->listeners)&&sounds_&&sounds_->readyFor(*source_,call.actionIndex);
+  if(action.kind!=source::Action::Particles||!particles_||t!=source::particles||call.actionIndex>=5)return false;
   const auto& target=particles_->sparks_[call.actionIndex];
   // Entry preflight is pure before the source contact cursor is installed.
   // Reached dispatch validates that cursor instead; re-running the preflight
@@ -139,7 +148,7 @@ class Owner final {
     return {A::Complete,0x1b27c0u,0xc80u};
    }
    if(action.kind==source::Action::Animation){
-    if(!animations_->activateSequence(action.animationIndex)){
+    if(!animations_->fire(action.animationIndex,static_cast<std::uint32_t>(call.triggerCollider-firstTriggerIdentity+1))){
      fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
     increment(counters_.animationActivations);return {A::Complete,0x101170u,0x90u};
    }
@@ -168,7 +177,7 @@ class Owner final {
   if(!source_||!preparedSourceFor(*source_)||!identitiesBound_||!group_.ready)return fail(Status::Unprepared);
   if(!queryIdle()||!g::validNativeTriggerGroup50GB(group_))return fail(Status::Input);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
-  for(std::size_t t=0;t<source::count;++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
+  for(std::size_t t=0;t<group_.triggers.size();++t){const auto& state=group_.triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
@@ -204,19 +213,29 @@ public:
    sizeof(g::TriggerSphereRootExitInput50IN)+sizeof(Geometry);
  }
  bool prepare(std::shared_ptr<const source::Owner> authored,
-  std::shared_ptr<gb_animation_runtime50GB::Owner> animations,std::shared_ptr<gb_pod_sound50GB::Owner> sounds,
+  std::shared_ptr<track_animation_runtime50AN::Owner> animations,std::shared_ptr<gb_pod_sound50GB::Owner> sounds,
   std::shared_ptr<gb_particle_runtime50GB::Owner> particles,std::size_t availableAdditionalPayloadBytes)noexcept {
   if(!thread()||attempted_||closed_)return false;attempted_=true;
   if(availableAdditionalPayloadBytes>32u*1024u*1024u||availableAdditionalPayloadBytes<maximumAdditionalPayloadBytes())
    return reject(Status::Capacity);
-  if(!authored||!authored->ready()||!authored->coldSource()||authored->coldSource()->ai().count()!=257||
-     !animations||!animations->stagedSourceReady()||animations->coldSource()!=authored->coldSource()||
-     !sounds||!sounds->readyFor(*authored,1)||!particles||!particles->sourceStaged()||
-     particles->actions_||particles->group_||particles->actionBindings_||
-     !particles->sourceOwner()||particles->sourceOwner()->sourceOwner()!=authored->coldSource())
+  // Each destination owner exists exactly when the course data authors it:
+  // the animation runtime when the TOB authors [Animations], PodSound and the
+  // particle runtime when a trigger action needs them. A present owner is
+  // bound; an action kind with no owner is refused (authoring already refuses
+  // a non-stock TOB that authors them).
+  if(!authored||!authored->ready()||!authored->coldSource()||!authored->coldSource()->ai().count()||
+     (authored->authorsAnimationActions()&&!animations)||
+     (animations&&!animations->ready())||
+     authored->authorsPodSound()!=bool(sounds)||(sounds&&!sounds->readyFor(*authored,1))||
+     (authored->authorsParticleActions()&&!particles)||
+     (particles&&(!particles->sourceStaged()||particles->actions_||particles->group_||particles->actionBindings_||
+      !particles->sourceOwner()||particles->sourceOwner()->sourceOwner()!=authored->coldSource())))
    return reject(Status::Unprepared);
-  for(std::size_t i=0;i<source::count;++i){const auto& s=authored->source(i);auto& state=group_.triggers[i];
-   if(s.sourceOrdinal!=i+1||s.shapeType!=5||s.actionCount!=(i==source::door?2u:i==source::particles?5u:1u)||
+  // Live trigger prefix of the capacity group (0 = no trigger state selected).
+  const auto live=authored->liveCount();
+  if(live>source::capacity||(live&&!group_.triggers.setCount(live)))return reject(Status::Capacity);
+  for(std::size_t i=0;i<live;++i){const auto& s=authored->source(i);auto& state=group_.triggers[i];
+   if(s.sourceOrdinal!=i+1||s.shapeType!=5||!s.actionCount||s.actionCount>source::maxActions||
       s.randomTriggerPercent!=100)return reject(Status::Input);
    state.flags29=s.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(s.oneTimeOnly?4u:0u));
    state.randomTriggerPercent90=100;state.callbackCount98=s.actionCount;
@@ -226,8 +245,9 @@ public:
   group_.actions={this,&preflightHook,&resumeHook};
   // Set cleanup ownership before the fallible five-target binding. Its real
   // accepted prefix remains retained if any later target rejects.
-  targetsBound_=true;
-  if(!particles_->bindActionSource(*this,group_,source_)){
+  // The five spark targets bind only when the triggers author Particles.
+  targetsBound_=particles_&&source_->authorsParticleActions();
+  if(targetsBound_&&!particles_->bindActionSource(*this,group_,source_)){
    // No query has been admitted. This closes the failed construction prefix
    // and enables explicit release of any partially bound target cursors.
    group_.actionsFailed=true;return reject(Status::Unprepared);}
@@ -243,9 +263,10 @@ public:
  bool preparedSourceFor(const source::Owner& authored,bool soundDestination=true)const noexcept {
   return thread()&&!closed_&&sourcePrepared_&&terminal_==Status::Complete&&source_.get()==&authored&&authored.ready()&&
    !group_.actionsFailed&&group_.actions.context==this&&group_.actions.preflight==&preflightHook&&
-   group_.actions.resume==&resumeHook&&animations_&&animations_->stagedSourceReady()&&
-   animations_->coldSource()==authored.coldSource()&&sounds_&&sounds_->sourceIdentity()==&authored&&(!soundDestination||sounds_->prepared())&&
-   particles_&&particles_->sourceOwner()&&particles_->sourceOwner()->sourceOwner()==authored.coldSource()&&targetsCurrent();
+   group_.actions.resume==&resumeHook&&
+   (!animations_||animations_->ready())&&
+   (!sounds_||(sounds_->sourceIdentity()==&authored&&(!soundDestination||sounds_->prepared())))&&
+   (!particles_||(particles_->sourceOwner()&&particles_->sourceOwner()->sourceOwner()==authored.coldSource()))&&targetsCurrent();
  }
  // Stages the actual eight-racer roster and source PLAYER/AI main690 lists.
  // It never publishes live readiness or creates a query/Bank borrow.
@@ -262,7 +283,7 @@ public:
   auto next=group_;
   if(!next.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
-  for(std::size_t i=0;i<source::count;++i){const auto ignore=source_->source(i).ignore;
+  for(std::size_t i=0;i<next.triggers.size();++i){const auto ignore=source_->source(i).ignore;
    const auto first=ignore==source::Ignore::AI?actualPlayerPrefixCount34:0u;
    const auto last=ignore==source::Ignore::Player?actualPlayerPrefixCount34:ignore==source::Ignore::AI?racerCount:0u;
    for(std::size_t j=first;j<last;++j)next.ignoreColliders[i][next.ignoreColliderCount[i]++]=identities[j].main690;
@@ -289,23 +310,25 @@ private:
   next.valid=true;geometry_[c]=next;return true;
  }
 public:
+ // Renderer leg: present exactly with the particle owners (see beginRendererQuery).
+ bool rendererCurrent()const noexcept {
+  return particles_?renderer_&&renderer_->ready()&&renderer_->runtimeOwner()==particles_.get():!renderer_;
+ }
  bool ready()const noexcept {
-  return thread()&&!retiring_&&!closed_&&queryBinding_&&renderer_&&renderer_->ready()&&
-   renderer_->runtimeOwner()==particles_.get()&&source_&&preparedSourceFor(*source_)&&identitiesBound_&&
-   animations_->ready()&&sounds_->prepared()&&group_.ready&&!group_.actionsFailed;
+  return thread()&&!retiring_&&!closed_&&queryBinding_&&rendererCurrent()&&source_&&preparedSourceFor(*source_)&&identitiesBound_&&
+   (!animations_||animations_->ready())&&(!sounds_||sounds_->prepared())&&group_.ready&&!group_.actionsFailed;
  }
  // ready() without the PodSound destination re-validation; see preparedSourceFor.
  bool queryReady()const noexcept {
-  return thread()&&!retiring_&&!closed_&&queryBinding_&&renderer_&&renderer_->ready()&&
-   renderer_->runtimeOwner()==particles_.get()&&source_&&preparedSourceFor(*source_,false)&&identitiesBound_&&
-   animations_->ready()&&group_.ready&&!group_.actionsFailed;
+  return thread()&&!retiring_&&!closed_&&queryBinding_&&rendererCurrent()&&source_&&preparedSourceFor(*source_,false)&&identitiesBound_&&
+   (!animations_||animations_->ready())&&group_.ready&&!group_.actionsFailed;
  }
- bool animationRetired()const noexcept{return !animations_||animations_->bindingRetired();}
+ bool hasParticleOwner()const noexcept{return bool(particles_);}
  bool particleIdle()const noexcept{return !particles_||!particles_->visiting_;}
  bool queryIdle()const noexcept{return thread()&&!lease_&&!servicing_&&!group_.queryActive;}
  const source::Owner* sourceOwner()const noexcept{return source_.get();}
  const gb_cold_sources50LA::Owner* coldSource()const noexcept{return source_?source_->coldSource():nullptr;}
- const gb_animation_runtime50GB::Owner* animationOwner()const noexcept{return animations_.get();}
+ const track_animation_runtime50AN::Owner* animationOwner()const noexcept{return animations_.get();}
  const gb_pod_sound50GB::Owner* soundOwner()const noexcept{return sounds_.get();}
  const gb_particle_runtime50GB::Owner* particleOwner()const noexcept{return particles_.get();}
  g::NativeTriggerGroup50GB& nativeGroup()noexcept{return group_;}

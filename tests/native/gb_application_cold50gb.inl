@@ -12,11 +12,6 @@
  auto& gbNavigation=gbNavigationOwner?*gbNavigationOwner:emptyGbNavigation;
  gb_navigation50GB::Diagnostic gbNavigationDiagnostic;
  std::shared_ptr<gb_trigger_actions50GB::Owner> gbTriggerActions;
- std::shared_ptr<gb_animation_source50GB::Owner> gbAnimationSource;
- std::shared_ptr<gb_animation_runtime50GB::Owner> gbAnimationRuntime;
- std::unique_ptr<gb_animation_binding50GB::Binding> gbAnimationBinding;
- gb_animation_runtime50GB::Diagnostic gbAnimationDiagnostic;
- gb_animation_binding50GB::Diagnostic gbAnimationBindingDiagnostic;
  std::shared_ptr<gb_particle_authoring50GB::Owner> gbParticleAuthoring;
  std::shared_ptr<gb_particle_attachments50GB::Owner> gbParticleAttachments;
  std::shared_ptr<OriginalTrackParticleCold50LA> gbTrackParticles;
@@ -53,11 +48,9 @@
   .gbNavigation=gbNavigation,
   .gbNavigationDiagnostic=gbNavigationDiagnostic,
   .gbTriggerAuthoring=gbTriggerAuthoring,
-  .gbAnimationSource=gbAnimationSource,
-  .gbAnimationRuntime=gbAnimationRuntime,
-  .gbAnimationDiagnostic=gbAnimationDiagnostic,
-  .gbAnimationBinding=gbAnimationBinding,
-  .gbAnimationBindingDiagnostic=gbAnimationBindingDiagnostic,
+  .trackAnimations=trackAnimations,
+  .trackAnimationBinding=trackAnimationBinding,
+  .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
   .gbOriginalWorld=gbOriginalWorld,
   .gbParticleAuthoring=gbParticleAuthoring,
   .gbExternalPayloadReservation=gbExternalPayloadReservation,

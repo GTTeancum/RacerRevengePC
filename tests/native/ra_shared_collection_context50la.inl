@@ -3,7 +3,7 @@
   producer->sharedRun=[&,runtime](EndQueryBridge::EndCandidateResult& out){
    auto* producer=endCandidateProducer;
    if(!producer||!producer->inCall||producer->storage!=&trackStorage||
-      !trackStorage.sharedRoster_||gcAnimatedWorld||gaAnimatedWorld||zoneQueue.count||
+      !trackStorage.sharedRoster_||(trackAnimations&&!trackAnimationRows.empty())||zoneQueue.count||
       sourceFollowQueries||runtime->follow_|| //No unimplemented native Follow subscriber is skipped.
       prepareSearchView50BT(registry,registrationBlocks,2,registrationView)!=SearchStorageStatus50BS::Complete||
       !runtime->projectSharedRegistered(out))return;

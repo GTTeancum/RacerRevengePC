@@ -5,6 +5,7 @@
 #include "mc_material_alpha50mc.h"
 #include "mc_world_semantics50mc.h"
 #include "source_texture50fc_fixture.h"
+#include "course_world_texture50st.h"
 
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_ipu_decoder.h"

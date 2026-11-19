@@ -16,15 +16,14 @@ namespace gb_original_world50LM { class Owner; }
 namespace gb_trigger_authoring50GB { class Owner; }
 namespace gb_collision_world50GB { class Owner; }
 namespace gb_trigger_actions50GB { class Owner; }
-namespace gb_animation_source50GB { class Owner; }
 namespace gb_particle_attachments50GB { class Owner; }
 namespace gb_track_fog50GB { class Owner; }
 namespace gb_particle_authoring50GB { class Owner; }
 namespace gb_pod_sound50GB { class Owner; }
 namespace gb_navigation50GB { class Owner; struct Diagnostic; }
-namespace gb_animation_runtime50GB { class Owner; struct Diagnostic; }
+namespace track_animation_runtime50AN { class Owner; }
 namespace gb_particle_runtime50GB { class Owner; struct Diagnostic; }
-namespace gb_animation_binding50GB { class Binding; struct Diagnostic; }
+namespace track_animation_binding50AN { class Binding; struct Diagnostic; }
 
 namespace interactive_course_cold50DU {
 struct GbColdPrefix {
@@ -45,11 +44,9 @@ struct GbColdPrefix {
     gb_navigation50GB::Owner& gbNavigation;
     gb_navigation50GB::Diagnostic& gbNavigationDiagnostic;
     std::shared_ptr<gb_trigger_authoring50GB::Owner>& gbTriggerAuthoring;
-    std::shared_ptr<gb_animation_source50GB::Owner>& gbAnimationSource;
-    std::shared_ptr<gb_animation_runtime50GB::Owner>& gbAnimationRuntime;
-    gb_animation_runtime50GB::Diagnostic& gbAnimationDiagnostic;
-    std::unique_ptr<gb_animation_binding50GB::Binding>& gbAnimationBinding;
-    gb_animation_binding50GB::Diagnostic& gbAnimationBindingDiagnostic;
+    std::shared_ptr<track_animation_runtime50AN::Owner>& trackAnimations;
+    std::unique_ptr<track_animation_binding50AN::Binding>& trackAnimationBinding;
+    track_animation_binding50AN::Diagnostic& trackAnimationBindingDiagnostic;
     std::shared_ptr<gb_original_world50LM::Owner>& gbOriginalWorld;
     std::shared_ptr<gb_particle_authoring50GB::Owner>& gbParticleAuthoring;
     std::size_t& gbExternalPayloadReservation;

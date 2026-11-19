@@ -1,0 +1,7 @@
+particle_emitters site=GB authored=12 read=12 types=8,8,8,8,8,8,8,11,11,11,11,11
+GB emitters: reader table equals old pinned descriptors (type/zone/soultree/instances/filename/offset bits/StartOn) and definition index map: True
+  instances total 67 definitions ['gbtemplefire.emt', 'genratorfire.emt', 'gbfireworks.emt', 'gbredfireworks.emt']
+SCB environment ParticleTextureMapName: demoprt.tga members present: ['particle\\demoprt.prt', 'particle\\demoprt.psm', 'particle\\demoprt.pst']
+positional_sounds site=positional_GB soultree_read=49 ambient_read=4 pcm=4
+GB sounds: reader projection equals old GB parse (49 rows) and old pinned ambient rows: True
+ALL GB EQUAL

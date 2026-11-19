@@ -1,11 +1,15 @@
 #pragma once
 #include "trigger_entry50in.h"
+#include "native_trigger_capacity50tg.h"
 #include <array>
 #include <cstdint>
 #include <limits>
 namespace rr::game {
-// Distinct exact TB storage; legacy GA13/callback2 bounds are untouched.
-inline constexpr std::size_t nativeTriggerCount50TB=16,nativeTriggerColliderCount50TB=16;
+// TB trigger store: capacity-sized once from the common trigger reader
+// (nativeTriggerCapacity50TG) with the authored live count triggerCount;
+// the stock count is a receipt of the authoring owner, not a size here.
+// Colliders: main+secondary of up to 8 racers. GA13/callback2 untouched.
+inline constexpr std::size_t nativeTriggerColliderCount50TB=16;
 struct NativeTriggerGroup50TB;
 struct SourceTriggerActionCall50TB {
     TriggerActionCall50IN source{};
@@ -48,11 +52,12 @@ struct SourceTriggerContactReceipt50TB {
     SourceTriggerActionResult50TB action{};
 };
 struct NativeTriggerGroup50TB {
- std::array<TriggerEntryState50IN,nativeTriggerCount50TB> triggers{};
+ std::array<TriggerEntryState50IN,nativeTriggerCapacity50TG> triggers{};
+ std::size_t triggerCount=0; // live authored prefix [0,triggerCount); 0 = no trigger state
  TriggerColliderStorage50IN<nativeTriggerColliderCount50TB> colliders{};
- std::array<std::uint32_t,nativeTriggerCount50TB> ignoreCollider{};
- std::array<std::array<std::uint32_t,8>,nativeTriggerCount50TB> ignoreColliders{};
- std::array<std::size_t,nativeTriggerCount50TB> ignoreColliderCount{};
+ std::array<std::uint32_t,nativeTriggerCapacity50TG> ignoreCollider{};
+ std::array<std::array<std::uint32_t,8>,nativeTriggerCapacity50TG> ignoreColliders{};
+ std::array<std::size_t,nativeTriggerCapacity50TG> ignoreColliderCount{};
  SourceTriggerActionHooks50TB actions{};
  SourceTriggerContactState50TB contact{};
  SourceTriggerContactReceipt50TB lastContact{};
@@ -68,13 +73,14 @@ inline std::size_t nativeTriggerCollider50TB(const NativeTriggerGroup50TB& group
 // Structural admission is shared by the distinct fallible source-action route.
 // A source-only group is never admitted by the legacy action dispatcher.
 inline bool validNativeTriggerStorage50TB(const NativeTriggerGroup50TB& group)noexcept {
+ if(group.triggerCount>group.triggers.size())return false;
  if(!group.ready||group.actionsFailed)return false;
  for(std::size_t i=0;i<group.colliders.size();++i){
   if(!trigger_entry50IN_detail::valid(group.colliders[i]))return false;
   for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
  }
- for(std::size_t i=0;i<group.triggers.size();++i){const auto& state=group.triggers[i];
-  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90!=100||state.callbackCount98!=(i==15?2u:1u))return false;
+ for(std::size_t i=0;i<group.triggerCount;++i){const auto& state=group.triggers[i];
+  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90!=100||!state.callbackCount98||state.callbackCount98>nativeTriggerActionSlots50TG)return false;
   if(nativeTriggerCollider50TB(group,state.collider.identity)!=group.colliders.size())return false;
   for(std::size_t j=0;j<i;++j)if(state.collider.identity==group.triggers[j].collider.identity)return false;
   if(group.ignoreCollider[i]&&nativeTriggerCollider50TB(group,group.ignoreCollider[i])==group.colliders.size())return false;
@@ -93,7 +99,7 @@ inline bool validNativeTriggerStorage50TB(const NativeTriggerGroup50TB& group)no
  for(const auto& collider:group.colliders)for(std::size_t slot=0;slot<collider.highWaterD0;++slot){
   const auto id=collider.membersCC[slot];if(!id)continue;
   const TriggerEntryState50IN* matching=nullptr;
-  for(const auto& state:group.triggers)if(state.collider.identity==id)matching=&state;
+  for(std::size_t t=0;t<group.triggerCount;++t)if(group.triggers[t].collider.identity==id)matching=&group.triggers[t];
   if(!matching||trigger_entry50IN_detail::find(matching->collider,collider.identity)==matching->collider.highWaterD0)return false;
  }
  return true;
@@ -112,7 +118,7 @@ inline bool nativeTriggerQueryBound50TB(const NativeTriggerGroup50TB& group,std:
 }
 inline bool nativeTriggerPairAllowed50TB(const NativeTriggerGroup50TB& group,
     std::size_t trigger,std::uint32_t collider)noexcept {
- if(trigger>=group.triggers.size()||!group.ready||group.actionsFailed||
+ if(trigger>=group.triggerCount||!group.ready||group.actionsFailed||
     nativeTriggerCollider50TB(group,collider)==group.colliders.size()||group.ignoreCollider[trigger]==collider)return false;
  if(group.ignoreColliderCount[trigger]>group.ignoreColliders[trigger].size())return false;
  for(std::size_t i=0;i<group.ignoreColliderCount[trigger];++i)if(group.ignoreColliders[trigger][i]==collider)return false;
@@ -134,7 +140,7 @@ inline SourceTriggerContactReceipt50TB resumeNativeSourceTriggerContact50TB(
     namespace d=trigger_entry50IN_detail;
     using P=SourceTriggerContactPhase50TB;using S=SourceTriggerContactStatus50TB;
     SourceTriggerContactReceipt50TB r;
-    if(!querySerial||!validSourceTriggerGroup50TB(group,hooks)||trigger>=group.triggers.size())return r;
+    if(!querySerial||!validSourceTriggerGroup50TB(group,hooks)||trigger>=group.triggerCount)return r;
     const auto ci=nativeTriggerCollider50TB(group,collider);
     if(ci==group.colliders.size())return r;
     auto& s=group.triggers[trigger];auto& other=group.colliders[ci];
@@ -218,7 +224,7 @@ inline SourceTriggerContactReceipt50TB serviceNativeSourceTrigger50TB(
     const SourceTriggerContactState50TB& pending,bool eligible=true) noexcept {
     namespace d=trigger_entry50IN_detail;using S=SourceTriggerContactStatus50TB;
     SourceTriggerContactReceipt50TB r;
-    if(!validSourceTriggerGroup50TB(group,hooks)||trigger>=group.triggers.size()||
+    if(!validSourceTriggerGroup50TB(group,hooks)||trigger>=group.triggerCount||
        (pending.phase!=SourceTriggerContactPhase50TB::Idle&&
         pending.phase!=SourceTriggerContactPhase50TB::Complete))return r;
     auto& s=group.triggers[trigger];

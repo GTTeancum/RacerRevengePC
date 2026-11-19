@@ -209,6 +209,8 @@ public:
    representative_.fill(mc_particle_attachments50MC::associationCount);
    std::size_t spanReferences=0;
    for(std::size_t i=0;i<mc_particle_attachments50MC::associationCount;++i){
+    // Only attached associations of the live emitter table have a placement.
+    if(attachments_->placementIndex(i)==mc_particle_attachments50MC::placementCount)continue;
     const auto k=attachments_->placementIndex(i);need(k<representative_.size(),"MC source placement index differs");
     const auto count=attachments_->spanCount(i);const auto* spans=attachments_->spanIndices(i);
     need(count&&spans&&attachments_->placement(i),"MC complete actual placement spans absent");
@@ -219,9 +221,8 @@ public:
      for(std::size_t j=0;j<count;++j)need(attachments_->spanIndices(previous)[j]==spans[j],"MC repeated association span differs");}
     for(std::size_t j=0;j<count;++j)need(spans[j]<world_->spans()->size(),"MC placement span exceeds actual static world");
    }
-   for(const auto i:representative_)need(i<mc_particle_attachments50MC::associationCount,"MC 2-placement coverage incomplete");
-   need(spanReferences==mc_particle_attachments50MC::sourceSurfaceReferences&&
-    attachments_->spanReferenceCount()==spanReferences,"MC 8-span coverage differs");
+   for(std::size_t k=0;k<attachments_->placementCountLive();++k)need(representative_[k]<mc_particle_attachments50MC::associationCount,"MC placement coverage incomplete");
+   need(attachments_->spanReferenceCount()==spanReferences,"MC placement span coverage differs");
    completed_.fill(false);ready_=true;return true;
   }catch(const std::exception& e){try{d.message=e.what();}catch(...){}return false;}catch(...){return false;}
  }

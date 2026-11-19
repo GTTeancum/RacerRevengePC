@@ -213,29 +213,30 @@ bool validateTbWorld(const VehicleWindowRequest50DS& request,VehicleWindowDiagno
     const auto* normals=owner.normals();const auto* projected=owner.projectionUvs();const auto* bank=owner.bank();
     if(!owner.loaded()||!source||!source->ready()||request.raStaticWorld||track.rcCrystal||
        track.raStaticFire||track.rcParticleWindow||track.gbParticleWindow||track.mcParticleWindow||track.mode!=VehicleWindowMode50DS::callerMaterialTextures||
-       track.mesh!=owner.mesh()||!track.mesh||track.mesh->vertices.size()!=151225u||
-       track.mesh->indices.size()!=286893u||!spans||spans->size()!=1376u||!selections||
+       // Counts from the owner's own data (were the stock TB 151225 / 286893 / 1376 / 103).
+       track.mesh!=owner.mesh()||!track.mesh||track.mesh->vertices.empty()||
+       track.mesh->indices.empty()||!spans||spans->empty()||!selections||
        !normals||normals->size()!=track.mesh->vertices.size()||track.sourceNormals!=normals->data()||
        track.sourceNormalCount!=normals->size()||!projected||projected->size()!=track.mesh->vertices.size()||
        track.sourceProjectionUvs!=projected->data()||track.sourceProjectionCount!=projected->size()||
        !track.spans||track.spanCount!=spans->size()||track.vertexColorScale!=255.f/128.f||!bank||!track.textures||
-       !track.textures->matchesSourceBank(*bank,track.textures->publicationToken())||track.textures->textureCount()!=103u)
+       !track.textures->matchesSourceBank(*bank,track.textures->publicationToken())||
+       !bank->textureCount()||track.textures->textureCount()!=bank->textureCount())
         return fail(d,VehicleWindowError50DS::request,"TB retained world/source publication differs");
-    std::size_t crowd=0;
     for(std::size_t i=0;i<spans->size();++i){const auto& a=(*spans)[i];const auto& b=track.spans[i];
         if(a.materialSelection>=selections->size()||a.vertexStart!=b.vertexStart||a.vertexCount!=b.vertexCount||
            a.indexStart!=b.indexStart||a.indexCount!=b.indexCount||a.textureIndex!=b.material.textureIndex||
            a.sourcePass!=b.sourcePass||a.sourcePassCount!=b.sourcePassCount||a.projectionPass!=b.projectionPass||
            b.gsDestinationAlphaPass||b.sourceEnvironmentMap||b.material.mode!=VehicleWindowMaterialMode50DS::requiredTexture)
             return fail(d,VehicleWindowError50DS::material,"TB ordered source span association differs");
-        if(pod_materials50ed_fixture::detail::normalized((*selections)[a.materialSelection].materialName)=="CROWD"){
-            if(b.nativeCoverage!=NativeTrackCoverage50DS::fourSampleAa1)
-                return fail(d,VehicleWindowError50DS::material,"TB original CROWD AA1 lowering missing");
-            ++crowd;
-        }
+        // AA1 exactly where the span's own pass authors onePassAntialiasingOnOff=1
+        // (was: the material named CROWD, 33 stock spans).
+        bool aa1Valid=true;
+        const bool aa1=course_world_texture50ST::authoredOnePassAa1((*selections)[a.materialSelection].sourcePassFields,aa1Valid);
+        if(!aa1Valid||aa1!=(b.nativeCoverage==NativeTrackCoverage50DS::fourSampleAa1))
+            return fail(d,VehicleWindowError50DS::material,"TB authored AA1 lowering differs from the pass field");
     }
-    if(crowd!=33u)return fail(d,VehicleWindowError50DS::material,"TB original CROWD span count differs");
-    for(U i=0;i<103u;++i){const auto* cpu=bank->texture(i);const auto* gpu=track.textures->asset(i);
+    for(U i=0;i<bank->textureCount();++i){const auto* cpu=bank->texture(i);const auto* gpu=track.textures->asset(i);
         if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity)
             return fail(d,VehicleWindowError50DS::material,"TB source image identity differs");
     }

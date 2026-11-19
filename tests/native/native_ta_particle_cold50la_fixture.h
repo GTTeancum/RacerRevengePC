@@ -452,24 +452,34 @@ inline bool prepareGb(rr::game::OriginalTrackParticleCold50LA& owner,
     const std::string pstMember=member.substr(0,member.size()-4)+".pst";
     rr::assets::DecodeError48C error;
     std::vector<std::uint8_t> prt,psm,pst;
-    require(source->extractMember(member,prt,error,9385u)&&
-        source->extractMember(psmMember,psm,error,5022u)&&
-        source->extractMember(pstMember,pst,error,132124u),
+    // Common course rule: the SCB-named PRT/PSM/PST are read by name at their
+    // own sizes (bounded by the shared 8 MiB member cap); the stock GB
+    // demoprt bytes are receipts, as on the common pool path above.
+    const auto memberBytes=[&](const std::string& name)->std::size_t{
+        for(const auto& e:source->archive().entries())
+            if(rr::assets::OriginalStandardArchiveProvider50LA::sameName(e.name,name))return e.bytes;
+        return 0;};
+    const auto prtBytes=memberBytes(member),psmBytes=memberBytes(psmMember),pstBytes=memberBytes(pstMember);
+    require(prtBytes&&psmBytes&&pstBytes&&prtBytes<=8u*1024u*1024u&&psmBytes<=8u*1024u*1024u&&pstBytes<=8u*1024u*1024u&&
+        source->extractMember(member,prt,error,prtBytes)&&
+        source->extractMember(psmMember,psm,error,psmBytes)&&
+        source->extractMember(pstMember,pst,error,pstBytes)&&!pst.empty(),
         "GB selected original particle closure unavailable");
-    require(prt.size()==9385u&&pod_materials50ed_fixture::detail::sha256(prt)==
-        "fc95eee7487a6ae0c00e50228cf3667f9978f74770fe913fe95310a35c59f15c",
-        "GB original particle PRT identity rejected");
-    require(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1",
-        "Original selected-track particle PSM identity rejected");
-    require(pst.size()==132124u&&pod_materials50ed_fixture::detail::sha256(pst)==pstSha,
-        "GB original particle PST identity rejected");
+    course_archive_receipt50CI::memberReceipt("gb_track_particle",member,prt,0,0,9385u,
+        "fc95eee7487a6ae0c00e50228cf3667f9978f74770fe913fe95310a35c59f15c");
+    course_archive_receipt50CI::memberReceipt("gb_track_particle",psmMember,psm,0,0,5022u,
+        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1");
+    course_archive_receipt50CI::memberReceipt("gb_track_particle",pstMember,pst,0,0,132124u,pstSha);
     const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
         Provider::MemberView selected;Provider::MountView mounted;
         return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
             provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            *mounted.archiveName==archiveName&&*mounted.archiveSha256==archiveSha&&
-            mounted.archiveBytes==archiveBytes&&mounted.memberCount==gb_cold_sources50LA::archiveEntries&&
+            // The mount the GB cold source made (original_track_cut_identity50la.h:
+            // the admitted archive's digest/size; stock disc = stock identity).
+            *mounted.archiveName==archiveName&&
+            *mounted.archiveSha256==rr::assets::originalTrackMountDigest50LA(archiveName,archiveSha)&&
+            mounted.archiveBytes==rr::assets::originalTrackMountBytes50LA(archiveName,archiveBytes)&&
+            mounted.memberCount==source->archive().entries().size()&&
             selected.member&&*selected.member==requested&&selected.data&&
             selected.revision==providerRevision&&selected.size==original.size()&&
             !std::memcmp(selected.data,original.data(),original.size());

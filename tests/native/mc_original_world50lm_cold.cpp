@@ -18,6 +18,10 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
             for(std::size_t i=0;i<archive.entries().size();++i)
                 shared::need(next->entries.emplace(detail::key(archive.entries()[i].name),i).second,"Ambiguous original MC member");
             std::map<std::string,std::uint32_t> materialIndices,textureIndices;
+            // Stock pin per admitted texture (only when its bytes are the stock bytes) and the
+            // per-load texture receipt line (course_world_texture50st.h).
+            std::map<std::string,const detail::SourceImage*> texturePins;
+            course_world_texture50ST::Tally textureTally;
             std::vector<Bytes> images;
             std::vector<a::MaterialTextureSlotInput50EA> slots;
             constexpr std::uint64_t textureBase=assetIdentity<<48;
@@ -50,15 +54,19 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                         texture=next->entry("textures\\"+stem+extension);if(texture)break;
                     }
                     shared::need(texture,"Original MC required texture absent: "+map.name);
-                    const auto textureKey=detail::key(texture->name);const auto* pin=detail::sourceImage(textureKey);
+                    const auto textureKey=detail::key(texture->name);
                     const bool animated=textureKey.ends_with(".ATM");
-                    if(animated)shared::need(authored.passes.size()==1&&(!pin||detail::initialFrame(pass.fields)==pin->initialFrame),
-                        "Original MC material/ATM initial frame differs");
+                    // A static ATM draws one authored frame: single-pass materials only (capability, not a pin).
+                    if(animated)shared::need(authored.passes.size()==1,"Original MC static ATM material pass count");
                     auto found=textureIndices.find(textureKey);
                     if(found==textureIndices.end()){
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
-                        std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields));
+                        // Stock pin only for stock bytes (course_world_texture50st.h); differing bytes: receipt, logged by image().
+                        const auto* pin=detail::matchedSourceImage(textureKey,bytes,shared::sha256(bytes),false);
+                        texturePins.emplace(textureKey,pin);
+                        std::uint32_t mip=0;bool decodedAnimated=false,independent=false;course_world_texture50ST::Receipt receipt;
+                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields),&receipt);
+                        textureTally.add(receipt);
                         shared::need(decodedAnimated==animated,"Original MC texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
                         shared::need(index<wma::maxWorldImages&&image.size()>=16,"MC original texture bank bound");
@@ -75,6 +83,10 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                         if(independent)++d.independentlyPinnedImages;else ++d.runtimeIdentityImages;
                         found=textureIndices.emplace(textureKey,index).first;
                     }
+                    // Material/ATM initial frame vs. the stock pin of the same stock bytes: receipt only.
+                    if(animated){const auto pinned=texturePins.find(textureKey);
+                        if(pinned!=texturePins.end()&&pinned->second)course_world_texture50ST::frameReceipt("MC",textureKey,
+                            detail::initialFrame(pass.fields),pinned->second->initialFrame);}
                     const auto index=static_cast<std::uint32_t>(next->selections.size());
                     shared::need(index<wma::maxWorldSelections,"Original MC authored pass count bound");
                     const auto& image=next->textures[found->second];tm::Selection selected;
@@ -173,6 +185,7 @@ bool Owner::load(std::shared_ptr<const mc_cold_sources50LA::Owner> sourceOwner,D
                 next->mesh.vertices.size()==expectedVertices&&next->mesh.indices.size()==expectedIndices&&images.size()==expectedImages&&
                 next->normals.size()==next->mesh.vertices.size()&&
                 next->projectionUvs.size()==next->mesh.vertices.size()&&rgbaBytes==expectedRgbaBytes&&d.independentlyPinnedImages==expectedPinnedImages&&d.runtimeIdentityImages==expectedImages-expectedPinnedImages;
+            textureTally.log("MC");
             wma::closureReceipt("MC",stockClosure,d.materials,d.selections,next->spans.size(),images.size(),next->mesh.vertices.size());
             shared::need(wma::closureBounds(d.scenes,d.placements,d.collisionOnly,d.surfaces,world.instances.size(),
                 d.materials,d.selections,d.secondPasses,next->spans.size(),next->mesh.vertices.size(),next->mesh.indices.size(),

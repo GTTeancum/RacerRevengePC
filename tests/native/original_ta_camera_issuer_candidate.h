@@ -517,7 +517,9 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::gb||authored.inputs.mcSourceIdentity||
        // GB's TOB stays borrowed from the retained GB cold source (loadGb leaves tob empty).
        authored.cam.empty()||!authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
-       authored.inputs.camBytes!=authored.cam.size()||!authored.inputs.tob||authored.inputs.tobBytes!=20617u)return {};
+       // The TOB size is the retained GB source's own (checked byte-for-byte
+       // against the mounted member below); stock 20617 is not a gate.
+       authored.inputs.camBytes!=authored.cam.size()||!authored.inputs.tob||!authored.inputs.tobBytes)return {};
     const auto& particles=*actual.actualTrackParticles4A0;
     const auto& rig=*(*actual.actualRigs)[0];
     const auto* pod=original_player_identity50IK::find(rig.podId);

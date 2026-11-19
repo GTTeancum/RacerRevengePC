@@ -50,7 +50,11 @@ public:
    if(!authored||!authored->ready()||!authored->coldSource()||!groups.uses(mixer)||
       mixer.count()!=p::audioMaximumVoices50HD||!mixer.originalSoundMode50KG()||!mixer.originalSoundMode50KG()->ready()){
     error="TB PodSound actual source/mixer/mode/groups unavailable";return false;}
-   const auto& trigger=authored->source(source::door);const auto& action=trigger.actions[actionIndex];
+   // The trigger is found by data (the first one authoring a PodSound); the
+   // stock descriptor below remains this stock-shaped owner's identity (TB-9).
+   const auto door=authored->firstTriggerWith(source::Action::PodSound);
+   if(door>=authored->liveCount()){error="TB PodSound owner requires an authored PodSound trigger action";return false;}
+   const auto& trigger=authored->source(door);const auto& action=trigger.actions[actionIndex];
    if(trigger.sourceOrdinal!=16||trigger.actionCount!=2||!trigger.oneTimeOnly||
       trigger.actions[0].kind!=source::Action::Animation||trigger.actions[0].animationIndex!=0||
       action.kind!=source::Action::PodSound||!action.original||action.filename!="sfx\\race\\hugedoor.vag"||
@@ -104,7 +108,8 @@ public:
   if(thread_!=std::this_thread::get_id()){error="TB PodSound owner thread differs";return false;}
   ++counters_.requests;
   if(!current()||source_.get()!=&authored||index!=actionIndex||
-     &action!=&source_->source(source::door).actions[actionIndex])
+     source_->firstTriggerWith(source::Action::PodSound)>=source_->liveCount()||
+     &action!=&source_->source(source_->firstTriggerWith(source::Action::PodSound)).actions[actionIndex])
    return reject(error,"TB PodSound reached source/action identity differs");
   const auto decision=g::triggerPodSoundAdmission50IN(true,
     {action.soundPosition,action.minDistance,action.maxDistance},actualListeners,listenerCount);

@@ -27,10 +27,7 @@ namespace tc_cold_visibility50TC { class Retirement; }
 namespace tb_cold_visibility50TB { class Retirement; }
 namespace gb_cold_visibility50GB { class Retirement; }
 namespace mc_cold_visibility50MC { class Retirement; }
-namespace tc_gate_visibility50TC { class Binding; }
-namespace tb_door_binding50TB { class Binding; }
-namespace gb_animation_binding50GB { class Binding; }
-namespace mc_animation_binding50MC { class Binding; }
+namespace track_animation_binding50AN { class Binding; }
 namespace mc_cold_sources50LA { class Owner; }
 namespace mc_lighting_authoring50MC { struct Record; }
 namespace original_cable_selection50LA { class Binding; }
@@ -349,38 +346,19 @@ class Owner final {
         const CameraVisibilityLease&,std::uint32_t callbackRacer,
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const std::uint32_t& actualCableField50)const noexcept;
-    friend class ::gb_animation_binding50GB::Binding;
-    bool bindGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t,const LiveZoneMembership50EN*) noexcept;
-    bool beginGbAnimationAccess(const ::gb_animation_binding50GB::Binding*,std::size_t,ResetVisibilityWorld50EY*&,
+    friend class ::track_animation_binding50AN::Binding;
+    // ONE visual-zone lane for the track's animation rows (every course on this
+    // owner's visibility world; work\scratch	rack-data-gapsnim\ANIM.md piece 3).
+    // Row k is identity base+k after the racers, the camera, RA static models and
+    // flares; its count is the course's animation rows (planTrackAnimationRows).
+    // Replaces the TB door / TC gate / GB four / MC fourteen per-course lanes.
+    bool bindTrackAnimationRow(const ::track_animation_binding50AN::Binding*,std::size_t,const LiveZoneMembership50EN*) noexcept;
+    bool beginTrackAnimationAccess(const ::track_animation_binding50AN::Binding*,std::size_t,ResetVisibilityWorld50EY*&,
         LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
-    void endGbAnimationAccess(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
-    bool commitGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
-    bool releaseGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
-    bool currentGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) const noexcept;
-    friend class ::mc_animation_binding50MC::Binding;
-    bool bindMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t,const LiveZoneMembership50EN*) noexcept;
-    bool beginMcAnimationAccess(const ::mc_animation_binding50MC::Binding*,std::size_t,ResetVisibilityWorld50EY*&,
-        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
-    void endMcAnimationAccess(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
-    bool commitMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
-    bool releaseMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
-    bool currentMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) const noexcept;
-    friend class ::tb_door_binding50TB::Binding;
-    bool bindTbDoorOwner(const ::tb_door_binding50TB::Binding*,const LiveZoneMembership50EN*) noexcept;
-    bool beginTbDoorAccess(const ::tb_door_binding50TB::Binding*,ResetVisibilityWorld50EY*&,
-        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
-    void endTbDoorAccess(const ::tb_door_binding50TB::Binding*) noexcept;
-    bool commitTbDoorOwner(const ::tb_door_binding50TB::Binding*) noexcept;
-    bool releaseTbDoorOwner(const ::tb_door_binding50TB::Binding*) noexcept;
-    bool currentTbDoorOwner(const ::tb_door_binding50TB::Binding*) const noexcept;
-    friend class ::tc_gate_visibility50TC::Binding;
-    bool bindTcGateOwner(const ::tc_gate_visibility50TC::Binding*,const LiveZoneMembership50EN*) noexcept;
-    bool beginTcGateAccess(const ::tc_gate_visibility50TC::Binding*,ResetVisibilityWorld50EY*&,
-        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
-    void endTcGateAccess(const ::tc_gate_visibility50TC::Binding*) noexcept;
-    bool commitTcGateOwner(const ::tc_gate_visibility50TC::Binding*) noexcept;
-    bool releaseTcGateOwner(const ::tc_gate_visibility50TC::Binding*) noexcept;
-    bool currentTcGateOwner(const ::tc_gate_visibility50TC::Binding*) const noexcept;
+    void endTrackAnimationAccess(const ::track_animation_binding50AN::Binding*,std::size_t) noexcept;
+    bool commitTrackAnimationRow(const ::track_animation_binding50AN::Binding*,std::size_t) noexcept;
+    bool releaseTrackAnimationRow(const ::track_animation_binding50AN::Binding*,std::size_t) noexcept;
+    bool currentTrackAnimationRow(const ::track_animation_binding50AN::Binding*,std::size_t) const noexcept;
     friend class ::ra_static_model_cold50LA::Owner;
     // Only the retained static-world owner can bind these authored-instance
     // identities. One namespace and one lifecycle, never a copied registry.
@@ -462,6 +440,7 @@ class Owner final {
     struct Storage;
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
+    std::size_t plannedAnimationRows_=0; // planTrackAnimationRows: the course's animation rows
     void endDraw(DrawLease&) noexcept;
     void endCameraVisibility(CameraVisibilityLease&) noexcept;
     bool cameraLeaseCurrent(const CameraVisibilityLease&) const noexcept;
@@ -546,13 +525,15 @@ public:
     // Native query only: authored flare rendering remains outside this owner.
     // Authenticated RC15/15 topology uses unchanged legacy backing and no local lights.
     // Exact TB10/11 source, including12 retained-selector repetitions ofLight92.
-    // Conservative additional descriptor reservation for this typed door lane:
-    // added common Storage fields/alignment plus the actual extra registration
-    // backing at maximumRacers. No topology/racer limit is enlarged.
-    static std::size_t tbDoorStorageReservationBytes() noexcept;
-    // Four source-counted GB animation identities; extra backing only on GB.
-    // Charge before prepareGbNative in the separately reviewed admission layer.
-    static std::size_t gbAnimationStorageReservationBytes() noexcept;
+    // The track's animation rows for the one visual-zone lane (every course):
+    // call before prepare*Native, with the count the course's [Animations] table
+    // loads (0 = no lane). Refused above maximumTrackAnimationRows or after a prepare.
+    static constexpr std::size_t maximumTrackAnimationRows=64; // = TrackAnimationLimits50AN::animations (checked by the binding)
+    bool planTrackAnimationRows(std::size_t rows) noexcept;
+    std::size_t trackAnimationRows() const noexcept;
+    // Additional Storage backing for that lane at maximumRacers (lane state, the
+    // extra registration records, padding). Charge before prepare*Native.
+    static std::size_t trackAnimationStorageReservationBytes(std::size_t rows) noexcept;
     // Exact GB13/17 source, sixty emitted points and two authored flashers.
     // Authored flare rendering is a separate visual owner.
     // Requires this exact strong owner. Retains backing, excludes timed service,
@@ -567,7 +548,7 @@ public:
     const ::mc_lighting_authoring50MC::Record* mcLightRecord(std::size_t) const noexcept;
     bool queryMcZoneLight(std::uint32_t,const std::array<float,3>&,
         original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
-    static std::size_t mcAnimationStorageReservationBytes() noexcept;
+    static std::size_t mcTopologyStorageReservationBytes() noexcept;
     std::size_t mcRetainedPayloadBytes() const noexcept;
     bool prepareGbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;

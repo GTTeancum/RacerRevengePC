@@ -1,6 +1,6 @@
 #pragma once
 #include "mc_trigger_geometry50mc.h"
-#include "mc_animation_runtime50mc.h"
+#include "track_animation_runtime50an.h"
 #include "../../src/game/native_trigger_group50mc.h"
 #include "../../src/game/trigger_sphere50in.h"
 #include <array>
@@ -25,7 +25,7 @@ class Owner final {
  const ::mc_query50MC::Binding* queryBinding_=nullptr;
  bool retiring_=false;
  std::shared_ptr<const mc_trigger_authoring50MC::Owner> source_;
- std::shared_ptr<mc_animation_runtime50MC::Owner> door_;
+ std::shared_ptr<track_animation_runtime50AN::Owner> door_; // the common track-animation runtime
  std::shared_ptr<const mc_trigger_geometry50MC::Owner> shapes_;
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
@@ -43,7 +43,7 @@ class Owner final {
   const auto& call=event.source;
   if(!ready()||terminal_!=Status::Complete||call.triggerCollider<firstTriggerIdentity)return false;
   const auto t=call.triggerCollider-firstTriggerIdentity;const auto c=colliderIndex(call.otherCollider);
-  if(t>=mc_trigger_authoring50MC::count||c>=group_.colliders.size())return false;
+  if(t>=source_->liveCount()||t>=group_.triggerCount||c>=group_.colliders.size())return false;
   const auto& trigger=source_->source(t);if(call.actionIndex>=trigger.actionCount)return false;
   if(!call.entering)return servicing_&&!lease_&&!group_.queryActive&&event.querySerial==0;
   if(servicing_||!lease_||!group_.queryActive||!event.querySerial||event.querySerial!=group_.querySerial||
@@ -52,7 +52,9 @@ class Owner final {
   const auto& action=trigger;
   if(action.action==mc_trigger_authoring50MC::Action::LostAI)
    return !action.authoredReset&&!action.effectiveReset1B5A60&&action.targetNodeIndex<source_->coldSource()->ai().count()&&((c&1u)||lease_->nodeC80);
-  return action.action==mc_trigger_authoring50MC::Action::Animation&&t==20&&call.actionIndex==0&&door_->ready()&&action.animationIndex==0;
+  // The animation owner holds the TOB's animated objects; the bridge index is
+  // bounded by the owner itself (activateSequence refuses an unknown index).
+  return action.action==mc_trigger_authoring50MC::Action::Animation&&call.actionIndex==0&&door_&&door_->ready()&&action.animationIndex<door_->rowCount();
  }
  g::SourceTriggerActionResult50MC resume(const g::SourceTriggerActionCall50MC& event)noexcept {
   using A=g::SourceTriggerActionStatus50MC;const auto& call=event.source;
@@ -65,7 +67,7 @@ class Owner final {
     return {A::Complete,0x1b27c0u,0xc80u};
    }
    if(action.action==mc_trigger_authoring50MC::Action::Animation){
-    if(!door_->activateSequence(action.animationIndex)){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
+    if(!door_->fire(action.animationIndex,static_cast<std::uint32_t>(call.triggerCollider-firstTriggerIdentity+1))){fail(Status::Action);return {A::Blocked,0x101170u,0x90u};}
     increment(counters_.animationActivations);return {A::Complete,0x101170u,0x90u};
    }
    fail(Status::Action);return {A::InvalidBinding,call.sourceSite,0};
@@ -107,27 +109,33 @@ public:
  // Cold setup publishes only stable source/group backing. It cannot admit a
  // query until real arena collider identities are bound after Bank visits.
  bool prepare(std::shared_ptr<const mc_trigger_authoring50MC::Owner> source,
-     std::shared_ptr<mc_animation_runtime50MC::Owner> door,std::shared_ptr<const mc_trigger_geometry50MC::Owner> shapes)noexcept {
+     std::shared_ptr<track_animation_runtime50AN::Owner> door,std::shared_ptr<const mc_trigger_geometry50MC::Owner> shapes)noexcept {
   if(attempted_)return false;attempted_=true;
-  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource()||source->coldSource()->ai().count()!=mc_cold_sources50LA::aiNodeCount||
-     !door||!door->stagedSourceReady()||door->coldSource()!=source->coldSource()||!shapes||!shapes->ready()||shapes->sourceIdentity()!=source.get())return false;
-  for(std::size_t i=0;i<mc_trigger_authoring50MC::count;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
-   if(authored.actionCount!=1||authored.randomTriggerPercent!=(i==20?50:(i==1||i==2||i==19)?100:99))return false;
+  // The animation owner is required when an Animation action is authored.
+  // Zero authored triggers = an empty group (no trigger state).
+  if(thread_!=std::this_thread::get_id()||!source||!source->ready()||!source->coldSource()||
+     (source->authors(mc_trigger_authoring50MC::Action::Animation)&&!door)||
+     (door&&!door->ready())||!shapes||!shapes->ready()||shapes->sourceIdentity()!=source.get())return false;
+  const auto live=source->liveCount();if(live>group_.triggers.size())return false;
+  for(std::size_t i=0;i<live;++i){const auto& authored=source->source(i);auto& state=group_.triggers[i];
+   // Authored chance in 0..100 (MC's chain implements the roll, 2DBDA0).
+   if(authored.actionCount!=1||authored.randomTriggerPercent<0||authored.randomTriggerPercent>100)return false;
    state.flags29=authored.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(authored.oneTimeOnly?4u:0u));
    state.randomTriggerPercent90=authored.randomTriggerPercent;state.callbackCount98=authored.actionCount;
    state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
+  group_.triggerCount=live;
   source_=std::move(source);door_=std::move(door);shapes_=std::move(shapes);group_.actions=hooks();sourcePrepared_=true;return true;
  }
 private:
  bool bindRacerIdentities(const std::array<RacerIdentities,racers>& identities,
      std::uint32_t actualPlayerPrefixCount34,const g::OriginalTriggerChance50MC& actualSharedChance,std::size_t racerCount=racers)noexcept {
-  if(bindAttempted_||!sourcePrepared_||!preparedSourceFor(*source_)||!door_->ready()||ready_||lease_||servicing_)return false;bindAttempted_=true;
+  if(bindAttempted_||!sourcePrepared_||!preparedSourceFor(*source_)||(door_&&!door_->ready())||ready_||lease_||servicing_)return false;bindAttempted_=true;
   if(!racerCount||racerCount>racers||actualPlayerPrefixCount34>racerCount||!actualSharedChance.bound())return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
   for(std::size_t i=0;i<racerCount*2;++i){
-   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+mc_trigger_authoring50MC::count))return false;
+   if(!ids[i]||(ids[i]>=firstTriggerIdentity&&ids[i]<firstTriggerIdentity+group_.triggerCount))return false;
    for(std::size_t j=0;j<i;++j)if(ids[i]==ids[j])return false;
   }
   // Staging contains only scalar/contact records. The published group address
@@ -135,7 +143,7 @@ private:
   auto next=group_;next.chance=actualSharedChance;
   if(!next.colliders.setCount(racerCount*2))return false;
   for(std::size_t i=0;i<racerCount*2;++i)next.colliders[i].identity=ids[i];
-  for(std::size_t i=0;i<mc_trigger_authoring50MC::count;++i)if(source_->source(i).ignorePlayer){
+  for(std::size_t i=0;i<group_.triggerCount;++i)if(source_->source(i).ignorePlayer){
    next.ignoreColliderCount[i]=actualPlayerPrefixCount34;
    for(std::size_t j=0;j<actualPlayerPrefixCount34;++j)next.ignoreColliders[i][j]=identities[j].main690;
   }
@@ -145,11 +153,11 @@ private:
 public:
  bool preparedSourceFor(const mc_trigger_authoring50MC::Owner& source)const noexcept {
   return sourcePrepared_&&thread_==std::this_thread::get_id()&&source_.get()==&source&&source.ready()&&
-   door_&&door_->stagedSourceReady()&&door_->coldSource()==source.coldSource()&&shapes_&&shapes_->ready()&&shapes_->sourceIdentity()==&source;
+   (door_?door_->ready():!source.authors(mc_trigger_authoring50MC::Action::Animation))&&shapes_&&shapes_->ready()&&shapes_->sourceIdentity()==&source;
  }
- const mc_animation_runtime50MC::Owner* doorOwner()const noexcept{return door_.get();}
+ const track_animation_runtime50AN::Owner* doorOwner()const noexcept{return door_.get();}
  bool queryIdle()const noexcept{return thread_==std::this_thread::get_id()&&!lease_&&!servicing_&&!group_.queryActive;}
- const mc_animation_runtime50MC::Owner* animationOwner()const noexcept{return door_.get();}
+ const track_animation_runtime50AN::Owner* animationOwner()const noexcept{return door_.get();}
  const mc_trigger_geometry50MC::Owner* geometryOwner()const noexcept{return shapes_.get();}
  const mc_trigger_authoring50MC::Owner* sourceOwner()const noexcept{return source_.get();}
  const mc_cold_sources50LA::Owner* coldSource()const noexcept{return source_?source_->coldSource():nullptr;}
@@ -161,7 +169,7 @@ public:
   // remains deferred until the genuine renderer boundary. Preserve actual
   // source/identity backing and reject stale, failed or retiring owners.
   if(!queryBinding_||!ready_||retiring_||closed_||!source_||!preparedSourceFor(*source_)||
-     !door_->ready()||group_.actionsFailed||servicing_||
+     (door_&&!door_->ready())||group_.actionsFailed||servicing_||
      (lease_?(!group_.queryActive||lease_->queryCollider!=collider):!queryIdle())||
      terminal_!=Status::Complete||c==group_.colliders.size()||!resource.nodes||!resource.nodeCount||
      !resource.rays||!resource.rayCount||(resource.root&g::type2Leaf49X)||resource.root>=resource.nodeCount||
@@ -178,7 +186,7 @@ public:
   if(lease_||servicing_||group_.queryActive||terminal_!=Status::Complete)return terminal_==Status::Complete?fail(Status::Input):terminal_;
   if(!g::validNativeTriggerGroup50MC(group_))return fail(Status::Input);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
-  for(std::size_t t=0;t<mc_trigger_authoring50MC::count;++t){const auto& state=group_.triggers[t];const auto& authored=shapes_->shape(t);
+  for(std::size_t t=0;t<group_.triggerCount;++t){const auto& state=group_.triggers[t];const auto& authored=shapes_->shape(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0;++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
     const auto c=colliderIndex(id);if(c==group_.colliders.size()||!geometry_[c].valid)return fail(Status::Input);
@@ -205,12 +213,12 @@ public:
   return Status::Complete;
  }
  g::NativeTriggerGroup50MC& nativeGroup()noexcept{return group_;}
- const g::TriggerEntryState50IN& state(std::size_t i)const{return group_.triggers.at(i);}
+ const g::TriggerEntryState50IN& state(std::size_t i)const{if(i>=group_.triggerCount)throw std::out_of_range("MC trigger state outside the live prefix");return group_.triggers[i];}
+ std::size_t triggerCount()const noexcept{return group_.triggerCount;}
  const Counters& counters()const noexcept{return counters_;}
  const std::string& lastError()const noexcept{return error_;}
  Status status()const noexcept{return terminal_;}
- bool ready()const noexcept{return queryBinding_&&!retiring_&&group_.ready&&!group_.actionsFailed&&ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&door_&&door_->ready()&&shapes_&&shapes_->ready()&&!closed_;}
- bool animationRetired()const noexcept{return !door_||door_->bindingRetired();}
+ bool ready()const noexcept{return queryBinding_&&!retiring_&&group_.ready&&!group_.actionsFailed&&ready_&&thread_==std::this_thread::get_id()&&source_&&source_->ready()&&(!door_||door_->ready())&&shapes_&&shapes_->ready()&&!closed_;}
  bool closed()const noexcept{return thread_==std::this_thread::get_id()&&closed_;}
  bool close()noexcept {
   if(!queryIdle()||queryBinding_)return false;if(closed_)return true;

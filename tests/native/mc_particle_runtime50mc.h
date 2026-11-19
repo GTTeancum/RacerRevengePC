@@ -23,7 +23,7 @@ class Owner final {
  std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> process_;
  std::shared_ptr<native_gc_water_session50KG::Application> globals_;
  std::shared_ptr<g::HostMonotonicClock50ID> clock_;g::OriginalApplicationAnimationClockView50KG applicationClock_;
- std::array<Record,40> records_{};g::OriginalGcParticleManager50KG* manager_=nullptr;
+ std::array<Record,source::descriptorCount> records_{};std::size_t live_=0;g::OriginalGcParticleManager50KG* manager_=nullptr;
  const ::mc_particle_render50MC::Owner* renderBinding_=nullptr;
  const std::thread::id thread_=std::this_thread::get_id();std::size_t initialized_=0,registryQuota_=0;
  std::uint64_t generation_=0;bool attempted_=false,staged_=false,failed_=false,visiting_=false,rendering_=false,quiesced_=false,closed_=false;
@@ -54,7 +54,7 @@ class Owner final {
    if(word(r.controls.word19C)>.25f){std::memcpy(r.controls.previous40,r.controls.position30,16);return true;}
    if(desc.attached&&completion==Completion::Unavailable)return fail(d,"MC attached Sparks2 needs genuine completed static placement",Status::unprepared,0x15d8ec);
    if(desc.attached&&completion==Completion::Stale){++d.staleSkips;r.carriedSize18C=f.initialSize184;r.controls.word19C=0;return true;}
-   return receipt(d,mc_type2_numeric50MC::emitAfterCommon(*source_,i-1,*manager_,r.managerOwnerId,r.controls,r.currentFrame190,r.carriedSize18C,dt,process_->rawRandom308030));
+   return receipt(d,mc_type2_numeric50MC::emitAfterCommon(*source_,source_->definitionIndexForDescriptor(i),*manager_,r.managerOwnerId,r.controls,r.currentFrame190,r.carriedSize18C,dt,process_->rawRandom308030));
   }
   g::water_wake_detail50jc::Math m;std::array<float,3> previous{},delta{},velocity{};
   for(unsigned k=0;k<3;++k){previous[k]=word(r.controls.previous40[k]);delta[k]=m.sub(word(r.controls.position30[k]),previous[k],0x15e128+8*k);}
@@ -77,7 +77,8 @@ class Owner final {
   visiting_=true;struct End{bool& b;~End(){b=false;}}end{visiting_};std::uint32_t pause=0;
   if(!applicationClock_.readPause11C(pause))return fail(d,"MC actual Application pause unavailable",Status::unprepared,0x161180);
   d.manager=manager_->advance(dt,pause!=0);if(!d.manager.okay())return fail(d,"MC shared manager update stopped",Status::storage,0x161180);
-  for(std::size_t i=0;i<40;++i){d.ordinal=i;if(!advanceRecord(i,dt,i<8?completed[i<2?0:1]:Completion::Unavailable,pause,d))return false;}
+  for(std::size_t i=0;i<live_;++i){d.ordinal=i;const auto k=graphs_->placementIndex(i);
+   if(!advanceRecord(i,dt,k<completed.size()?completed[k]:Completion::Unavailable,pause,d))return false;}
   d.initialized=initialized_;d.source.status=Status::complete;return true;
  }
 public:
@@ -102,9 +103,10 @@ public:
    return fail(d,"MC prepaid lifetime registry/owner budget",Status::capacity,0x27d7a0);
   d.additionalPayloadReservation=sizeof(Owner)+reservedRegistryPeakBytes-before;source_=std::move(src);graphs_=std::move(graphs);cold_=std::move(cold);process_=std::move(process);globals_=std::move(globals);
   clock_=process_->clock101A50;applicationClock_=std::move(clock);generation_=generation;registryQuota_=reservedRegistryPeakBytes;manager_=manager;
-  if(manager_->reserveAdditionalEmitters(40,registryQuota_,d.registry)!=g::OriginalGcParticleStatus50KG::complete)return fail(d,"MC guarded registry allocation",Status::capacity,0x27d7a0);
-  for(std::size_t i=0;i<40;++i){d.ordinal=i;auto& r=records_[i];const auto& desc=source_->descriptor(i);const auto& f=source_->definitionForDescriptor(i);const auto* group=manager_->group(f.particleGroup1B8);
-   if(!group||group->type!=(f.kind==source::Kind::Sparks2?6:8)||!desc.effectiveStartOn||desc.attached!=(i<8))return fail(d,"MC original descriptor/type order",Status::assetIdentity,0x27c800);
+  live_=source_->emitterCount();
+  if(manager_->reserveAdditionalEmitters(live_,registryQuota_,d.registry)!=g::OriginalGcParticleStatus50KG::complete)return fail(d,"MC guarded registry allocation",Status::capacity,0x27d7a0);
+  for(std::size_t i=0;i<live_;++i){d.ordinal=i;auto& r=records_[i];const auto& desc=source_->descriptor(i);const auto& f=source_->definitionForDescriptor(i);const auto* group=manager_->group(f.particleGroup1B8);
+   if(!group||group->type!=(f.kind==source::Kind::Sparks2?6:8)||!desc.effectiveStartOn||desc.attached!=(graphs_->placementIndex(i)<mc_particle_attachments50MC::placementCount))return fail(d,"MC original descriptor/type order",Status::assetIdentity,0x27c800);
    r.definition=&f;r.descriptor=&desc;r.controls.flags1D4=1;r.controls.position30[3]=r.controls.previous40[3]=r.controls.velocity60[3]=0x3f800000;
    for(unsigned k=0;k<3;++k){put(r.controls.velocity60[k],f.velocity60[k]);if(!desc.attached)put(r.controls.position30[k],desc.authoredPositionOrOffset.v[k]);}
    std::memcpy(r.controls.previous40,r.controls.position30,16);r.delay1DC=f.timing.delayTime1E0;put(r.duration1E4,f.timing.maxTimeOn1EC);r.carriedSize18C=0;
@@ -113,10 +115,11 @@ public:
    r.managerOwnerId=manager_->registerEmitter(row);if(r.managerOwnerId!=i+1)return fail(d,"MC actual source-ordered registry insertion",Status::allocation,0x15dd98);
    g::startEffect50BC(r.controls);r.enabled=true;++initialized_;
   }
-  d.registry=manager_->emitterRegistryReservation();if(d.registry.terminal||!d.registry.allocationBound||d.registry.registeredEmitters!=40)return fail(d,"MC complete40 registry rejected",Status::storage,0x27d7a0);
+  d.registry=manager_->emitterRegistryReservation();if(d.registry.terminal||!d.registry.allocationBound||d.registry.registeredEmitters!=live_)return fail(d,"MC complete emitter registry rejected",Status::storage,0x27d7a0);
   staged_=true;d.initialized=initialized_;d.source.status=Status::complete;return true;
  }
- bool sourceStaged()const noexcept{return backing()&&staged_&&!failed_&&!quiesced_&&initialized_==40;}
+ bool sourceStaged()const noexcept{return backing()&&staged_&&!failed_&&!quiesced_&&live_&&initialized_==live_;}
+ std::size_t emitterCount()const noexcept{return live_;}
  const source::Owner* sourceOwner()const noexcept{return backing()?source_.get():nullptr;}
  const mc_particle_attachments50MC::Owner* attachmentOwner()const noexcept{return backing()?graphs_.get():nullptr;}
  const g::OriginalTrackParticleCold50LA* coldOwner()const noexcept{return cold_.get();}
