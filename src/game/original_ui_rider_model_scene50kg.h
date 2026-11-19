@@ -75,6 +75,11 @@ public:
         OriginalUiRiderModelDiagnostic50KG&) noexcept;
     // Only after successful backend drain/detach with completion entitlement.
     // The exact domain survives false; this does not acquire that entitlement.
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on pod's graph (assets->addon()).
+    // Same graph build, User_Rotate and orientation as load(); it acquires no
+    // material-lifetime row (add-on materials are static Rider-page rows).
+    bool loadAddon(std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>,
+        OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool modelDestroyedAfterDetach(OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool requiresModelCleanup() const noexcept;
     bool reload(OriginalUiRiderMaterialLifetime50KG&,const OriginalUiRiderMaterialFootprint50KG&,

@@ -31,6 +31,12 @@ struct Overlay {
     std::uint16_t nameWidget=0;                  // suppressed[1]: venus16 name text
     std::array<Line,2> lines{};                  // pilot name, then package name under it
     std::uint32_t statRider=0;                   // the add-on's registry number the stats input carries
+    // Menu-art step A: add-on model table row drawn in place of the anchor pod
+    // (podWidget = suppressed[0]); npos = no add-on model this frame.
+    static constexpr std::size_t noRow=static_cast<std::size_t>(-1);
+    std::size_t modelRow=noRow;
+    mutable std::uint32_t modelPackets=0;        // add-on model packets emitted this frame
+    mutable const char* modelRefused=nullptr;    // why the add-on model drew nothing (static text)
     mutable std::uint32_t drawnLines=0;          // this frame (logged once per highlighted add-on)
     mutable std::uint32_t skippedLines=0;        // lines the font could not draw
     bool suppresses(std::uint16_t id) const noexcept {

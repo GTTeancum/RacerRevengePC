@@ -72,10 +72,15 @@ inline std::vector<rr::assets::AudioRequest50HC> readEvents(
 }
 // Shared source filenames own one cold PCM allocation, while every authored
 // race/speech row keeps its own semantic event and variant-history position.
+// expectedRows is the registry extent of the racers actually loaded: the four
+// RACE_SND rows plus the selected player's named rows (18 for every stock pod,
+// so stock is clipCount exactly as before; 0 for an add-on pod, which has no
+// named announcer: PORT EXTENSION, NOT ORIGINAL). Bounded by clipCount.
 inline std::vector<rr::assets::AudioRequest50HC> uniquePcmRequests(
-    const std::vector<rr::assets::AudioRequest50HC>& rows) {
+    const std::vector<rr::assets::AudioRequest50HC>& rows,std::size_t expectedRows=clipCount) {
     using pod_materials50ed_fixture::detail::need;
-    need(rows.size()==clipCount,"50HQ logical event registry extent differs");
+    need(expectedRows>=4&&expectedRows<=clipCount&&rows.size()==expectedRows,
+        "50HQ logical event registry extent differs");
     const auto normalized=[](std::string name){
         for(auto& c:name){if(c=='\\')c='/';else if(c>='A'&&c<='Z')c=char(c-'A'+'a');}
         return name;
@@ -188,8 +193,9 @@ public:
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(clipCount);
             for(std::size_t i=0;i<present;++i){const auto&r=i<4?race[detail::keys[i]-1]:speech[detail::keys[i]-1];
                 d::need(!r.loop&&!r.stereo&&r.stream==(i>=4),"50HQ authored delivery flags differ");requests.push_back(r);}
-            if(!named)std::cerr<<"dlc_race_audio racer="<<identity->racer60<<" named_clips=0 race_clips=4\n";
-            const auto unique=detail::uniquePcmRequests(requests);
+            const auto unique=detail::uniquePcmRequests(requests,present);
+            if(!named)std::cerr<<"dlc_race_audio racer="<<identity->racer60<<" named_clips=0 race_clips=4 registry_rows="
+                <<requests.size()<<" pcm_files="<<unique.size()<<'\n';
             if(!rr::assets::loadAudioBank50HC(audioRoot,unique,bank_,error))return false;
             d::need(bank_.clips.size()==unique.size(),"50HQ incomplete PCM registry");
             for(std::size_t i=0;i<present;++i){const auto* asset=bank_.find(requests[i].name);

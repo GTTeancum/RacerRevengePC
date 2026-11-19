@@ -42,6 +42,15 @@ public:
     // (geometry UI/Geometry/NN.psg in UIUNLOCK; textures from UIPODTEX/UIUNLOCK).
     bool loadUnlock(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
         OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on pod's menu model. The
+    // User_Rotate layout (position, look, up, rotation) is a read-only copy of the
+    // authored stock Rider widget `layoutWidget` (PORT STAND-IN: an add-on package
+    // has no Rider widget of its own); the model is `modelName` in the add-on's
+    // own archive (identity addonUi), found by name. widgetId() is layoutWidget.
+    bool loadAddon(std::shared_ptr<const OriginalUiArchive50KG> stockRider,std::uint16_t layoutWidget,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& modelName,
+        OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    bool addon() const noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;
     const OriginalUiRiderPodConfig50KG* config() const noexcept;
@@ -54,6 +63,7 @@ public:
 private:
     bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t,
         bool tournament,OriginalUiRiderPodDiagnostic50KG&,bool unlock=false) noexcept;
+    bool decodeModel(OriginalUiRiderPodDiagnostic50KG&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

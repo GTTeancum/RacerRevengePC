@@ -193,15 +193,16 @@ def main():
     parser.add_argument('--eyecheck-dlc-hall', metavar='PACKAGE/ITEM',
                         help='Eye check (DLC Hall merge): seed saves\\dlc-progress-v1.json with a TA record of this '
                              'admitted add-on pod (lap 1.00 s, race 5.00 s, name EYECHECK; faster than any stock TA '
-                             'row) and start the game as a normal interactive window (no unattended route, no '
-                             'capture). Go Main -> Options -> Hall of Fame -> TA by hand; the add-on entry shows the '
-                             'pod name and no icon. Needs --env RR_DLC_ROOT=<folder with the package>; the run ends '
-                             'at --seconds (use e.g. 900).')
+                             'row), then drive Main -> Options -> Hall of Fame (Options slot 4) -> TA in process '
+                             '(route main-options-hall-ta, no manual input), write that Hall frame as an image '
+                             '(logs-only off for this run) and hold there until --seconds runs out (use 90). '
+                             'Needs --env RR_DLC_ROOT=<folder with the package>. Name the output eyecheck-dlc-hall-...')
     parser.add_argument('--hold-rider', action='store_true',
-                        help='With --addon-rider: stop on the Rider screen with the add-on highlighted (no Confirm, '
-                             'sets RR_TEST_ADDON_RIDER_HOLD=1) and write that Rider frame as an image for an eye '
-                             'check (turns logs-only off for this run). The run then idles until its wall budget; '
-                             'use a short --seconds (60)')
+                        help='Eye check: stop on the Rider screen (no Confirm) and write that Rider frame as an image '
+                             '(turns logs-only off for this run). With --addon-rider it holds with that add-on '
+                             'highlighted (RR_TEST_ADDON_RIDER_HOLD=1); without it, on the stock rider the route lands '
+                             'on (RR_TEST_RIDER_HOLD=1; --route main-rider-course-ta lands on Rider19). The run then '
+                             'idles until its wall budget; use a short --seconds (90)')
     parser.add_argument('--addon-course', metavar='PACKAGE/ITEM',
                         help='Test only (DLC): add-on course (sets RR_TEST_ADDON_COURSE). Not implemented in this '
                              'build: the variable is passed through and nothing reads it yet')
@@ -226,13 +227,14 @@ def main():
             parser.error('--addon-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
         if args.player_racer is not None:
             parser.error('--addon-rider and --player-racer cannot be combined')
-    if args.hold_rider and args.addon_rider is None:
-        parser.error('--hold-rider needs --addon-rider')
+    if args.hold_rider and args.route not in ADDON_RIDER_ROUTES:
+        parser.error('--hold-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
     if args.eyecheck_dlc_hall is not None:
         if not addon_key.fullmatch(args.eyecheck_dlc_hall):
             parser.error('--eyecheck-dlc-hall expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
         if args.addon_rider is not None or args.player_racer is not None:
-            parser.error('--eyecheck-dlc-hall is an interactive run; it cannot be combined with test routes')
+            parser.error('--eyecheck-dlc-hall runs its own Main/Options/Hall route; it cannot be combined with other test routes')
+        args.route = 'main-options-hall-ta'   # in-process HallRoute (no manual input)
         if not any(item.startswith('RR_DLC_ROOT=') for item in args.env):
             parser.error('--eyecheck-dlc-hall needs --env RR_DLC_ROOT=<folder with the package>')
     if args.addon_course is not None:
@@ -288,13 +290,11 @@ def main():
                RR_TEST_MUTE_OUTPUT='1',  # Tests are silent; player builds are not.
                RR_VIDEO_MAXIMIZED='0')  # Never cover the desktop unless asked.
     if args.eyecheck_dlc_hall is not None:
-        # Interactive eye check: a normal window the user drives (no unattended
-        # route, no automatic capture, no wall-budget hand-off inside the game).
-        for key in ('RR_UNATTENDED_CAPTURE', 'RR_UNATTENDED_UI_ROUTE', 'RR_UNATTENDED_SECONDS',
-                    'RR_WINDOW_CAPTURE_AUTO'):
-            env.pop(key, None)
-    # A --hold-rider run writes its held Rider frame as an image (eye check).
-    logs_only = args.logs_only and not args.hold_rider
+        # In-process route Main -> Options -> Hall TA, then hold (PORT EXTENSION,
+        # tests/native/original_ui_capture_navigation50la.h HallRoute).
+        env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
+    # A --hold-rider / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
+    logs_only = args.logs_only and not args.hold_rider and args.eyecheck_dlc_hall is None
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
@@ -350,7 +350,7 @@ def main():
     if args.addon_rider is not None:
         env['RR_TEST_ADDON_RIDER'] = args.addon_rider
     if args.hold_rider:
-        env['RR_TEST_ADDON_RIDER_HOLD'] = '1'
+        env['RR_TEST_ADDON_RIDER_HOLD' if args.addon_rider is not None else 'RR_TEST_RIDER_HOLD'] = '1'
         env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Rider frame as an image
     if args.addon_course is not None:
         env['RR_TEST_ADDON_COURSE'] = args.addon_course
@@ -498,6 +498,19 @@ def main():
         if logs_only:
             result['noImagesWritten'] = not any(p.suffix.lower() in {'.ppm', '.png', '.jpg', '.pending'} for p in output.rglob('*'))
             result['routeCompleted'] = result['routeCompleted'] and result['noImagesWritten']
+        if args.eyecheck_dlc_hall is not None:
+            # Held on the Hall TA page until the wall budget: complete when the
+            # Hall frame was written and the hold was reached.
+            texts = log_text
+            for name in ('stderr.log', 'stdout.log'):
+                extra = output / name
+                if extra.is_file():
+                    texts += extra.read_text(errors='replace')
+            hall_images = sorted(str(p) for p in capture.rglob('hall-*.ppm'))
+            result['dlcHallEyecheck'] = dict(
+                key=args.eyecheck_dlc_hall, hallImages=hall_images,
+                holdReached='hall_route hold screen=11 course=0 planet=0' in texts)
+            result['routeCompleted'] = bool(hall_images and result['dlcHallEyecheck']['holdReached'])
         if args.hold_rider:
             # A held run never confirms and ends at its wall budget, so the race
             # receipts above are absent. It is complete when the Rider frame with
@@ -510,9 +523,11 @@ def main():
             rider_images = sorted(str(p) for p in capture.rglob('rider-*.ppm'))
             result['addonRiderHold'] = dict(
                 key=args.addon_rider, riderImages=rider_images,
-                holdReached=f'addon_rider_route hold key={args.addon_rider} ' in texts,
+                holdReached=(f'addon_rider_route hold key={args.addon_rider} ' in texts) if args.addon_rider
+                            else ('rider_route hold rider=' in texts),
                 carousel=re.findall(r'dlc_rider_carousel [^\r\n]*', texts),
-                draw=re.findall(r'dlc_rider_draw [^\r\n]*', texts))
+                draw=re.findall(r'dlc_rider_draw [^\r\n]*', texts),
+                model=re.findall(r'dlc_rider_model[ _][^\r\n]*', texts))
             result['routeCompleted'] = bool(rider_images and result['addonRiderHold']['holdReached'])
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and

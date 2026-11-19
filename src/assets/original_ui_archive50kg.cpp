@@ -230,8 +230,39 @@ const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
     if (const auto* admitted = admittedRow(archive->firstMember + ordinal)) return admitted;
     return &memberCatalog[archive->firstMember + ordinal];
 }
+namespace {
+// PORT EXTENSION, NOT ORIGINAL (DLC): identity records of add-on package menu
+// archives. One record per distinct (package path, archive SHA-256), created on
+// the first load and kept for the process (identity pointers stay valid for
+// every material/image provenance that names them). A reload of the same bytes
+// reuses its record. Never part of the stock catalog.
+struct AddonArchiveRecord {
+    std::string path, sha;
+    std::deque<std::string> text;
+    std::vector<OriginalUiMemberIdentity50KG> members;
+    OriginalUiArchiveIdentity50KG identity{};
+};
+struct AddonArchiveRegistry {
+    std::mutex lock;
+    std::deque<AddonArchiveRecord> records;
+};
+AddonArchiveRegistry& addonArchiveRegistry() { static AddonArchiveRegistry r; return r; }
+}
+const OriginalUiArchiveIdentity50KG* originalUiAddonMemberArchive50DL(
+    const OriginalUiMemberIdentity50KG* member) noexcept {
+    if (!member) return nullptr;
+    try {
+        auto& r = addonArchiveRegistry();
+        std::lock_guard<std::mutex> guard(r.lock);
+        for (const auto& record : r.records)
+            if (!record.members.empty() && member >= record.members.data() &&
+                member < record.members.data() + record.members.size()) return &record.identity;
+    } catch (...) {}
+    return nullptr;
+}
 struct OriginalUiArchive50KG::Storage {
     const OriginalUiArchiveIdentity50KG* identity = nullptr;
+    const OriginalUiMemberIdentity50KG* addonMembers = nullptr; // PORT EXTENSION: add-on rows (count = identity->memberCount)
     std::vector<std::uint8_t> decoded;
     std::vector<std::uint8_t> encoded;
     std::vector<ResourceBlock48C> blocks;
@@ -361,6 +392,76 @@ bool OriginalUiArchive50KG::loadImpl(OriginalUiArchiveId50KG id,
     catch (...) { diagnostic.status = Status::unexpectedFailure; }
     return false;
 }
+bool OriginalUiArchive50KG::loadAddon(const std::string& discPath, std::vector<std::uint8_t>&& input,
+    std::size_t fileBytes, std::size_t decodedBytes, std::uint32_t entries,
+    OriginalUiArchiveDiagnostic50KG& diagnostic) noexcept {
+    diagnostic = {};
+    using Status = OriginalUiArchiveStatus50KG;
+    if (storage_) { diagnostic.status = Status::alreadyLoaded; return false; }
+    if (discPath.empty() || discPath.size() > 512 || input.empty() || input.size() > fileBytes) {
+        diagnostic.status = Status::resource; return false;
+    }
+    try {
+        DecodeLimits48C limits;
+        limits.resource_file_bytes = fileBytes; limits.resource_decoded_bytes = decodedBytes;
+        limits.resource_entries = entries;
+        ResArchive48C parsed;
+        if (!decodeResource48C(input, parsed, diagnostic.resource, nullptr, limits)) {
+            diagnostic.status = Status::resource; return false;
+        }
+        if (parsed.entries.empty() || parsed.entries.size() > entries) { diagnostic.status = Status::memberTable; return false; }
+        for (std::size_t i = 0; i < parsed.entries.size(); ++i) {
+            const auto& e = parsed.entries[i];
+            if (e.name.empty() || e.name.size() > 255 || e.logical_offset > parsed.decoded.size() ||
+                e.bytes > parsed.decoded.size() - e.logical_offset) {
+                diagnostic.member = i; diagnostic.status = Status::memberTable; return false;
+            }
+            // Names are the only address: a repeated name would make find() ambiguous.
+            for (std::size_t j = 0; j < i; ++j)
+                if (sameName(e.name, parsed.entries[j].name.c_str())) {
+                    diagnostic.member = i; diagnostic.status = Status::memberTable; return false;
+                }
+        }
+        const auto archiveSha = sha256Hex(input.data(), input.size());
+        const AddonArchiveRecord* record = nullptr;
+        {
+            auto& r = addonArchiveRegistry();
+            std::lock_guard<std::mutex> guard(r.lock);
+            for (const auto& existing : r.records)
+                if (existing.path == discPath && existing.sha == archiveSha) { record = &existing; break; }
+            if (!record) {
+                AddonArchiveRecord next;
+                next.path = discPath; next.sha = archiveSha;
+                next.members.reserve(parsed.entries.size());
+                for (const auto& e : parsed.entries) {
+                    next.text.push_back(e.name);
+                    const char* name = next.text.back().c_str();
+                    next.text.push_back(sha256Hex(parsed.decoded.data() + e.logical_offset, e.bytes));
+                    next.members.push_back({name, e.logical_offset, e.bytes, next.text.back().c_str()});
+                }
+                r.records.push_back(std::move(next));
+                auto& added = r.records.back();
+                added.identity = {OriginalUiArchiveId50KG::addonUi, added.path.c_str(), input.size(),
+                                  added.sha.c_str(), 0, added.members.size()};
+                record = &added;
+            }
+        }
+        if (record->members.size() != parsed.entries.size()) { diagnostic.status = Status::memberIdentity; return false; }
+        auto candidate = std::make_unique<Storage>();
+        candidate->identity = &record->identity;
+        candidate->addonMembers = record->members.data();
+        candidate->decoded = std::move(parsed.decoded);
+        candidate->blocks = std::move(parsed.blocks);
+        candidate->encoded.swap(input);
+        storage_ = std::move(candidate);
+        return true;
+    } catch (const std::bad_alloc&) { diagnostic.status = Status::allocation; }
+    catch (...) { diagnostic.status = Status::unexpectedFailure; }
+    return false;
+}
+bool OriginalUiArchive50KG::addon() const noexcept {
+    return storage_ && storage_->identity && storage_->identity->id == OriginalUiArchiveId50KG::addonUi && storage_->addonMembers;
+}
 bool OriginalUiArchive50KG::loaded() const noexcept { return bool(storage_); }
 const OriginalUiArchiveIdentity50KG* OriginalUiArchive50KG::identity() const noexcept {
     return storage_ ? storage_->identity : nullptr;
@@ -370,7 +471,8 @@ std::size_t OriginalUiArchive50KG::memberCount() const noexcept {
 }
 OriginalUiMemberView50KG OriginalUiArchive50KG::member(std::size_t ordinal) const noexcept {
     if (!storage_ || ordinal >= storage_->identity->memberCount) return {};
-    const auto* identity = originalUiMemberIdentity50KG(storage_->identity->id, ordinal);
+    const auto* identity = storage_->addonMembers ? storage_->addonMembers + ordinal :
+        originalUiMemberIdentity50KG(storage_->identity->id, ordinal);
     if (!identity || identity->logicalOffset > storage_->decoded.size() ||
         identity->bytes > storage_->decoded.size() - identity->logicalOffset) return {};
     return {identity, storage_->decoded.data() + identity->logicalOffset, identity->bytes};

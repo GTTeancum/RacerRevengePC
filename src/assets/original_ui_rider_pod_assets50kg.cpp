@@ -11,6 +11,8 @@ struct OriginalUiRiderPodAssets50KG::Storage {
     OriginalUiRiderPodConfig50KG config{};
     PsgHierarchyView49O hierarchy{};
     Scene48D scene;
+    std::shared_ptr<const OriginalUiArchive50KG> layoutArchive; // PORT EXTENSION: stock Rider (layout source)
+    bool addon=false;
 };
 namespace {
 using E=OriginalUiRiderPodError50KG;
@@ -91,17 +93,41 @@ bool OriginalUiRiderPodAssets50KG::loadImpl(
             return fail(d,E::widget,0x1D31D0);
         next->model=next->archive->find("UI/Geometry/"+stem+".psg");
         if (!next->model.identity) return fail(d,E::member,0x1D35C4);
-        if (!readPsgHierarchy49O(next->model.data,next->model.size,next->hierarchy,d.hierarchy))
-            return fail(d,E::hierarchy,0x1D35C4);
-        const std::vector<std::uint8_t> bytes(next->model.data,next->model.data+next->model.size);
-        if (!decodeScene48D(bytes,next->scene,d.geometry)||
-            next->scene.nodes.size()!=next->hierarchy.nodeCount||next->scene.world_space||
-            !next->scene.identity_matrix_palette||next->scene.lods.empty())
-            return fail(d,E::geometry,0x1D35C4);
-        storage_=std::move(next);d={};return true;
+        storage_=std::move(next);
+        if (!decodeModel(d)) {storage_.reset();return false;}
+        d={};return true;
     } catch (const std::bad_alloc&) {return fail(d,E::allocation,0x1D3590);}
       catch (...) {return fail(d,E::widget,0x1D3590);}
 }
+bool OriginalUiRiderPodAssets50KG::decodeModel(OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    auto& s=*storage_;
+    if (!readPsgHierarchy49O(s.model.data,s.model.size,s.hierarchy,d.hierarchy))
+        return fail(d,E::hierarchy,0x1D35C4);
+    const std::vector<std::uint8_t> bytes(s.model.data,s.model.data+s.model.size);
+    if (!decodeScene48D(bytes,s.scene,d.geometry)||
+        s.scene.nodes.size()!=s.hierarchy.nodeCount||s.scene.world_space||
+        !s.scene.identity_matrix_palette||s.scene.lods.empty())
+        return fail(d,E::geometry,0x1D35C4);
+    return true;
+}
+bool OriginalUiRiderPodAssets50KG::loadAddon(std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+    std::uint16_t layoutWidget,std::shared_ptr<const OriginalUiArchive50KG> addonUi,
+    const std::string& modelName,OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if (storage_) return fail(d,E::alreadyLoaded,0x1D3590);
+    if (!addonUi||!addonUi->addon()||modelName.empty()) return fail(d,E::archive,0x1D3590);
+    if (!loadImpl(stockRider,layoutWidget,false,d)) return false; // layout from the authored stock widget
+    try {
+        auto& s=*storage_;
+        const auto model=addonUi->find(modelName);
+        if (!model.identity||!model.data) {storage_.reset();return fail(d,E::member,0x1D35C4);}
+        s.layoutArchive=std::move(s.archive);s.archive=std::move(addonUi);s.model=model;s.addon=true;
+        s.hierarchy={};s.scene={};
+        if (!decodeModel(d)) {storage_.reset();return false;}
+        d={};return true;
+    } catch (...) {storage_.reset();return fail(d,E::allocation,0x1D3590);}
+}
+bool OriginalUiRiderPodAssets50KG::addon() const noexcept {return storage_&&storage_->addon;}
 bool OriginalUiRiderPodAssets50KG::loaded() const noexcept {return !!storage_;}
 std::uint16_t OriginalUiRiderPodAssets50KG::widgetId() const noexcept {return storage_?storage_->widget:0;}
 const OriginalUiRiderPodConfig50KG* OriginalUiRiderPodAssets50KG::config() const noexcept {return storage_?&storage_->config:nullptr;}

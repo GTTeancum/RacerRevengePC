@@ -39,10 +39,11 @@ inline bool option(const char* name){
  require(!value||std::string(value)=="0"||std::string(value)=="1","window capture boolean option must be 0 or 1");
  return value&&value[0]=='1';
 }
-enum class Stage : std::uint8_t {main,rider,course,race,other,count};
+// hall: only the DLC Hall eye-check route (main-options-hall-ta) maps a screen to it.
+enum class Stage : std::uint8_t {main,rider,course,race,hall,other,count};
 inline const char* stageName(Stage stage)noexcept{
  switch(stage){case Stage::main:return "main";case Stage::rider:return "rider";
- case Stage::course:return "course";case Stage::race:return "track";default:return "other";}
+ case Stage::course:return "course";case Stage::race:return "track";case Stage::hall:return "hall";default:return "other";}
 }
 // One real application wall budget, retained through every UI/race cold load.
 // It never changes SDL's observed focus, input release, or source clocks.
@@ -51,7 +52,7 @@ class Run final {
  const Clock::time_point started_=Clock::now();
  std::filesystem::path directory_;
  bool enabled_=false,automatic_=false,unattended_=false,navigate_=false,timeoutReported_=false;
- bool navigateSa_=false,navigateOcco_=false,navigateDudGa_=false,navigateBenGa_=false,navigateAlderMa_=false,navigateOdyMa_=false,navigateGasganoSa_=false,navigateMawhonicRa_=false,navigateTournamentTa_=false;
+ bool navigateSa_=false,navigateOcco_=false,navigateDudGa_=false,navigateBenGa_=false,navigateAlderMa_=false,navigateOdyMa_=false,navigateGasganoSa_=false,navigateMawhonicRa_=false,navigateTournamentTa_=false,navigateHallTa_=false;
  std::uint32_t videoHoldSeconds_=0;
  Clock::time_point baselineFinished_{};
  std::uint32_t wallSeconds_=180;
@@ -68,7 +69,7 @@ public:
   automatic_=option("RR_WINDOW_CAPTURE_AUTO");unattended_=option("RR_UNATTENDED_CAPTURE");
   const auto* route=std::getenv("RR_UNATTENDED_UI_ROUTE");
   require(!route||std::string(route)=="main-rider-course-ta"||std::string(route)=="main-rider-course-sa"||
-      std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa"||std::string(route)=="main-mawhonic09-course-ra"||std::string(route)=="main-tournament-course-ta",
+      std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa"||std::string(route)=="main-mawhonic09-course-ra"||std::string(route)=="main-tournament-course-ta"||std::string(route)=="main-options-hall-ta",
       "unsupported unattended original UI route");
   navigate_=route!=nullptr;
   restartOnce_=option("RR_UNATTENDED_RESTART_ONCE");
@@ -82,6 +83,8 @@ public:
   navigateGasganoSa_=route&&std::string(route)=="main-gasgano07-course-sa";
   navigateMawhonicRa_=route&&std::string(route)=="main-mawhonic09-course-ra";
   navigateTournamentTa_=route&&std::string(route)=="main-tournament-course-ta";
+  // PORT EXTENSION, NOT ORIGINAL: DLC Hall eye check (Main -> Options -> Hall TA, then hold).
+  navigateHallTa_=route&&std::string(route)=="main-options-hall-ta";
   const auto* testProfile=std::getenv("RR_ORIGINAL_TEST_PROFILE");
   require(!navigateGasganoSa_||(testProfile&&std::string(testProfile)=="gasgano"),
       "Gasgano/SA capture requires RR_ORIGINAL_TEST_PROFILE=gasgano");
@@ -127,7 +130,7 @@ public:
        "unattended capture requires all-AI mode or an explicit supported direct-human menu route");
   }
   std::cerr<<platformName<<"_capture_run "<<Json{{"evidence_mode",evidenceMode()},{"automatic",automatic_},
-      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateTournamentTa_?"main-tournament-course-ta":navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
+      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateHallTa_?"main-options-hall-ta":navigateTournamentTa_?"main-tournament-course-ta":navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
       {"test_profile",testProfileName()},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
  }
  bool logsOnly()const noexcept{return logsOnly_;}
@@ -144,6 +147,7 @@ public:
  bool navigateGasganoSa()const noexcept{return navigateGasganoSa_;}
  bool navigateMawhonicRa()const noexcept{return navigateMawhonicRa_;}
  bool navigateTournamentTa()const noexcept{return navigateTournamentTa_;}
+ bool navigateHallTa()const noexcept{return navigateHallTa_;}
  const char* testProfileName()const noexcept{return navigateMawhonicRa_?"mawhonic-ryloth":navigateGasganoSa_?"gasgano":"none";}
  bool videoHoldComplete()const noexcept{return !videoHoldSeconds_||(!baselineFile_.empty()&&
      Clock::now()-baselineFinished_>=std::chrono::seconds(videoHoldSeconds_));}
@@ -201,7 +205,8 @@ public:
   receipt["native_restart_test"]={{"requested",restartOnce_},{"issued",restartIssued_},
       {"first_race",firstRaceEvidence_},{"pause_menu_tested",false}};
   if(navigateGasganoSa_||navigateMawhonicRa_)receipt["test_profile"]=testProfileName();
-  for(const auto stage:{Stage::main,Stage::rider,Stage::course,Stage::race}){
+  for(const auto stage:{Stage::main,Stage::rider,Stage::course,Stage::race,Stage::hall}){
+   if(stage==Stage::hall&&!navigateHallTa_)continue; // stock summaries unchanged
    const auto i=static_cast<std::size_t>(stage);
    receipt[stageName(stage)]={{"image_file",images_[i].string()},{"receipt_file",receipts_[i].string()}};
   }

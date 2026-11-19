@@ -123,6 +123,9 @@ private:
     void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept override;
     bool widgets(bool,bool,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool model(std::uint16_t,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): draw add-on model table row `row`
+    // with the anchor pod's selection flags; see original_ui_rider_addon_overlay50dl.h.
+    bool addonModel(std::size_t row,std::uint8_t flags191,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool append(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,float packetZ,
         OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;

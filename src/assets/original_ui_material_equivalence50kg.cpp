@@ -33,7 +33,10 @@ const OriginalUiArchiveIdentity50KG* memberArchive(const OriginalUiMemberIdentit
     for(auto id:ids){const auto* a=originalUiArchiveIdentity50KG(id);if(!a)continue;
         for(std::size_t i=0;i<a->memberCount;++i)if(originalUiMemberIdentity50KG(id,i)==member)return a;
     }
-    return nullptr;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on package menu archive owns its
+    // own authored PSM/PST rows (identity addonUi). Only reached for a row no
+    // catalog archive owns, so every stock answer above is unchanged.
+    return originalUiAddonMemberArchive50DL(member);
 }
 bool knownField(const std::string& key) noexcept {
     for(std::size_t i=0;i<originalUiGsFieldCount50KG;++i)

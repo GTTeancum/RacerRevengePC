@@ -3,6 +3,7 @@
 #include "original_ui_shared_dialogs50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_rider_addon_overlay50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
 #include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include "../../../src/assets/original_ui_material_equivalence50kg.h"
 #include "../../../src/assets/original_ui_material_binding50kg.h"
@@ -87,6 +88,12 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
        same(pass.textureName,"18_shdw")||same(pass.textureName,"21_shdw")||same(pass.textureName,"22_shdw")||same(pass.textureName,"25_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
         return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on pod's own "<stem>_shdw" pass
+    // takes the same shadow admission (it checks the add-on owner itself).
+    if(assets::originalUiAddonMemberArchive50DL(pass.identity)&&pass.textureName.size()>5&&
+       pass.textureName.compare(pass.textureName.size()-5,5,"_shdw")==0){assets::OriginalUiRider19ShadowMaterial50KM policy{};
+        return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
+            convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
     if(same(pass.microprogram,"SpecularMapCompressed")){assets::OriginalUiRider19SpecularMaterial50KM policy{};
         return assets::prepareOriginalUiRider19SpecularMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19SpecularMaterialSpan50KM(policy,images,range,output);}
@@ -144,6 +151,9 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     game::OriginalUiRiderStatFrame50KG statFrame{};
     OriginalUiRiderStatDraw50KG statDraw;
     game::OriginalUiLitGeometryWorkspace50KM workspace{};
+    // PORT EXTENSION (DLC): the anchor pod's selection of this frame, recorded
+    // only while an add-on overlay is active (never on a stock frame).
+    std::uint8_t addonFlags191=0;bool addonFlagsValid=false;
     game::OriginalUiTextLayout50KG textScratch{};
     std::vector<game::OriginalUiTextureAnimation50KG> animations;
     std::vector<std::uint32_t> frames;
@@ -451,6 +461,23 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
                 if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d,RegistrationKind::ledgerDynamic))return false;
             }
         }
+        // PORT EXTENSION, NOT ORIGINAL (DLC): add-on model table rows. Their own
+        // materials are static rows of this page (resident with the static set,
+        // uploaded by the frontend's own entry upload); shared original names use
+        // the stock rows above. Nothing is added without add-on models.
+        std::size_t addonBindings=0;
+        if(const auto* table=s.backend->addonModels())for(std::size_t r=0;r<table->size();++r){
+            const auto* row=table->row(r);if(!row||!row->ready||!row->pod||!row->materials)continue;
+            const auto* scene=row->pod->scene();const auto* m=row->materials.get();
+            if(!scene||!m->images()||scene->materials.size()!=m->materialCount())return fail(d,E::model);
+            for(std::uint32_t slot=0;slot<m->materialCount();++slot)for(std::uint32_t p=0;p<m->passCount(slot);++p){
+                d.material=slot;d.pass=p+1;
+                const auto* pass=m->pass(slot,p);if(!pass)return fail(d,E::material);
+                const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->addonImage(r,pass->imageIndex);
+                if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d))return false;
+                ++addonBindings;
+            }
+        }
         const auto* binderImages=s.binderAssets->images();const auto* binderPass=s.binderAssets->pass();
         if(!binderImages||!binderImages->textures()||!binderPass)return fail(d,E::resource);
         for(std::uint32_t i=0;i<binderImages->textures()->textureCount();++i)
@@ -472,6 +499,7 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
         }
         for(bool known:assigned)if(!known)return fail(d,E::material);
         s.bindings=std::move(bindings);s.samplers=std::move(samplers);s.bankGeneration=s.backend->generation();
+        if(addonBindings)std::fprintf(stderr,"dlc_rider_materials status=registered addon_passes=%zu bindings=%zu\n",addonBindings,s.bindings.size());
         s.history=std::move(history);s.representatives=std::move(representatives);s.groupsValid=true;
         s.registryGeneration=s.backend->registryGeneration();if(s.gpu)s.gpu->releaseRiderBorrow(this);s.gpu.reset();s.publication=0;
         rollback.committed=true;return true;
@@ -842,6 +870,8 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
     auto& s=*storage_;if(!s.backend->attached(id)||!s.backend->shown(id))return true;
     game::OriginalUiRiderSelectedPacket50KG selected{};
     if(!game::prepareOriginalUiRiderSelectedPacket50KG(id,*s.dynamic,*s.backend,s.render,s.lighting,*s.light,selected,d.selected))return fail(d,E::model);
+    if(const auto* addon=riderAddon50DL::overlayFor(this);addon&&id==addon->suppressed[0]){
+        s.addonFlags191=selected.selection.sourceModelFlags191;s.addonFlagsValid=selected.emitsGeometry;}
     if(selected.emitsGeometry){
         const auto& packet=selected.packet;const auto* materials=s.backend->materials(id);
         if(!packet.scene||!materials||packet.scene->lods.size()!=1)return fail(d,E::geometry);
@@ -911,6 +941,79 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
     }
     return true;
 }
+bool OriginalUiRiderDrawContribution50KG::addonModel(std::size_t index,std::uint8_t flags,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step A): the add-on pod model,
+    // projected exactly as a stock pod (same light rows, Rider camera context,
+    // palette, fog and lit/specular surface projection) from its own table row.
+    // No binder helpers yet. A row that cannot draw is reported, never a frame failure.
+    auto& s=*storage_;const auto* addon=riderAddon50DL::overlayFor(this);
+    // A refused row withdraws everything it emitted this frame (never half a model).
+    const auto vertices0=s.vertices.size(),w0=s.w.size(),fog0=s.fog.size(),packets0=s.packets.size();
+    const auto refuse=[&](const char* why){
+        s.vertices.resize(vertices0);s.w.resize(w0);s.fog.resize(fog0);s.packets.resize(packets0);
+        if(addon)addon->modelRefused=why;return true;};
+    const auto* table=s.backend->addonModels();
+    auto* row=table?const_cast<game::OriginalUiRiderAddonModels50DL*>(table)->row(index):nullptr;
+    if(!row||!row->ready||!row->pod||!row->materials||!row->scene||!row->scene->loaded())return refuse("add-on model row not ready");
+    if((flags&1u)==0)return refuse("anchor pod culled");
+    const auto* scene=row->pod->scene();const auto* materials=row->materials.get();const auto archive=s.backend->riderArchive();
+    if(!scene||!archive||!row->pod->hierarchy()||scene->lods.size()!=1||scene->materials.size()!=materials->materialCount())
+        return refuse("add-on model shape");
+    game::original_racer_lighting50KM::LightMatrices lights{};
+    if(game::projectOriginalUiGlobalLightRows50KM(true,s.lighting.directionalLook78,s.lighting.directional3C,
+        s.lighting.ambient50,lights)!=game::original_racer_lighting50KM::Status::complete)return refuse("light rows");
+    game::OriginalUiRiderModelPacket50KG packet{};
+    if(!game::prepareOriginalUiRiderLitContext50KG(*archive,s.render,lights,packet.context))return refuse("camera context");
+    if(!row->scene->projectPalette(flags,packet.palette,d.model))return refuse("palette");
+    if(!game::prepareOriginalUiRiderModelFog50KG(*row->pod->hierarchy(),row->scene->graph(),s.render.cameraAfterFog.position,
+        s.render.fogStart,packet.fog))return refuse("fog bounds");
+    packet.scene=scene;packet.sourceModelFlags191=flags;
+    const auto& surfaces=scene->lods[0].surfaces;std::uint32_t emitted=0;
+    for(std::uint32_t surface=0;surface<surfaces.size();++surface){
+        const auto materialIndex=surfaces[surface].material_index;
+        if(materialIndex>=materials->materialCount()||surfaces[surface].indices.size()%3)return refuse("surface material");
+        const auto count=surfaces[surface].indices.size()/3;if(!count)continue;
+        if(count>originalUiMaximumSourceQuads50KM)return refuse("surface size");
+        s.scratchVertices.resize(count*4);s.scratchW.resize(count*4);s.scratchFog.resize(count*4);
+        // Own material passes, or the stock rows of a shared original name.
+        std::vector<std::pair<const assets::OriginalUiMaterialPass50KG*,std::uint32_t>> passes;
+        if(materials->addonShared(materialIndex)){
+            const auto name="ui/textures/"+scene->materials[materialIndex];
+            for(std::uint32_t ordinal=1;ordinal<=8;++ordinal){std::uint32_t found=unresolved;
+                for(std::size_t b=0;b<s.bindings.size();++b){const auto& binding=s.bindings[b];
+                    if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass&&binding.pass->pass==ordinal&&
+                       same(binding.registeredName,name.c_str())&&binding.sourceRegistered&&binding.leaf!=unresolved&&
+                       s.drawablePacket(static_cast<std::uint32_t>(b))){found=static_cast<std::uint32_t>(b);break;}}
+                if(found==unresolved)break;
+                passes.emplace_back(s.bindings[found].pass,found);
+            }
+            if(passes.empty())return refuse("shared original material has no live stock row");
+        }else for(std::uint32_t p=0;p<materials->passCount(materialIndex);++p){
+            const auto* material=materials->pass(materialIndex,p);if(!material)return refuse("material pass");
+            const auto* map=material->imageIndex==unresolved?nullptr:s.backend->addonImage(index,material->imageIndex);
+            if(material->imageIndex!=unresolved&&!map)return refuse("add-on image not in the bank");
+            const auto binding=s.find(&material->source,map?map->combinedIndex:unresolved);
+            if(binding==unresolved)return refuse("add-on material not registered");
+            passes.emplace_back(&material->source,binding);
+        }
+        for(const auto& [source,binding]:passes){
+            game::OriginalUiLitSurfaceOutput50KM projected{s.scratchVertices.data(),s.scratchW.data(),s.scratchFog.data(),static_cast<std::uint32_t>(count),0,0};
+            const auto status=same(source->microprogram,"SpecularMapCompressed")?
+                game::projectOriginalUiSpecularMapCompressedSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,projected,s.workspace):
+                game::projectOriginalUiLitSceneSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,packet.fog.computeRadialFog1B2,projected,s.workspace);
+            if(status!=game::OriginalUiLitGeometryStatus50KM::complete||projected.materialIndex!=materialIndex)return refuse("surface projection");
+            if(!s.capacity(projected.slotCount))return fail(d,E::capacity);
+            if(!projected.slotCount)continue;const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+            const auto n=std::size_t(projected.slotCount)*4;
+            s.vertices.insert(s.vertices.end(),s.scratchVertices.begin(),s.scratchVertices.begin()+n);
+            s.w.insert(s.w.end(),s.scratchW.begin(),s.scratchW.begin()+n);s.fog.insert(s.fog.end(),s.scratchFog.begin(),s.scratchFog.begin()+n);
+            s.packets.push_back({first,projected.slotCount,binding,static_cast<std::uint32_t>(s.packets.size())});
+            ++emitted;
+        }
+    }
+    if(addon){addon->modelPackets+=emitted;if(!emitted&&!addon->modelRefused)addon->modelRefused="no surface emitted";}
+    return true;
+}
 bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noexcept {
     auto& s=*storage_;auto& widgets=*s.resources->widgets();const auto* order=widgets.order(top);
     if(!order)return fail(d,E::widget);const auto& materials=*s.resources->materials();
@@ -929,6 +1032,12 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
                 s.vertices.erase(s.vertices.begin()+std::ptrdiff_t(vertices),s.vertices.end());
                 s.w.erase(s.w.begin()+std::ptrdiff_t(w),s.w.end());s.fog.erase(s.fog.begin()+std::ptrdiff_t(fog),s.fog.end());
                 s.packets.erase(s.packets.begin()+std::ptrdiff_t(packets),s.packets.end());
+                if(state.kind==game::OriginalUiRiderWidgetKind50KG::pod&&id==addon->suppressed[0]&&
+                   addon->modelRow!=riderAddon50DL::Overlay::noRow){
+                    if(!s.addonFlagsValid)addon->modelRefused="anchor pod not selected this frame";
+                    else if(!addonModel(addon->modelRow,s.addonFlags191,d))return false;
+                }
+                s.addonFlagsValid=false;
                 continue;
             }
             const auto* descriptor=id==addon->nameWidget?widgets.textDescriptor(id):nullptr;
@@ -1189,6 +1298,17 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         ++ordinal;
     }
     if(ordinal!=3235)return fail(d,E::schedule);
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on pod's own menu material that
+    // Mat_Stbl does not have ranks after its 3235 rows, in registry order (the
+    // same rows the material table appends). Only static add-on rows reach here.
+    {
+        const auto& names=rr::assets::dlc50DL::addonPodUiMaterialNames();
+        for(std::size_t i=0;i<input.size();++i){
+            if(ranks[i]!=unresolved||input[i].kind!=RegistrationKind::existingStatic)continue;
+            for(std::size_t k=0;k<names.size()&&k<0x100000u;++k)
+                if(same(input[i].registeredName,names[k].c_str())){ranks[i]=3235u+static_cast<std::uint32_t>(k);break;}
+        }
+    }
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
         if(input[i].kind==RegistrationKind::ledgerDynamic&&
@@ -1243,6 +1363,12 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         const auto current=static_cast<std::uint32_t>(groups.size());
         //29C490 examines every earlier registration, including redirected ones.
         for(auto& prior:groups){
+            // PORT EXTENSION, NOT ORIGINAL (DLC): add-on rows (ranks after the 3235
+            // Mat_Stbl rows) and stock rows never redirect into each other. Without
+            // this an equivalent later add-on row absorbed a stock group (e.g. the
+            // terminal icon prompt), changing stock representatives and the stock
+            // frame's drained terminal. With no add-on rows nothing is skipped.
+            if((prior.rank>=3235u)!=(next.rank>=3235u))continue;
             const auto equal=nextHistory[next.registration].state.compare(nextHistory[prior.registration].state);
             if(equal==assets::OriginalUiMaterialEquivalence50KG::unsupported)return fail(d,E::schedule,0x249BA0);
             if(equal==assets::OriginalUiMaterialEquivalence50KG::equivalent&&current<prior.limit)prior.redirect=current;

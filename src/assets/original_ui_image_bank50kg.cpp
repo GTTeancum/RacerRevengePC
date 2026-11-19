@@ -5,7 +5,7 @@ namespace rr::assets {
 namespace {
 using E=OriginalUiImageBankError50KG;using D=OriginalUiImageBankDiagnostic50KG;
 bool fail(D& d,E e) noexcept {d.error=e;return false;}
-struct Located {OriginalUiMemberView50KG view;std::size_t globalOrdinal=0;};
+struct Located {OriginalUiMemberView50KG view;std::size_t globalOrdinal=0;bool addon=false;std::size_t addonArchive=0;};
 bool locate(const OriginalUiImageBankInput50KG& input,const OriginalUiMemberIdentity50KG* identity,
     Located& out) noexcept {
     if(!identity)return false;
@@ -14,6 +14,13 @@ bool locate(const OriginalUiImageBankInput50KG& input,const OriginalUiMemberIden
             const auto view=archive->member(i);
             if(view.identity==identity){out={view,archive->identity()->firstMember+i};return true;}
         }
+    // PORT EXTENSION (DLC): an add-on archive member; its ordinal is local to its archive.
+    for(std::size_t a=0;a<input.addonArchives.size();++a){const auto& archive=input.addonArchives[a];
+        for(std::size_t i=0;i<archive->memberCount();++i){
+            const auto view=archive->member(i);
+            if(view.identity==identity){out={view,i,true,a};return true;}
+        }
+    }
     return false;
 }
 bool same(const OriginalUiImageSource50KG& a,const OriginalUiImageSource50KG& b) noexcept {
@@ -31,7 +38,7 @@ bool samePixels(const Texture48E& a,const Texture48E& b) noexcept {
 }
 }
 struct OriginalUiImageBank50KG::Storage {
-    std::vector<std::shared_ptr<const OriginalUiArchive50KG>> archives;
+    std::vector<std::shared_ptr<const OriginalUiArchive50KG>> archives,addonArchives;
     std::vector<std::shared_ptr<const OriginalUiScreenAssets50KG>> owners;
     std::shared_ptr<OriginalUiScreenAssets50KG> images;
     std::vector<std::vector<OriginalUiImageBankMapping50KG>> mappings;
@@ -40,15 +47,24 @@ OriginalUiImageBank50KG::OriginalUiImageBank50KG() noexcept=default;
 OriginalUiImageBank50KG::~OriginalUiImageBank50KG()=default;
 bool OriginalUiImageBank50KG::load(const OriginalUiImageBankInput50KG& input,D& d) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded);
-    if(input.archives.empty()||input.archives.size()>11||input.owners.empty()||input.owners.size()>128)
+    using AddonLimits=OriginalUiImageBankAddonLimits50DL;
+    if(input.archives.empty()||input.archives.size()>11||input.owners.empty()||
+       input.addonArchives.size()>AddonLimits::archives||
+       input.owners.size()>128+input.addonArchives.size()) // one owner per add-on archive on top of the stock 128
         return fail(d,E::input);
     try {
+        for(std::size_t i=0;i<input.addonArchives.size();++i){const auto& a=input.addonArchives[i];
+            if(!a||!a->loaded()||!a->addon()||!a->identity()||a->memberCount()>AddonLimits::members)return fail(d,E::input);
+            for(std::size_t j=0;j<i;++j)if(input.addonArchives[j]->identity()==a->identity())return fail(d,E::input);
+        }
+        std::size_t stockSources=0,addonSources=0;
         for(std::size_t i=0;i<input.archives.size();++i){const auto& a=input.archives[i];
             if(!a||!a->loaded()||!a->identity()||
                 a->identity()!=originalUiArchiveIdentity50KG(a->identity()->id))return fail(d,E::input);
             for(std::size_t j=0;j<i;++j)if(input.archives[j]->identity()==a->identity())return fail(d,E::input);
         }
         auto next=std::make_unique<Storage>();next->archives=input.archives;next->owners=input.owners;
+        next->addonArchives=input.addonArchives;
         next->mappings.resize(input.owners.size());std::vector<OriginalUiImageSource50KG> sources;
         for(std::size_t owner=0;owner<input.owners.size();++owner){
             d.owner=static_cast<std::uint32_t>(owner);const auto& bank=input.owners[owner];
@@ -61,20 +77,30 @@ bool OriginalUiImageBank50KG::load(const OriginalUiImageBankInput50KG& input,D& 
                 if(!provenance||!texture||!bank->decodedTexture(image)||
                     !locate(input,provenance->memberIdentity,member)||
                     (provenance->celIdentity&&!locate(input,provenance->celIdentity,cel)))return fail(d,E::provenance);
-                if(member.globalOrdinal>=32767||provenance->pstOffset>std::numeric_limits<std::uint32_t>::max())
-                    return fail(d,E::capacity);
+                if(provenance->pstOffset>std::numeric_limits<std::uint32_t>::max())return fail(d,E::capacity);
+                if(member.addon){
+                    // PORT EXTENSION (DLC): add-on images never carry a CEL here.
+                    if(cel.view.identity||member.addonArchive>=AddonLimits::archives||
+                       member.globalOrdinal>=AddonLimits::members)return fail(d,E::capacity);
+                }else if(member.globalOrdinal>=32767||(cel.view.identity&&cel.addon))return fail(d,E::capacity);
                 OriginalUiImageSource50KG source{};source.member=member.view;source.cel=cel.view;
                 source.pstOffset=provenance->pstOffset;source.pstBytes=provenance->pstBytes;
                 // Native namespace0x5549. 15-bit globally unique member ordinal,
                 // one CEL metadata bit, then original stored-PST byte offset.
-                source.identity=0x5549000000000000ull|((member.globalOrdinal+1ull)<<33)|
-                    (std::uint64_t(bool(source.cel.identity))<<32)|source.pstOffset;
+                // PORT EXTENSION: add-on namespace 0x41 in the top byte, 7-bit
+                // add-on archive index (bits 49..55), 10-bit member index (39..48).
+                source.identity=member.addon?
+                    (0x4100000000000000ull|((member.addonArchive+1ull)<<49)|((member.globalOrdinal+1ull)<<39)|source.pstOffset):
+                    (0x5549000000000000ull|((member.globalOrdinal+1ull)<<33)|
+                    (std::uint64_t(bool(source.cel.identity))<<32)|source.pstOffset);
                 std::size_t index=0;for(;index<sources.size();++index){
                     if(same(source,sources[index]))break;
                     if(source.identity==sources[index].identity)return fail(d,E::identityConflict);
                 }
                 if(index==sources.size()){
-                    if(sources.size()==256)return fail(d,E::capacity);
+                    // Stock keeps its own 256; add-on images have their own capacity.
+                    if(member.addon?addonSources==AddonLimits::sources:stockSources==256)return fail(d,E::capacity);
+                    ++(member.addon?addonSources:stockSources);
                     sources.push_back(source);
                 }
                 mappings[image]={static_cast<std::uint32_t>(index),texture->identity,source.identity};
@@ -107,6 +133,9 @@ OriginalUiMemberView50KG OriginalUiImageBank50KG::sourceMember(std::uint32_t ind
     const auto* source=storage_&&storage_->images?storage_->images->sourceProvenance(index):nullptr;
     if(!source||!source->memberIdentity)return {};
     for(const auto& archive:storage_->archives)for(std::size_t i=0;i<archive->memberCount();++i){
+        const auto member=archive->member(i);if(member.identity==source->memberIdentity)return member;
+    }
+    for(const auto& archive:storage_->addonArchives)for(std::size_t i=0;i<archive->memberCount();++i){
         const auto member=archive->member(i);if(member.identity==source->memberIdentity)return member;
     }
     return {};

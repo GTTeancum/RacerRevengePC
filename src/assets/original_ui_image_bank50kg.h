@@ -9,6 +9,18 @@ struct OriginalUiImageBankInput50KG {
     // which pins its real binder owner. Input order becomes explicit remap order.
     std::vector<std::shared_ptr<const OriginalUiScreenAssets50KG>> owners;
     const OriginalUiIpumTextureCache50KG* ipumCache=nullptr;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): add-on package menu archives (identity
+    // addonUi, never in the catalog). Kept apart from `archives`: they take none
+    // of the stock archive slots, catalog ordinals or the 256 stock sources;
+    // their images use the add-on capacity below and their own ID namespace.
+    // Empty without add-on content (the bank is then exactly the stock bank).
+    std::vector<std::shared_ptr<const OriginalUiArchive50KG>> addonArchives;
+};
+// PORT EXTENSION (DLC): the one place for the add-on part of a UI image bank.
+struct OriginalUiImageBankAddonLimits50DL {
+    static constexpr std::size_t archives=68;     // = dlc50DL::RegistryLimits::pods
+    static constexpr std::size_t members=512;     // = dlc50DL::RegistryLimits::uiEntries
+    static constexpr std::size_t sources=archives*8; // distinct add-on images (8 per pod)
 };
 struct OriginalUiImageBankMapping50KG {
     std::uint32_t combinedIndex=0;

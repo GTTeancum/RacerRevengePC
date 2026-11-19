@@ -8,6 +8,7 @@
 #include "original_appstart_template_cache50kg.h"
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_program_table50la.h"
+#include "dlc_registry50dl.h"
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
@@ -1815,6 +1816,35 @@ OriginalUiArchiveId50KG modelArchive(const OriginalUiMaterialPass50KG& pass) {
 // 08c_3 has the existing03c_3 FIX64 three-pass state and one packed-kind0 mip.
 // 25c_7 AA1 and22_3 special programs remain unadmitted.
 // 17_3 uses its separate exact-source cutout policy, never these identity sets.
+// PORT EXTENSION, NOT ORIGINAL (DLC): an admitted add-on pod's own menu
+// material. The PSM member must come from that pod's own UI archive (the
+// archive identity's discPath is the registry's ui.archive) and its name must
+// be one of that pod's uiMaterials. Returns the leaf name ("a2r_ark_1") or "".
+std::string addonPodMaterialLeaf(const OriginalUiMaterialPass50KG& pass) {
+    const auto* archive=originalUiAddonMemberArchive50DL(pass.identity);
+    if(!archive||!archive->discPath||!pass.identity||!pass.identity->name)return {};
+    std::string name=pass.identity->name;
+    for(auto& c:name){if(c=='/')c='\\';if(c>='A'&&c<='Z')c=char(c-'A'+'a');}
+    if(name.size()<5||name.compare(name.size()-4,4,".psm")!=0)return {};
+    name.resize(name.size()-4);
+    for(std::size_t i=0;i<dlc50DL::addonPodCount();++i){
+        const auto* pod=dlc50DL::addonPodAt(i);
+        if(!pod||pod->ui.archive!=archive->discPath)continue;
+        for(const auto& m:pod->uiMaterials)if(m==name){
+            const auto slash=name.find_last_of('\\');
+            return slash==std::string::npos?name:name.substr(slash+1);
+        }
+        return {};
+    }
+    return {};
+}
+// The image member must be `<leaf>.pst` of the SAME add-on archive.
+bool addonPodImageMember(const OriginalUiMaterialPass50KG& pass,const OriginalUiMemberIdentity50KG* member,
+    const std::string& leaf) {
+    const auto* archive=originalUiAddonMemberArchive50DL(pass.identity);
+    if(!archive||!member||originalUiAddonMemberArchive50DL(member)!=archive||!member->name)return false;
+    return same(member->name,("ui\\textures\\"+leaf+".pst").c_str());
+}
 const char* unlockedIpumName(const OriginalUiMaterialPass50KG& pass) {
     constexpr const char* names[]{"19c_1","03c_1","03c_2","04c_1","04c_2","10c_1","10c_2","12c_1","15c_1","15c_2","07c_2","09c_1",
         "01c_1","01c_2","08c_1","08c_2","14c_2","16c_1","16c_2","17c_1","17c_2","18c_1","18c_2","22c_1","25c_1","25c_2","25c_3","25c_4","25c_5"};
@@ -1950,14 +1980,17 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG& 
     OriginalUiRider19BodyMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=pass.pass;
     try {
-        const auto* name=unlockedBodyName(pass);
-        const bool original19=name&&(same(name,"19_1")||same(name,"19_2"));
+        const auto* stockName=unlockedBodyName(pass);
+        const auto addonLeaf=stockName?std::string():addonPodMaterialLeaf(pass); // PORT EXTENSION (DLC)
+        const char* name=stockName?stockName:(addonLeaf.empty()?nullptr:addonLeaf.c_str());
+        const bool original19=stockName&&(same(stockName,"19_1")||same(stockName,"19_2"));
         if(!name||pass.pass!=1||!same(pass.microprogram,"DiffuseCompressed")||!same(pass.textureName,name)||
            (pass.gs[Field::alphaBlendingOnOff].value!=0||pass.gs[Field::alphaTestOnOff].value!=0))
             return fail(d,Error::profile,"canonical unlocked Rider indexed body first pass",0x2476a0u);
         const auto memberName=std::string("ui\\textures\\")+name+".pst";
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::podTextures,memberName.c_str());
         const auto* source=images.sourceProvenance(imageIndex);
+        const auto* member=stockName?catalogMember(OriginalUiArchiveId50KG::podTextures,memberName.c_str()):
+            (source&&addonPodImageMember(pass,source->memberIdentity,addonLeaf)?source->memberIdentity:nullptr);
         const auto* texture=images.decodedTexture(imageIndex);
         const auto* bank=images.textures();
         const auto* image=bank?bank->texture(imageIndex):nullptr;
@@ -2075,7 +2108,11 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
     d={};d.pass=pass.pass;
     try {
         if (!pass.identity)return fail(d,Error::profile,"canonical Rider shadow PSM identity",0x2476a0u);
-        const auto* name=unlockedShadowName(pass);
+        const auto* stockName=unlockedShadowName(pass);
+        // PORT EXTENSION (DLC): an add-on pod's own "<stem>_shdw" material.
+        auto addonLeaf=stockName?std::string():addonPodMaterialLeaf(pass);
+        if(addonLeaf.size()<6||addonLeaf.compare(addonLeaf.size()-5,5,"_shdw")!=0)addonLeaf.clear();
+        const char* name=stockName?stockName:(addonLeaf.empty()?nullptr:addonLeaf.c_str());
         if (!name || pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") ||
             !same(pass.textureName,name) ||
             pass.gs[Field::alphaBlendingOnOff].value!=1 || pass.gs[Field::inputColorA].value!=2 ||
@@ -2088,8 +2125,9 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
             return fail(d,Error::profile,"actual default-unlocked Rider shadow attenuation pass1",0x2476a0u);
         // Exact canonical PSM selects its corresponding original PST.
         const auto memberName=std::string("ui\\textures\\")+name+".pst";
-        const auto* member=catalogMember(modelArchive(pass),memberName.c_str());
         const auto* source=images.sourceProvenance(imageIndex);
+        const auto* member=stockName?catalogMember(modelArchive(pass),memberName.c_str()):
+            (source&&addonPodImageMember(pass,source->memberIdentity,addonLeaf)?source->memberIdentity:nullptr);
         const auto* texture=images.decodedTexture(imageIndex);
         const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
         if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
@@ -2119,8 +2157,11 @@ bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50
         const bool character=pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\12c_4.psm") ||
             pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\03c_3.psm") ||
             pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\08c_3.psm");
-        const auto* bodyName=unlockedBodyName(pass);
-        const bool original19=bodyName&&(same(bodyName,"19_1")||same(bodyName,"19_2"));
+        const auto* stockBody=unlockedBodyName(pass);
+        // PORT EXTENSION (DLC): an add-on pod's own body material (pass2 specmap1).
+        const auto addonLeaf=stockBody?std::string():addonPodMaterialLeaf(pass);
+        const char* bodyName=stockBody?stockBody:(addonLeaf.empty()?nullptr:addonLeaf.c_str());
+        const bool original19=stockBody&&(same(stockBody,"19_1")||same(stockBody,"19_2"));
         const bool window=pass.identity==catalogMember(modelArchive(pass),"ui\\textures\\pod_wndw.psm");
         if ((!bodyName&&!window&&!character) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
             !same(pass.textureName,"specmap1") ||

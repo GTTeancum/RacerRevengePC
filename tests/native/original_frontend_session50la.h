@@ -219,7 +219,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   if(raceReturnScreen)std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';
   original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnScreen);
   original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnScreen);
-  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
+  original_ui_capture_navigation50LA::HallRoute hallRoute(captureRun.navigateHallTa()&&!raceReturnScreen);
+  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa(),captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;
@@ -540,6 +541,19 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
      if(ending){tournamentReturnRoute.reachEnding(originalMain.coordinator.snapshot());
       originalMain.requestQuit();reportUiState("tournament_ending");break;}}
    }
+   if(hallRoute.enabled()){
+    require50DU(originalMain.inputCount==hallRoute.issuedActions(),"physical menu input interrupted unattended Hall route");
+    const auto snapshot=originalMain.coordinator.snapshot();
+    const auto* navigation=originalMain.navigation();
+    const auto group=navigation?navigation->controllerGroup[0]:0;
+    const auto slot=navigation&&group>0&&static_cast<std::size_t>(group)<navigation->groups.size()?
+        navigation->groups[group].selectedSlot:0;
+    const auto action=hallRoute.poll(snapshot,group,slot,windowCapture.captured(windows_capture50LD::Stage::hall));
+    if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));
+     const auto* after=originalMain.navigation();const auto afterGroup=after?after->controllerGroup[0]:0;
+     hallRoute.validateDispatch(originalMain.coordinator.snapshot(),afterGroup,
+         after&&afterGroup>0&&static_cast<std::size_t>(afterGroup)<after->groups.size()?after->groups[afterGroup].selectedSlot:0);}
+   }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");
     const auto snapshot=originalMain.coordinator.snapshot();
@@ -609,14 +623,16 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto snapshot=originalMain.coordinator.snapshotWithoutGarageRuntime();
     const auto stage=snapshot.route.screen==4?windows_capture50LD::Stage::main:
         snapshot.route.screen==5?windows_capture50LD::Stage::rider:
-        snapshot.route.screen==6?windows_capture50LD::Stage::course:windows_capture50LD::Stage::other;
+        snapshot.route.screen==6?windows_capture50LD::Stage::course:
+        (hallRoute.enabled()&&snapshot.route.screen==11)?windows_capture50LD::Stage::hall:windows_capture50LD::Stage::other;
     const bool sourceAccepted=originalMain.submittedScreen==5&&originalMain.sourceFrameGeneration&&
         originalMain.submittedTriangles&&originalMain.coordinator.gpu()&&
         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
-    const bool settled=original_ui_capture_navigation50LA::Route::settled(snapshot)&&
+    const bool settled=(stage==windows_capture50LD::Stage::hall?original_ui_capture_navigation50LA::HallRoute::settled(snapshot):
+        original_ui_capture_navigation50LA::Route::settled(snapshot))&&
         (stage!=windows_capture50LD::Stage::rider||sourceAccepted);
     const bool captureWindowImage=host.hasWindow()&&captureRoute.captureAllowed(snapshot,sourceAccepted,originalMain.sourceFrameGeneration,
-        originalMain.submittedPublication)&&windowCapture.due(stage,settled);
+        originalMain.submittedPublication)&&(!hallRoute.enabled()||hallRoute.captureAllowed(snapshot))&&windowCapture.due(stage,settled);
     const auto swapStart=originalMain.stageStart();
     if(host.hasWindow()&&!windowCapture.swapAndCapture(renderer,host,captureWindowImage,windowSwaps+1,
         [&](){return host.swapWindow(hostDiagnostic);})){

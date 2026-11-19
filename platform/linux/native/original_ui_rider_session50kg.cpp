@@ -7,6 +7,7 @@
 #include "original_ui_rider_addon_overlay50dl.h"
 #include "../../../src/assets/dlc_registry50dl.h"
 #include "../../../src/game/dlc_rider_entries50dl.h"
+#include "../../../src/game/original_ui_rider_addon_models50dl.h"
 #include <cmath>
 #include <cstdio>
 #include <bit>
@@ -125,6 +126,9 @@ struct OriginalUiRiderSession50KG::Storage {
     bool nativePrepared=false,nativeEntryActive=false,nativeEntryCommitted=false;
     std::uint8_t nativeEntryPhase=0;
 
+    // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step A): the add-on pod model
+    // table (empty without add-on pods; loaded only for a free-play carousel).
+    game::OriginalUiRiderAddonModels50DL addonModels;
     game::OriginalUiRiderBackend50KG backend;
     game::OriginalUiRiderDynamicOwner50KG dynamic;
     game::OriginalUiApertureOwner50KG aperture;
@@ -172,7 +176,7 @@ struct OriginalUiRiderSession50KG::Storage {
     std::size_t addonSlot=0;            // 0 = stock rider; k = addonRiderAt(k-1), 1..addonRiderCount()
     bool addonAnchorLast=true;          // entered by Next past the last (true) or Previous past the first (false) stock rider
     std::uint32_t addonConfirmRider=0;  // stock rider an add-on Confirm records (the last stock Confirm's rider)
-    bool addonSkipLogged=false,addonRestoreTried=false;
+    bool addonSkipLogged=false,addonRestoreTried=false,addonModelLogged=false,addonAdvanceLogged=false;
     std::array<std::string,3> addonText{}; // name, short name, package name of the highlighted add-on
     riderAddon50DL::Overlay addonOverlay{};
     const assets::dlc50DL::AddonPod* addonPod() const noexcept {
@@ -186,11 +190,38 @@ struct OriginalUiRiderSession50KG::Storage {
         std::fprintf(stderr,"dlc_rider_carousel player=%u action=%s slot=%zu key=%s number=%u anchor_rider=%u anchor_slot=%u\n",
             unsigned(addonPlayer)+1u,action,addonSlot,pod?pod->key.c_str():"-",pod?pod->number:0u,state.rider4C4,unsigned(state.slot4C8));
     }
+    // The add-on model table row of carousel slot k (1-based), only when it is
+    // the same registry pod and ready; nullptr otherwise (bounds-checked).
+    game::OriginalUiRiderAddonModels50DL::Row* addonModelRow(std::size_t slot) noexcept {
+        const auto* pod=slot?game::dlc50DL::addonRiderAt(slot-1):nullptr;
+        auto* row=pod?addonModels.row(slot-1):nullptr;
+        return row&&row->ready&&row->scene&&row->number==pod->number?row:nullptr;
+    }
+    game::OriginalUiRiderPodScene50KG* anchorPodScene() noexcept {
+        std::array<std::uint16_t,4> ids{};
+        return controlWidgets(state.slot4C8,state.rider4C4,ids)?dynamic.podScene(ids[0]):nullptr;
+    }
     bool setAddonSlot(std::size_t slot) noexcept {
         if(!addonCarousel||slot>game::dlc50DL::addonRiderCount())return false;
-        const auto previous=addonSlot;addonSlot=slot;
+        const auto previous=addonSlot;
+        if(slot&&!game::dlc50DL::addonRiderAt(slot-1))return false;
+        // Model handoff, as an original move: the incoming pod takes the outgoing
+        // pod's directional orientation; the add-on User_Rotate runs while shown.
+        {
+            auto* fromRow=addonModelRow(previous);auto* toRow=addonModelRow(slot);
+            auto* from=previous?(fromRow?fromRow->scene.get():nullptr):anchorPodScene();
+            auto* to=slot?(toRow?toRow->scene.get():nullptr):anchorPodScene();
+            if(from&&to&&from!=to&&from->loaded()&&to->loaded()){
+                game::OriginalUiRiderPodOrientation50KG orientation;game::OriginalUiRiderModelDiagnostic50KG md;
+                if(from->captureDirectionalOrientation(orientation,md))(void)to->restoreDirectionalOrientation(orientation,md);
+            }
+            if(fromRow)fromRow->scene->deselected();
+            if(toRow)toRow->scene->selected();
+        }
+        addonSlot=slot;
         const auto* pod=addonPod();
         if(slot&&!pod){addonSlot=previous;return false;}
+        addonModelLogged=false;
         try{addonText={pod?pod->name:std::string(),pod?pod->shortName:std::string(),pod?pod->packageName:std::string()};}
         catch(...){addonText={};}
         addonSkipLogged=false;
@@ -867,6 +898,23 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             if(count!=13)return result(d,Status::resource);
         }
         if(fromTournament)backend.tournamentPredecessor=cold.predecessorTournament;
+        // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step A): add-on pod models for the
+        // free-play carousel, loaded while this session is still private. The layout
+        // source is the authored pod widget of the default entry rider 19 (PORT STAND-IN).
+        if((cold.prospectiveMode==0||cold.prospectiveMode==1)&&game::dlc50DL::addonRiderCount()){
+            std::uint16_t layout=0;
+            for(const auto control:page->groups[1].controls){
+                if(control<0||static_cast<std::size_t>(control)>=page->controls.size())continue;
+                if(s->selection()->controlRider(static_cast<std::uint16_t>(control))!=19)continue;
+                const auto& ids=page->controls[static_cast<std::size_t>(control)].widgets;
+                if(!ids.empty()&&s->widgets().state(ids[0]).kind==Kind::pod)layout=ids[0];
+            }
+            game::OriginalUiRiderAddonModels50DL::Input addon;
+            addon.stockRider=cold.riderArchive;addon.appStart=cold.appStart;addon.podTextures=cold.podTextures;
+            addon.materialRuntime=cold.materialRuntime;addon.ipumCache=cold.ipumCache.get();addon.layoutWidget=layout;
+            if(layout&&s->addonModels.load(addon))backend.addonModels=&s->addonModels;
+            else std::fprintf(stderr,"dlc_rider_model_prepare status=refused reason=\"no authored layout widget or table\"\n");
+        }
         if(!s->backend.bind(backend,d.backend))return result(d,Status::backend);
         s->backendBound=true;
         if(!s->dynamic.bind(cold.riderArchive,s->widgets(),cold.application->modelMotion,cold.application->modelMode0Ik,
@@ -1549,6 +1597,11 @@ Status OriginalUiRiderSession50KG::update(const OriginalUiMainSessionUpdate50KG&
         if(!shared->advanceMenu470(*this,s->collector,in.elapsedSeconds,sd))s->fault(Status::unsupportedState,sd.sourcePC);
     }
     s->inOperation=false;
+    if(!s->state.faulted&&s->addonSlot)if(auto* row=s->addonModelRow(s->addonSlot)){
+        game::OriginalUiRiderModelDiagnostic50KG md;
+        if(!row->scene->advance(in.elapsedSeconds,md)&&!s->addonAdvanceLogged){s->addonAdvanceLogged=true;
+            std::fprintf(stderr,"dlc_rider_model key=%s status=paused reason=\"User_Rotate advance refused\"\n",row->key.c_str());}
+    }
     if(!s->state.faulted&&!s->restoreRememberedAddon()&&!s->state.faulted)s->fault(Status::widget,0x1EAFB0);
     if(s->state.faulted){s->cpuDrain();d=s->callbackFault;return d.status;}
     if(s->state.updates==std::numeric_limits<std::uint64_t>::max()){s->fault(Status::unsupportedState,0x1EB4F0);d=s->callbackFault;return d.status;}
@@ -1621,6 +1674,9 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         overlay.collector=&s->collector;overlay.suppressed=ids;overlay.nameWidget=ids[1];
         overlay.lines[0]={&s->addonText[0],&s->addonText[1]};overlay.lines[1]={&s->addonText[2],nullptr};
         overlay.statRider=pod->number;
+        // Menu-art step A: the add-on's own pod model in place of the anchor pod.
+        if(s->addonModelRow(s->addonSlot))overlay.modelRow=s->addonSlot-1;
+        else overlay.modelRefused="no ready add-on model row";
     }
     const riderAddon50DL::Scope addonScope(s->addonSlot?&s->addonOverlay:nullptr);
     s->cpuDrain();if(!s->invalidateProposal()){d=s->callbackFault;return d.status;}
@@ -1651,9 +1707,18 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         s->cpuDrain();d=s->callbackFault;return d.status;}
     if(s->state.renders==std::numeric_limits<std::uint64_t>::max()){
         s->fault(Status::unsupportedState,0x1ECE20);s->cpuDrain();d=s->callbackFault;return d.status;}
+    if(s->addonSlot&&!s->addonModelLogged){
+        // One line per highlighted add-on model (first rendered frame).
+        s->addonModelLogged=true;const auto* pod=s->addonPod();const auto* row=s->addonModelRow(s->addonSlot);
+        const bool drawn=s->addonOverlay.modelPackets&&!s->addonOverlay.modelRefused;
+        std::fprintf(stderr,"dlc_rider_model key=%s number=%u model=%s status=%s packets=%u%s%s%s\n",
+            pod?pod->key.c_str():"-",pod?pod->number:0u,pod?pod->ui.riderModel.c_str():"-",drawn?"drawn":"refused",
+            s->addonOverlay.modelPackets,drawn?"":" reason=\"",drawn?"":(s->addonOverlay.modelRefused?s->addonOverlay.modelRefused:
+                (row?"no packet":"no ready add-on model row")),drawn?"":"\"");
+    }
     if(s->addonSlot&&!s->addonSkipLogged&&(s->addonOverlay.drawnLines||s->addonOverlay.skippedLines)){
         s->addonSkipLogged=true;const auto* pod=s->addonPod();
-        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u stats=pod_phy model=none portrait=none background=none\n",
+        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u stats=pod_phy model=pod portrait=none background=none character=none\n",
             pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines);
     }
     ++s->state.renders;s->state.framePublished=true;return result(d,Status::ok);
@@ -1741,6 +1806,7 @@ Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
     if(!s.backend.finalizeTeardown(s.collector.materialSequence(),d.backend))return result(d,Status::backend);
     s.sourceTornDown=true;s.dependenciesPrepared=false;s.state.selectionAttached=false;
     if(s.addonCarousel)game::dlc50DL::setHighlightedAddonRider(s.addonPlayer,0); // no Rider page, no highlight
+    s.addonModels.drain(); // add-on graphs hold no lifetime rows; the renderer is retired above
     return result(d,Status::ok);
 }
 

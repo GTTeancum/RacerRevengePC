@@ -253,8 +253,9 @@ struct OriginalUiRiderPodScene50KG::Storage {
     ModelGraph model;
     OriginalUiUserRotateParameters50KG rotation{};
     std::array<std::array<I,2>,2> binders{};
-    bool paused=true,destroyed=false;
+    bool paused=true,destroyed=false,addon=false;
     bool destroy(D& d)noexcept {
+        if(addon){model={};destroyed=true;paused=true;for(auto& pair:binders)pair={{I::none,I::none}};return true;}
         if(!material.beforeInvalidation(d))return false;
         if(!destroyed){model={};destroyed=true;paused=true;
             for(auto& pair:binders)pair={{I::none,I::none}};}
@@ -290,11 +291,26 @@ bool OriginalUiRiderPodScene50KG::load(std::shared_ptr<const assets::OriginalUiR
         storage_=std::move(next);return true;
     } catch (...) {return reject(E::allocation,0x1D3590);}
 }
+bool OriginalUiRiderPodScene50KG::loadAddon(std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> assets,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D3590);
+    if (!assets||!assets->loaded()||!assets->addon()||!assets->hierarchy()||!assets->config()) return fail(d,E::asset,0x1D3590);
+    try {
+        auto next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);next->addon=true;
+        const auto& c=*next->sourceAssets->config();
+        if (!next->model.build(*next->sourceAssets->hierarchy(),c.position,c.look,c.up,false)) return fail(d,E::graph,0x1D3678);
+        next->rotation={c.rotate,c.velocity,c.position};next->paused=c.startPaused;
+        next->binders={{{{next->model.find("binderleft1"),next->model.find("binderright1")}},
+            {{next->model.find("binderleft2"),next->model.find("binderright2")}}}};
+        storage_=std::move(next);return true;
+    } catch (...) {return fail(d,E::allocation,0x1D3590);}
+}
 bool OriginalUiRiderPodScene50KG::modelDestroyedAfterDetach(D& d) noexcept {
     d={};return !storage_||storage_->destroy(d);
 }
 bool OriginalUiRiderPodScene50KG::requiresModelCleanup() const noexcept {
-    return storage_&&(!storage_->destroyed||storage_->material.pending());
+    // An add-on graph owns no lifetime row: plain destruction is complete cleanup.
+    return storage_&&!storage_->addon&&(!storage_->destroyed||storage_->material.pending());
 }
 bool OriginalUiRiderPodScene50KG::reload(OriginalUiRiderMaterialLifetime50KG& ledger,
     const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
@@ -311,7 +327,7 @@ bool OriginalUiRiderPodScene50KG::reload(OriginalUiRiderMaterialLifetime50KG& le
         {{s.model.find("binderleft2"),s.model.find("binderright2")}}}};
     return true;
 }
-bool OriginalUiRiderPodScene50KG::loaded() const noexcept {return storage_&&!storage_->destroyed&&storage_->material.active();}
+bool OriginalUiRiderPodScene50KG::loaded() const noexcept {return storage_&&!storage_->destroyed&&(storage_->addon||storage_->material.active());}
 bool OriginalUiRiderPodScene50KG::captureDirectionalOrientation(
     OriginalUiRiderPodOrientation50KG& output,D& d) const noexcept {
     d={};if (!loaded()) return fail(d,E::phase,0x28A530);

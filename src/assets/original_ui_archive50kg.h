@@ -20,7 +20,11 @@ enum class OriginalUiArchiveId50KG : std::uint8_t {
     backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13,
     garage = 14, garagePod19 = 15,
     garagePod01 = 16, garagePod02 = 17, garagePod03 = 18, garagePod04 = 19, garagePod07 = 20, garagePod08 = 21, garagePod09 = 22, garagePod10 = 23, garagePod11 = 24, garagePod12 = 25, garagePod14 = 26, garagePod15 = 27, garagePod16 = 28, garagePod17 = 29, garagePod18 = 30, garagePod20 = 31, garagePod21 = 32, garagePod22 = 33, garagePod23 = 34, garagePod24 = 35, garagePod25 = 36, garagePod26 = 37, loadingIcon = 38, trackRa = 39, sourcePod01 = 40,
-    unlock = 41, win = 42
+    unlock = 41, win = 42,
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an admitted add-on package's own menu
+    // archive (UI/<STEM>_UI.RES). Never in the catalog: originalUiArchiveIdentity50KG
+    // returns nullptr for it, so every stock identity gate stays closed to it.
+    addonUi = 43
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;
@@ -42,6 +46,10 @@ int originalUiGaragePodCareer50KG(OriginalUiArchiveId50KG) noexcept;
 // Ordinal is local to this archive, retaining its original archive order.
 const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
     OriginalUiArchiveId50KG, std::size_t ordinal) noexcept;
+// PORT EXTENSION (DLC): the add-on archive identity a member row belongs to
+// (nullptr for every stock catalog row and unknown pointer). Process lifetime.
+const OriginalUiArchiveIdentity50KG* originalUiAddonMemberArchive50DL(
+    const OriginalUiMemberIdentity50KG*) noexcept;
 
 struct OriginalUiMemberView50KG {
     const OriginalUiMemberIdentity50KG* identity = nullptr;
@@ -92,6 +100,15 @@ public:
     // ASCII case-insensitive; slash and backslash are equivalent. No basename
     // fallback, prefix matching, cross-archive lookup or temporary allocation.
     OriginalUiMemberView50KG find(const std::string& originalName) const noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): load an add-on package's menu archive
+    // (not in the catalog). discPath is the package path ("dlc:/<pkg>/UI/..").
+    // The decode stays within the given capacity; members are found by name
+    // only (find), never by ordinal. The identity and member rows are owned by
+    // this object (identity()->id == addonUi); no stock catalog row is touched.
+    bool loadAddon(const std::string& discPath,std::vector<std::uint8_t>&& input,
+        std::size_t fileBytes,std::size_t decodedBytes,std::uint32_t entries,
+        OriginalUiArchiveDiagnostic50KG&) noexcept;
+    bool addon() const noexcept;
 private:
     friend class OriginalUiMaterialTemplates50KG;
     friend class OriginalUiEncodedArchiveView50KG;

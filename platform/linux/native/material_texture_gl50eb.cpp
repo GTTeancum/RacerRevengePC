@@ -604,7 +604,21 @@ bool OriginalUiRiderResidentPool50KG::stage(const std::shared_ptr<OriginalUiRide
         return fail(d,MaterialTextureGlError50EB::request,"Rider pool context/functions/sealed upload owner changed");
     bool included[assets::maxMaterialTextureAssets50EA]{};
     std::size_t unionBytes=s.bytes(),publicationBytes=0;
-    if(unionBytes>ceiling)return fail(d,MaterialTextureGlError50EB::budget,"existing Rider pool already exceeds unchanged ceiling");
+    // PORT EXTENSION, NOT ORIGINAL (DLC): the add-on pod images of this bank get
+    // their own allowance on top of the unchanged 32 MiB stock ceiling (exactly
+    // their bytes; zero without add-on images, so the stock limit is untouched).
+    std::size_t addonBytes=0;
+    for(std::uint32_t i=0;i<cpu->textureCount();++i){const auto* p=images->sourceProvenance(i);const auto* t=cpu->texture(i);
+        if(p&&t&&assets::originalUiAddonMemberArchive50DL(p->memberIdentity)){
+            if(t->texture.rgba.size()>std::numeric_limits<std::size_t>::max()-addonBytes)
+                return fail(d,MaterialTextureGlError50EB::budget,"add-on Rider image bytes overflow");
+            addonBytes+=t->texture.rgba.size();
+        }
+    }
+    if(addonBytes>assets::maxMaterialTextureRGBABytes50EA)
+        return fail(d,MaterialTextureGlError50EB::budget,"add-on Rider images exceed the material texture RGBA capacity");
+    const std::size_t poolCeiling=ceiling+addonBytes;
+    if(unionBytes>poolCeiling)return fail(d,MaterialTextureGlError50EB::budget,"existing Rider pool already exceeds unchanged ceiling");
     d.bankTextureCount=cpu->textureCount();d.bankRgbaBytes=cpu->rgbaByteCount();d.maximumGpuBytes=ceiling;
     d.poolLiveGpuBytes=s.bytes();d.poolLiveTextureCount=s.count();
     for(auto i:demand.indices_){
@@ -626,12 +640,12 @@ bool OriginalUiRiderResidentPool50KG::stage(const std::shared_ptr<OriginalUiRide
                p.pstOffset!=provenance->pstOffset||p.pstBytes!=provenance->pstBytes)
                 return fail(d,MaterialTextureGlError50EB::assets,"Rider shared image provenance or sampler changed");
         }else{
-            if(bytes>ceiling-unionBytes)return fail(d,MaterialTextureGlError50EB::budget,"whole Rider pool including staged/queued/cleanup names exceeds32MiB");
+            if(bytes>poolCeiling-unionBytes)return fail(d,MaterialTextureGlError50EB::budget,"whole Rider pool including staged/queued/cleanup names exceeds32MiB");
             unionBytes+=bytes;
         }
         if(resident.references==std::numeric_limits<U>::max())return fail(d,MaterialTextureGlError50EB::allocation,"Rider publication reference overflow");
     }
-    if(unionBytes>ceiling||out.lastPublication_==std::numeric_limits<std::uint64_t>::max())
+    if(unionBytes>poolCeiling||out.lastPublication_==std::numeric_limits<std::uint64_t>::max())
         return fail(d,MaterialTextureGlError50EB::budget,"Rider pool bytes/publication generation exhausted");
     // Actual sealed frontend upload lifetime spans every staged attempt,
     // including partial failure and state restoration. Reuse-only stages are

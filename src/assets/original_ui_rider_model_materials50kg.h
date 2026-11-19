@@ -57,6 +57,20 @@ public:
         std::shared_ptr<const OriginalUiArchive50KG> unlock,std::shared_ptr<const OriginalUiArchive50KG> appStart,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
         OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on pod model (pod->addon()).
+    // Materials whose PSM is in the add-on archive are loaded here with their
+    // textures (add-on archive first, else the stock Rider archive or UIPODTEX;
+    // a name in two owners is refused). A material the add-on archive does not
+    // have but the stock Rider archive does (shared original names such as cable,
+    // pod_wndw) is NOT loaded: addonShared(m) is true and it has no passes here;
+    // the drawer uses the stock row of that name. Anything else is refused.
+    bool loadAddonPod(std::shared_ptr<const OriginalUiRiderPodAssets50KG>,
+        std::shared_ptr<const OriginalUiArchive50KG> stockRider,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    bool addonShared(std::uint32_t material) const noexcept;
     bool loaded() const noexcept;
     std::uint32_t materialCount() const noexcept;
     std::uint32_t passCount(std::uint32_t material) const noexcept;

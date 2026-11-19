@@ -15,6 +15,7 @@ struct OriginalUiRiderModelMaterials50KG::Storage {
     std::shared_ptr<const OriginalUiArchive50KG> rider,appStart,podTextures;
     std::vector<std::vector<OriginalUiRiderModelMaterialPass50KG>> materials;
     std::shared_ptr<OriginalUiScreenAssets50KG> images;
+    std::vector<bool> shared; // PORT EXTENSION: add-on model slots resolved by the stock row
 };
 OriginalUiRiderModelMaterials50KG::OriginalUiRiderModelMaterials50KG() noexcept=default;
 OriginalUiRiderModelMaterials50KG::~OriginalUiRiderModelMaterials50KG()=default;
@@ -134,6 +135,75 @@ bool OriginalUiRiderModelMaterials50KG::load(std::shared_ptr<const void> model,c
         }
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderModelMaterials50KG::loadAddonPod(std::shared_ptr<const OriginalUiRiderPodAssets50KG> model,
+    std::shared_ptr<const OriginalUiArchive50KG> stockRider,std::shared_ptr<const OriginalUiArchive50KG> app,
+    std::shared_ptr<const OriginalUiArchive50KG> podTextures,const OriginalUiMaterialRuntime50KG& runtime,
+    const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if(storage_)return fail(d,E::alreadyLoaded);
+    const auto addonUi=model?model->archive():nullptr;const auto* scene=model?model->scene():nullptr;
+    if(!model||!model->loaded()||!model->addon()||!addonUi||!addonUi->addon()||!scene||
+       scene->materials.empty()||scene->materials.size()>256||!stockRider||!stockRider->loaded()||
+       stockRider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+       !app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)||
+       !podTextures||!podTextures->loaded()||
+       podTextures->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures))return fail(d,E::input);
+    try {
+        auto next=std::make_unique<Storage>();next->model=model;
+        next->rider=addonUi;next->appStart=std::move(app);next->podTextures=std::move(podTextures);
+        OriginalUiMaterialTemplates50KG templates;
+        if(!templates.load(*next->appStart,d.materialDetail))return fail(d,E::material);
+        next->materials.resize(scene->materials.size());next->shared.assign(scene->materials.size(),false);
+        std::vector<OriginalUiImageSource50KG> sources;
+        for(std::size_t m=0;m<scene->materials.size();++m){
+            d.material=static_cast<std::uint32_t>(m);const auto& name=scene->materials[m];
+            if(!basename(name))return fail(d,E::material);
+            const auto psm="ui/textures/"+name+".psm";
+            if(!addonUi->find(psm).identity){
+                // Shared original name: the stock Rider archive must own it.
+                if(!stockRider->find(psm).identity)return fail(d,E::material);
+                next->shared[m]=true;continue;
+            }
+            if(stockRider->find(psm).identity)return fail(d,E::material); // ambiguous owner
+            OriginalUiMaterial50KG material;
+            if(!readOriginalUiMaterial50KG(*addonUi,psm,templates,
+                OriginalUiTemplate50KG::defaultMt,runtime,material,d.materialDetail))return fail(d,E::material);
+            auto& passes=next->materials[m];passes.reserve(material.passes.size());
+            for(std::size_t p=0;p<material.passes.size();++p){
+                d.pass=static_cast<std::uint32_t>(p);OriginalUiRiderModelMaterialPass50KG pass;
+                pass.source=std::move(material.passes[p]);
+                if(pass.source.textureCount==1){
+                    if(!basename(pass.source.textureName))return fail(d,E::texture);
+                    const auto prefix="ui/textures/"+pass.source.textureName;
+                    if(addonUi->find(prefix+".atm").identity||stockRider->find(prefix+".atm").identity||
+                       next->podTextures->find(prefix+".atm").identity)return fail(d,E::animatedTexture);
+                    const OriginalUiMemberView50KG owners[3]{addonUi->find(prefix+".pst"),
+                        stockRider->find(prefix+".pst"),next->podTextures->find(prefix+".pst")};
+                    OriginalUiMemberView50KG member{};std::size_t found=0;
+                    for(const auto& owner:owners)if(owner.identity){member=owner;++found;}
+                    if(found!=1||!member.data)return fail(d,E::texture);
+                    std::size_t i=0;for(;i<sources.size();++i)if(sources[i].member.identity==member.identity)break;
+                    if(i==sources.size()){
+                        if(sources.size()==256)return fail(d,E::texture);
+                        OriginalUiImageSource50KG source{};source.member=member;source.pstBytes=member.size;
+                        source.identity=0x524d000000000000ull|std::uint64_t(i+1);
+                        sources.push_back(source);
+                    }
+                    pass.imageIndex=static_cast<std::uint32_t>(i);
+                }else if(pass.source.textureCount!=0)return fail(d,E::material);
+                passes.push_back(std::move(pass));
+            }
+        }
+        if(!sources.empty()){
+            next->images=std::make_shared<OriginalUiScreenAssets50KG>();
+            if(!next->images->load(sources,d.images,cache))return fail(d,E::images);
+        }
+        storage_=std::move(next);d={};return true;
+    }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderModelMaterials50KG::addonShared(std::uint32_t m)const noexcept {
+    return storage_&&m<storage_->shared.size()&&storage_->shared[m];
 }
 bool OriginalUiRiderModelMaterials50KG::loaded()const noexcept{return bool(storage_);}
 std::uint32_t OriginalUiRiderModelMaterials50KG::materialCount()const noexcept {

@@ -15,7 +15,8 @@
 // at most 26 Rider Nexts, followed by the original course sequence. The free-play
 // add-on rider test (RR_TEST_ADDON_RIDER=<package>/<item> on main-rider-course-ta,
 // PORT EXTENSION, NOT ORIGINAL) presses Rider Next at most 26 + add-on count times
-// until that add-on is highlighted; RR_TEST_ADDON_RIDER_HOLD=1 then stops there
+// until that add-on is highlighted; RR_TEST_ADDON_RIDER_HOLD=1 then stops there.
+// RR_TEST_RIDER_HOLD=1 (no add-on) stops on the stock rider the route lands on
 // (no Confirm) so the run holds on the Rider screen until its wall budget. GA takes
 // three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one; the explicit Mawhonic9/RA fixture takes four.
 // It does not write a profile, select a screen, advance a transition, control a racer, or admit a
@@ -54,6 +55,7 @@ class Route final {
     std::uint8_t issued_=0;
     // PORT EXTENSION, NOT ORIGINAL (DLC add-on rider test, main-rider-course-ta only).
     bool addon_=false,addonHold_=false,awaitingAddonMove_=false,addonHoldLogged_=false;
+    bool stockHold_=false,stockHoldLogged_=false; // test eye check: hold on the landed stock Rider
     const char* addonKey_=nullptr;
     unsigned addonTarget_=0,priorHighlight_=0;
     std::uint32_t addonMoves_=0;
@@ -175,6 +177,8 @@ public:
         addonKey_=addon_?key:nullptr;
         const char* hold=std::getenv("RR_TEST_ADDON_RIDER_HOLD");
         addonHold_=addon_&&hold&&std::strcmp(hold,"1")==0;
+        const char* stockHold=std::getenv("RR_TEST_RIDER_HOLD");
+        stockHold_=enabled_&&!addon_&&!selectedRoute_&&!sa_&&!occo_&&stockHold&&std::strcmp(stockHold,"1")==0;
     }
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+
@@ -277,6 +281,12 @@ public:
                 }
             }
             if(!riderCaptured||!riderSourceAccepted)return -1;
+            if(stockHold_){
+                if(!stockHoldLogged_){stockHoldLogged_=true;
+                    std::cerr<<"rider_route hold rider="<<s.rider.rider4C4<<" slot="<<s.rider.slot4C8
+                        <<" (no Confirm; the run ends at its wall budget)\n";}
+                return -1;
+            }
         }else{
             require(mainCaptured&&riderCaptured,
                 "unattended Course arrived without the completed Main/Rider screenshots");
@@ -464,6 +474,101 @@ public:
                 !same(t.requested,s.route)&&t.lifecycle==Life::requestScreenExit)&&t.phase==Phase::none,
             "tournament route original Confirm did not accept a destination");
         ++confirms_;awaitingDispatch_=false;
+    }
+};
+// PORT EXTENSION, NOT ORIGINAL (DLC Hall eye check, route main-options-hall-ta):
+// Main -> Options (Main slot 4) -> Hall of Fame (Options slot 4) -> the Hall's
+// first page, which must be TA (course 0, planet 0). Then it holds: no further
+// input, the settled Hall frame is captured once, the run idles until its wall
+// budget. Emits only original Main/Options Down (3), Hall Right (1, only if the
+// Hall did not open on TA) and Confirm (4) events;
+// every destination is admitted by the actual frontend, never selected here.
+class HallRoute final {
+    using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
+    using Life=rr::game::OriginalUiTransitionLifecycle50KG;
+    using Phase=rr::game::OriginalUiTransitionPhase50KG;
+    using Aperture=rr::game::OriginalUiApertureState50KG;
+    static constexpr std::uint8_t screens_[3]{4,12,11};
+    bool enabled_=false,awaitingDispatch_=false,awaitingMove_=false,awaitingHallMove_=false,holdLogged_=false;
+    std::uint8_t moves_=0,confirms_=0,hallMoves_=0;
+    std::uint32_t courseAtMove_=0;
+    std::int32_t slotAtMove_=0;
+    static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
+    static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
+        return a.screen==b.screen&&a.page==b.page;
+    }
+    static bool open(const rr::game::OriginalUiApertureSnapshot50KG& a)noexcept{
+        return a.bound&&a.inputEnabled268&&a.state==Aperture::open;
+    }
+public:
+    static bool settled(const Snapshot& s)noexcept{
+        const auto& t=s.transition;
+        if(!s.prepared||!s.active||s.faulted||s.quitRequested||!s.frameSubmitted||s.deferredQueue||!t.bound||
+           t.initialRestartPending||t.applicationRequestQueued||t.lifecycle!=Life::idle||t.phase!=Phase::none||
+           s.route.page!=1||!same(s.route,t.current)||!same(s.route,t.requested))return false;
+        if(s.route.screen==4)return s.main.bound&&!s.main.faulted&&!s.main.quitRequested&&
+            s.main.mainPageShown&&s.main.inputContainerShown&&s.main.framePublished&&open(s.main.aperture);
+        if(s.route.screen==12)return s.options.bound&&!s.options.faulted&&!s.options.quitRequested&&
+            s.options.pageShown&&s.options.inputContainerShown&&s.options.framePublished&&open(s.options.aperture);
+        if(s.route.screen==11)return s.hall.bound&&!s.hall.faulted&&!s.hall.quitRequested&&
+            s.hall.pageShown&&s.hall.inputContainerShown&&s.hall.framePublished&&open(s.hall.aperture);
+        return false;
+    }
+    explicit HallRoute(bool enabled)noexcept:enabled_(enabled){}
+    bool enabled()const noexcept{return enabled_;}
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(moves_+confirms_+hallMoves_);}
+    // The Hall stage frame: TA, settled, after both Confirms.
+    bool captureAllowed(const Snapshot& s)const noexcept{
+        return s.route.screen!=11||(confirms_==2&&!awaitingDispatch_&&settled(s)&&
+            s.hall.courseIndex==0&&s.hall.planetIndex==0);
+    }
+    // -1 wait/hold, 3 Down, 4 Confirm.
+    int poll(const Snapshot& s,std::int32_t group,std::int32_t slot,bool hallCaptured){
+        if(!enabled_)return -1;
+        require(!awaitingDispatch_,"Hall route dispatch receipt was not verified");
+        require(!s.faulted&&!s.quitRequested,"Hall route original UI became unavailable");
+        const auto screen=screens_[confirms_<2?confirms_:2];
+        const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==confirms_;
+        const bool outgoing=confirms_&&s.route.screen==screens_[confirms_-1]&&s.switches==confirms_-1u;
+        require(expected||outgoing,"Hall route left the bounded Main/Options/Hall route");
+        if(!expected||!settled(s))return -1;
+        if(confirms_==2){
+            if(s.hall.courseIndex!=0){
+                // Not opened on TA: step the Hall's course cycle (original Right, 1) until TA.
+                require(hallMoves_<13,"Hall route: TA (course 0) not reached within the 13 Hall courses");
+                courseAtMove_=s.hall.courseIndex;awaitingHallMove_=awaitingDispatch_=true;return 1;
+            }
+            require(s.hall.planetIndex==0,"Hall route: TA (course 0) is not on planet 0");
+            if(!hallCaptured)return -1;
+            if(!holdLogged_){holdLogged_=true;
+                std::cerr<<"hall_route hold screen=11 course="<<s.hall.courseIndex<<" planet="<<s.hall.planetIndex
+                    <<" (no further input; the run ends at its wall budget)\n";}
+            return -1;
+        }
+        // Main and Options: walk Down to slot 4, then Confirm.
+        require((confirms_==0?group==1:group>0)&&slot>=1&&slot<=6&&moves_<12,"Hall route menu selection diverged");
+        if(slot!=4){slotAtMove_=slot;awaitingMove_=awaitingDispatch_=true;return 3;}
+        awaitingDispatch_=true;return 4;
+    }
+    void validateDispatch(const Snapshot& s,std::int32_t group,std::int32_t slot){
+        require(enabled_&&awaitingDispatch_,"Hall route has no pending dispatch receipt");
+        const auto& t=s.transition;
+        if(awaitingHallMove_){
+            require(!s.faulted&&s.route.screen==11&&same(t.current,s.route)&&same(t.requested,s.route)&&
+                s.hall.courseIndex!=courseAtMove_,"Hall route Right did not change the Hall course");
+            ++hallMoves_;awaitingHallMove_=awaitingDispatch_=false;return;
+        }
+        if(awaitingMove_){
+            require(!s.faulted&&s.route.screen==screens_[confirms_]&&same(t.current,s.route)&&same(t.requested,s.route)&&
+                group>0&&slot!=slotAtMove_,"Hall route Down did not move the menu selection");
+            ++moves_;awaitingMove_=awaitingDispatch_=false;return;
+        }
+        require(!s.faulted&&!s.quitRequested&&s.route.screen==screens_[confirms_]&&t.bound&&same(t.current,s.route)&&
+            !same(t.requested,s.route)&&t.requested.screen==screens_[confirms_+1]&&
+            t.lifecycle==Life::requestScreenExit&&t.phase==Phase::none,
+            "Hall route original Confirm did not accept its exact destination");
+        ++confirms_;awaitingDispatch_=false;
+        std::cerr<<"hall_route confirm="<<unsigned(confirms_)<<" target_screen="<<unsigned(t.requested.screen)<<'\n';
     }
 };
 // The same unattended tournament run AFTER a race: the 1AB5BC request opened

@@ -7,6 +7,7 @@
 #include "../assets/original_ui_image_bank50kg.h"
 #include "../assets/original_ui_material_binding50kg.h"
 #include "../assets/original_ui_rider_model_materials50kg.h"
+#include "original_ui_rider_addon_models50dl.h"
 #include <string>
 #include <vector>
 namespace rr::platform {class OriginalUiRiderDrawContribution50KG;class OriginalUiTournamentDrawContribution50KG;}
@@ -23,6 +24,10 @@ struct OriginalUiRiderBackendInput50KG {
     // current Rider static population. Overlap authenticates immutable source
     // definitions only; a private same-owner retirement is required to attach.
     std::shared_ptr<const OriginalUiTournamentPredecessorInventory50KG> tournamentPredecessor;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): the session's add-on pod model table.
+    // Its ready rows' images are appended to the bank AFTER every stock owner, so
+    // stock owner indices and the stock bank are unchanged. nullptr = none.
+    OriginalUiRiderAddonModels50DL* addonModels=nullptr;
 };
 enum class OriginalUiRiderBackendError50KG : std::uint8_t {
     none,input,alreadyBound,material,bank,membership,binder,busy,lifetime,completion,allocation
@@ -78,6 +83,9 @@ public:
     const assets::OriginalUiImageBankMapping50KG* staticImage(std::uint32_t,std::uint32_t) const noexcept;
     const assets::OriginalUiImageBankMapping50KG* modelImage(std::uint16_t,std::uint32_t) const noexcept;
     const assets::OriginalUiImageBankMapping50KG* binderImage(std::uint32_t) const noexcept;
+    // PORT EXTENSION (DLC): image `image` of add-on model table row `row`.
+    const assets::OriginalUiImageBankMapping50KG* addonImage(std::size_t row,std::uint32_t image) const noexcept;
+    const OriginalUiRiderAddonModels50DL* addonModels() const noexcept;
     const assets::OriginalUiRiderModelMaterials50KG* materials(std::uint16_t) const noexcept;
     const OriginalUiRiderVisibilityHandle50KG* membership(std::uint16_t) const noexcept;
     const OriginalUiRiderMaterialLifetime50KG& materialLifetime()const noexcept;
