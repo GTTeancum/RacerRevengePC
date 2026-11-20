@@ -21,6 +21,8 @@
 #include <limits>
 #include <type_traits>
 #include "../../src/game/navigation_view50cr.h"
+#include "../../src/game/track_navigation50eu.h"
+#include "../../src/game/reset_timers50aw.h"
 
 namespace native_original_ai_recovery {
 using namespace rr::game;
@@ -31,13 +33,18 @@ enum class Stage : std::uint8_t {
     Ground,GroundDiagnostic,FinishPhysics,FinishVisibility,Complete
 };
 // Which original call site owns the current 2255B0 continuation.
-enum class Caller : std::uint8_t {None,Scalar16EAA0,Base228BBC,Trigger1B27C0};
+// Restart1AEA70: not a 2255B0 call. The 1AC8E0 race restart's 1AEA70 stores
+// the 2A2880 grid pose through 2169C0 and calls virtual78 = 216A30 directly
+// (between frames); it shares the 216A30 stages from BasePrefix on.
+enum class Caller : std::uint8_t {None,Scalar16EAA0,Base228BBC,Trigger1B27C0,Restart1AEA70};
 struct State {
     Stage stage=Stage::Idle;
     Caller caller=Caller::None;
     std::uint64_t scalarResetSerial=0,completed=0;
     // 228BBC: the base cursor serial (BaseUndertrackContinuation50X::serial).
     std::uint64_t baseSerial=0;
+    // 1AEA70: the restart serial (one per in-place restart, every racer).
+    std::uint64_t restartSerial=0;
     // 1B27C0: the trigger query that issued this reset (issuer, serial,
     // candidate, action). A different query starts a fresh continuation.
     const void* triggerIssuer=nullptr;
@@ -207,12 +214,14 @@ inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindin
     const TriggerQuery* trigger=nullptr) noexcept {
     const bool base=state.caller==Caller::Base228BBC;
     const bool fromTrigger=state.caller==Caller::Trigger1B27C0;
-    if(!base&&!fromTrigger&&state.caller!=Caller::Scalar16EAA0)
+    const bool restart=state.caller==Caller::Restart1AEA70;
+    if(!base&&!fromTrigger&&!restart&&state.caller!=Caller::Scalar16EAA0)
         return fail(diagnostic,0x2255b0u,"AI 2255B0 has no original caller");
     if(fromTrigger!=(trigger!=nullptr))
         return fail(diagnostic,0x2255b0u,"AI 2255B0 trigger caller requires its live trigger query");
     const auto domain=base?UndertrackResetDomain50EW::PlayerPostPackedBytes50S: // 228BBC domain (see 50EW)
         fromTrigger?UndertrackResetDomain50EW::SourceTriggerAiPostWorld:
+        restart?UndertrackResetDomain50EW::PlayerControllerReady50LC: // the Ready domain (see 50EW)
         UndertrackResetDomain50EW::OriginalAiPostPlayer;
     if(state.stage==Stage::Complete)return true;
     visibility::ResetVisibilityLease lease;
@@ -225,6 +234,10 @@ inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindin
             trigger->querySerial,trigger->candidateOrdinal,trigger->actionIndex,state.racer60};
         borrowed=owners.visibility.beginSourceTriggerResetVisibility50MB(state.rosterSlot,frame,bindings,parameters,
             &owners.cables254Field50,identity,lease,diagnostic.visibility);
+    }else if(restart){
+        // 1AEA70 runs between frames: the Ready lease (every racer).
+        borrowed=owners.visibility.beginPlayerInputResetVisibility(state.rosterSlot,frame,bindings,parameters,
+            &owners.cables254Field50,lease,diagnostic.visibility);
     }else borrowed=base?
         owners.visibility.beginPlayerResetVisibility(state.rosterSlot,frame,bindings,parameters,
             &owners.cables254Field50,lease,diagnostic.visibility):
@@ -239,6 +252,9 @@ inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindin
     };
     for(;;)switch(state.stage){
     case Stage::Idle: {
+        // 1AEA70: BC0/BD0 came from 2169C0 (the entry stored them); no
+        // spline selection and no C80 store.
+        if(restart){state.stage=Stage::Placement;break;}
         if(!ordinary_navigation_detail50MB::indicesPrepared(owners.aiTrack)||!ordinary_navigation_detail50MB::gatesPrepared(owners.aiTrack)||
            progress.reset.vehicleC80>=ordinary_navigation_detail50MB::count(owners.aiTrack))
             return fail(diagnostic,0x225620u,"actual AI spline/currentC80 is unavailable");
@@ -277,6 +293,12 @@ inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindin
             if(!visibilityRows[ordinal]||!zone.firstMethod||!zone.secondMethod)
                 return fail(diagnostic,0x225a74u,"actual application zone table row is unbound");
             collisionRows[ordinal]=static_cast<std::uint32_t>(ordinal+1u);
+        }
+        if(restart){
+            // 1AEB60..1AEB70 / 2169C0 216A20..216A2C: C30 = World74+4C0[0],
+            // C34 = World74+4C4[0] (the first application table rows).
+            state.placement.vehicleC30=visibilityRows[0];state.placement.vehicleC34=collisionRows[0];
+            state.stage=Stage::BasePrefix;break;
         }
         if(!ordinary_navigation_detail50MB::bindPlacement(state.selection,owners.aiTrack,
             visibilityRows.data(),collisionRows.data(),count,state.placement,diagnostic.placement))
@@ -482,6 +504,51 @@ inline bool resumeTrigger1B27C0(VehicleFrameState49W& frame,const VehicleFrameBi
     diagnostic.sourcePC=0;
     diagnostic.message="trigger LostAI 2255B0 returned in the same PostWorld collision query";
     return true;
+}
+// Caller 1AEA70 (the 1AC8E0 in-place race restart), between frames, for an
+// original AI: 2169C0 stored start2169C0's BC0 (2A2880 grid position, Y + this
+// racer's 7EC lift, W 1.0) and BD0 (2A2880 heading); C30/C34 are bound here
+// from the first 4C0/4C4 rows; then virtual78 = 216A30 (AI) from 216A50 on.
+// The 216A30 a1 != 0 tail (21737C..2173F4) is the caller's, after this returns
+// (fullReset216A30Tail below). Same durable continuation rules as 2255B0.
+inline bool restart1AEA70(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const AiRuntimeState50IV& ai,const UndertrackPlacement50ET& start2169C0,std::uint64_t serial,
+    State& state,Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    diagnostic={};
+    if(!navigationReadyOrdinaryShared50MB(owners))
+        return fail(diagnostic,0x1aeb74u,"restart ai placement requires the final same-world AI navigation view");
+    if(!serial||!ai.initialized||ai.physicalReset2255B0Pending||frame.phase!=VehicleFramePhase49W::Ready||
+       frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||frame.fields.vehicle3C)
+        return fail(diagnostic,0x1aeb88u,"AI restart virtual78 is not at its between-frames Ready boundary");
+    if(!registered694Bound50UT(bindings,parameters,owners))
+        return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
+    if(state.caller!=Caller::Restart1AEA70||state.restartSerial!=serial){
+        if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
+            return fail(diagnostic,0x1aeb88u,"a race restart cannot replace an unfinished AI reset");
+        rekey50UT(state,Caller::Restart1AEA70,ai);state.restartSerial=serial;
+        // 2169C0 216A10..216A1C: BC0 and BD0 (C30/C34 at Stage::Placement).
+        std::memcpy(state.placement.positionBC0,start2169C0.positionBC0,sizeof state.placement.positionBC0);
+        std::memcpy(state.placement.headingBD0,start2169C0.headingBD0,sizeof state.placement.headingBD0);
+    }
+    if(state.rosterSlot!=ai.managerIndexFE0||state.racer60!=ai.racer60)
+        return fail(diagnostic,0x1aeb88u,"restart placement belongs to another racer");
+    if(!run2255B0Ai50UT(frame,bindings,parameters,progress,state,owners,workspace,diagnostic))return false;
+    diagnostic.sourcePC=0;diagnostic.message="original-AI 1AEA70 virtual78 216A30 returned";
+    return true;
+}
+// 216A30 with a1 != 0, 21737C..2173F4 (after 217374 beq s3): the parts with a
+// port owner, for every racer (Player 1A24F0 and AI 216A30 reach the same
+// tail). 2173F8 D28 = 0 and 217378 82C = 0 run on both a1 paths (the reset
+// body). PORT STAND-IN (restart.txt): 21737C 228110 (wreck pieces deactivate),
+// 217384 217940 (D40 virtual94, racer virtualA8(0), +64/+68 = 0, +78 = CF8) and
+// 2173BC..2173E0 (the D34 row -1,0,0,0,0) have no port owner reachable here.
+inline void fullReset216A30Tail(VehicleFrameState49W& frame,TrackNavigationProgress50EU& progress,
+    BaseTailState50X& tail) noexcept {
+    resetBaseTimers50AW(tail);                         // 21738C 2179B0: AD4..AE4 = 0
+    initializeTrackNavigationProgress50EU(progress);   // 217394..2173B8: C80 1, C84 0, C88 1, C8C 0
+    frame.fields.vehicle844=1u;                        // 2173E4
+    frame.fields.flagB9D0=false;                       // 2173E8..2173F4: B9D bit0 = 0
 }
 
 } // namespace native_original_ai_recovery

@@ -375,6 +375,7 @@ void Context::run() {
  auto& racerVisuals=this->racerVisuals;
  auto& recoveryPaused=this->recoveryPaused;
  const auto& refreshAnimatedCandidates=this->refreshAnimatedCandidatesCall;
+ const auto& restartGridPlacementCall=this->restartGridPlacementCall;
  auto& renderDiagnostics=this->renderDiagnostics;
  auto& renderedCameraPublication=this->renderedCameraPublication;
  auto& renderer=this->renderer;
@@ -2076,18 +2077,21 @@ void Context::run() {
     return true;
    }catch(...){return false;}
   };
-  const auto placeOnGrid2A2880=[&](std::size_t slot)noexcept->bool{
+  const auto placeOnGrid2A2880=[&](std::size_t slot,std::uint32_t a1,bool replay1B0bit4)noexcept->bool{
    // 1AEA70 per racer: rank = slot - humans34 for an AI racer (racer+58 == 1),
-   // slot + manager38 (the AI count) for a human; 2A2880(raceB8 map, rank) then
-   // 2169C0 places the racer at that pose. The 2A2880 geometry is the one map
-   // view's (source_grid50IG), grounded with the racer's own PHY lift.
-   // PORT STAND-IN: no live (mid-race) 2169C0 placement owner is reachable from
-   // this scope (native_racer50HN::placeColdGrid refuses a moved body, and the
-   // racer's query rows / rebase models live in the continuation): the step is
-   // refused after the pose is computed (fix-H.txt, area H).
+   // slot + manager38 (the AI count) for a human; 2A2880(raceB8 map, rank) over
+   // the one map view (source_grid50IG). 2169C0 stores BC0 = position with Y +
+   // racer+7EC (this racer's PHY lift), W = 1.0, and BD0 = the 2A2880 heading;
+   // the continuation's racer owners then run 7F4/C84 = 0, virtual78
+   // (1A24F0 / 216A30, which grounds the pose with its own reset probe) and
+   // the 844 / 3C stores (restartGridPlacementCall). No host grounding here.
+   // PORT STAND-IN (restart.txt): the Time Trial branch 1AEC40..1AECE0
+   // (11258 == 3: manager+40, the record racer, 2A2880 rank 0 + 2169C0 +
+   // virtual78(1)) has no racer in the port's bank; the record actor's own
+   // restart is the 1ACB18 hook.
    try{
     if(slot>=racerBank.count()||!racerBank.active(slot))return false;
-    bool ok=false;std::uint32_t rank=0;rr::game::BodyMatrix48G grounded{};
+    bool ok=false;std::uint32_t rank=0;rr::game::UndertrackPlacement50ET start2169C0{};
     racerBank.visit(slot,[&](){
      const auto humans=static_cast<std::size_t>(originalAiHumanCount);
      const bool ai=s.fields.vehicle58==1u;
@@ -2095,18 +2099,25 @@ void Context::run() {
      rank=static_cast<std::uint32_t>(ai?slot-humans:slot+(racerBank.count()-humans));
      rr::game::GridCenterResult50AC grid{};
      if(rank>7u||!source_grid50IG::prepare(mapView,rank,grid))return;
-     const float lift=x.parameters.visual.verticalLimit7EC;
-     rr::game::BodyMatrix48G requested=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
+     const float lift=x.parameters.visual.verticalLimit7EC; // 2169F8 racer+7EC
      for(unsigned axis=0;axis<3;++axis){
       const float at=std::bit_cast<float>(grid.position[axis]);
-      requested.v[12+axis]=axis==1?at+lift:at;
+      start2169C0.positionBC0[axis]=axis==1?at+lift:at+0.f;     // 2169F0..216A08
+      start2169C0.headingBD0[axis]=std::bit_cast<float>(grid.heading[axis]);
      }
-     ok=native_racer50HN::groundGridPose(ground,requested,lift,groundStack.data(),groundStack.size(),grounded);
+     start2169C0.positionBC0[3]=1.f;                                // 216A0C W = 1.0
+     start2169C0.headingBD0[3]=std::bit_cast<float>(grid.heading[3]);
+     for(float v:start2169C0.positionBC0)if(!std::isfinite(v))return;
+     for(float v:start2169C0.headingBD0)if(!std::isfinite(v))return;
+     ok=true;
     });
     std::cerr<<"race_start_grid pc=2A2880 slot="<<slot<<" rank="<<rank<<" pose_ok="<<ok;
-    if(ok)std::cerr<<" x="<<grounded.v[12]<<" y="<<grounded.v[13]<<" z="<<grounded.v[14];
-    std::cerr<<" live_placement_2169C0=absent\n";
-    return false;
+    if(ok)std::cerr<<" x="<<start2169C0.positionBC0[0]<<" y="<<start2169C0.positionBC0[1]
+        <<" z="<<start2169C0.positionBC0[2];
+    std::cerr<<'\n';
+    if(!ok)return false;
+    // Outside the publication's bank visit: the owner visits the slot itself.
+    return restartGridPlacementCall(slot,start2169C0,a1,replay1B0bit4);
    }catch(...){return false;}
   };
   const auto lockStart1AED30=[&]()noexcept->bool{
@@ -2152,9 +2163,13 @@ void Context::run() {
    // = 141520 on the Time Trial record actor (flags29 bits 0/1 clear, vtable+28).
    return nativeRecordActor&&nativeRecordActor->restart1ACB18();
   };
-  const auto resetCamera=[&](std::uint32_t a1)noexcept->bool{
-   // 1ACBA0 per human 1AF330 / 1750A0, plus 175430(race48) when a1 != 0 (area B).
-   return sourceCameraSession&&sourceCameraSession->rebindRacerCameras1ACBA0(a1);
+  const auto resetCamera=[&](std::uint32_t a1,bool replay1B0bit4)noexcept->bool{
+   // 1ACBA0 per human 1AF330 / 1750A0, 1AFC70(B4) and 1ACD44 (area B's Session).
+   if(!sourceCameraSession)return false;
+   if(sourceCameraSession->rebindRacerCameras1ACBA0(a1,replay1B0bit4))return true;
+   const auto& d=sourceCameraSession->diagnostic();
+   try{std::cerr<<"race_start_camera pc=1ACBA0 refused_pc="<<std::hex<<d.sourcePC<<std::dec<<'\n';}catch(...){}
+   return false;
   };
   const auto readBestLapCB4=[&](std::size_t slot,float& bestLapCB4)noexcept->bool{
    try{

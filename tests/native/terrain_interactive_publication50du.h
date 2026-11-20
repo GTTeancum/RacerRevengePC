@@ -482,6 +482,12 @@ struct Context final {
     using recoveryPausedType = bool;
     recoveryPausedType& recoveryPaused;
     BorrowedCall<bool()> refreshAnimatedCandidatesCall;
+    // 1AEA70 per racer after 2A2880 (restart only), bound by the continuation over
+    // that racer's own recovery owners: 7F4/C84 = 0, 2169C0 (start2169C0 BC0/BD0),
+    // virtual78 (1A24F0 / 216A30, a1 = !replay1B0bit4, a2 = 1), 844 = (a1 != 0),
+    // B0+3C[slot] = 0. Slot 0 first performs 16E830 for every AI (1AEA88..1AEAC4).
+    BorrowedCall<bool(std::size_t slot,const rr::game::UndertrackPlacement50ET& start2169C0,
+        std::uint32_t a1,bool replay1B0bit4)noexcept> restartGridPlacementCall;
     using renderDiagnosticsType = render_diagnostics50GQ::Interval;
     renderDiagnosticsType& renderDiagnostics;
     using renderedCameraPublicationType = std::uint64_t;

@@ -684,6 +684,9 @@ class Session final {
     OriginalGcGaIntroExitOwner exit_;
     OriginalDirectRaceStartOwner directStart_;
     bool directStartPending_=false;
+    // The in-place restart's one 1A9750(race, a1) call (rebindRacerCameras1ACBA0).
+    OriginalRaceViewportCall restartViewport_;
+    bool restartViewportCold_=false,restartViewportPending_=false;
     OriginalRaceStartCountdown countdown_;
     // race+D4 PodRaceStartOverlay (196F20), one per race on every course.
     // Shared with the renderer, which may outlive this Session.
@@ -1364,30 +1367,160 @@ public:
         }catch(...){return false;}
     }
     std::shared_ptr<const OriginalRaceStartOverlay50HU> startOverlay()const noexcept{return startOverlay_;}
-    // 1ACBA0 (in-place restart 1AC8E0), course-free: per human i below
-    // race+1B0 low2, 1750A0(race48[i], 1AF330(racerB0,i), i, 0) re-binds that
-    // human's controller to its racer and re-places the follow camera on the
-    // grid (2A2880, 179580, 13DDB0, 1148D0/175224 visibility), then camera34[i]
-    // vtable+18; with a1 != 0 also 175430(race48) (mode44 4, cut cursor 0,
-    // 1756D0 when the cut count is nonzero, 62/63 flags, 7C restart, 199770).
-    // PORT STAND-IN (flagged): only the racer-identity part of 1750A0 is
-    // checked (the racer owners survive the restart, so its binding stores are
-    // unchanged). The grid re-placement, the visibility re-registration, the
-    // camera34 vtable+18 reset and 175430 are not ported: the call refuses
-    // with the first unported pc in diagnostic(), so the race start logs the
-    // step as refused (same camera behaviour as before the rewrite).
-    bool rebindRacerCameras1ACBA0(std::uint32_t a1)noexcept{
-        if(!onOwnerThread()||closed_||abandoned_||!coldBound_){set(Status::owner,0x1acba0);return false;}
+    // 1ACBA0..1ACE10 camera and B4 part of the in-place restart 1AC8E0,
+    // course-free, run after the racers' 1AEA70 grid placement:
+    //  * per human i below race+1B0 low2: 1750A0(race48[i], 1AF330(B0,i), i, 0).
+    //    Its 179D90/13DEF0/13DEE0/286D20 and +40/+A8 stores re-bind the SAME
+    //    racer owners (identity checked). 175148..175150: follow+108 (the CAM
+    //    preset storage 2842F0/286860 allocate) is set once the fresh 179580 ran,
+    //    so the restart skips 175158..175204 (2A2880 rank 1, 308C90, 179580).
+    //    175208 13DDB0(attached6C, racer CE0, 90); 175224..175250 camera3C leaves
+    //    its zone (1148D0) and re-attaches at the racer's 7F0 zone and saved 20
+    //    (114770 method 2); 18AD20(raceC4, racer) stores the same racer.
+    //  * 1ACBE8 camera34 slots > 0 virtual18: the port has one camera (none).
+    //  * 1ACC24: race1B0 bit4 (replay) skips 1ACC34..1ACE10.
+    //  * 1ACC7C 1AFC70(B4), then 1ACD44:
+    //    a1 != 0: 175430(race48) (restartIntro175430 below) + 1A9750(race,1);
+    //    a1 == 0: 1ACD68 1AFD80(B4): countdown re-arm, 1AD330, 1A9750(race,0),
+    //    1AD3C0 for 11258 2/3.
+    // 1A9750 is this Session's viewport call (cold = a1); a renderer drain that
+    // must wait for the next image resumes at the next advanceSceneChild.
+    // The caller (race start) performs 175430's 199770 on the race's own F8;
+    // this Session applies the same call to its native HUD projection.
+    // PORT STAND-IN (restart.txt): 2D2090's TV +24 = 0, and 1AFC70's per-racer
+    // 3C/40/44 rows, +4C/+50/+54 (no port field in LapTimingManager50ID).
+    bool rebindRacerCameras1ACBA0(std::uint32_t a1,bool replay1B0bit4)noexcept{
+        if(!onOwnerThread()||closed_||abandoned_||!coldBound_||!displayInputs_){set(Status::owner,0x1acba0);return false;}
+        if(pendingDisplayWork()||restartViewportPending_||exit_.requestPending()||taSkipFadeRequest_.pending()||
+           (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published)){
+            set(Status::order,0x1acba0);return false;}
+        const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
+        if(!replay1B0bit4&&!a1&&(launch==2||launch==3)&&!actual_.startMusicRequest){set(Status::owner,0x1ad3c0);return false;}
         // 1A95B0 builds one controller per human; the native camera owns the
-        // single-human slot. Zero humans: the 1ACBA0 loop and 175430 do not run.
-        if(!actual_.humanCount34){
-            if(a1){set(Status::owner,0x175430);return false;}
-            set(Status::complete,0x1acbdc);return true;
+        // single-human slot. Zero humans: the 1ACBA0 loop does not run.
+        if(actual_.humanCount34>1u){set(Status::owner,0x1750a0);return false;}
+        if(actual_.humanCount34==1u){
+            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(0)){
+                set(Status::owner,0x1750a0);return false;}
+            // follow+108 clear would be the fresh 179580 path: not a restart.
+            if(!follow_.prepared||!follow_.bank.records||!follow_.bank.count){set(Status::sourcePath,0x175174);return false;}
+            if(!attached_.prepared||!attachedOffset_.sourceMemberIdentity||attachedOffset_.pod60!=attached_.binding.pod60){
+                set(Status::owner,0x175208);return false;}
+            lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+               !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_))){set(Status::visibility,0x175224);return false;}
+            auto* world=lease.world();auto* workspace=lease.workspace();const auto* racer7F0=lease.racerVisibility7F0();
+            if(!world||!workspace||!racer7F0){set(Status::visibility,0x175224);return false;}
+            // 175208..175220 13DDB0: +4 = 90, +10 = racer CE0 (filters 30/34/38 already allocated).
+            attached_.fov04=90.f;attached_.offset10=attachedOffset_.racerCE0;++attached_.revision;
+            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*workspace);
+            if(result_.spatial.status!=LiveZoneStatus50EN::Complete){set(Status::visibility,0x175224);return false;}
+            result_.spatial=attachOriginalCameraSceneFromRacer175224(*world,spatial_,*racer7F0,*workspace);
+            if(result_.spatial.status!=LiveZoneStatus50EN::Complete){set(Status::visibility,0x175250);return false;}
+            if(!readOriginalFollowSceneBinding(spatial_,visibilityKeys_.view(),sceneBinding_)){set(Status::owner,0x175250);return false;}
+            pose_.position=sceneBinding_.position180;
         }
-        if(actual_.humanCount34!=1u||!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||
-           !actual_.bank.active(0)){set(Status::owner,0x1750a0);return false;}
-        set(Status::sourcePath,0x175174);return false; // 2A2880 grid re-placement: not ported.
+        if(replay1B0bit4){set(Status::complete,0x1ace14);return true;}
+        // 1AFC70(B4) on the port's fields: flags58 bits 0..4 = 0, +30 = 0, +34 = 0.
+        actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58&~0x1fu);
+        actual_.all8Manager.time30=0.f;countdown_.countdown34=0.f;
+        restartHostRows1AC8E0();
+        if(a1){
+            if(!restartIntro175430())return false;
+        }else{
+            // 1AFD80: +34 = App33C ? 0.2 : 5.2, +58 bit2, 1AD330 (no 101C10 call).
+            const auto begun=beginOriginalRaceCountdown1AFD80(countdown_,actual_.all8Manager,
+                displayInputs_->application33C,launch,startActions_);
+            if(begun.status!=OriginalCameraStartStatus::complete){set(Status::sourcePath,begun.sourcePC);return false;}
+            auto& host=actual_.hostRace.rows();
+            host.config.countdownSeconds=static_cast<double>(countdown_.countdown34);
+            host.countdownRemaining=host.config.countdownSeconds;
+        }
+        // The port's per-racer view of the manager word (as at 1AFF38).
+        for(std::size_t i=0;i<actual_.bank.count();++i)
+            actual_.bank.visit(i,[&](){actual_.arena.fields.applicationByte58=actual_.all8Manager.flags58;});
+        // 1ACD58 1A9750(race,1) / 1AFDE0 1A9750(race,0).
+        if(!beginRestartViewport1A9750(a1!=0u))return false;
+        if(!a1&&(launch==2||launch==3)){
+            // 1AFDE8..1AFE18 1AD3C0 for 11258 2/3: the same one 308030 draw and
+            // start line as OriginalEventStartMusic (1AD3DC..).
+            if(std::fegetround()!=FE_TONEAREST){set(Status::numeric,0x1ad3dc);return false;}
+            auto& raw=actual_.arena.noiseOwner().sharedRandomState;raw=raw*0x41c64e6du+0x3039u;
+            volatile float converted=static_cast<float>(static_cast<std::int32_t>(raw&0x7fffffffu));
+            volatile float probability=converted*0x1p-31f;
+            if(!actual_.startMusicRequest(actual_.startMusicContext,probability<0.5f?45:44,1)){
+                set(Status::sourcePath,0x1a46e0);return false;}
+        }
+        set(Status::complete,0x1ace10);return true;
     }
+private:
+    // Host rows mirror the one restarted race clock (they keep no clock of
+    // their own): Countdown, no finish, no race time, unobserved racers. The
+    // countdown seconds are re-installed by 1AFD80 (a1 == 0 here, a1 != 0 at
+    // the intro exit, which requires exactly these rows).
+    void restartHostRows1AC8E0()noexcept{
+        auto& host=actual_.hostRace.rows();
+        host.phase=race_session50HM::Phase::Countdown;host.error=race_session50HM::Error::None;
+        host.resultsClosed=false;host.finishCount=0;host.raceSeconds=0;host.countdownRemaining=0;
+        for(std::uint32_t i=0;i<host.racerCount&&i<race_session50HM::maxRacers;++i)
+            host.racers[i]=race_session50HM::Racer{};
+        goPublished_=false;goEdgePending_=false;
+    }
+    // 175430(race48): mode44 = 4; +60 bits 12..16 (the cut cursor) = 0; with
+    // an effective cut count (A8 bits 4..8) > 0, 1756D0 selects cut 1; +62
+    // bit7 = 0, +8C = 0, +63 bit0 = 0; 7C: 2D7980 (route[0] != -1) -> 2D5890;
+    // 199770(F8, 1,1,1,0,1) (native projection here; the F8 owner by the race
+    // start). The next frames run the same intro machine as the cold start, so
+    // its one-shot exit owners (direct start / intro exit / skip fade) and the
+    // countdown installation are new source invocations again.
+    bool restartIntro175430()noexcept{
+        if(exit_.requestPending()||taSkipFadeRequest_.pending()){set(Status::order,0x175430);return false;}
+        controller_.mode44=4;
+        coldController_.word60Value&=~0x1f000u;taCutCursor_=0;
+        if(startPrelude_.controllerCutCountA8()>0&&!nextTaCut1756D0()){set(Status::sourcePath,taFailurePC_);return false;}
+        controller_.flags62=static_cast<std::uint8_t>(controller_.flags62&0x7fu);controller_.cooldown8C=0.f;
+        controller_.flags63Low5=static_cast<std::uint8_t>(controller_.flags63Low5&~1u);
+        if(start_.prepared&&start_.route[0]!=-1){
+            RaceStartRacerBank bank;GcStartRacerEffectBank unused;
+            if(!readRacers(bank,unused)){set(Status::owner,0x2d5890);return false;}
+            std::array<std::uint32_t,4> samples{};std::size_t sampled=0;
+            for(;;){
+                RaceStartPreparationReceipt receipt;
+                const auto status=rerouteOriginalRaceStartCamera2D5890(start_,bank,actual_.sharedRandom,
+                    actual_.arena.noiseOwner(),{samples.data(),sampled},receipt);
+                if(status==RaceStartStatus::missingClockSample){
+                    if(sampled==samples.size()||!sampleHostTimestamp50ID(actual_.applicationClock,samples[sampled])){
+                        set(Status::clock,0x101a50);return false;}
+                    ++sampled;continue;
+                }
+                if(status!=RaceStartStatus::ok){set(Status::numeric,0x2d5890);return false;}
+                break;
+            }
+        }
+        // 199770(1,1,1,0,1): bit2 = 1, bit3 = 0, bit4 = 1; a1 = 1 sets a clear
+        // bit0 (a2 = 1 keeps 1E0).
+        uiFlags1E4_=static_cast<std::uint8_t>((uiFlags1E4_&~0x08u)|0x15u);
+        std::destroy_at(&exit_);std::construct_at(&exit_);
+        directStart_=OriginalDirectRaceStartOwner{};directStartPending_=false;
+        std::destroy_at(&taSkipFadeRequest_);std::construct_at(&taSkipFadeRequest_);
+        taExitReason_=0;taSkipFadeFinished_=false;countdownInstalled_=false;
+        return true;
+    }
+    // One 1A9750(race, cold) invocation per restart; a blocked renderer drain
+    // keeps this same call for the next frame (no prefix replay).
+    bool beginRestartViewport1A9750(bool cold)noexcept{
+        restartViewport_=OriginalRaceViewportCall{};restartViewportCold_=cold;
+        return resumeRestartViewport1A9750();
+    }
+    bool resumeRestartViewport1A9750()noexcept{
+        auto& app=*displayInputs_;
+        result_.start=restartViewport_.advance(restartViewportCold_,display_,sceneBorrow(),app.renderer,app.diagnostic);
+        if(result_.start.status==OriginalCameraStartStatus::complete){restartViewportPending_=false;return true;}
+        if(result_.start.status==OriginalCameraStartStatus::rendererNoImage||
+           result_.start.status==OriginalCameraStartStatus::rendererDrain){restartViewportPending_=true;return true;}
+        restartViewportPending_=false;set(Status::renderer,result_.start.sourcePC);return false;
+    }
+public:
     // 1983A0 on the race's one start overlay (raceD4): age 0.75, the four
     // once-flags cleared (the in-place restart 1AC8E0 at 1ACDF0). False when
     // the overlay was never loaded (caller logs the refusal).
@@ -1725,7 +1858,7 @@ public:
             (endingFadeRequested_&&!endingFade_.complete()));
     }
     bool pendingDisplayWork()const noexcept {
-        return displayInputs_&&(videoRequestPending50LA()||(displayInputs_->video.flags404Low6&3u)||
+        return displayInputs_&&(restartViewportPending_||videoRequestPending50LA()||(displayInputs_->video.flags404Low6&3u)||
             (raceFlags1B0_&8u)||displayInputs_->fadeManagerA8==8||
             (asyncFade_.started()&&!asyncFade_.complete())||
             (taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
@@ -2076,6 +2209,8 @@ public:
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         if(frameStage_==FrameStage::idle||frameStage_==FrameStage::published){
+            // A restart's 1A9750 blocked on the renderer drain resumes first.
+            if(restartViewportPending_&&!resumeRestartViewport1A9750())return fail(Status::renderer,result_.start.sourcePC);
             if(pendingDisplayWork())return set(Status::videoPending);
             if(publicationCount_==std::numeric_limits<std::uint64_t>::max())return fail(Status::order);
             if(!frame||frame<=completedFrame_)return set(Status::order);

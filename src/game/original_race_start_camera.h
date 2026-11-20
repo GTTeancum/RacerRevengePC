@@ -80,6 +80,12 @@ enum class RaceStartStatus : std::uint8_t {
 RaceStartStatus prepareOriginalRaceStartCamera(OriginalRaceStartCamera&,
     const RaceStartRacerBank&, RaceStartRandomGlobals&, CoupledNoiseContext49M&,
     RaceStartSeedSamples, RaceStartPreparationReceipt&) noexcept;
+//2D5890 alone on an already prepared child (175430 -> 2D7980 route[0] != -1
+// -> 2D5890, the in-place restart 1AC8E0 a1 != 0): a new route draw on the
+// existing 2D52E0 grid with the SAME shared RNG. Staged; commits only on ok.
+RaceStartStatus rerouteOriginalRaceStartCamera2D5890(OriginalRaceStartCamera&,
+    const RaceStartRacerBank&, RaceStartRandomGlobals&, CoupledNoiseContext49M&,
+    RaceStartSeedSamples, RaceStartPreparationReceipt&) noexcept;
 //2D6DD0. Invoked by controller1762D8 after source selects the registered child.
 RaceStartStatus activateOriginalRaceStartCamera(OriginalRaceStartCamera&,
     const RaceStartRacerBank&) noexcept;

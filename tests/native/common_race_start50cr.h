@@ -105,11 +105,15 @@ struct Hooks final {
     // 1AEA70 -> 216690 for one racer: CB0/CB8/CC0 (CB4 kept when 11258==3, lap_timing50id.h),
     // CC8/CCC/CD8 and its 217420 leaf (racer +7D0..+7DC, +D38/+D3C zeroed). Restart only.
     Hook<bool(std::size_t slot,std::uint32_t mode11258)noexcept> resetRacerTiming216690;
-    Hook<bool(std::size_t slot)noexcept> placeOnGrid2A2880;   // 1AEA70 2A2880 per racer (restart only; fresh = cold load)
+    // 1AEA70 per racer (restart only; fresh = cold load): 16E830 (AI, all first), 2A2880 rank pose,
+    // 7F4/C84 = 0, 2169C0, virtual78(a1 = !race1B0 bit4, a2 = 1), 844 = (1AC8E0 a1 != 0), B0+3C[slot] = 0.
+    Hook<bool(std::size_t slot,std::uint32_t a1,bool replay1B0bit4)noexcept> placeOnGrid2A2880;
     Hook<bool()noexcept> lockStart1AED30;                    // 1AED30 start lock (fresh and restart)
     Hook<bool()noexcept> showStartOverlay197040;             // 197040 fresh / 1983A0(raceD4) restart: the race's start overlay
     Hook<bool()noexcept> restartRecordActor;                 // 1ACB18 B0+40 vtable+18 record actor (11258==3 and bit4 clear only)
-    Hook<bool(std::uint32_t a1)noexcept> resetCamera;        // 1ACBA0 per human 1AF330/1750A0; a1 != 0 also 175430(race48)
+    // 1ACBA0 per human 1AF330/1750A0; unless race1B0 bit4 (1ACC24): 1AFC70(B4), then 1ACD44
+    // a1 != 0: 175430(race48) + 1A9750(race,1); a1 == 0: 1AFD80(B4) countdown re-arm.
+    Hook<bool(std::uint32_t a1,bool replay1B0bit4)noexcept> resetCamera;
     // Read only, for common_race_start best_lap_cb4= (PLAN 5.5 run 3): the human slot's CB4
     // after the 216690 reset. Empty = the field is logged as 0; never a refusal.
     Hook<bool(std::size_t slot,float& bestLapCB4)noexcept> readBestLapCB4;

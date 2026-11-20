@@ -300,6 +300,22 @@ RaceStartStatus prepareOriginalRaceStartCamera(C& destination,const RaceStartRac
     destination=next;globals=stagedGlobals;shared.sharedRandomState=stagedRaw;receipt=stagedReceipt;
     return RaceStartStatus::ok;
 }
+RaceStartStatus rerouteOriginalRaceStartCamera2D5890(C& destination,const RaceStartRacerBank& bank,
+    RaceStartRandomGlobals& globals,CoupledNoiseContext49M& shared,RaceStartSeedSamples samples,
+    RaceStartPreparationReceipt& receipt) noexcept {
+    if(!matches(destination,bank)||!destination.prepared||destination.route[0]==-1)return RaceStartStatus::invalidOwner;
+    if(std::fegetround()!=FE_TONEAREST)return RaceStartStatus::unsupportedNumericDomain;
+    C next=destination;Math math;auto stagedGlobals=globals;auto stagedRaw=shared.sharedRandomState;
+    RaceStartPreparationReceipt stagedReceipt{};
+    Random random{math,stagedGlobals,stagedRaw,samples,stagedReceipt};
+    route(next,bank,random,math);
+    if(random.missing)return RaceStartStatus::missingClockSample;
+    if(random.invalid)return RaceStartStatus::invalidSourceState;
+    if(!math.ok)return RaceStartStatus::unsupportedNumericDomain;
+    if(!stateValid(next))return RaceStartStatus::invalidSourceState;
+    destination=next;globals=stagedGlobals;shared.sharedRandomState=stagedRaw;receipt=stagedReceipt;
+    return RaceStartStatus::ok;
+}
 RaceStartStatus activateOriginalRaceStartCamera(C& destination,const RaceStartRacerBank& bank) noexcept {
     if(!matches(destination,bank))return RaceStartStatus::invalidOwner;
     if(!stateValid(destination))return RaceStartStatus::invalidSourceState;

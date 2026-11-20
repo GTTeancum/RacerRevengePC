@@ -95,7 +95,12 @@ bool entryDomain(const VehicleFrameState49W& s,UndertrackResetDomain50EW domain)
         return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&
             (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
     case UndertrackResetDomain50EW::PlayerControllerReady50LC:
-        return s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u;
+        // The Ready (between frames) domain: the 1A17A4 Player input reset, and
+        // the 1AC8E0 race restart's 1AEA70 virtual78 for every racer (Player
+        // 1A24F0 or original AI 216A30 with bound owners). Name kept to avoid a
+        // header round; rename to ReadyBetweenFrames with the next header batch.
+        return s.phase==VehicleFramePhase49W::Ready&&
+            (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
     case UndertrackResetDomain50EW::SourceTriggerAiPostWorld:
         return s.phase==VehicleFramePhase49W::PostWorld&&s.fields.vehicle58==1u&&
             s.fields.nativeAiOwnersBound50IV&&

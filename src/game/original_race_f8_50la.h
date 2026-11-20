@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 namespace original_main_entry50KG { struct Application; class RaceF8RendererLease50LA; class NativeF8BarPrefix50LA; }
+namespace common_race_start50CR { class Owner; }
 namespace rr::assets {
 class OriginalStandardMaterialDomain50LA;
 class OriginalStandardMaterialContext50LA;
@@ -30,6 +31,8 @@ class OriginalRaceF850LA final {
     friend class ::original_main_entry50KG::RaceF8RendererLease50LA;
     friend class ::original_main_entry50KG::NativeF8BarPrefix50LA;
     friend class OriginalRaceConstructor50LA;
+    // The in-place restart 1AC8E0 a1 != 0: 175430's 199770(F8,1,1,1,0,1).
+    friend class ::common_race_start50CR::Owner;
     struct Impl;
     std::unique_ptr<Impl> impl_;
     OriginalRaceF850LA(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t);

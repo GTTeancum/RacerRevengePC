@@ -3084,6 +3084,99 @@ SessionExit50DU Context::run() {
    }else require50DU(sourceCameraInput.bind(*sourceCameraSession,controlPresets),"original camera input bind rejected");
   };
   auto bindResultsFeedback=[&](){sourceResultsFeedback.bindAfterPublication(*this,racerBank);};
+  // 1AEA70 per racer for the in-place restart 1AC8E0 (one path for every course
+  // and pod; the publication computes the 2A2880 pose and calls this per slot in
+  // manager order). The pose belongs to the racer's own recovery owners: the
+  // SAME 216A30 stages as 2255B0 (human 1A24F0 prefix + 1A0240; AI 216A30),
+  // entered with 2169C0's BC0/BD0 in the Ready (between frames) domain.
+  std::uint64_t restartSerial1AEA70=0;
+  const auto restartGridPlacement1AEA70=[&,requireRuntimeNavigation,refreshAnimatedCandidates,recoveryQueries](
+      std::size_t slot,const rr::game::UndertrackPlacement50ET& start2169C0,std::uint32_t a1,bool replay1B0bit4)noexcept->bool{
+   std::uint32_t pc=0x1aeb74u;const char* why="restart placement owner unavailable";
+   const auto refuse=[&]()noexcept{
+    try{std::cerr<<"race_start_grid pc=1AEA70 slot="<<slot<<" refused_pc="<<std::hex<<pc<<std::dec
+        <<" reason="<<(why?why:"unknown")<<'\n';}catch(...){}
+    return false;
+   };
+   try{
+    if(slot>=racerBank.count()||!racerBank.active(slot)||!originalRecoveryEnabled||!originalResetGround||
+       !originalRecoveryWorkspace||slot>=racerCables.size()||!racerCables[slot]||!originalAiAudio)return refuse();
+    if(slot==0){
+     if(restartSerial1AEA70==std::numeric_limits<std::uint64_t>::max())return refuse();
+     ++restartSerial1AEA70;
+     // 1AEA88..1AEAC4: 16E830(racer, 1) for every AI (manager slots humans34
+     // up to count30) before any racer is placed (a1 is overwritten at 16E830).
+     for(std::size_t ai=static_cast<std::size_t>(originalAiHumanCount);ai<racerBank.count();++ai){
+      const bool reset=racerBank.visit(ai,[&](){
+       if(s.fields.vehicle58!=1u||!originalAi.initialized)return false;
+       rr::game::resetAiRuntimeScalars50IV(originalAi,s.bodies.main.controls.player.flagsB9C);return true;});
+      if(!reset){pc=0x16e830u;why="16E830 needs an initialized original AI in every AI slot";return refuse();}
+     }
+    }
+    bool placed=false;
+    racerBank.visit(slot,[&](){
+     requireRuntimeNavigation();
+     if(!refreshAnimatedCandidates()){pc=0x124cb0u;why="world publication unavailable";return;}
+     const auto drained=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,trackCounts.events);
+     if(drained.status!=ZoneQueueStatus50CQ::Complete||drained.remaining){
+      pc=0x124cb0u;why="world registration queue pending";return;}
+     // 1AEB44/1AEB48: racer 7F4 = 0 (the AI's last zone; no Player port field)
+     // and C84 = 0, before 2169C0.
+     navigationProgress.vehicleC84=0;
+     if(s.fields.vehicle58==1u)originalAi.navigation.lastZone7F4=0;
+     const auto queries=recoveryQueries();const auto& relative=x.secondaryInputs.targetRelative2F0;
+     const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
+     auto heightDomain=selectedRuntimeHeightDomain;
+     if(s.fields.vehicle58==0u){
+      // 1AEB88 virtual78 = 1A24F0 (Player), same owner set as the 1A17A4 reset.
+      if(!liveAudio||humanBaseUndertrack.pending||
+         originalManualResetSerial==std::numeric_limits<std::uint64_t>::max()){pc=0x1a24f0u;why="human reset owner busy";return;}
+      std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
+      auto& controllerD40=liveAudio->humanController();
+      if(!originalAiAudio->humanPhysicalResetOwners(playerRacer60,s,controllerD40,flags22C,field24C)||
+         flags22C!=&controllerD40.flags22C()||!field24C){pc=0x1a259cu;why="human D40/D44 reset owners unavailable";return;}
+      if(track.hasWater())require50DU(track.roles.water&&track.roles.water->bindResetDomain(selectedRuntimeHeightDomain,
+          terrainOwner.lift1F0,heightDomain),"human restart requires actual same-runtime water334 and live348 lift");
+      native_original_human_recovery::Owners owners{lightOwner,racerCables[slot]->visibility50(),
+          controllerD40,lapContinuity.prefix,*field24C,mapView,heightDomain,
+          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
+          *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount};
+      ++originalManualResetSerial; // the one Ready-domain serial of the human State
+      if(!native_original_human_recovery::restart1AEA70(s,x.bindings,x.parameters,navigationProgress,start2169C0,
+          originalManualResetSerial,originalHumanRecovery,owners,*originalRecoveryWorkspace,originalHumanRecoveryDiagnostic)){
+       pc=originalHumanRecoveryDiagnostic.sourcePC;why=originalHumanRecoveryDiagnostic.message;return;}
+      // The Ready lease publishes on the next ordinary graphics sequence.
+      originalManualResetGraphicsDue=graphicsSequence[0]+1u;
+     }else{
+      // 1AEB88 virtual78 = 216A30 (original AI), same owner set as 2255B0.
+      std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
+      if(!originalAiAudio->physicalResetOwners(slot,originalAi.racer60,s,flags22C,field24C)||!flags22C||!field24C){
+       pc=0x216a80u;why="AI D40/D44 reset owners unavailable";return;}
+      if(track.hasWater())require50DU(slot<nativeWaterRacers.size()&&nativeWaterRacers[slot]&&
+          nativeWaterRacers[slot]->bindResetDomain(selectedRuntimeHeightDomain,terrainOwner.lift1F0,heightDomain),
+          "AI restart requires the racer's water reset domain");
+      native_original_ai_recovery::Owners owners{lightOwner,racerCables[slot]->visibility50(),
+          *flags22C,*field24C,aiView,heightDomain,resetGlobals,resetLifecycle,
+          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount};
+      if(!native_original_ai_recovery::restart1AEA70(s,x.bindings,x.parameters,navigationProgress,originalAi,
+          start2169C0,restartSerial1AEA70,originalRecovery,owners,*originalRecoveryWorkspace,originalRecoveryDiagnostic)){
+       pc=originalRecoveryDiagnostic.sourcePC;why=originalRecoveryDiagnostic.message;return;}
+     }
+     // virtual78 a1 = !race1B0 bit4 (1AEB9C..1AEBB4): 216A30's a1 != 0 tail.
+     if(!replay1B0bit4)native_original_ai_recovery::fullReset216A30Tail(s,navigationProgress,baseTail);
+     // 1AEBB8..1AEBCC: 844 = (1AC8E0 a1 != 0).
+     s.fields.vehicle844=a1?1u:0u;
+     // PORT STAND-IN (restart.txt): 1AEBD0..1AEBE0 B0+3C[slot] = 0 (no port
+     // field carries the manager's +3C row) and, with race1B0 bit4 set,
+     // 1AEC00..1AEC24 D40 virtual80 / virtual8C (no port owner).
+     placed=true;
+    });
+    if(!placed)return refuse();
+    return true;
+   }catch(const std::exception& e){why=e.what();return refuse();}
+   catch(...){return refuse();}
+  };
   interactive_publication50DU::Context publicationContext50DU{
   .track=track,
   .laps=laps,
@@ -3321,6 +3414,8 @@ SessionExit50DU Context::run() {
   .racerVisuals=racerVisuals,
   .recoveryPaused=recoveryPaused,
   .refreshAnimatedCandidatesCall=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
+  .restartGridPlacementCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,const rr::game::UndertrackPlacement50ET&,
+      std::uint32_t,bool)noexcept>{restartGridPlacement1AEA70},
   .renderDiagnostics=renderDiagnostics,
   .renderedCameraPublication=renderedCameraPublication,
   .renderer=renderer,

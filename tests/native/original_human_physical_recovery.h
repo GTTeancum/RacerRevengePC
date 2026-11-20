@@ -28,6 +28,9 @@ struct State {
     ResetGroundResult50IZ ground{};
     std::uint32_t vehicle850=0;
     bool vehicle850Known=false;
+    // This continuation is the 1AEA70 race-restart virtual78 (BC0/BD0 from
+    // 2169C0), not a 2255B0 reset.
+    bool restart1AEA70=false;
 };
 struct Diagnostic {
     std::uint32_t sourcePC=0;
@@ -91,6 +94,19 @@ bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
 bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,State& state,Owners& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
+
+// 1AEA70 (the 1AC8E0 in-place race restart), between frames: 2169C0 stored
+// start2169C0's BC0 (2A2880 grid position, Y + this racer's 7EC lift, W 1.0)
+// and BD0 (2A2880 heading); C30/C34 are bound from the first 4C0/4C4 rows;
+// then virtual78 = 1A24F0(a1, a2=1): 1A2508 prefix, 1A0240 (3C == 0), 216A30
+// from 216A50 on. PORT STAND-IN (restart.txt): 1A24F0's a1 != 0 block
+// 1A2578..1A258C (racer350+100 = racer10A4, 1098 = 5.0, FF8 = 0) has no port
+// owner. The 216A30 a1 != 0 tail is the caller's (native_original_ai_recovery::
+// fullReset216A30Tail). Shares the Ready domain/lease with resetController2255B0.
+bool restart1AEA70(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const UndertrackPlacement50ET& start2169C0,std::uint64_t serial,State& state,Owners& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
 
 } // namespace native_original_human_recovery

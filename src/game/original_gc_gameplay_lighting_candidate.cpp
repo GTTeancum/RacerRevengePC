@@ -1209,6 +1209,14 @@ static bool baseUndertrackRacer228BBC(const VehicleFrameState49W& s) noexcept {
     return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&
         (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
 }
+// The Ready (between frames) lease ("player input" lease; rename with the next
+// renderer-header batch): the 1A17A4 Player input reset, and the 1AC8E0 race
+// restart's 1AEA70 virtual78 (1A24F0 / 216A30) for every racer, Player or
+// original AI with bound owners. Completion needs the next graphics publication.
+static bool readyRacerBetweenFrames(const VehicleFrameState49W& s) noexcept {
+    return s.phase==VehicleFramePhase49W::Ready&&
+        (s.fields.vehicle58==0u||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV));
+}
 bool Owner::resetLeaseCurrent(const ResetVisibilityLease& lease) const noexcept {
     if(!storage_||invalidated_||lease.owner_!=this||!lease.frame_||
        !lease.bindings_||!lease.parameters_)return false;
@@ -1222,7 +1230,7 @@ bool Owner::resetLeaseCurrent(const ResetVisibilityLease& lease) const noexcept 
         s.bodies.main.phase==MainBodyPhase49K::AwaitingWorldPreparation&&
         s.bodies.phase==CoupledBodyPhase49M::AwaitingWorldPreparation:
         lease.player_?
-        (lease.input_?s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u:
+        (lease.input_?readyRacerBetweenFrames(s):
             baseUndertrackRacer228BBC(s)):
         s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
     return domain&&!v.sourceTerminalRetired&&
@@ -1272,7 +1280,7 @@ bool Owner::beginResetVisibility(std::uint32_t slot,const VehicleFrameState49W& 
         s.bodies.main.phase==MainBodyPhase49K::AwaitingWorldPreparation&&
         s.bodies.phase==CoupledBodyPhase49M::AwaitingWorldPreparation:
         player?
-        (input?s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u:
+        (input?readyRacerBetweenFrames(s):
             baseUndertrackRacer228BBC(s)):
         s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
     if(!domain||s.fields.vehicle3C)return fail(d,Status::phase,0x216a90);

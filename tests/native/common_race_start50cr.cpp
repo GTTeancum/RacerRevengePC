@@ -37,6 +37,7 @@
 #include "original_race_hud_scope50la.h"
 #include "../../platform/linux/native/original_application_aural50kg.h"
 #include "../../src/game/original_race_music_manager50la.h"
+#include "../../src/game/original_race_f8_50la.h"
 #include <cstdio>
 #include <optional>
 #include <thread>
@@ -80,11 +81,11 @@ bool racers1AEA70(Run& run,const Hooks& hooks,std::size_t racers)noexcept {
     }
     return true;
 }
-bool grid2A2880(Run& run,const Hooks& hooks,std::size_t racers)noexcept {
+bool grid2A2880(Run& run,const Hooks& hooks,std::size_t racers,bool bit4)noexcept {
     run.enter(Step::grid2A2880);
     if(!hooks.placeOnGrid2A2880)return run.fail(Step::grid2A2880,"2A2880 grid placement owner absent");
     for(std::size_t slot=0;slot<racers;++slot)
-        if(!(*hooks.placeOnGrid2A2880)(slot))return run.fail(Step::grid2A2880,"2A2880 grid placement refused");
+        if(!(*hooks.placeOnGrid2A2880)(slot,run.request.a1,bit4))return run.fail(Step::grid2A2880,"2A2880 grid placement refused");
     return true;
 }
 bool lock1AED30(Run& run,const Hooks& hooks)noexcept {
@@ -190,7 +191,7 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     r.field90_=0; // 1AC994
     // 1AC9A0 1AEA70 (per racer 216690 with its 217420 leaf; its 2A2880 placement
     // is the grid hook), 1AC9A8 1AED30.
-    if(!racers1AEA70(run,hooks,out.racers)||!grid2A2880(run,hooks,out.racers)||!lock1AED30(run,hooks))return done(false);
+    if(!racers1AEA70(run,hooks,out.racers)||!grid2A2880(run,hooks,out.racers,bit4)||!lock1AED30(run,hooks))return done(false);
     if(!bit4){
         // 1ACA94..1ACAB8: race94 = 4.0, race1B0 bit2 clear. The 2AED60(raceFC,500)
         // fade is the race's own 1A7BD0 fade-in after bit3 below (PORT STAND-IN,
@@ -236,7 +237,16 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     // loading-camera suffix only (w0-requests\round3-A.txt).
     run.enter(Step::cameraReset);
     if(!hooks.resetCamera)return run.fail(Step::cameraReset,"camera session reset owner absent"),done(false);
-    if(!(*hooks.resetCamera)(request.a1))return run.fail(Step::cameraReset,"camera session reset refused"),done(false);
+    if(!(*hooks.resetCamera)(request.a1,bit4))return run.fail(Step::cameraReset,"camera session reset refused"),done(false);
+    if(request.a1!=0u&&!bit4){
+        // 175430 tail 1754D8..1754F4: 199770(race88+F8, 1,1,1,0,1) on the race's
+        // own attached F8 (the Session performed 175430's camera stores and
+        // its native HUD projection of the same call; 1A9750(race,1) is the
+        // Session's viewport call, independent of these F8 stores).
+        if(!r.f8Attached_||!r.f8Source_||r.f8Owner_.get()!=r.f8Source_||
+           !r.f8Source_->visibility199770(1,1,1,0,1))
+            return run.fail(Step::cameraReset,"175430 199770(F8,1,1,1,0,1) refused"),done(false);
+    }
     if(request.a1==0u){
         // 1ACD70..1ACDE0: race78 VCR tail (race-internal; race78 null = skip).
         run.enter(Step::vcr1ACD68);

@@ -20,7 +20,8 @@ template<class OwnersT>
 inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
-    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic,
+    const UndertrackPlacement50ET* restart=nullptr) noexcept {
     diagnostic={};
     // Validate the final source role/world before any continuation or visibility
     // effect, including when resuming after selection/placement already ran.
@@ -38,12 +39,19 @@ inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const Veh
        &bindings.podLiveQuery50IZ->live.world!=&owners.collisionWorld||
        &bindings.podLiveQuery50IZ->live.workspace!=&owners.collisionWorkspace)
         return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
-    if(state.serial!=serial||state.domain!=domain){
+    if(restart&&!controller)return fail(diagnostic,0x1aeb88u,"race restart virtual78 runs between frames only");
+    if(state.serial!=serial||state.domain!=domain||state.restart1AEA70!=(restart!=nullptr)){
         if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
             return fail(diagnostic,0x228bbcu,"a different human reset cannot replace this unfinished call");
         const auto completed=state.physicalCompleted;const auto vehicle850=state.vehicle850;
         const auto known=state.vehicle850Known;state={};state.physicalCompleted=completed;
         state.vehicle850=vehicle850;state.vehicle850Known=known;state.serial=serial;state.domain=domain;
+        if(restart){
+            // 2169C0 216A10..216A1C: BC0 and BD0 (C30/C34 at Stage::Placement).
+            state.restart1AEA70=true;
+            std::memcpy(state.placement.positionBC0,restart->positionBC0,sizeof state.placement.positionBC0);
+            std::memcpy(state.placement.headingBD0,restart->headingBD0,sizeof state.placement.headingBD0);
+        }
     }
     if(state.stage==Stage::Complete)return true;
     visibility::ResetVisibilityLease lease;
@@ -61,6 +69,8 @@ inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const Veh
     };
     for(;;)switch(state.stage){
     case Stage::Idle:
+        // 1AEA70: no spline selection; BC0/BD0 are 2169C0's.
+        if(state.restart1AEA70){state.stage=Stage::Placement;break;}
         if(!ordinary_navigation_detail50MB::indicesPrepared(owners.mapTrack)||!ordinary_navigation_detail50MB::gatesPrepared(owners.mapTrack))
             return fail(diagnostic,0x2255e0u,"actual human map progression/indices are unavailable");
         state.selectionProgress=progress.reset;state.stage=Stage::Select;break;
@@ -92,6 +102,11 @@ inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const Veh
             if(!visibilityRows[ordinal]||!zone.firstMethod||!zone.secondMethod)
                 return fail(diagnostic,0x225a74u,"actual application zone table row is unbound");
             collisionRows[ordinal]=static_cast<std::uint32_t>(ordinal+1u);
+        }
+        if(state.restart1AEA70){
+            // 1AEB60..1AEB70 / 216A20..216A2C: C30 = World74+4C0[0], C34 = World74+4C4[0].
+            state.placement.vehicleC30=visibilityRows[0];state.placement.vehicleC34=collisionRows[0];
+            state.stage=Stage::PlayerPrefix;break;
         }
         if(!ordinary_navigation_detail50MB::bindPlacement(state.selection,owners.mapTrack,
             visibilityRows.data(),collisionRows.data(),count,state.placement,diagnostic.placement))
@@ -230,6 +245,15 @@ bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBinding
     std::uint64_t serial,State& state,Owners& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
+}
+bool restart1AEA70(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const UndertrackPlacement50ET& start2169C0,std::uint64_t serial,State& state,Owners& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    if(!resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,
+        UndertrackResetDomain50EW::PlayerControllerReady50LC,state,owners,workspace,diagnostic,&start2169C0))return false;
+    diagnostic.sourcePC=0;diagnostic.message="human 1AEA70 virtual78 1A24F0/216A30 returned";
+    return true;
 }
 
 } // namespace native_original_human_recovery

@@ -82,6 +82,14 @@ bool prepareParticles1B4DC0(Track& t,const LoadInputs& in,Diagnostic& d)noexcept
     d.value=0;
     try{
         if(t.roles.particles||t.roles.emitters)return refuse(d,step,0x1B4DC0u,"particle manager already published");
+        // Host data check (PLAN 4.3, never a race): the manager and the ground-effects owner
+        // are runtime owners of the Application (material domain 3E1A70, 36B530 directory,
+        // 101A50 clock), so the check logs the step as not built and goes on; the particle
+        // receipts are verified by the race logs instead.
+        if(in.hostDataCheck&&!in.application){
+            log::load(step,true,0,"host check: runtime particle owners not built");
+            return true;
+        }
         if(!in.application)return refuse(d,step,0x1B4DC0u,"particle manager needs the Application's material domain (none in this load)");
         if(!in.materials382B38||!in.generation)return refuse(d,step,0x1B4DC0u,"particle manager needs the race's 382B38 table and generation");
         auto owner=std::make_shared<rr::game::OriginalTrackParticleCold50LA>();
@@ -105,7 +113,7 @@ bool prepareParticles1B4DC0(Track& t,const LoadInputs& in,Diagnostic& d)noexcept
             track_particle_emitters50CR::Inputs inputs;
             inputs.manager=t.roles.particles;inputs.process=process;inputs.clock=process->clock101A50;
             // PORT STAND-IN (flagged): LoadInputs carries no process particle-globals
-            // pointer this round (w0-requestsound3-E.txt 1); the owner keeps its own
+            // pointer this round (w0-requests round3-E.txt 1); the owner keeps its own
             // TypeID 11 speed scale until it does.
             inputs.globals=nullptr;
             inputs.generation=in.generation;
@@ -144,12 +152,17 @@ bool readMaterials274160(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
         if(!selections||!materials||!bank)return refuse(d,step,0x274160u,"static world material tables unavailable");
         // The APPSTART DefaultMT template the 2476A0 rule inherits from (the one
         // application-lifetime APPSTART owner; never replaced on a race restart).
-        if(!in.application)return refuse(d,step,0x2476A0u,"material rule needs the Application's APPSTART DefaultMT template (none in this load)");
+        // Host data check (never a race): the 2476A0 rule needs the Application's APPSTART
+        // DefaultMT template and material runtime; the check logs the counts and the one
+        // texture budget below without running the rule (verified by the race logs).
+        const bool hostOnly=in.hostDataCheck&&!in.application;
+        if(!hostOnly&&!in.application)return refuse(d,step,0x2476A0u,"material rule needs the Application's APPSTART DefaultMT template (none in this load)");
+        std::uint64_t secondPasses=0,aa1Passes=0,blended=0,alphaTested=0,destinationAlpha=0;
+        if(!hostOnly){
         const auto appStart=in.application->appStart(runtime_asset_paths50LB::resolve("work/native/project/disc"));
         if(!appStart)return refuse(d,step,0x2476A0u,"APPSTART archive unavailable for the DefaultMT template");
         rr::assets::OriginalUiMaterialTemplates50KG templates;rr::assets::OriginalUiMaterialDiagnostic50KG md;
         if(!templates.load(*appStart,md))return refuse(d,step,0x2476A0u,"APPSTART DefaultMT template rejected");
-        std::uint64_t secondPasses=0,aa1Passes=0,blended=0,alphaTested=0,destinationAlpha=0;
         for(std::size_t i=0;i<selections->size();++i){
             const auto& selection=(*selections)[i];
             material_alpha50gx_fixture::Policy policy;
@@ -160,6 +173,7 @@ bool readMaterials274160(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
             secondPasses+=selection.pass==2;aa1Passes+=policy.onePassAa1;
             blended+=policy.blend!=material_alpha50gx_fixture::Blend::opaque;alphaTested+=policy.sourceAlphaTest;
             destinationAlpha+=policy.gsDestinationAlphaPass!=0;
+        }
         }
         t.counts.materials=static_cast<std::uint32_t>(materials->size());
         t.counts.textures=bank->textureCount();
