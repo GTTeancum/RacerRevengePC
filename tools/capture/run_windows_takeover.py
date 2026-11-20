@@ -344,6 +344,10 @@ def main():
         env['RR_TEST_RESULTS_CONFIRM'] = str(args.results_confirm)
     if args.results_exit:
         env['RR_TEST_RESULTS_EXIT'] = args.results_exit
+        # On the original Results screen (Results104, now Single Race too) the
+        # exit is the player confirming its pages: 1AB5BC then leaves for
+        # Hall11 (a record), Unlock10 or Course6, as the original does.
+        env.setdefault('RR_TEST_RESULTS_CONFIRM', '2')
     if args.hold_results:
         env['RR_TEST_RESULTS_HOLD'] = '1'
     if args.camera_cycle:

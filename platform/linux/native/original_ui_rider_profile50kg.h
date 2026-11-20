@@ -129,15 +129,6 @@ public:
         unavailable,locked,invalid,readError,writeError,durabilityUnknown};
     BetaPersistenceStatus betaPersistenceStatus() const noexcept;
     bool saveNativeBetaProgress() noexcept;
-    // PORT STAND-IN (DLC decision D7 b): a free-play race ends on the native
-    // Results panel, before the retail end dispatch, so no 1AB5BC / 1AC440 /
-    // save moment runs in that flow for any pod. For a latched free-play
-    // add-on run only, this applies 1ABFC0 against the merged Hall (stock +
-    // DLC rows), submits a qualifying record to the DLC side file and writes
-    // the side file at once (one dlc_record line either way). Any other run:
-    // false, nothing read, changed or logged. Never writes the stock save.
-    bool commitAddonFreePlayRecordAtNativeResults(
-        const game::OriginalRaceRecordQualificationRacerObservation50KG& row0) noexcept;
     bool reloadNativeBetaProgressFromMenu() noexcept;
     void bindNativeBetaAutosave(std::shared_ptr<const game::OriginalUiGameSettingsProfile50KG>) noexcept;
     bool youngAnakinMcTestProfile() const noexcept;

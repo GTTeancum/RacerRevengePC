@@ -216,7 +216,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // the tournament Hall11 / Win7 / Unlock10 that leads on to it.
   const auto firstScreen=originalMain.coordinator.snapshot().route.screen;
   const bool raceReturnGarage=firstScreen==13;
-  const bool raceReturnScreen=raceReturnGarage||firstScreen==11||firstScreen==7||firstScreen==10;
+  // Free Play's 1AB908 row opens Course6 first; a fresh frontend opens Main4.
+  const bool raceReturnScreen=raceReturnGarage||firstScreen==11||firstScreen==7||firstScreen==10||firstScreen==6;
   if(raceReturnScreen)std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';
   original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnScreen);
   original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnScreen);
@@ -225,7 +226,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // to Main, this frontend's route stays idle (no second race is started).
   const bool resultsExitReturned=rr::platform::testResultsInput50PD().returnedToMain;
   if(resultsExitReturned)std::cerr<<"test_results_exit frontend_after_results route=idle first_screen="<<unsigned(firstScreen)<<'\n';
-  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned,captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
+  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen,captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;

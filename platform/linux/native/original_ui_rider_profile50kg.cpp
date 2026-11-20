@@ -656,60 +656,6 @@ bool OriginalUiRiderProfileOwner50KG::prepareRaceRecordQualification1ABFC0(
     return Query::prepare(config,s.hallRecords,s.unlock10FAC,s.packed1125F,race1B0Low2,
         selectorA1,rows,rowCount,s.generation,out,d);
 }
-bool OriginalUiRiderProfileOwner50KG::commitAddonFreePlayRecordAtNativeResults(
-    const game::OriginalRaceRecordQualificationRacerObservation50KG& row0) noexcept {
-    // PORT STAND-IN, see the declaration. Gate first: nothing for stock runs.
-    if(!storage_||!storage_->readable()||!storage_->common||storage_->common->mode34!=0u)return false;
-    const auto& s=*storage_;
-    const auto profileRider=std::uint32_t(s.packed1125D>>3);
-    const auto raced=game::dlc50DL::racedRider(profileRider);
-    if(raced==profileRider||!assets::dlc50DL::addonPod(raced))return false;
-    try {
-        const auto key=game::dlc50DL::riderKey(raced);
-        const auto course=std::uint32_t(s.packed1125F&15u);
-        assets::dlc50DL::CourseRow row;std::string upper;
-        if(!assets::dlc50DL::courseRow(course,row)||row.addon||!assets::dlc50DL::stockCourseCode(row.code,upper)){
-            std::fprintf(stderr,"dlc_record racer=%s course=%u status=refused reason=\"not a stock course\"\n",key.c_str(),course);
-            return true;
-        }
-        // 1ABFC0, selector 0, one human: the merged table for this add-on run.
-        std::optional<game::OriginalRaceRecordQualification50KG> query;
-        game::OriginalRaceRecordQualification50KG::Diagnostic qd;
-        if(!prepareRaceRecordQualification1ABFC0(0,std::uint8_t(1),&row0,1,query,qd)||!query){
-            std::fprintf(stderr,"dlc_record racer=%s course=%s status=refused reason=\"1ABFC0 query status %u\"\n",
-                key.c_str(),upper.c_str(),unsigned(qd.status));
-            return true;
-        }
-        const auto* ranks=query->firstRacerRanks()?&*query->firstRacerRanks():nullptr;
-        if(!query->originalV0()){
-            std::fprintf(stderr,"dlc_record racer=%s course=%s status=notQualified table=merged lap=%g race=%g knockouts=%u retired=%u lap_rank=%u race_rank=%u knockout_rank=%u\n",
-                key.c_str(),upper.c_str(),double(row0.records.bestLapCB4),double(row0.records.timeCB8),
-                row0.records.countCD0,row0.retirementCD4,ranks?ranks->lap:0u,ranks?ranks->race:0u,ranks?ranks->knockouts:0u);
-            return true;
-        }
-        OriginalPersistedProfileName50KG first;
-        if(!s.saveProfile.persistedName(false,0u,first)){
-            std::fprintf(stderr,"dlc_record racer=%s course=%s status=refused reason=\"player name unavailable\"\n",key.c_str(),upper.c_str());
-            return true;
-        }
-        assets::dlc50DL::ProgressRaceResult r;
-        r.stockCode=upper;r.subtype11258=s.subtype11258;r.lapCount1125C=s.common->playerBits1125C;
-        r.packed1125C=static_cast<std::uint16_t>(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8));
-        r.unlock10FAC=s.unlock10FAC;r.race1B0Low2=1;
-        r.racers[0].racer=key;r.racers[0].values=row0;
-        {std::string name;for(std::size_t i=0;i<20&&first.c_str()[i];++i)name.push_back(first.c_str()[i]);r.racers[0].name=name;}
-        auto& owner=assets::dlc50DL::progressOwner();
-        const auto outcome=owner.submit(r);
-        using St=assets::dlc50DL::ProgressSubmitOutcome::Status;
-        std::fprintf(stderr,"dlc_record racer=%s course=%s status=%s table=merged lap=%g race=%g lap_rank=%u race_rank=%u knockout_rank=%u%s%s\n",
-            key.c_str(),upper.c_str(),outcome.status==St::recorded?"recorded":outcome.status==St::notQualified?"notQualified":"refused",double(row0.records.bestLapCB4),double(row0.records.timeCB8),
-            unsigned(outcome.first.lap),unsigned(outcome.first.race),unsigned(outcome.first.knockouts),
-            outcome.reason.empty()?"":" reason=",outcome.reason.c_str());
-        // No stock save moment exists in this flow: write the side file now.
-        (void)owner.saveIfChanged();
-        return true;
-    }catch(...){return true;}
-}
 bool OriginalUiRiderProfileOwner50KG::prepareRaceRivalQualification1ABE70(
     const game::OriginalRaceRivalRacerObservation50KG* rows,std::size_t availableRows,
     std::int32_t actualManagerCount30,
@@ -857,7 +803,7 @@ bool OriginalUiRiderProfileOwner50KG::markResultsHallDirty1CA6E4(
 }
 bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
     game::OriginalUiHallProfile50KG& out) const noexcept {
-    if(!hallRecordsReady()||(mode!=5&&mode!=2))return false;
+    if(!hallRecordsReady()||(mode!=5&&mode!=2&&mode!=0))return false;
     const auto& s=*storage_;game::OriginalUiHallProfile50KG p;
     p.ownerReady=true;p.mode34=mode;p.remembered6EC=s.rememberedHall6EC;
     p.packed1125E=s.packed1125E;p.availability11018=s.common->availability11018;
@@ -872,6 +818,15 @@ bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
         //11260/64/68 are the last 1AC440 rank stores. 1126C/70/74 are cleared
         // with them at race start (1A77E0/1A7804, 1ACCB0/1ACCD4) and written only
         // by the two-human 1AC440 branch, which no native race reaches: zero.
+        if(s.hallRanks11260)p.ranks11260={s.hallRanks11260->lap11260,
+            s.hallRanks11260->race11264,s.hallRanks11260->knockouts11268};
+    }
+    if(mode==0){
+        // Free Play race-return Hall (1AB884 17DE10(6,11,1), P+34 stays 0):
+        // opens on P+700 (1E4718); 1E2010.. ranks as for mode2.
+        if(s.common->mode34!=0u)return false;
+        p.course700=s.rememberedCourse[0];
+        p.raceCourse1125F=static_cast<std::uint8_t>(s.packed1125F&15u);
         if(s.hallRanks11260)p.ranks11260={s.hallRanks11260->lap11260,
             s.hallRanks11260->race11264,s.hallRanks11260->knockouts11268};
     }
@@ -899,7 +854,7 @@ bool OriginalUiRiderProfileOwner50KG::hallPlanetColors(std::uint32_t planet,
 }
 bool OriginalUiRiderProfileOwner50KG::hallBrowseRecordSnapshot(std::uint32_t course,
     game::OriginalUiHallCourseRecords50KG& out) const noexcept {
-    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2&&storage_->common->mode34!=0)||
        course>=storage_->hallRecords.courses.size())return false;
     out=storage_->hallRecords.courses[course];
     // PORT EXTENSION, NOT ORIGINAL: add-on pod records merged at display time
@@ -921,13 +876,13 @@ bool OriginalUiRiderProfileOwner50KG::hallBrowseRecordSnapshot(std::uint32_t cou
 bool OriginalUiRiderProfileOwner50KG::hallBrowsePlanetColors(std::uint32_t planet,
     OriginalUiCourseProfileColors50KG& out) const noexcept {
     //1E3438 reads P+79C+planet*12 in every mode.
-    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2&&storage_->common->mode34!=0)||
        planet>=storage_->planetColors.size())return false;
     out=storage_->planetColors[planet];return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitHallPlanet(std::uint32_t planet,
     OriginalUiRiderProfileStamp50KG expected) noexcept {
-    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2&&storage_->common->mode34!=0)||
        expected.mode34!=storage_->common->mode34||
        expected.generation!=storage_->generation||planet>=storage_->planetColors.size()||
        storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
@@ -953,7 +908,7 @@ bool OriginalUiRiderProfileOwner50KG::commitHallBack(std::uint16_t slot,
     storage_->rememberedHall6EC=slot;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitHallRender(OriginalUiRiderProfileStamp50KG expected) noexcept {
-    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2)||
+    if(!hallRecordsReady()||(storage_->common->mode34!=5&&storage_->common->mode34!=2&&storage_->common->mode34!=0)||
        expected.mode34!=storage_->common->mode34||
        expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
     //1E3F40..1E3F4C clears only profile7E4 bit0 after genuine page render.

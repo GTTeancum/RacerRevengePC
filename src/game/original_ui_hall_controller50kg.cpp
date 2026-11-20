@@ -15,8 +15,10 @@ bool expand(P& p,const OriginalUiCommands50KG& c) noexcept {for(std::size_t i=0;
 bool profile(const OriginalUiHallProfile50KG& p) noexcept {constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
  if(!p.ownerReady||(p.availability11018&31)<1||(p.availability11018&31)>13||p.courseOrder100C4!=order)return false;
  if(p.mode34==5)return p.remembered6EC>=1&&p.remembered6EC<=13;
- //1E4764: mode2 opens on slot 187B10+1 (6EC is not read). Modes0/1 (P+700/
- // P+710) and the 1E4788 "Invalid gamemode" assertion stay unsupported here.
+ //1E4764: mode2 opens on slot 187B10+1 (6EC is not read). 1E4718: mode0
+ // opens on P+700 (the Free Play race-return Hall, 1AB884). Mode1 (P+710)
+ // and the 1E4788 "Invalid gamemode" assertion stay unsupported here.
+ if(p.mode34==0)return p.course700>=1&&p.course700<=13;
  return p.mode34==2&&p.order187B10<13;}
 // Cross table 1E3FC0..1E41C8. Mode2 rows; any other mode -> Course 6/1.
 bool confirmDecision(const OriginalUiHallProfile50KG& v,OriginalUiHallConfirmRoute50KG& route,std::uint8_t& screen,std::uint32_t& pc) noexcept {
@@ -57,7 +59,8 @@ S OriginalUiHallOfFameController50KG::phase(const State& s,OriginalUiHallPhase50
  case OriginalUiHallPhase50KG::openingAC:{if(!s.loaded)return S::invalidInput;ok=enabled(p,1,true);for(auto c:page()->groups[1].controls)if(ok)ok=control(p,c,O::setEnabled,false,0x1E44E4);
  for(unsigned i=0;i<(view.availability11018&31)&&ok;++i)for(auto c:page()->groups[1].controls)if(storage_->courses[c]==view.courseOrder100C4[i]){ok=control(p,c,O::setEnabled,true,0x1E4550);break;}
  // 1E46F4 mode5 -> P+6EC; 1E4764 mode2 -> 187B10(P)+1.
- const auto slot=static_cast<std::uint16_t>(view.mode34==5?view.remembered6EC:view.order187B10+1u);
+ const auto slot=static_cast<std::uint16_t>(view.mode34==5?view.remembered6EC:
+     view.mode34==0?view.course700:view.order187B10+1u);
  OriginalUiCommands50KG commands;if(ok)ok=enterOriginalUiGroup50KG(p.state.navigation,1,slot,0,commands)==OriginalUiNavigationStatus50KG::ok&&expand(p,commands);
  std::uint32_t course=0;if(ok)ok=selectedCourse(p.state,course,p.planet);p.writePlanet=true;p.planetPC=0x1E4834;p.startSong5=true;if(ok)ok=enabled(p,2,false);break;}
  case OriginalUiHallPhase50KG::openedB0:if(!s.loaded)return S::invalidInput;

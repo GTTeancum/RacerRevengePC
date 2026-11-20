@@ -1163,7 +1163,9 @@ struct OriginalUiFrontend50KG::Storage {
                 samplers=m.optionsResources->samplers();
             }else if(same(route,{11,1})){
                 // Options Hall is mode5; the 1AB5BC tournament Hall keeps mode2.
-                const bool raceReturnHall=initialRaceReturn&&prospectiveMode==2&&cold.profile&&cold.profile->mode34==2;
+                // Free Play (mode0) race-return Hall: 1AB884 leaves P+34 at 0.
+                const bool raceReturnHall=initialRaceReturn&&(prospectiveMode==2||prospectiveMode==0)&&
+                    cold.profile&&cold.profile->mode34==prospectiveMode;
                 if(!hallInputsReady()||(!raceReturnHall&&prospectiveMode!=5)||
                    (!initialNativeHall&&!raceReturnHall&&!rgbaReady)){
                     result(d,Status::unavailableDestination);return false;}
@@ -1219,7 +1221,11 @@ struct OriginalUiFrontend50KG::Storage {
                 const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1})&&prospectiveMode==2&&
                     active->tournament->routeProposalCurrent(tournamentProposal)&&tournamentProposal.decision.request.targetScreen==6;
                 const bool fromPause=initialNativePauseCourse&&prospectiveMode==0;
-                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament&&!fromPause)){
+                // Free Play: the race's own 1AB908 Course row, or Hall Cross 1E41C4 (mode0 -> Course6).
+                const bool fromRaceReturn=initialRaceReturn&&prospectiveMode==0;
+                const bool fromHall=active&&active->hall&&same(active->currentRoute(),{11,1})&&hallConfirm&&prospectiveMode==0&&
+                    active->hall->confirmProposalCurrent(hallProposal)&&hallProposal.decision.request.targetScreen==6;
+                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament&&!fromPause&&!fromRaceReturn&&!fromHall)){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
                 input.prepareRylothBackground=true; // Original background resource, independent of test-pair provenance.
@@ -1234,7 +1240,7 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiCourseSessionCold50KG session;session.resources=m.courseResources;session.holograms=m.courseHolograms;
                 session.courseArchive=cold.course;session.english=&english;session.profile=cold.riderProfile;
                 session.commonProfile=cold.profile;session.application=cold.application;session.lightManager=cold.lightManager;
-                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromPause?0:fromTournament?9:5;
+                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromPause?0:fromTournament?9:fromHall?11:fromRaceReturn?6:5;
                 if(fromPause)session.pauseCourseOrigin=nativePauseCourseOrigin;
                 if(fromTournament){
                     session.applicationAnimation=cold.applicationAnimation;
@@ -1362,7 +1368,7 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiHallSessionCold50KG input;input.resources=m.hallResources;input.gpu=m.gpu;input.hallArchive=cold.hall;
                 input.profile=cold.riderProfile;input.commonProfile=cold.profile;input.application=cold.application;
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
-                input.origin=initialRaceReturn&&prospectiveMode==2?OriginalUiHallEntryOrigin50KG::tournamentRaceReturn:
+                input.origin=initialRaceReturn&&(prospectiveMode==2||prospectiveMode==0)?OriginalUiHallEntryOrigin50KG::tournamentRaceReturn:
                     OriginalUiHallEntryOrigin50KG::options;
                 m.hall=std::make_unique<OriginalUiHallOfFameSession50KG>();
                 if(m.hall->bind(input,d.hall)!=HallStatus::ok){result(d,Status::session);return false;}
@@ -1777,7 +1783,9 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
     const bool raceReturn=nativeHall&&nativeHall->nativeRaceReturnRoute50PD(raceScreen,racePage);
     const bool garageFirst=raceReturn&&raceScreen==13&&racePage==1;
     // Hall11 (tournament), Win7, Unlock10 first screens; see prepareNativeRaceReturn.
-    const bool screenFirst=raceReturn&&racePage==1&&(raceScreen==11||raceScreen==7||raceScreen==10);
+    // Free Play's 1AB908 row (17DE10(App,6,6,1)) opens Course first (mode0 only).
+    const bool screenFirst=raceReturn&&racePage==1&&(raceScreen==11||raceScreen==7||raceScreen==10||
+        (raceScreen==6&&cold.profile&&cold.profile->mode34==0));
     if(raceReturn&&!garageFirst&&!screenFirst)return result(d,Status::unavailableDestination,0x17DE10);
     using Id=assets::OriginalUiArchiveId50KG;
     if(!archive(cold.appStart,Id::appStart)||!archive(cold.mainMenu,Id::mainMenu)||!archive(cold.options,Id::options)||
@@ -1838,13 +1846,15 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
             s.prepared=true;return result(d,Status::ok);
         }
         if(screenFirst){
-            if(!cold.profile||cold.profile->mode34!=2)return s.fault(d,Status::invalidInput,0x17DE10);
+            // Tournament rows (mode2) or the Free Play rows 1AB884/1AB8E8/1AB908 (mode0, Hall/Unlock/Course).
+            if(!cold.profile||(cold.profile->mode34!=2&&cold.profile->mode34!=0)||
+               (cold.profile->mode34==0&&raceScreen==7))return s.fault(d,Status::invalidInput,0x17DE10);
             const Route first{static_cast<std::uint8_t>(raceScreen),1};
             s.nativeRaceReturnRoot=nativeHall;s.nativeRaceReturnRoute=first;s.nativeRaceReturnStamp=cold.riderProfile->stamp();
             if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
             // Shared-dialog boot bank (same session-less Main bank as Garage-first).
             if(!s.buildGarageBoot(s.raceReturnBoot,d))return s.fault(d,d.status);
-            if(!s.build(s.active,first,d,2))return s.fault(d,d.status==Status::ok?Status::session:d.status,d.sourcePC);
+            if(!s.build(s.active,first,d,cold.profile->mode34))return s.fault(d,d.status==Status::ok?Status::session:d.status,d.sourcePC);
             // Cold preparation writes no profile field (Unlock grants only on Cross).
             if(cold.riderProfile->stamp().generation!=s.nativeRaceReturnStamp.generation||cold.profile->mode34!=2)
                 return s.fault(d,Status::invalidInput,0x17DE10);

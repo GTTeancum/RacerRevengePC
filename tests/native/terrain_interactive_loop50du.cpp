@@ -1740,9 +1740,14 @@ void Context::run() {
          // unreceived and logged.
          using AckRoute=rr::game::OriginalRaceAckRoute50PD;
          const bool tournamentScreen=destination.tournament&&destination.flags==6u&&destination.page==1u;
+         // Free Play (1AB828..1AB908): Hall11 after 1AC440 (record7E4),
+         // Unlock10 (187E30), otherwise Course6, each 17DE10(App,6,screen,1).
+         const bool freePlayScreen=!destination.tournament&&destination.flags==6u&&destination.page==1u;
          const bool received=destination.route==AckRoute::garage||
              (tournamentScreen&&(destination.route==AckRoute::hall||destination.route==AckRoute::unlock||
-              destination.route==AckRoute::win));
+              destination.route==AckRoute::win))||
+             (freePlayScreen&&(destination.route==AckRoute::hall||destination.route==AckRoute::unlock||
+              destination.route==AckRoute::course));
          if(received){
           const auto& owned=originalMainApplication.sourceRace28COwner_;
           // 1AB680: 1AC440 immediately precedes the 17DE10 Hall request.
@@ -1806,6 +1811,10 @@ void Context::run() {
        common.fallback=true;
        std::cerr<<"common_race_end_entry fallback=host_panel\n";
       }
+      // PORT STAND-IN (flagged): the HostRaceResults50IL panel. Single Race
+      // (subtype1, mode0 and mode2) now takes the counted race's Results104 /
+      // 1AB5BC flow; this panel remains only where no Results root exists
+      // (subtypes 2/3 and a rejected root), to be retired with them.
       // Explicit native presentation substitution at1A7DD0, before the
       // source launch1 UI199770/race104 virtual+20, HUD-stop1AD230 and
       // race virtual+78 dispatch.1AD230 is not a Results implementation.
@@ -1814,15 +1823,8 @@ void Context::run() {
       std::cerr<<"NATIVE HUMAN RESULTS: genuine source end predicate, countdown, audio wait and displayed fade complete; "
           "source standings retained. Native presentation substitutes at1A7DD0 before retail end dispatch; "
           "HUD-stop1AD230 and retail result/profile/save/progression owners were not executed.\n";
-      // PORT STAND-IN (DLC D7 b): this flow has no 1AC440/save moment. A
-      // latched free-play add-on run records to the DLC side file here (the
-      // profile owner gates it; stock runs: nothing happens, nothing logged).
-      if(originalMainApplication.riderProfile){
-       rr::game::OriginalRaceRecordQualificationRacerObservation50KG row0{};
-       row0.records={lapContinuity.timing.bestLapCB4,lapContinuity.timing.timeCB8,lapContinuity.timing.countCD0};
-       row0.retirementCD4=race.racers[0].retirementCD4;
-       (void)originalMainApplication.riderProfile->commitAddonFreePlayRecordAtNativeResults(row0);
-      }
+      // The former DLC write-at-panel stand-in (b6b9ab4) is retired: Single
+      // Race now ends on the counted race's Results/1AB5BC/1AC440 flow.
       break;
      }else require50DU(ending.status==OriginalHumanEndClockStatus50KG::advanced||
          ending.status==OriginalHumanEndClockStatus50KG::unchanged,"actual human ending root remains at a source boundary");

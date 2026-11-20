@@ -78,8 +78,9 @@ S OriginalUiHallOfFameSession50KG::bind(const OriginalUiHallSessionCold50KG&cold
  if(!cold.externalTransition||cold.externalTransition->snapshot().bound||!cold.profile||!cold.profile->hallRecordsReady()||!cold.commonProfile||!cold.commonProfile->known||cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||(cold.application->globalFlags228&4)||cold.application->transportE00!=-1)return result(d,S::profile);
  if((cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled)||(cold.audioMode==OriginalUiMainAudioMode50KG::muted?bool(cold.audio):!cold.audio||!cold.audio->hallOfFameMenuReady()))return result(d,S::audio);
  const bool raceReturn=cold.origin==OriginalUiHallEntryOrigin50KG::tournamentRaceReturn;
- if((!raceReturn&&cold.origin!=OriginalUiHallEntryOrigin50KG::options)||(raceReturn&&cold.commonProfile->mode34!=2))return result(d,S::profile);
- const std::uint32_t entryMode=raceReturn?2u:5u;
+ if((!raceReturn&&cold.origin!=OriginalUiHallEntryOrigin50KG::options)||(raceReturn&&cold.commonProfile->mode34!=2&&cold.commonProfile->mode34!=0))return result(d,S::profile);
+ // Race return keeps P+34: Tournament (mode2, 1AB698) or Free Play (mode0, 1AB884).
+ const std::uint32_t entryMode=raceReturn?cold.commonProfile->mode34:5u;
  try{auto s=std::make_unique<Storage>();s->cold=cold;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();s->entryMode=entryMode;s->state.entryMode34=entryMode;game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;
   assets::OriginalUiPageDiagnostic50KG parse;if(s->controller.bind(cold.hallArchive,parse)!=MS::ok||!s->controller.initialState(s->nav)||!cold.profile->hallSnapshotForMode(entryMode,view)||s->controller.phase(s->nav,HP::entry74,view,plan)!=MS::ok)return result(d,S::profile);
   if(!s->collector.bindFrame(cold.resources,cold.gpu,d.draw))return result(d,S::draw);
@@ -89,11 +90,11 @@ S OriginalUiHallOfFameSession50KG::bind(const OriginalUiHallSessionCold50KG&cold
  }catch(...){return result(d,S::resource);}
 }
 bool OriginalUiHallOfFameSession50KG::acceptEntryProfileCommit()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->entryCommitted||s->inOperation||!s->process())return false;
- if(s->entryMode==2){
+ if(s->entryMode!=5){
   // 17DE10(App,6,11,1) -> 17DB80/ld_ui writes no mode: the common profile and
   // rider-profile generation must be exactly those seen at bind.
   const auto st=s->cold.profile->stamp();
-  if(!common(s->coldCommon,*s->cold.commonProfile)||s->coldCommon.mode34!=2||st.generation!=s->coldStamp.generation||st.mode34!=2)return false;
+  if(!common(s->coldCommon,*s->cold.commonProfile)||s->coldCommon.mode34!=s->entryMode||st.generation!=s->coldStamp.generation||st.mode34!=s->entryMode)return false;
   s->liveCommon=s->coldCommon;s->liveStamp=st;s->entryCommitted=true;return true;}
  auto expected=s->coldCommon;if(expected.mode34!=5){expected.previousMode38=expected.mode34;expected.mode34=5;}auto st=s->cold.profile->stamp();if(!common(expected,*s->cold.commonProfile)||st.generation!=s->coldStamp.generation||st.mode34!=5)return false;s->liveCommon=expected;s->liveStamp=st;s->entryCommitted=true;return true;}
 S OriginalUiHallOfFameSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG&e,D&d)noexcept{

@@ -1165,7 +1165,7 @@ SessionExit50DU Context::run() {
        // Song 25 is the intro camera's 1756D0 -> 1A46E0(25,0) on every
        // course that runs the tournament intro, not a TA-only track song.
        originalCameraEnabled&&nativeOrdinaryLaunch11258==1u&&
-           (dynamicProfile.game34==2u||cameraStartup350!=0)),
+           (dynamicProfile.game34==2u||dynamicProfile.game34==0u||cameraStartup350!=0)),
        audioError.empty()?"source music cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==
        raceMusic->expectedReadyClips(),

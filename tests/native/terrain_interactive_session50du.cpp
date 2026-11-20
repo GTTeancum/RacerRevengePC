@@ -735,7 +735,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Human Career intro needs the genuine RA race/world prefix, but does not
  // opt into the separate source spectator Pause implementation.
  const bool sourceConsumedIntroActivation=consumedLaunch&&isRaTrack&&humanCourseEnabled&&
-     originalCameraEnabled&&dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1;
+     originalCameraEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1;
  // Actual world/collision ownership remains in the next lexical stage.
  // It retires before this original early fixture/rig/audio prefix, on all exits.
  interactive_world50DU::Context world50DU{

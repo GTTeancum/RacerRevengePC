@@ -24,6 +24,7 @@ struct OriginalUiHallProfile50KG {
     std::uint8_t finalMedal1938=0;      // 1E4094 M[100C0][100C0][order]
     bool unlockPending187E30=false;     // 1E416C
     std::uint8_t raceCourse1125F=0;     // 1E2038 low nibble of 1125F
+    std::uint32_t course700=0;          // 1E4718: mode0 race-return opening slot (P+700)
     // 1E2050/1E28A0/1E30E8 first-human ranks 11260/64/68 and 1E2068/1E28B8/
     // 1E3100 second-human ranks 1126C/70/74 (lap, race, knockouts).
     std::array<std::uint32_t,3> ranks11260{},ranks1126C{};
