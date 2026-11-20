@@ -1440,6 +1440,43 @@ SessionExit50DU Context::run() {
   require50DU(::allocations==beforeOpponentAudio,"opponent engine audio update allocated C++ storage");
  };
  std::function<void()> activateColdRace;
+ // The one neutral, unscored native setup tick of every racer (opponents first, slot 0
+ // last inside its Bank visit; raceSetupFrame set by the caller): establishes actual
+ // graphics/ground before countdown rendering. The fresh race runs it after the cold
+ // load (activateColdRace); every 1AC8E0 restart with race1B0 bit4 clear runs the SAME
+ // tick after its 1AEA70 placements (restartSetupTick1AC8E0), so the replayed intro
+ // draws the restarted pods on the fresh intro's path. setupTickSlot names the racer
+ // being ticked for a refusal. PORT STAND-IN (existing, flagged): the original updates
+ // every racer on every intro/countdown frame (1AED30 only locks axes); the port's
+ // held phase runs no racer frame, only this tick.
+ std::size_t setupTickSlot=0;
+ const auto setupTickRacers=[&](const platform::WindowInput50DQ& noKeys){
+  auto initializeGraphics=[&](std::size_t actualRacerSlot){
+   if(s.fields.vehicle58==0u){composePacket(false,noKeys,actualRacerSlot);sampleController();}
+   require50DU(advanceFrame(actualRacerSlot),"native race grid setup tick rejected");
+   require50DU(lapContinuity.state.vehicleCC8==0,"race setup tick unexpectedly completed a lap");
+  };
+  for(std::size_t racer=1;racer<racerBank.count();++racer){
+   setupTickSlot=racer;
+   opponentFrame=true;
+   try{
+    captureDynamicBeforeFrame(racer);
+    if(originalAiEnabled)observeOriginalAiFleet();
+    racerBank.visit(racer,[&](){initializeGraphics(racer);});
+   }
+   catch(const std::exception& error){
+    opponentFrame=false;
+    std::throw_with_nested(std::runtime_error("Original racer "+racerRigs[racer]->podId+
+        " [initial native graphics tick, "+racerNames[racer]+"]: "+error.what()));
+   }
+   opponentFrame=false;
+  }
+  setupTickSlot=0;
+  captureDynamicBeforeFrame(0);
+  if(originalAiEnabled)observeOriginalAiFleet();
+  // Slot 0 runs inside its Bank visit on every course (one shared arena).
+  racerBank.visit(0,[&](){initializeGraphics(0);});
+ };
  // One cold prefix for every course (the MC/GB aggregate shape): the
  // collision world's query fence, the Bank registries, the lap tracker's view
  // of the track, then the Bank's native backing. Role owners themselves are
@@ -2028,29 +2065,7 @@ SessionExit50DU Context::run() {
   }
   if(originalAiEnabled)for(std::size_t slot=0;slot<racerBank.count();++slot)
    racerBank.visit(slot,[&](){s.fields.applicationByte58=originalAiSession.manager.flags58;});
-  auto initializeGraphics=[&](std::size_t actualRacerSlot){
-   if(s.fields.vehicle58==0u){composePacket(false,noKeys,actualRacerSlot);sampleController();}
-   require50DU(advanceFrame(actualRacerSlot),"native race grid setup tick rejected");
-   require50DU(lapContinuity.state.vehicleCC8==0,"cold race setup unexpectedly completed a lap");
-  };
-  for(std::size_t racer=1;racer<racerBank.count();++racer){
-   opponentFrame=true;
-   try{
-    captureDynamicBeforeFrame(racer);
-    if(originalAiEnabled)observeOriginalAiFleet();
-    racerBank.visit(racer,[&](){initializeGraphics(racer);});
-   }
-   catch(const std::exception& error){
-    opponentFrame=false;
-    std::throw_with_nested(std::runtime_error("Original racer "+racerRigs[racer]->podId+
-        " [initial native graphics tick, "+racerNames[racer]+"]: "+error.what()));
-   }
-   opponentFrame=false;
-  }
-  captureDynamicBeforeFrame(0);
-  if(originalAiEnabled)observeOriginalAiFleet();
-  // Slot 0 runs inside its Bank visit on every course (one shared arena).
-  racerBank.visit(0,[&](){initializeGraphics(0);});
+  setupTickRacers(noKeys);
   raceSetupFrame=false;
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
@@ -3181,6 +3196,30 @@ SessionExit50DU Context::run() {
    }catch(const std::exception& e){why=e.what();return refuse();}
    catch(...){return refuse();}
   };
+  // Common rewrite (item 0): after the whole 1AC8E0 body (race1B0 bit4 clear), the fresh
+  // race's one neutral setup tick for every racer (setupTickRacers above), every course and
+  // pod: each restarted racer publishes graphics/ground (21A660 graphics, the light owner's
+  // updateAfterGraphics) exactly as after the cold load, which the render gate and the
+  // racers' light leases require after their 1AEA70 reset. A racer that refuses names its
+  // slot, pod and cause; the restart is refused.
+  const auto restartSetupTick1AC8E0=[&]()noexcept->bool{
+   const platform::WindowInput50DQ noKeys{};
+   const bool wasSetup=raceSetupFrame;
+   raceSetupFrame=true;
+   bool ok=false;std::string why;
+   try{setupTickRacers(noKeys);ok=true;}
+   catch(const std::exception& e){try{why=e.what();}catch(...){}}
+   catch(...){try{why="unknown exception";}catch(...){}}
+   raceSetupFrame=wasSetup;opponentFrame=false;
+   try{
+    const auto slot=setupTickSlot;
+    std::cerr<<"race_start_setup_tick pc=1AEA70 racers="<<racerBank.count()<<" ok="<<ok;
+    if(!ok)std::cerr<<" refused_slot="<<slot<<" pod="<<(slot<racerRigs.size()&&racerRigs[slot]?racerRigs[slot]->podId:std::string("?"))
+        <<" reason="<<why;
+    std::cerr<<" graphics_sequence0="<<graphicsSequence[0]<<" graphics_due="<<originalManualResetGraphicsDue<<'\n';
+   }catch(...){}
+   return ok;
+  };
   interactive_publication50DU::Context publicationContext50DU{
   .track=track,
   .laps=laps,
@@ -3420,6 +3459,7 @@ SessionExit50DU Context::run() {
   .refreshAnimatedCandidatesCall=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
   .restartGridPlacementCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,const rr::game::UndertrackPlacement50ET&,
       std::uint32_t,bool)noexcept>{restartGridPlacement1AEA70},
+  .restartSetupTickCall=interactive_frame50DU::BorrowedCall<bool()noexcept>{restartSetupTick1AC8E0},
   .renderDiagnostics=renderDiagnostics,
   .renderedCameraPublication=renderedCameraPublication,
   .renderer=renderer,

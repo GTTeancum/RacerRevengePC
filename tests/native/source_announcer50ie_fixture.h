@@ -145,6 +145,26 @@ public:
         }
         return false;
     }
+    // In-place 1AC8E0 tail on race10C+168, every course and pod, every restart:
+    //  1ACE4C 1A6590 -> 2C55A0: +19C/+19D/+19E = -1 and the 27x8 recent rows (+C4) = -1;
+    //  1ACE58 2C4EF0: every announcer voice stopped (the shared Dax episode's source stop).
+    // Unprepared (no announcer owner for this race) has nothing to reset. A suspended
+    // request/update invocation is never discarded: refused with its pc.
+    bool restart1ACE4C(const char*& why)noexcept {
+        using P=rr::game::AnnouncerPhase50IE;using U=rr::game::AnnouncerUpdatePhase50IE;
+        why=nullptr;
+        if(!prepared_)return true;
+        if(!current()){why="2C55A0 announcer owner not current (pc=1ACE4C)";return false;}
+        if((cursor_.phase!=P::Idle&&cursor_.phase!=P::Done)||(update_.phase!=U::Idle&&update_.phase!=U::Done)){
+            why="2C55A0 announcer request/update invocation suspended (pc=1ACE4C)";return false;}
+        state_.pendingKey19C=-1;state_.pendingRacer19D=-1;state_.pendingPriority19E=-1; // 2C55A0..2C55AC
+        for(auto& row:state_.recentC4)row.fill(-1);                                        // 2C55B4..2C55E4
+        // 2C4EF0 2915D0/2924A0: the playing voice is stopped (hardware stop, as 26D070's
+        // native stop), also while the race audio is still paused from the Pause screen;
+        // the episode's own end/restore stays with its later activity/update, as in the original.
+        mixer_->stop(episode_->slot());
+        return true;
+    }
     const rr::assets::AudioBank50HC&bank()const noexcept{return bank_;}
     const rr::game::AnnouncerState50IE&state()const noexcept{return state_;}
     const rr::game::AnnouncerCursor50IE&lastRequest()const noexcept{return cursor_;}

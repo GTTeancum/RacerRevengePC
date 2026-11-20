@@ -1393,6 +1393,12 @@ public:
         if(pendingDisplayWork()||exit_.requestPending()||taSkipFadeRequest_.pending()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published)){
             set(Status::order,0x1acba0);return false;}
+        // The restarted race's fades are new source invocations (re-armed below, after
+        // the last refusal); a fade of the previous race that has not completed is never
+        // discarded: the restart is refused with that fade's pc.
+        if(!replay1B0bit4){
+            if(const auto busy=restartVideoBusyPC1AC8E0()){set(Status::order,busy);return false;}
+        }
         const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
         if(!replay1B0bit4&&!a1&&(launch==2||launch==3)&&!actual_.startMusicRequest){set(Status::owner,0x1ad3c0);return false;}
         // 1A95B0 builds one controller per human; the native camera owns the
@@ -1419,10 +1425,20 @@ public:
             if(!readOriginalFollowSceneBinding(spatial_,visibilityKeys_.view(),sceneBinding_)){set(Status::owner,0x175250);return false;}
             pose_.position=sceneBinding_.position180;
         }
-        if(replay1B0bit4){set(Status::complete,0x1ace14);return true;}
+        if(replay1B0bit4){
+            // 1ACAC8..1ACAEC per human: 17BCE0(race48[i]+64).
+            if(actual_.humanCount34==1u&&!resetFollowMotion17BCE0())return false;
+            set(Status::complete,0x1ace14);return true;
+        }
+        rearmRestartVideoOwners1AC8E0();
         // 1AFC70(B4) on the port's fields: flags58 bits 0..4 = 0, +30 = 0, +34 = 0.
         actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58&~0x1fu);
         actual_.all8Manager.time30=0.f;countdown_.countdown34=0.f;
+        // 1ACCEC..1ACD00: with race48+78 (the course TV camera), 2D30B0 resets its
+        // selector, as 1ACE14 does on the replay branch. Absent TV = the beqz 1ACCF4 skip.
+        if(replayTv_.present())replayTv_.reset2D30B0();
+        // 1ACD10..1ACD3C per human: 17BCE0(race48[i]+64), then 178700(race48[i]).
+        if(actual_.humanCount34==1u&&(!resetFollowMotion17BCE0()||!restoreSavedCamera178700()))return false;
         restartHostRows1AC8E0();
         if(a1){
             if(!restartIntro175430())return false;
@@ -1453,6 +1469,91 @@ public:
         set(Status::complete,0x1ace10);return true;
     }
 private:
+    // In-place 1AC8E0 (race1B0 bit4 clear), every course and pod: each fade the restarted
+    // race requests is a new source invocation, as in the original, which keeps no
+    // once-per-race fade state:
+    //   1A7BD0 2AEE90 -> 2AE93C 260610 (race fade-in; 1ACB7C sets race1B0 bit3 on every call),
+    //   176454 2AED60 / 25A9C0 / 2AEE90(1500) -> 260610 (intro skip on the replayed intro),
+    //   1A7F24 2AED60 -> 2AE7D0 state 7 260850 (ending fade-out at the next finish).
+    // Re-armed only when the previous invocation completed; 0 = every owner idle,
+    // otherwise the pc of the fade still running (the restart is refused, nothing discarded).
+    std::uint32_t restartVideoBusyPC1AC8E0()const noexcept{
+        if(!displayInputs_)return 0x1ac8e0u;
+        const auto a8=displayInputs_->fadeManagerA8;
+        if(a8==8)return 0x2ae93cu;                  // 2AE93C 260610 fade-in not yet issued
+        if(a8==7||a8==4)return 0x2ae7fcu;           // 2AE7D0 ending fade-out still in its states
+        if(fadeInRequestConsumer_!=FadeInRequestConsumer::none||fadeInRequest_.pending()||
+           taSkipFadeInRequest_.pending())return 0x260610u;
+        if(endingFadeRequest_.pending())return 0x260850u;
+        if((asyncFade_.started()&&!asyncFade_.complete())||(taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
+           (endingFadeRequested_&&!endingFade_.complete()))return 0x25e610u;
+        return 0;
+    }
+    // 17BCE0(race48[i]+64), the human's Follow camera, on both 1AC8E0 branches
+    // (1ACACC with race1B0 bit4, 1ACD14 without): +180 and +1A0 = the shared 433DB0
+    // packet (the same copy as the 2255B0 reset's motion stage). Filters, presets,
+    // activation and timer state are untouched.
+    bool resetFollowMotion17BCE0()noexcept{
+        if(follow_.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get()){
+            set(Status::owner,0x17bce0u);return false;}
+        const auto& zero=actual_.followQueries.get()->sharedZero433DB0();
+        std::memcpy(&follow_.scratch180,&zero,16);
+        std::memcpy(&follow_.collision.localPoint1A0,&zero,16);++follow_.revision;
+        return true;
+    }
+    // 1ACD18 178700(race48[i]) (race1B0 bit4 clear), every course and pod: +63 bit1 = 0,
+    // +A4 = 1.0, then 177AB0 to the human's saved mode App2DC+11030 with its saved Follow
+    // preset App2DC+11038 (178810: mode44 != 4; 1787CC: mode44 == 4 passes the cut cursor),
+    // then 284550(+64): the Follow offsets +58..+64 = 0. One view: 17878C's multi-view
+    // clamp (race1B0 low2 >= 2) is not reached. Same transition owners and transition
+    // input as the intro exit's 178700 (advanceExit). Modes other than 0 (Follow) and
+    // 5 (Attached) have no port camera owner: refused with 178810.
+    bool restoreSavedCamera178700()noexcept{
+        if(follow_.revision==std::numeric_limits<std::uint64_t>::max()){set(Status::owner,0x178844u);return false;}
+        const auto& preference=actual_.preferences.slots[0];
+        if(preference.field11030>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max())||
+           preference.field11038>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max())){
+            set(Status::sourcePath,0x178700u);return false;}
+        if(preference.field11030!=0u&&preference.field11030!=5u){set(Status::sourcePath,0x178810u);return false;}
+        if(controller_.mode44==4){set(Status::sourcePath,0x1787ccu);return false;} // not reached: 1ACD10 precedes 175430
+        lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+        if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+           !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_))){set(Status::visibility,0x177ab0u);return false;}
+        auto* world=lease.world();auto* work=lease.workspace();if(!world||!work){set(Status::owner,0x177ab0u);return false;}
+        const auto zones=visibilityKeys_.view();OriginalFollowSceneTransitionInput transition;
+        const bool projected=actual_.bank.visit(0,[&](){
+            return readOriginalAttachedSceneTransitionInput(attached_.binding,key(scene_),
+                {actual_.arena.nodes,actual_.arena.sceneNodeCount},actual_.collisionWorld,
+                actual_.mainMembership690,zones,transition);
+        });
+        if(!projected){set(Status::owner,0x177b18u);return false;}
+        controller_.flags63Low5=static_cast<std::uint8_t>(controller_.flags63Low5&~2u); // 17870C..178728
+        controller_.specialDelayA4=1.f;                                                 // 17872C
+        std::int32_t variant=static_cast<std::int32_t>(preference.field11038);          // 178770 sp+2C
+        const auto switched=preference.field11030==0u?
+            transitionOriginalFollow177AB0(controller_,follow_,sceneBinding_,followChild_,*world,spatial_,
+                zones,*work,0,&variant,transition):
+            transitionOriginalAttached177AB0(controller_,attached_,sceneBinding_,attachedChild_,*world,spatial_,
+                zones,*work,5,transition);
+        if(switched.status!=OriginalFollowControllerStatus::complete){set(Status::sourcePath,switched.sourcePC);return false;}
+        pose_.position=sceneBinding_.position180; // 177AB0 scene180 write
+        follow_.distanceOffset58=follow_.yawOffset5C=follow_.pitchOffset60=follow_.fovOffset64=0; // 284550
+        ++follow_.revision;
+        return true;
+    }
+    // Call only after restartVideoBusyPC1AC8E0() returned 0 for this same restart.
+    void rearmRestartVideoOwners1AC8E0()noexcept{
+        std::destroy_at(&fadeInRequest_);std::construct_at(&fadeInRequest_);
+        std::destroy_at(&asyncFade_);std::construct_at(&asyncFade_);fadeInRequested_=false;
+        std::destroy_at(&taSkipFadeInRequest_);std::construct_at(&taSkipFadeInRequest_);
+        std::destroy_at(&taSkipAsyncFade_);std::construct_at(&taSkipAsyncFade_);taSkipFadeInRequested_=false;
+        std::destroy_at(&endingFadeRequest_);std::construct_at(&endingFadeRequest_);
+        std::destroy_at(&endingFade_);std::construct_at(&endingFade_);endingFadeRequested_=false;
+        // 25A9C0 owners: a completed owner starts over; one never started is already fresh
+        // (a running one cannot reach here: frameStage idle/published is required above).
+        if(taSkipBlockingFade_.complete()){std::destroy_at(&taSkipBlockingFade_);std::construct_at(&taSkipBlockingFade_);}
+        if(blockingFade_.complete()){std::destroy_at(&blockingFade_);std::construct_at(&blockingFade_);}
+    }
     // PORT STAND-IN (restart.txt item 9): the host race rows are port bookkeeping with no
     // original counterpart (the original has no host race rows to restart). They mirror the
     // one restarted race clock (they keep no clock of their own): Countdown, no finish, no
@@ -2777,7 +2878,7 @@ public:
         // request bits set again (a later fade, e.g. after an in-place 1AC8E0 restart) starts a
         // new owner. A pending fade is never replaced (it is not complete).
         auto& fade=frameStage_==FrameStage::taSkipVideo?taSkipBlockingFade_:blockingFade_;
-        if(&fade==&blockingFade_&&fade.complete()){fade.~OriginalVideoBlockingFade();::new(static_cast<void*>(&fade)) OriginalVideoBlockingFade();}
+        if(fade.complete()){std::destroy_at(&fade);std::construct_at(&fade);}
         result_.start=fade.advance(v,actual_.applicationClock,backend);
         return set(result_.start.status==OriginalCameraStartStatus::complete?Status::complete:Status::videoPending,
             result_.start.sourcePC);

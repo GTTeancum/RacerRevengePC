@@ -376,6 +376,7 @@ void Context::run() {
  auto& recoveryPaused=this->recoveryPaused;
  const auto& refreshAnimatedCandidates=this->refreshAnimatedCandidatesCall;
  const auto& restartGridPlacementCall=this->restartGridPlacementCall;
+ const auto& restartSetupTickCall=this->restartSetupTickCall;
  auto& renderDiagnostics=this->renderDiagnostics;
  auto& renderedCameraPublication=this->renderedCameraPublication;
  auto& renderer=this->renderer;
@@ -2186,6 +2187,11 @@ void Context::run() {
   raceStartHooks.restartRecordActor.emplace(restartRecordActor);
   raceStartHooks.resetCamera.emplace(resetCamera);
   raceStartHooks.readBestLapCB4.emplace(readBestLapCB4);
+  // After a whole 1AC8E0 restart (race1B0 bit4 clear): the fresh race's one neutral setup
+  // tick for every racer, through the continuation that owns it (PORT STAND-IN, flagged:
+  // see common_race_start50CR::Hooks::restartSetupTick).
+  const auto restartSetupTick=[&]()noexcept->bool{return restartSetupTickCall();};
+  raceStartHooks.restartSetupTick.emplace(restartSetupTick);
   struct RaceFlowBinding final {
    common_race_start50CR::Owner& start;common_race_end50CR::Owner& end;bool bound=false;
    ~RaceFlowBinding(){if(bound){end.unbind();start.unbind();}}

@@ -488,6 +488,9 @@ struct Context final {
     // B0+3C[slot] = 0. Slot 0 first performs 16E830 for every AI (1AEA88..1AEAC4).
     BorrowedCall<bool(std::size_t slot,const rr::game::UndertrackPlacement50ET& start2169C0,
         std::uint32_t a1,bool replay1B0bit4)noexcept> restartGridPlacementCall;
+    // After a whole 1AC8E0 restart (race1B0 bit4 clear): the fresh race's one neutral setup tick
+    // for every racer (common_race_start50CR::Hooks::restartSetupTick). False names the racer.
+    BorrowedCall<bool()noexcept> restartSetupTickCall;
     using renderDiagnosticsType = render_diagnostics50GQ::Interval;
     renderDiagnosticsType& renderDiagnostics;
     using renderedCameraPublicationType = std::uint64_t;

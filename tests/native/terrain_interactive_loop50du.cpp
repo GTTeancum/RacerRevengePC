@@ -264,7 +264,19 @@ void Context::run() {
  // kept by 216690 when 11258 == 3. After it returns, the loop's own records of
  // the finished/ending race (host bookkeeping, not race state) start again
  // from the fresh-race values the cold setup gave them.
+ // Host record that the restarted race's 1A7BD0 fade-in (race1B0 bit3) is still to be
+ // requested (host bookkeeping, not race state; see the presented-frame service below).
+ bool restartFadeIn1A7BD0Pending=false;
  const auto resetLoopAfterRaceStart=[&](){
+  restartFadeIn1A7BD0Pending=true;
+  // 1AFE30 at the restarted race's GO starts its recording again (287B60, bit1): the
+  // race78 replay owner returns to its bound state (same race, same channels).
+  {const char* why=nullptr;
+   require50DU(native_race_replay50PD::owner().rearm1AC8E0(why),why?why:"1AC8E0 race78 replay re-arm refused");}
+  // 1ACE4C 1A6590 -> 2C55A0 and 1ACE58 2C4EF0 on race10C+168 (the announcer): pending
+  // line and recent rows cleared, every announcer voice stopped.
+  if(sourceAnnouncer){const char* why=nullptr;
+   require50DU(sourceAnnouncer->restart1ACE4C(why),why?why:"1ACE4C announcer restart refused");}
   humanResultsActive=false;humanResultsReady=false;
   humanResultsCountdown=humanCourseEnabled?4.f:0.f;   // race94 of the human Course route (1A6660)
   recoveryPaused=false;
@@ -3835,6 +3847,23 @@ void Context::run() {
       if(static_cast<unsigned>(fade.status)!=reportedPresentedFade){reportedPresentedFade=static_cast<unsigned>(fade.status);
        std::cerr<<"race_replay fade_in_presented status="<<reportedPresentedFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec
            <<" pending="<<sourceCameraSession->pendingDisplayWork()<<'\n';}
+     }
+     // 1A7BD0..1A7C18 after an in-place 1AC8E0 (1ACB7C sets race1B0 bit3 on every
+     // call), every course and pod: the race update requests the fade-in of the
+     // restarted scene once it is covered. While it is not covered (or the fade
+     // manager is busy) 2AEE90 returns 0 and bit3 stays set: retried on the next
+     // update, as in the original. Reached after the replayed intro has exited
+     // (countdownInstalled), as the cold race reaches it after its intro.
+     if(restartFadeIn1A7BD0Pending&&!native_common_results50PD::state().replayActive&&actualGameplayImageCompleted&&
+        sourceCameraSession->countdownInstalled()&&!sourceCameraSession->blockingVideoPending()&&
+        !sourceCameraSession->asyncVideoPending()){
+      const auto fade=sourceCameraSession->advanceRaceFadeInPrefix();
+      static unsigned reportedRestartFade=0xffu;
+      if(static_cast<unsigned>(fade.status)!=reportedRestartFade){reportedRestartFade=static_cast<unsigned>(fade.status);
+       std::cerr<<"race_restart_fade_in status="<<reportedRestartFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec<<'\n';}
+      if(fade.status==sourceCamera::Status::complete)restartFadeIn1A7BD0Pending=false;
+      else require50DU(fade.status==sourceCamera::Status::videoPending,
+          "1A7BD0 restarted-race fade-in refused (see race_restart_fade_in status/pc)");
      }
      if(humanCourseEnabled&&sourceCameraSession->endingFadeQueued()){
       require50DU(actualGameplayImageCompleted&&

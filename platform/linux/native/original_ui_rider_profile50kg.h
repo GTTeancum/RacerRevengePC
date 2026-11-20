@@ -21,6 +21,7 @@ namespace original_results_roster50LA { class Read; }
 namespace original_main_entry50KG { struct Application; }
 namespace original_racer_manager_entity { class Owner; }
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace common_race_start50CR { class Owner; }
 namespace rr::game { struct OriginalUiGarageState50KG; struct ControlPresets49D; struct OriginalUiGameSettingsProfile50KG; class OriginalResults10450LA; class OriginalRaceConstructor50LA; struct LapRecordQueryResult50ID; }
 
 namespace rr::platform {
@@ -239,6 +240,7 @@ private:
     game::LapRecordQueryResult50ID resultsKnockoutQuery1863B0(std::uint32_t,std::uint32_t)const noexcept;
     friend struct ::original_main_entry50KG::Application;
     friend class ::original_racer_manager_entity::Owner;
+    friend class ::common_race_start50CR::Owner; // 1AC8E0 1ACC4C restartPodRace1ACC4C only
     // Pure, private preparation from the SAME profile's Hall/config/names.
     // No current caller. Row0/race1B0 are observations, not authority: a future
     // once-only1AB520 continuation must establish the actual retained manager,
@@ -313,6 +315,11 @@ private:
     // constructor boundary, never on a page proposal or resource prewarm.
     // Represents only proven7E4 bit0; upper seven bits stay unrepresented.
     bool beginPodRace1A66CC(const OriginalUiMainProfile50KG& actualCommon)noexcept;
+    // In-place 1AC8E0 (race1B0 bit4 clear) 1ACC4C..1ACC78: the same 7E4 bit0 = 0 and
+    // 7E8 = 0 stores as 1A66D8..1A66F0, on every restart. The native generation moves
+    // only when a stored value changes, counted with the armed launch's other race
+    // stores (as 1AB598/1AB5A8), so an armed tournament launch stays valid.
+    bool restartPodRace1ACC4C(const OriginalUiMainProfile50KG& actualCommon)noexcept;
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;

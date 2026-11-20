@@ -241,6 +241,20 @@ bool OriginalUiRiderProfileOwner50KG::beginPodRace1A66CC(
     ++storage_->generation; //Native observation identity, not a guest field.
     return true;
 }
+bool OriginalUiRiderProfileOwner50KG::restartPodRace1ACC4C(
+    const OriginalUiMainProfile50KG& actualCommon)noexcept {
+    if(!storage_||storage_->common.get()!=&actualCommon||!actualCommon.known)return false;
+    auto& s=*storage_;
+    const bool changed=s.bit0_7E4||s.word7E8!=0u;
+    if(changed&&s.generation==std::numeric_limits<std::uint64_t>::max())return false;
+    s.bit0_7E4=false; //1ACC64..1ACC6C (1ACC38 andi a1,zero,1 = 0)
+    s.word7E8=0;      //1ACC78
+    // PORT EXTENSION (148r): the add-on course ranks are cleared where the original
+    // clears App2DC+11260.. / +1126C.. (1ACC90..1ACCD4); host memory only.
+    rr::game::dlc50DL::clearAddonCourseRecord();
+    if(changed){++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps;}
+    return true;
+}
 
 bool OriginalUiRiderProfileOwner50KG::initializeAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,

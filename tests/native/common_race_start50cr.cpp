@@ -150,6 +150,18 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
         return done(true);
     }
 
+    // The previous race's 1A7DA0 end-clock invocation: the original keeps no cursor
+    // across races (1A7DA0 is an ordinary per-update call). A completed receipt is
+    // dropped at the tail below; a suspended music/announcer/fade cut is never
+    // discarded, so the restart is refused before any effect.
+    using EndClock=rr::game::OriginalHumanEndClockStatus50KG;
+    const auto endClockSettled=[&]()noexcept {
+        if(!r.endClockProgress_)return true;
+        const auto st=r.endClockProgress_->status;
+        return st==EndClock::advanced||st==EndClock::unchanged||st==EndClock::needOriginalEndDispatch1A7DD0;
+    };
+    if(!endClockSettled())
+        return run.fail(first,"1A7DA0 end-clock cut still suspended (pc=1A7DA0); restart refused before 1AC8E0"),done(false);
     // ---- 1AC8E0 restart body, in the Step order (dis_all.txt 1AC8E0..1ACE48) ----
     // 1AC900 World74+3D0 2DCC70; 161F60 and 2702E0 run through the same one
     // world hook. PORT STAND-IN (flagged, existing): the track owners perform
@@ -226,7 +238,23 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
         // 1ACC34..1ACC84 (the race's own fields): race1B0 bit5 = 0, race1A8 = 0.
         r.flags1B0KnownValue_=std::uint8_t(r.flags1B0KnownValue_&~0x20u);
         r.flags1B0KnownMask_=std::uint8_t(r.flags1B0KnownMask_|0x20u);
+        // 1ACC4C..1ACC78: App2DC+7E4 bit0 = 0 (1ACC38 andi a1,zero,1) and App2DC+7E8 = 0,
+        // the same two profile stores as the fresh 1A66D8..1A66F0, through the rider
+        // profile's one owner of them. 1ACC90..1ACCD4 (App2DC+11260.. and +1126C.. = 0,
+        // i = 0..2) have no port field; that owner's add-on rank clear stands for them
+        // (PORT EXTENSION, existing, dlc_course_records50dl.h).
+        if(!application_.profile||!application_.riderProfile||
+           !application_.riderProfile->restartPodRace1ACC4C(*application_.profile))
+            return run.fail(Step::tail1ACB7C,"1ACC4C profile 7E4/7E8 restart stores refused (pc=1ACC4C)"),done(false);
         r.field1A8_=0;
+        // 1ACCD8..1ACCE8: race104 (Results) vtable+18 = 141520 (vtable 3CF3A0+18,
+        // SLUS_202.68): flags29 bit0 then bit1 cleared, then vtable+28 (141460) over
+        // its empty child list - the Results Entity is disabled again for the
+        // restarted race. Already disabled = the same stores of the same values.
+        // PORT STAND-IN (flagged): the original has no null test (race104 always
+        // exists); a port race without its Results owner skips the call.
+        if(r.results104_&&!r.results104_->loadedDisabled()&&!r.results104_->disable1A8B1C())
+            return run.fail(Step::tail1ACB7C,"1ACCD8 race104 141520 Results disable refused (pc=1ACCD8)"),done(false);
     }
     // 1ACBA0.. per human 1AF330 / 1750A0 camera racer binding, then 1ACD44 on a1:
     // a1 != 0: 175430(race48) + 1A9750(race,1); a1 == 0: 1ACD68 1AFD80(B4), the
@@ -256,11 +284,27 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     }
     // 1ACDF0 1983A0(raceD4): the race's start overlay reset (hook).
     if(!overlay197040(run,hooks))return done(false);
+    // The restarted pods publish graphics/ground through the fresh race's one neutral
+    // setup tick (PORT STAND-IN, see Hooks::restartSetupTick), after 1AFC70 cleared the
+    // manager's started bit, so the replayed intro runs on the fresh intro's path.
+    // race1B0 bit4 (Practice replay): the racers are posed by race78, no tick.
+    if(!bit4){
+        run.enter(Step::restartSetupTick);
+        if(!hooks.restartSetupTick)return run.fail(Step::restartSetupTick,"restart neutral setup tick owner absent"),done(false);
+        if(!(*hooks.restartSetupTick)())
+            return run.fail(Step::restartSetupTick,"restart neutral setup tick refused (race_start_setup_tick names the racer)"),done(false);
+    }
     // 1ACE04 194CC0(raceD0): the port's race has no D0 time-stats object, which
     // is the original's beqz 1ACDFC skip.
     // This race's next finish runs a fresh 1A7DD0 invocation (the suspended
     // native cursor of the previous one is retired; R1 owns the reset).
     r.resetEndInvocation1A7DD0();
+    // 1ACE44..1ACE48: race98 = 10.0 (both race1B0 bit4 branches join here), the
+    // ending music delay that 1A7E44 counts down after the next finish.
+    r.endClock98_.musicDelay98=10.f;
+    // The previous race's settled 1A7DA0 receipt (checked above) is dropped: the next
+    // finish starts a new 1A7DA0 invocation. The Root publication order stays.
+    r.endClockProgress_.reset();
     {
         auto& common=native_common_results50PD::state();
         common.endActive=false;common.endLogged=false;common.endRefusedLogged=false;common.fallback=false;

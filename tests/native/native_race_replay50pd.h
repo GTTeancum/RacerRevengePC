@@ -92,6 +92,19 @@ public:
         for(auto& t:tracks_){t.rootCount=0;t.samples.clear();}
         stats_={};lastWrites_=0;state44_={};
     }
+    // In-place 1AC8E0 (race1B0 bit4 clear; every course and pod): the restarted race
+    // records again from its own GO 1AFE30 (287B60 then bit1, startRecording), as the
+    // original does at every GO. The binding (race78 channels, traits, roots) is the
+    // same race's and stays; only the previous recording's native samples are dropped.
+    // Idle (never bound) stays idle. Refused when race78 is no longer published.
+    bool rearm1AC8E0(const char*& why)noexcept{
+        why=nullptr;
+        if(phase_==Phase::idle)return true;
+        if(!current(why))return false;
+        for(auto& t:tracks_)t.samples.clear();
+        pending_={};captured_.fill(false);state44_={};lastWrites_=0;
+        phase_=Phase::bound;return true;
+    }
     // 1AD9A0 for every racer, in roster order, after race78 and Race90 exist
     // and before the first VCR update (bit4 closes registration).
     bool bind(const std::shared_ptr<OriginalRaceConstructor50LA>& race,const RacerTraits* traits,

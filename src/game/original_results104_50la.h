@@ -11,6 +11,7 @@ namespace rr::platform { class GameHost50ER; class VehicleWindowGl50DS; }
 namespace original_results_roster50LA { class Read; }
 namespace original_position_stats_adapter50LA { class Owner; }
 namespace common_roster50CR { class Owner; }
+namespace common_race_start50CR { class Owner; }
 namespace native_racer50HN { class Bank; }
 namespace rr::assets {
 class OriginalStandardMaterialDomain50LA;
@@ -41,6 +42,7 @@ class OriginalResults10450LA final {
     friend class OriginalRaceConstructor50LA;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class ::original_race_hud_scope50LA::Registration;
+    friend class ::common_race_start50CR::Owner; // 1AC8E0 1ACCD8 race104 141520 (disable1A8B1C) only
     static bool nameEntryRaceCurrent1C9B10(const OriginalRaceConstructor50LA&,const OriginalResults10450LA*,
         const std::shared_ptr<OriginalApplicationEntities50LA>&,const std::uint64_t&)noexcept;
     static bool liveResultsRaceAuthorityCurrent(const OriginalRaceConstructor50LA&,
