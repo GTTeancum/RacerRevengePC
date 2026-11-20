@@ -87,7 +87,6 @@
 #include "source_texture50fc_fixture.h"
 #include "pod_scene_rebase50fb.h"
 #include "track_materials50fa_fixture.h"
-#include "track_normals50hk_fixture.h"
 #include "material_alpha50gx_fixture.h"
 #include "sky50gw_fixture.h"
 #include "original_track_sky50kx_fixture.h"
@@ -162,7 +161,6 @@
 #include "gameplay_binder_window_candidate_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "selected_grid_navigation50ig.h"
-#include "../../src/game/track_navigation_view50mb.h"
 #include <type_traits>
 #include <variant>
 #include "track_session_assets50ig_fixture.h"

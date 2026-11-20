@@ -32,6 +32,12 @@ struct Context final {
     // W0 common rewrite: one end dispatch 1A7DD0 and departure (common_race_end50cr.h)
     using raceEndType = common_race_end50CR::Owner;
     raceEndType& raceEnd;
+    // W0 round 2 (i3 #1, i4 #1): the port-side race-start hooks I3 fills at publication (a
+    // publication local that outlives the loop). The loop passes them to
+    // raceEnd.continue1A7DD0 (Time Trial 1ABC0C / Practice 1ABD28 in place) and to
+    // Application::restartConsumedRace1AC8E0 (Pause RESTART 1BD934).
+    using raceStartHooksType = const common_race_start50CR::Hooks;
+    raceStartHooksType& raceStartHooks;
     using originalUiActiveType = bool;
     originalUiActiveType& originalUiActive;
     using courseRaceLaunchedType = bool;
@@ -494,7 +500,9 @@ struct Context final {
     engineDamageType& engineDamage;
     using speechEventsType = std::uint64_t;
     speechEventsType& speechEvents;
-    using materialAudioType = std::unique_ptr<material_audio50HI::Provider>;
+    // W0 round 2 (i2 #7, r7 #2): the one provider is Track::roles.audio (05.12); bind
+    // `.materialAudio=track.roles.audio`. No second provider exists.
+    using materialAudioType = const std::shared_ptr<material_audio50HI::Provider>;
     materialAudioType& materialAudio;
     using originalAiAudioType = std::unique_ptr<native_original_ai_audio::Owner>;
     originalAiAudioType& originalAiAudio;

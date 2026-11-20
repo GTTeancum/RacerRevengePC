@@ -96,6 +96,12 @@ struct Context final {
     // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
     using trackType = const common_track50CR::Track;
     trackType& track;
+    // W0 round 2 (i1 #1, i2 #1): the owning handle of the SAME Track. I1's session builds it
+    // (identity only) and fills `.trackOwner=raceTrack`; I2 begins the stage
+    // (original_consumed_stage50DU::Owner::begin takes the shared_ptr) and loads it
+    // (Application::loadConsumedRaceTrack1A9EE0 takes Track&).
+    using trackOwnerType = const std::shared_ptr<common_track50CR::Track>;
+    trackOwnerType& trackOwner;
     // W0 common rewrite: one roster (common_roster50cr.h)
     using rosterType = common_roster50CR::Owner;
     rosterType& roster;

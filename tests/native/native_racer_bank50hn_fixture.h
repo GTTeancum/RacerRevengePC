@@ -36,10 +36,7 @@ namespace mc_collision_world50MC { class Owner; }
 namespace gb_query50GB { class Binding; }
 namespace mc_query50MC { class Binding; }
 namespace gb_collision_world50GB { class Owner; }
-namespace tc_cold_visibility50TC { class Retirement; }
-namespace tb_cold_visibility50TB { class Retirement; }
-namespace gb_cold_visibility50GB { class Retirement; }
-namespace mc_cold_visibility50MC { class Retirement; }
+namespace racer_cold_visibility50CR { class Retirement; } // W0 round 2: one retirement for every course
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 
@@ -279,10 +276,7 @@ private:
     const ::track_animation_binding50AN::Binding* animationIssuer_=nullptr;
     bool animationBlocked_=false,animationVisit_=false;
     friend class mb_source_trigger50MB::Owner;
-    friend class ::tc_cold_visibility50TC::Retirement;
-    friend class ::tb_cold_visibility50TB::Retirement;
-    friend class ::gb_cold_visibility50GB::Retirement;
-    friend class ::mc_cold_visibility50MC::Retirement;
+    friend class ::racer_cold_visibility50CR::Retirement;
     enum class QueryState:std::uint8_t {idle,active,suspended};
     const mb_source_trigger50MB::Owner* sourceIssuer_=nullptr;
     std::uint64_t sourceGeneration_=0,lastSourceSerial_=0;

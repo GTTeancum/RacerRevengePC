@@ -28,7 +28,7 @@ namespace ra_pod_scene50LA { class Owner; }
 namespace mb_source_trigger50MB { class Owner; }
 // The one cold-unwind caller (replaces the four per-course Retirement classes;
 // its owner folds tc/tb/gb/mc_cold_visibility50xx.h into it).
-namespace track_cold_visibility50CR { class Retirement; }
+namespace racer_cold_visibility50CR { class Retirement; }
 namespace track_animation_binding50AN { class Binding; }
 namespace common_track50CR { class Track; }
 namespace original_cable_selection50LA { class Binding; }
@@ -275,7 +275,7 @@ class Owner final {
     static std::optional<std::size_t> podFlareAuthoredIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
 
     friend class ::mb_source_trigger50MB::Owner;
-    friend class ::track_cold_visibility50CR::Retirement;
+    friend class ::racer_cold_visibility50CR::Retirement;
     friend class ::ra_pod_scene50LA::Owner;
     //Actual RA source flare identity in the SAME canonical visibility domain.
     //Private World producer only; no public admission/ready flag.

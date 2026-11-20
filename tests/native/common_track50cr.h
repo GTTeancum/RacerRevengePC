@@ -49,7 +49,8 @@
 namespace rr::assets { class OriginalStandardArchiveProvider50LA; class OriginalStandardTextureResolver50LA;
     class OriginalStandardMaterialTable50LA; struct OriginalPositionalSounds50SR; struct MaterialAudioCatalog50HI; }
 namespace rr::game { class OriginalApplicationEntities50LA; class OriginalTrackFogRuntime50CR; class OriginalTrackParticleCold50LA;
-    struct NativeTriggerGroup50MC; class OriginalRaceConstructor50LA; class OriginalRacerModelRenderGlobals50LA; }
+    struct NativeTriggerGroup50MC; class OriginalRaceConstructor50LA; class OriginalRacerModelRenderGlobals50LA;
+    struct VehicleAnimationShared49T; struct SourceLibmState49T; }
 namespace rr::game::original_gc_gameplay_lighting_candidate { class Owner; }
 namespace rr::platform { class AudioMixer50HD; class RaceAudioGroups50IC; }
 namespace original_main_entry50KG { struct Application; }
@@ -65,6 +66,8 @@ namespace water_resources50JC { struct Owner; }                          // R7: 
 namespace native_water_runtime50JC { class Owner; class Application; }   // R7: water runtime
 namespace material_audio50HI { class Provider; }                         // R7: AUB 271600 provider
 namespace positional_sound_rows50SR { class Owner; }                     // R7 NEW: one positional-sound owner
+namespace course_trigger_actions50CT { class Owner; }                    // R5: the one trigger action owner (W0 round 2, r5 #2)
+namespace track_particle_emitters50CR { class Owner; }                   // R7 NEW (W0 round 2): the one track ground-effects owner (track_particle_emitters50cr.h)
 namespace common_race_world50CR { class World; }
 
 namespace common_track50CR {
@@ -162,19 +165,28 @@ enum class BlockId : std::uint8_t {
     fogZones,           // R6  OriginalTrackFogZone50CR per SCB zone (273C30)
     particleEmitters,   // R7  particle emitter table rows (27DE00)                     original capacity 40 (particle_emitters50PE)
     positionalSounds,   // R7  sound rows of the track (AUB/SCB sound rows)
+    particleAttachments,// R7  ground-effect placements: one per TOB emitter instance (SoulTree attachment)  W0 round 2
+    particleDefinitions,// R7  ground-effect definitions: one per distinct EmitterFilename (EMT)            W0 round 2
     count
 };
 struct BlockRow { const char* name; std::size_t ceiling; log::Writer owner; };
 inline const BlockRow& blockRow(BlockId b)noexcept {
     static constexpr BlockRow rows[]={
+        // nav_*: the 2A1260 reader's own guard rr::game::navigationNodeLimit50ET (1024,
+        // undertrack_reposition50et.h) is stricter and wins; readNavigation2A1260 refuses (logged)
+        // if a ceiling here ever drops below it.
         {"nav_map_nodes",4096u,log::Writer::R4},{"nav_ai_nodes",4096u,log::Writer::R4},
         {"nav_map_gates",4096u,log::Writer::R4},{"nav_ai_gates",4096u,log::Writer::R4},
         {"nav_map_index",4096u,log::Writer::R4},{"nav_ai_index",4096u,log::Writer::R4},
         {"nav_map_metadata",4096u,log::Writer::R4},{"nav_ai_metadata",4096u,log::Writer::R4},
         {"nav_portals",4096u,log::Writer::R4},{"nav_field_mask",4096u,log::Writer::R4},
+        // triggers: allocation guard only; the original 274E90 has no limit of its own
+        // (NumberOfTriggers is read as-is). NativeTriggerGroup50MC sizes with the same ceiling (block=trigger_group).
         {"triggers",1024u,log::Writer::R5},{"trigger_ignore",1024u,log::Writer::R5},{"trigger_memberships",1024u,log::Writer::R5},
         {"lights",1024u,log::Writer::R6},{"fog_zones",256u,log::Writer::R6}, // 256 = originalTrackFogZoneLimit50CR
         {"particle_emitters",40u,log::Writer::R7},{"positional_sounds",4096u,log::Writer::R7},
+        // definitions <= emitter rows (27DE00 capacity 40); attachments: allocation guard (instances of those rows).
+        {"particle_attachments",4096u,log::Writer::R7},{"particle_definitions",40u,log::Writer::R7},
     };
     static_assert(sizeof(rows)/sizeof(rows[0])==static_cast<std::size_t>(BlockId::count));
     const auto i=static_cast<std::size_t>(b);
@@ -253,18 +265,19 @@ struct Counts final {
     std::uint32_t staticModels=0;     // TOB StaticModelParams rows (271A00)
     std::uint32_t triggers=0;         // TOB numberoftriggers (274E90)
     std::uint32_t triggerActions=0;   // total triggerNactionM rows
-    std::uint32_t cuts=0;             // TOB [CSCameras].NumberOfCameras (World+3E4, 174E58)
+    std::uint32_t cuts=0;             // TOB [CSCameras].NumberOfCameras (World+3E4, 174E58); absent block = 0; read at 05.02
     std::uint32_t lights=0;           // SCB NumberOfLights
     std::uint32_t navMapNodes=0;      // m<code>.spl nodes (2A1260)
     std::uint32_t navAiNodes=0;       // a<code>.spl nodes
-    std::uint32_t lapMarkers=0;       // ProgressNode markers (2A1980..19C0)
+    std::uint32_t lapMarkers=0;       // ProgressNode markers (2A1980..19C0); counted at step 08, printed by Track::logTrackData
     std::uint32_t particleEmitters=0; // particle emitter rows (27DE00)
+    std::uint32_t particleAttachments=0; // ground-effect placements (emitter instances), 05.06 (W0 round 2)
     std::uint32_t aubRows=0;          // AUB catalog rows (271600)
     std::uint32_t positionalSounds=0; // track sound rows
     std::uint32_t materials=0;        // materials (274160)
     std::uint32_t textures=0;         // textures (14D370/29E340)
     std::uint32_t atmRows=0;          // animated-texture rows
-    std::uint32_t animations=0;       // track animation rows (101860)
+    std::uint32_t animations=0;       // track animation rows (101860), read at 05.02 ([Animations] NumberOfAnimations) so 05.13 can size its lane
     std::uint32_t skyCubes=0;         // SCB Environment sky cubes (274AE0)
     std::uint64_t storageBytes=0;     // collision/zone storage bytes (track_runtime_storage50IG)
     bool water=false;                 // SCB Environment names water (A9: 274570 none / 2745D4 factory)
@@ -378,7 +391,10 @@ public:
 // World, the camera session, the renderer request and the frame owners borrow
 // the same object; the Track's release order (Track::release) is the one closer.
 struct Roles final {
-    std::shared_ptr<track_runtime_storage50IG::Storage> storage;                     // R3  05.03 collision/zone storage (sized from Counts)
+    // R3: published after the collision world's prepareStorage (I2, after step 10) by
+    // track_collision_world50CR::publishStorageRole(track): an alias of the collision world's
+    // one Storage (its racer rows are sized from the roster). 05.03 sizes the plan and logs it.
+    std::shared_ptr<track_runtime_storage50IG::Storage> storage;
     std::shared_ptr<track_collision_world50CR::Owner> collision;                     // R3  05.03/05.04 one collision world, lease, query bracket, lift bind
     std::shared_ptr<single_pass_world50LM::Owner> staticWorld;                       // R3  05.07 instances + single-pass decoder (mesh, bank, spans, selections)
     std::shared_ptr<rr::game::OriginalTrackFogRuntime50CR> fog;                      // R6  05.05 273C30 (borrowed by camera + renderer)
@@ -386,10 +402,19 @@ struct Roles final {
     std::shared_ptr<original_track_sky50KX::Owner> sky;                              // R6  05.11 274AE0
     std::shared_ptr<const course_trigger_sources50CT::Owner> triggerSource;          // R5  05.09 274E90 rows
     std::shared_ptr<rr::game::NativeTriggerGroup50MC> triggers;                      // R5  05.09 2A00A0/2A0E20/2A0B30 one group (50MC shape)
+    // R5 type, created by I2 after step 08 (needs the AI node count) and bound after step 10
+    // (racer identities); null when the track has no triggers. The collision world borrows the
+    // same pointer (StorageRequest.actions). Track::release drops this reference first; the
+    // collision world closes the owner at its retirement (W0 round 2, r5 #2 / r3 #3).
+    std::shared_ptr<course_trigger_actions50CT::Owner> triggerActions;
     std::shared_ptr<track_animation_runtime50AN::Owner> animation;                   // R5  05.14 101860 family
     std::shared_ptr<track_uv_animation50uv_fixture::Owner> uvAnimation;              // R5  05.14 29B1D0
     std::shared_ptr<track_atm50CR::Owner> atm;                                       // R5  05.14 authored animated textures
     std::shared_ptr<rr::game::OriginalTrackParticleCold50LA> particles;              // R7  05.06 1B4DC0 manager (renderer particle window reads it)
+    // R7 05.06 (W0 round 2): the one ground-effects owner over the TOB [ParticleEmitters] rows
+    // (27DE00/27C600/27C7B0, EMT definitions, SoulTree attachments, 15AEA0), emitting into
+    // `particles` by each row's TypeID (the original's switch: data). Null when the TOB has no rows.
+    std::shared_ptr<track_particle_emitters50CR::Owner> emitters;
     std::shared_ptr<const water_resources50JC::Owner> waterResources;                // R7  05.10 null when the SCB names no water (A9)
     std::shared_ptr<native_water_runtime50JC::Owner> water;                          // R7  05.10 runtime (null when no water)
     std::shared_ptr<material_audio50HI::Provider> audio;                             // R7  05.12 AUB catalog + material audio
@@ -399,10 +424,15 @@ struct Roles final {
 
 // ---------------------------------------------------------------- load inputs
 // What the 1A9EE0 chain borrows from its caller (I2). Synchronous borrows only.
+// W0 round 2 (r11 #1, i2 #2): pointers, so the host data check (runHostDataCheck)
+// can run the SAME readers with no Application, race or World. In a race all three
+// are non-null (Load::run refuses otherwise); only Load::run reads hostDataCheck and
+// decides which publishing parts to skip; a reader never branches on it.
 struct LoadInputs final {
-    const original_main_entry50KG::Application& application;
-    rr::game::OriginalRaceConstructor50LA& race;
-    common_race_world50CR::World& world;                      // race+74 (step 2 already ran)
+    const original_main_entry50KG::Application* application=nullptr;
+    rr::game::OriginalRaceConstructor50LA* race=nullptr;
+    const common_race_world50CR::World* world=nullptr;       // race+74 (step 2 already ran); read only
+    bool hostDataCheck=false;                                 // R11 track_check.cpp only; never set in a race
     std::shared_ptr<rr::game::OriginalApplicationEntities50LA> entities;
     std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> materials382B38;
     rr::platform::AudioMixer50HD* mixer=nullptr;
@@ -410,6 +440,10 @@ struct LoadInputs final {
     std::uint32_t racers=0;                                   // field size (1AD520: 1..8)
     std::uint64_t generation=0;                               // session generation
     std::string audioRoot;                                    // AUB PCM root (material audio)
+    // The session frame's ONE shared animation state (libm + motion), the same objects the
+    // racers' animation uses (errno/motion parity). I2 fills &s.animationShared. 05.14 refuses
+    // (logged) when null. W0 round 2 (r5 #1).
+    rr::game::VehicleAnimationShared49T* animationShared=nullptr;
 };
 
 class Track;
@@ -434,8 +468,13 @@ bool readAub271600(Track&,const LoadInputs&,Diagnostic&)noexcept;            // 
 bool prepareLights(Track&,const LoadInputs&,Diagnostic&)noexcept;            // R6  05.13 SCB Lights/LightN, all light types and flashers (prepareMaSa path)
 bool prepareAnimation101860(Track&,const LoadInputs&,Diagnostic&)noexcept;   // R5  05.14 101860 animation, ATM, 29B1D0 UV
 bool finishTail1AA400(Track&,const LoadInputs&,Diagnostic&)noexcept;         // R3  05.15 1AA400..1AA508 tail (restores model directory)
-// Step 8 (after the camera session, PLAN 2.1 order), R4:
-bool readNavigation2A1260(Track&,Diagnostic&)noexcept;                       // R4  08 2A1160/2A1260 both splines; sizes nav blocks from node counts
+// Step 8, R4. Cold order (W0 round 2, i2 #6): readNavigation2A1260 runs right after the
+// load; grid input, roster (10) and collision storage come next, then bindNavigation1ACF70,
+// all before the camera session (06), which needs a runtime-valid map view. The log steps
+// keep their PLAN numbers.
+// `libm` is the session's ONE serial libm owner (s.animationShared.libm): the 2A1D80 gate
+// build runs the source acos on it (W0 round 2, r4 #1).
+bool readNavigation2A1260(Track&,rr::game::SourceLibmState49T& libm,Diagnostic&)noexcept; // R4  08 2A1160/2A1260 both splines; sizes nav blocks from node counts
 bool bindNavigation1ACF70(Track&,Diagnostic&)noexcept;                       // R4  08 1ACF70 zone index against roles.collision's live world
 NavigationView navigationView(const Track&,NavigationRole)noexcept;          // R4  view over roles.navigation
 
@@ -487,5 +526,14 @@ private:
     log::Step reached_=log::Step::archive12CEA0;
     std::uint32_t pc_=0;
 };
+
+// ---------------------------------------------------------------- host data check (PLAN 4.3)
+// R3 (common_track_load50cr.cpp), W0 round 2 (r11 #1): the entry R11's track_check.cpp
+// calls. Builds the host archive provider / texture resolver pair the same way the
+// Application's fresh native service does, then runs Load::run with
+// LoadInputs{.hostDataCheck=true} (steps 04, 05.01..05.15), readNavigation2A1260 (08,
+// with one check-local libm state), and track.logTrackData(). The SAME reader functions
+// as a race; no second count reader. Stops at the first refusal (d). Never used in a race.
+bool runHostDataCheck(Track& track,const Identity& identity,Diagnostic& d)noexcept;
 
 } // namespace common_track50CR

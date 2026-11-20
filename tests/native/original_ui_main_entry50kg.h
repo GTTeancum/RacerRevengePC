@@ -18,7 +18,6 @@ namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalSessionF8Intro50LA;class OriginalLoadingManager33050LA;}
 namespace original_results_roster50LA { class Read; }
 namespace interactive_publication50DU { struct Context; }
-namespace ra_native_session50LA { class Join; }
 namespace rr::game { class OriginalResults10450LA; struct InputEvent48Z; struct OriginalResults104Diagnostic50LA; struct OriginalRaceF8Diagnostic50LA; struct OriginalRaceEndEntryDiagnostic50LA; struct OriginalHumanEndClockResult50KG; }
 namespace interactive_continuation50DU {struct Context;}
 namespace original_course_targets50KX { class ConsumedLaunch; }
@@ -259,7 +258,6 @@ private:
     friend class ::original_pause_observation50LA::Owner;
     friend class ::original_race_hud_scope50LA::Registration; //Separate ALL8 listener camera borrow, never End/HUD authority.
     friend class ::original_results_roster50LA::Read;
-    friend class ::ra_native_session50LA::Join;
     const std::shared_ptr<rr::assets::OriginalPauseSourceData50LA>&
         pauseSourceDataForResults50LA(const original_pause_cold50LA::Owner&)const noexcept;
     bool loadConsumedPauseSourceCold50LA(rr::game::OriginalRaceConstructor50LA&,
@@ -372,7 +370,10 @@ private:
         const original_camera_session50KX::Session&)const noexcept;
     bool resultsPublishedRoot50LA(const rr::game::OriginalRaceConstructor50LA&,
         rr::game::OriginalResults104Diagnostic50LA&,bool requireUpdateEligible=true)const noexcept;
-    // UNCALLED CPU-only slot44 bridge; no scheduler/render/input admission.
+    // F8 slot44 1994B0 layout, admitted on every race with the one issued Camera34 (R1).
+    // Its original caller is the race's F8 update/draw: the owner of the F8 frame call
+    // (I4 loop) calls it once per F8 frame on every race where the F8 renderer runs
+    // (W0 round 2; was UNCALLED).
     bool layoutConsumedF81994B0(rr::game::OriginalRaceF8Diagnostic50LA&)const noexcept;
     // Native resource custody; no original gameplay render-phase admission.
     bool retainConsumedF8Renderer50LA(rr::game::OriginalRaceF8Diagnostic50LA&)const noexcept;
@@ -530,14 +531,7 @@ private:
     // Uncalled native custody leaf, not a source loader or child constructor.
     bool retainNativeTaCutAuthoring50LA()const noexcept;
     bool constructNativeTaController174A30()const noexcept;
-    // Private, uncalled object-local unloaded child lifetime. No source74
-    // publication, registry key, VUB loader or replacement process input.
-    bool constructUnpublishedNativeTaCutChild282860()const noexcept;
     bool abortUnpublishedNativeTaCutChild()const noexcept;
-    // Private, UNCALLED first-TA01 copied-input resource prerequisite only.
-    // No caller child/ordinal/file/FP promise or source IO completion authority.
-    std::shared_ptr<original_camera_session50KX::Session> resourceNativeTaCameraSession50LA()const noexcept;
-    bool deriveUnpublishedNativeTa01Resources()const noexcept;
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
     // The actual persistent dispatcher is Root-owned, never manufactured on
     // Garage entry. The two counted global dialog children share this scope.
@@ -626,8 +620,6 @@ private:
     //Explicit native progress/archive/scene/TOB prefix: pc1AA0C0 stops BEFORE
     //World slotA4/271CF0. pc1A6CC8 preserves the never-prepared native-only
     //audio route without ANY new effects. Neither is full1A9EE0 completion.
-    // Private conditional source segment; no caller joins the missing music1A3C00 interval.
-    bool loadRetainedSourceTrackSegment1A6CF4(std::uint32_t&)const noexcept;
     bool retireConsumedRaMusicNative10C(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
     bool revokeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool retireConsumedRaCameraNative34(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
@@ -1071,6 +1063,10 @@ private:
     //17C848/84C copies the six original bytes at3A8600 into36B420.
     const std::string fontDirectory36B420_="font\\";
 public:
+    // W0 round 2 (i3 publication #3): App+2E0 (17C714 constructor scalar, 17C9EC predefined
+    // track) for common_race_end50CR::Launch::app2E0 (Pause rows 9/10 skip rule, A10).
+    // Read only; 0 when the constructor has not produced it.
+    std::uint32_t useProfile2E0()const noexcept {return sourceUseProfile2E0_.value_or(0u);}
     // Borrow of the one Application-issued course Session (every course).
     // Its root owner closes it explicitly; this never extends that lifetime
     // beyond the synchronous caller.
@@ -1093,8 +1089,10 @@ public:
         const common_track50CR::NavigationView& map,
         const original_camera_session50KX::AuthoredStorage& authored)const noexcept;
     // W0 common rewrite (R9): race start entry 1AC8E0 for callers that hold only the Application
-    // (Results replay rows 1CA..., Pause RESTART 1BD934, Time Trial 1ABC0C, Practice 1ABC1C). Runs the
+    // (Results restart rows 1C8DF0/1C9774, Pause RESTART 1BD934, Time Trial 1ABC0C, Practice 1ABD28). Runs the
     // bound common_race_start50CR::Owner in place; never reloads the session. `hooks` come from I3.
+    // The owner is created with std::make_shared by setup.cpp (contexts carry raceStartOwner,
+    // W0 round 2); raceStart50CR_ keeps a weak_ptr, so a dead owner is seen as unbound.
     bool bindRaceStart50CR(const std::shared_ptr<common_race_start50CR::Owner>&)const noexcept;
     bool restartConsumedRace1AC8E0(rr::game::OriginalRaceConstructor50LA&,const common_race_start50CR::Request&,
         const common_race_start50CR::Hooks&,common_race_start50CR::Receipt&)const noexcept;

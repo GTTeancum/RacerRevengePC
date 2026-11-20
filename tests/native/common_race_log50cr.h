@@ -69,7 +69,7 @@ enum class Step : std::uint8_t {
     navigation2A1260,      // 08 2A1160/2A1260 splines, 1ACF70 zone index
     cutResources175510,    // 09 175510 cut resources, 1AAB30
     roster1AA510,          // 10 1AA510 -> 1AD520 -> 1AE280 (humans 1ADF80, AI 1AE3CC -> 2129C0)
-    speech1AF330,          // 11 1AF330, 2C2B50, 2C4B30 speech banks (see W0-HANDOFF note on 1AED30)
+    speech1AF330,          // 11 1AF330, 2C2B50, 2C4B30 speech banks (1AED30 is the start lock, race start step; R9 checked)
     cameraRacers1750A0,    // 12 1750A0/1752D0 camera racer binding
     raceUi1A8A40,          // 13 race vtable+74 1A8A40: Pause100, Results104, F8, VCR78, HUD
     raceStart,             // 14 race start tail (1A6AA0 fresh / 1AC8E0 restart)
@@ -99,7 +99,7 @@ inline const StepRow& stepRow(Step s) noexcept {
         {"05.10",0x274570u,"water",          Writer::R7},
         {"05.11",0x274AE0u,"sky",            Writer::R6},
         {"05.12",0x271600u,"aub",            Writer::R7},
-        {"05.13",0x1A9EE0u,"lights",         Writer::R6},
+        {"05.13",0x2783D0u,"lights",         Writer::R6},   // the numeric SCB light reader (W0 round 2, r6 #2)
         {"05.14",0x101860u,"animation",      Writer::R5},
         {"05.15",0x1AA400u,"tail",           Writer::R3},
         {"06",   0x1A95B0u,"camera_session", Writer::R2},
@@ -107,7 +107,7 @@ inline const StepRow& stepRow(Step s) noexcept {
         {"08",   0x2A1260u,"navigation",     Writer::R4},
         {"09",   0x175510u,"cut_resources",  Writer::R2},
         {"10",   0x1AA510u,"roster",         Writer::R10},
-        {"11",   0x1AF330u,"speech",         Writer::R10},
+        {"11",   0x1AF330u,"speech",         Writer::I2},    // logged by the caller of the live-audio speech load (I2 world.cpp), W0 round 2
         {"12",   0x1750A0u,"camera_racers",  Writer::R2},
         {"13",   0x1A8A40u,"race_ui",        Writer::R1},
         {"14",   0x1AC8E0u,"race_start",     Writer::R9},
@@ -301,6 +301,9 @@ inline void raceStart(const RaceStart& v,std::ostream* sink=nullptr){
 }
 
 // common_lap racer=<slot> lap=<n> time=<t> best=<cb4> marker=FF8
+// Source (W0 round 2, r4): common_lap50CR::Tracker::applyCrossing prints it, one line
+// per accepted crossing; the per-race marker count is common_track_data role=lap_markers
+// (Track::logTrackData from Counts::lapMarkers, counted at step 08).
 inline void lap(std::size_t slot,std::uint32_t lapCC8,float time,float bestCB4,std::uint32_t markerFF8,std::ostream* sink=nullptr){
     std::ostringstream o;
     o<<"common_lap racer="<<slot<<" lap="<<lapCC8<<" time="<<time<<" best="<<bestCB4<<" marker="<<markerFF8;

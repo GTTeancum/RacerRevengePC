@@ -55,7 +55,7 @@ class Tracker final {
     bool prepared_=false;
 public:
     // R4, 2A1980/2A273C/2A26E0: ProgressNode markers from the map/AI views (the
-    // one shared prepare). Logs common_track_data role=lap_markers. `field` is the
+    // one shared prepare). lap_markers is counted at step 08 (readNavigation2A1260) and printed by Track::logTrackData (W0 round 2). `field` is the
     // race's racer count (1..8); slots >= field are refused.
     bool prepare(const common_track50CR::NavigationView& map,const common_track50CR::NavigationView& ai,
         std::size_t field,Diagnostic& d)noexcept;

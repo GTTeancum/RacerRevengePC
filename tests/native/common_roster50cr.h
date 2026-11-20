@@ -76,7 +76,7 @@ bool buildTimeTrialField(std::uint32_t humanRacer60,Field& out,Diagnostic& d)noe
 // R10: ALL8 spectator field (humans34 == 0) on whatever course the launch names.
 bool buildSpectatorField(const std::uint32_t* racer60,std::size_t entries,bool addonCourse,Field& out,Diagnostic& d)noexcept;
 // R10: one row from a racer id: stock A5 table (original_racer_selection50IJ /
-// original_player_identity50IK) or registry pod row (dlc50DL::podRow). Refuses
+// original_player_identity50IK) or registry pod row (original_racer_selection50IJ::findAnyByRacer60 / rr::assets::dlc50DL::addonPod). Refuses
 // pod id 0 / >=100 (A8, 210824) and an add-on pod in an AI slot unless
 // dlc50DL::addonRiderMayBeAi(racer, addonCourse).
 bool rowForRacer(std::uint32_t racer60,bool human,bool addonCourse,Row& out,Diagnostic& d)noexcept;
@@ -96,8 +96,10 @@ public:
     // R10, 1AA510 -> 1AD520 -> 1AE280: load every slot's pod from its own files into
     // `rigs` in the original order (every human 1ADF80 -> 1AE0A4 -> 2129C0 before
     // every AI 1AE3CC -> 2129C0), then the wreck chain 165E90 per slot. The
-    // human source pod (B-P03) goes through original_racer_manager_entity::Owner::
-    // continueSourcePod1AE0A4. The query bootstrap collision uses each slot's own
+    // human pod loads through the same 2129C0 PodLoad as every slot (OwnershipBridge,
+    // 1A0848 bind for slot < humans34). PORT STAND-IN (W0 round 2, r10 #2): the race+B0
+    // manager's own 1ADF80 -> 1AE0A4 source chain is not joined (it needs sourceWorldRows_
+    // from 1AA580, and its Pod%02d id cannot name an add-on human). The query bootstrap collision uses each slot's own
     // pod (C2). Logs common_roster and common_pod_receipt lines. Stops at the first
     // refused slot.
     bool loadAll(const common_track50CR::Track& track,

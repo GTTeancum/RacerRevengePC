@@ -83,6 +83,11 @@ struct Context final {
     // W0 common rewrite: one end dispatch 1A7DD0 and departure (common_race_end50cr.h)
     using raceEndType = common_race_end50CR::Owner;
     raceEndType& raceEnd;
+    // W0 round 2 (i3 publication #2): the owning handle of the SAME object as raceStart.
+    // setup.cpp creates it with std::make_shared and passes it down; publication hands it
+    // to Application::bindRaceStart50CR, which keeps a weak_ptr (expires with the owner).
+    using raceStartOwnerType = const std::shared_ptr<common_race_start50CR::Owner>;
+    raceStartOwnerType& raceStartOwner;
     BorrowedCall<bool(const rr::game::VehicleLiveQueryResult50EQ&,rr::game::Type2StaticQuery49X&,const rr::game::LiveZoneMembership50EN&,std::uint64_t&,const char*)> acceptLiveQueryCall;
     using actualHeightType = const track_height_cold50JB::Owner;
     actualHeightType& actualHeight;
@@ -421,7 +426,9 @@ struct Context final {
     mainQueryRefType& mainQueryRef;
     using managerRuntimeSelectionType = rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection;
     managerRuntimeSelectionType& managerRuntimeSelection;
-    using materialAudioType = std::unique_ptr<material_audio50HI::Provider>;
+    // W0 round 2 (i2 #7, r7 #2): the one provider is Track::roles.audio (05.12); bind
+    // `.materialAudio=track.roles.audio`. No second provider exists.
+    using materialAudioType = const std::shared_ptr<material_audio50HI::Provider>;
     materialAudioType& materialAudio;
     using materialOwnerType = std::unique_ptr<pod_materials50ed_fixture::Owner>;
     materialOwnerType& materialOwner;

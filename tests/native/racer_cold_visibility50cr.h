@@ -1,12 +1,26 @@
 #pragma once
+// Common rewrite (W0 round 2, requests i3 continuation #1 and R6): the ONE terminal
+// cold racer visibility retirement, for every course and every pod. Replaces the
+// four copies tb_cold_visibility50tb.h, tc_cold_visibility50tc.h,
+// gb_cold_visibility50gb.h and mc_cold_visibility50mc.h, which differed only in the
+// per-course query flag they tested and the per-course lighting call they made. The
+// one lighting Owner (R6) has one pair: retireColdVehicle / coldVehicleUntouched.
+//
+// Terminal native cold lifetime bridge only. It cannot bind/start/complete a
+// source query, create a reset lease, or issue a source retirement receipt.
+// Nothing here writes racer or guest memory; the lighting Owner performs the
+// retirement of its own registrations.
+//
+// Owner after W0: area E (lights). The racer Bank's query-active flags are still
+// the retired per-course pair (gbQueryActive_/mcQueryActive_, never set on the
+// common path); area C replaces them with the one collision world's flag and adds
+// it to selected() below (W0-RULINGS FIX LIST, native_racer_bank50hn_fixture.h).
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_cables50hw_fixture.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "../../src/game/original_shared_rng50iu.h"
 
-namespace mc_cold_visibility50MC {
-// Terminal native cold lifetime bridge only. It cannot bind/start/complete a
-// source query, create a reset lease, or issue a source retirement receipt.
+namespace racer_cold_visibility50CR {
 class Retirement final {
     using LightOwner=rr::game::original_gc_gameplay_lighting_candidate::Owner;
     using LightDiagnostic=rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
@@ -19,7 +33,7 @@ class Retirement final {
         return !bank.retired_&&bank.sealed_&&slot<bank.count_&&
             (slot?bank.visiting_:bank.readBlocked_)&&
             bank.visitDepth_==1&&bank.currentSlot_==slot&&
-            !bank.pendingToken_&&!bank.mcQueryActive_&&!bank.sourceIssuer_&&!bank.retirementVisit_&&
+            !bank.pendingToken_&&!bank.sourceIssuer_&&!bank.retirementVisit_&&
             !bank.nativeFifoPins_&&!bank.raWorldLifetime_&&
             bank.queryState_==native_racer50HN::Bank::QueryState::idle;
     }
@@ -32,6 +46,8 @@ class Retirement final {
     static bool actualArena(const native_racer50HN::Bank& bank,
         const rr::game::VehicleFrameState49W& frame,const rr::game::VehicleFrameBindings49W& bindings,
         const rr::game::VehicleFrameParameters49W& parameters) noexcept {
+        // Every course saves the racer frame without the process-shared motion
+        // and 308030 noise (one rule, original_shared_rng50iu.h).
         const bool frameRegistered=rr::game::racerFrameSharedExclusion50GB(frame,
             [&](const void* p,std::size_t bytes){return exactSpan(bank,p,bytes);},
             [&](const void* p,std::size_t bytes){
@@ -70,7 +86,7 @@ public:
     static bool untouchedSlot(native_racer50HN::Bank& bank,std::size_t slot,
         LightOwner& visibility,LightDiagnostic& diagnostic) noexcept {
         if(!selected(bank,slot))return reject(slot,diagnostic);
-        return visibility.mcColdVehicleUntouched(static_cast<std::uint32_t>(slot),diagnostic);
+        return visibility.coldVehicleUntouched(static_cast<std::uint32_t>(slot),diagnostic);
     }
     static bool retireSlot(native_racer50HN::Bank& bank,std::size_t slot,
         const rr::game::VehicleFrameState49W& frame,const rr::game::VehicleFrameBindings49W& bindings,
@@ -78,8 +94,8 @@ public:
         native_racer50HW::Cables& cables,LightOwner& visibility,LightDiagnostic& diagnostic) noexcept {
         if(!selected(bank,slot)||!actualArena(bank,frame,bindings,parameters)||
            !actualCables(rig,cables,frame,bindings))return reject(slot,diagnostic);
-        return visibility.retireMcColdVehicle(static_cast<std::uint32_t>(slot),frame,bindings,parameters,
+        return visibility.retireColdVehicle(static_cast<std::uint32_t>(slot),frame,bindings,parameters,
             &cables.visibility50(),diagnostic);
     }
 };
-} // namespace mc_cold_visibility50MC
+} // namespace racer_cold_visibility50CR

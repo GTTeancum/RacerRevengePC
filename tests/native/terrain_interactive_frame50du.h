@@ -269,7 +269,9 @@ struct Context final {
     audioListenerReadyType& audioListenerReady;
     using audioListenerType = rr::game::SpeechPosition50HG;
     audioListenerType& audioListener;
-    using materialAudioType = std::unique_ptr<material_audio50HI::Provider>;
+    // W0 round 2 (i2 #7, r7 #2): the one provider is Track::roles.audio (05.12); bind
+    // `.materialAudio=track.roles.audio`. No second provider exists.
+    using materialAudioType = const std::shared_ptr<material_audio50HI::Provider>;
     materialAudioType& materialAudio;
     using membershipWorkType = rr::game::LiveZoneWorkspace50EN;
     membershipWorkType& membershipWork;
