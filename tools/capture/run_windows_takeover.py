@@ -24,15 +24,22 @@ if ROOT.parent.name == 'worktrees' and ROOT.parent.parent.name == '.claude':
 
 # The 23 original racer ids (no pods 5, 6, 13).
 ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
-# Free Play routes start from a fresh profile (Main slot 1, Rider19), so a
-# seeded racer applies to the tournament route only.
-PLAYER_RACER_ROUTES = ('main-tournament-course-ta',)
-# Add-on riders join the free-play (mode 0) Rider carousel only; the plain
-# free-play route starts from a fresh profile on Rider19 and races TA.
-ADDON_RIDER_ROUTES = ('main-rider-course-ta',)
+# Common rewrite B-C21 (writer R11): ONE free-play route for every course and pod.
+# main-rider-course: Main -> Rider (the racer the profile remembers for free play:
+# --player-racer seeds it, else the fresh Rider19) -> Course, where --course picks the course
+# on the Course screen with the original course arrow, --laps sets the original Duration row and
+# --course-mode the event type (tests/native/original_ui_capture_navigation50la.h Route).
+# main-rider-course-ta is the same route under its old name. The per-course routes
+# (main-rider-course-sa, main-gasgano07-course-sa, main-mawhonic09-course-ra, main-dud04/ben02-course-ga,
+# main-alder10/ody11-course-ma) and their game-side test profiles are retired.
+FREE_PLAY_ROUTES = ('main-rider-course', 'main-rider-course-ta')
+PLAYER_RACER_ROUTES = FREE_PLAY_ROUTES + ('main-tournament-course-ta',)
+ADDON_RIDER_ROUTES = FREE_PLAY_ROUTES
 # DLC phase 3 (146c, PORT EXTENSION, NOT ORIGINAL): add-on course item key and the free-play route it rides.
 ADDON_COURSE_KEY = re.compile(r'[a-z0-9][a-z0-9-]{2,47}/[a-z0-9][a-z0-9-]{1,46}')
-ADDON_COURSE_ROUTES = ('main-rider-course-ta',)
+ADDON_COURSE_ROUTES = FREE_PLAY_ROUTES
+# A course code as data: a stock code (TA..SC) or an add-on course code (nv, ...).
+COURSE_CODE = re.compile(r'[A-Za-z0-9]{2}')
 
 
 # Tournament course order (career progress219C) -> course code.
@@ -88,6 +95,26 @@ def seed_player_racer(data, racer):
             put(medal(racer, racer, o), u32(medal(19, 19, o)))
     put(8, len(d) - 16)
     put(12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
+    return bytes(d)
+
+
+def seed_free_play(data):
+    """Return progress-v1.bin bytes for the free-play route on any course: course
+    availability 11018 (second header word, saveNativeBetaProgress in
+    platform/linux/native/original_ui_rider_profile50kg.cpp) = all 13 stock courses, the
+    value the game itself writes once a career has opened every course (high bits kept), and
+    Main remembered slot 6E0 = 1 (the route's entry). The CRC and size words are rewritten;
+    anything off-layout is refused. Which courses the Course screen offers stays the game's
+    own rule over this data."""
+    d = bytearray(data)
+    u32 = lambda at: struct.unpack_from('<I', d, at)[0]
+    if len(d) < 28 or u32(0) != 0x42505252 or u32(4) != 1 or u32(8) != len(d) - 16 or \
+            u32(12) != zlib.crc32(bytes(d[16:])) & 0xffffffff:
+        raise ValueError('Seed save is not an intact progress-v1 file')
+    struct.pack_into('<I', d, 16 + 4, (u32(16 + 4) & 0xe0) | 13)   # availability11018
+    struct.pack_into('<I', d, 16 + 8, 1)                            # savedSlot6E0
+    struct.pack_into('<I', d, 8, len(d) - 16)
+    struct.pack_into('<I', d, 12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
     return bytes(d)
 
 
@@ -190,11 +217,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--sdl', type=Path, required=True)
-    parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
-                        'main-alder10-course-ma', 'main-ody11-course-ma',
-                        'main-rider-course-ta', 'main-tournament-course-ta',
-                        'main-rider-course-sa', 'main-gasgano07-course-sa',
-                        'main-mawhonic09-course-ra', 'none'], default='main-dud04-course-ga')
+    parser.add_argument('--route', choices=['main-rider-course', 'main-rider-course-ta',
+                        'main-tournament-course-ta', 'none'], default='main-rider-course')
     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
@@ -323,6 +347,20 @@ def main():
                              'sets RR_TEST_ADDON_COURSE_HOLD=1) and write that Course frame as an image for an eye check '
                              '(turns logs-only off for this run). The run then idles until its wall budget; use a short '
                              '--seconds (60)')
+    # Common rewrite round (R11, test only): one free-play route, course picked on the Course screen.
+    parser.add_argument('--course', metavar='CODE',
+                        help='Test only: on the free-play Course screen press the original course arrow until '
+                             'this course (a stock code such as GA, or an add-on course code such as nv) is '
+                             'highlighted, then Confirm (sets RR_TEST_COURSE). Needs --seed-save (the run seeds '
+                             'course availability 13 and Main slot 1 into it); add-on codes need --env RR_DLC_ROOT')
+    parser.add_argument('--laps', type=int, metavar='N',
+                        help='Test only: set the Course screen Duration (laps) row to N (1..25) through the '
+                             'original Left/Right laps move before Confirm (sets RR_TEST_COURSE_LAPS). Free play '
+                             'only: the tournament keeps its original 3 laps')
+    parser.add_argument('--return-hold', type=int, default=0, metavar='SECONDS',
+                        help='Test only: once a race has returned to a frontend screen (Results then Hall, Course '
+                             'or the tournament screens: frontend_race_return), end the run SECONDS later through '
+                             'the game\'s own clean wall-budget exit (sets RR_TEST_RETURN_HOLD_SECONDS)')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     parser.add_argument('--keep-binaries', action='store_true',
@@ -346,8 +384,24 @@ def main():
             parser.error('--addon-rider and --player-racer cannot be combined')
     if args.hold_course and args.addon_course is None:
         parser.error('--hold-course needs --addon-course')
-    if args.course_mode and args.route != 'main-rider-course-ta':
-        parser.error('--course-mode works only with --route main-rider-course-ta')
+    if args.course_mode and args.route not in FREE_PLAY_ROUTES:
+        parser.error('--course-mode works only with --route ' + ' / '.join(FREE_PLAY_ROUTES))
+    if args.course is not None:
+        if not COURSE_CODE.fullmatch(args.course):
+            parser.error('--course expects a two-character course code (TA, GA, nv, ...)')
+        if args.route not in FREE_PLAY_ROUTES:
+            parser.error('--course works only with --route ' + ' / '.join(FREE_PLAY_ROUTES))
+        if args.addon_course is not None:
+            parser.error('--course and --addon-course both pick the course; use one')
+        if not args.seed_save:
+            parser.error('--course needs --seed-save: a progress file the game itself wrote')
+    if args.laps is not None:
+        if not 1 <= args.laps <= 25:
+            parser.error('--laps must be 1..25 (the original Duration range)')
+        if args.route not in FREE_PLAY_ROUTES:
+            parser.error('--laps works only on the free-play route; the tournament keeps its original 3 laps')
+    if not 0 <= args.return_hold <= 600:
+        parser.error('--return-hold must be 0..600 seconds')
     if args.hold_course and args.hold_rider:
         parser.error('--hold-course and --hold-rider cannot be combined (each stops its own screen)')
     if args.hold_rider and args.route not in ADDON_RIDER_ROUTES:
@@ -408,10 +462,14 @@ def main():
             shutil.copy2(seed, saves / 'progress-v1.bin')
         else:
             (saves / 'progress-v1.bin').write_bytes(seed_player_racer(seed.read_bytes(), args.player_racer))
+        if args.route in FREE_PLAY_ROUTES:  # the free-play route enters on Main slot 1, any course
+            target = saves / 'progress-v1.bin'
+            target.write_bytes(seed_free_play(target.read_bytes()))
+            print('test_seed free_play availability=13 main_slot=1', flush=True)
         if args.seed_slow_hall is not None:
             target = saves / 'progress-v1.bin'
             target.write_bytes(seed_slow_hall(target.read_bytes(), args.seed_slow_hall,
-                                              args.route not in PLAYER_RACER_ROUTES))  # free-play routes need Main slot 1
+                                              args.route in FREE_PLAY_ROUTES))  # free-play routes need Main slot 1
             print(f'test_seed hall={args.seed_slow_hall} slow=1', flush=True)
     if args.seed_slow_dlc_hall is not None:
         dlc_root = next(item.split('=', 1)[1] for item in args.env if item.startswith('RR_DLC_ROOT='))
@@ -521,8 +579,15 @@ def main():
     if args.hold_course:
         env['RR_TEST_ADDON_COURSE_HOLD'] = '1'
     if args.course_mode:
+        # (Before R11 this also turned logs-only off, so every Time Trial run wrote images;
+        # only --hold-course writes the Course frame now.)
         env['RR_TEST_COURSE_SUBTYPE'] = '3' if args.course_mode == 'time_trial' else '1'
-        env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Course frame as an image
+    if args.course is not None:
+        env['RR_TEST_COURSE'] = args.course
+    if args.laps is not None:
+        env['RR_TEST_COURSE_LAPS'] = str(args.laps)
+    if args.return_hold:
+        env['RR_TEST_RETURN_HOLD_SECONDS'] = str(args.return_hold)
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
     # A run that must reach Results (and what follows it) keeps racing past
@@ -535,16 +600,6 @@ def main():
         env['RR_TEST_RACE_FULL_BUDGET'] = '1'
     if args.all_ai:
         env['RR_ORIGINAL_AI_ALL_RACERS'] = '1'
-    if args.route == 'main-mawhonic09-course-ra':
-        # Normal-mode (mode 0) RA route: its explicit Mawhonic/Ryloth test
-        # profile requires all eight original AI racers (see Run-Ryloth-FPS.cmd).
-        env.update(RR_ORIGINAL_TEST_PROFILE='mawhonic-ryloth', RR_ORIGINAL_AI_ALL_RACERS='1',
-                   RR_ORIGINAL_RIDER_PREVIEWS='3,7,9,23,24')
-    if args.route == 'main-gasgano07-course-sa':
-        # The game requires its explicit Gasgano test profile on this route
-        # (Gasgano remembered for this process only); the human races (AI=0)
-        # unless --all-ai was given.
-        env['RR_ORIGINAL_TEST_PROFILE'] = 'gasgano'
     if args.route == 'none':
         env.pop('RR_UNATTENDED_UI_ROUTE', None)
         env['RR_TRACK'] = args.track
@@ -567,7 +622,7 @@ def main():
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
                   addonCourseHold=args.hold_course, courseMode=args.course_mode,
                   eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results, resultsHallCapture=args.hold_results_hall,
-                  seedSlowHall=args.seed_slow_hall,
+                  seedSlowHall=args.seed_slow_hall, course=args.course, laps=args.laps, returnHold=args.return_hold,
                   resultsExit=args.results_exit,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
@@ -634,8 +689,9 @@ def main():
                           lifecycle[0][1:] == lifecycle[1][1:] and
                           live_ids == {lifecycle[0][1]} and
                           all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
-        track = ('GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else
-                 'RA' if args.route.endswith('-ra') else 'SA' if args.route.endswith('-sa') else 'TA')
+        # The course the run asked for (data): --course, the add-on course item, else TA (fresh Course entry).
+        track = (args.course.upper() if args.course else
+                 args.addon_course.split('/', 1)[1].upper() if args.addon_course else 'TA')
         # A seeded tournament run goes to the course the seed's career reached.
         if args.route == 'main-tournament-course-ta' and args.seed_save:
             track = seeded_tournament_track((saves / 'progress-v1.bin').read_bytes()) or track

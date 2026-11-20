@@ -218,7 +218,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   const bool raceReturnGarage=firstScreen==13;
   // Free Play's 1AB908 row opens Course6 first; a fresh frontend opens Main4.
   const bool raceReturnScreen=raceReturnGarage||firstScreen==11||firstScreen==7||firstScreen==10||firstScreen==6;
-  if(raceReturnScreen)std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';
+  if(raceReturnScreen){std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';captureRun.noteRaceReturn();}
   // Unattended test only: RR_TEST_RESULTS_HALL_CAPTURE=1 writes the settled
   // race-return Hall (screen 11, the 1AB5BC Hall row) once, as hall-N.
   const bool raceReturnHallCapture=raceReturnScreen&&firstScreen==11&&[]{
@@ -231,7 +231,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // to Main, this frontend's route stays idle (no second race is started).
   const bool resultsExitReturned=rr::platform::testResultsInput50PD().returnedToMain;
   if(resultsExitReturned)std::cerr<<"test_results_exit frontend_after_results route=idle first_screen="<<unsigned(firstScreen)<<'\n';
-  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen,captureRun.navigateSa(),captureRun.navigateOcco(),captureRun.navigateDudGa(),captureRun.navigateBenGa(),captureRun.navigateAlderMa(),captureRun.navigateOdyMa(),captureRun.navigateGasganoSa(),captureRun.navigateMawhonicRa());
+  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen);
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;
@@ -575,23 +575,6 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const bool sourceAccepted=originalMain.submittedScreen==5&&originalMain.sourceFrameGeneration&&
         originalMain.submittedTriangles&&originalMain.coordinator.gpu()&&
         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
-    // Inspect the actual retained profile and cold catalog. RA is deliberately
-    // absent until genuine runtime owners are integrated; UI fixture availability
-    // is never a race-readiness certificate.
-    std::uint8_t selectedRiderBits=0;std::uint32_t selectedComparison=0;
-    const bool mawhonicProfileReady=originalMainApplication.riderProfile&&
-        originalMainApplication.riderProfile->riderConfirmSnapshot(selectedRiderBits,selectedComparison)&&
-        (selectedRiderBits>>3)==9&&selectedComparison==9;
-    // Read-only prospective tuple, identical to frontend courseLaunchProposal;
-    // source profile track/lap packing is not committed until actual Confirm.
-    const original_course_targets50KX::Selection mawhonicSelection{
-        snapshot.course.selectedCourse44,snapshot.course.selectedPlanet40,9,
-        snapshot.course.subtypeSlot14F4,snapshot.course.laps14EC,snapshot.course.entrants14F0,
-        static_cast<std::uint16_t>(3u|(1u<<5)|(7u<<7)|(9u<<11))};
-    const bool mawhonicTargetReady=!captureRun.navigateMawhonicRa()||
-        (mawhonicProfileReady&&snapshot.course.selectedCourse44==7&&snapshot.course.selectedPlanet40==2&&
-         snapshot.course.courseSlot14E4==5&&
-         courseTargets.admits(mawhonicSelection));
     const auto action=captureRoute.poll(snapshot,group,slot,
         windowCapture.captured(windows_capture50LD::Stage::main),windowCapture.captured(windows_capture50LD::Stage::rider),
         windowCapture.captured(windows_capture50LD::Stage::course),sourceAccepted,
@@ -601,7 +584,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         // its accepted result. Do not duplicate the obsolete all-AI/corpus
         // restriction here: rooted direct-human tracks need neither.
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&
-        renderer.initialized()&&mawhonicTargetReady,
+        renderer.initialized(),
         originalMain.sourceFrameGeneration,originalMain.submittedPublication);
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));captureRoute.validateDispatch(originalMain.coordinator.snapshot());}
    }
@@ -695,12 +678,6 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    }
    original_course_targets50KX::Selection selected;
    if(originalMain.coordinator.takeCourseLaunch(selected)){
-    if(captureRun.navigateMawhonicRa())require50DU(captureRoute.actionsDispatched()&&
-        selected.rider==9&&selected.course==7&&selected.planet==2&&selected.laps==3&&selected.entrants==8,
-        "Mawhonic/RA capture rejected a mismatched original Course handoff");
-    if(captureRun.navigateGasganoSa())require50DU(captureRoute.actionsDispatched()&&
-        selected.rider==7&&selected.course==11&&selected.planet==4&&selected.laps==3&&selected.entrants==8,
-        "Gasgano/SA capture rejected a mismatched original Course handoff");
     const auto* target=courseTargets.admits(selected);
     // RA leaves Course through the same typed cold-load exit as every other
     // course (the original 1465C0 Course exit reads no track id). The former

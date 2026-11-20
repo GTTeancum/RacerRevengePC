@@ -52,7 +52,10 @@ class Run final {
  const Clock::time_point started_=Clock::now();
  std::filesystem::path directory_;
  bool enabled_=false,automatic_=false,unattended_=false,navigate_=false,timeoutReported_=false;
- bool navigateSa_=false,navigateOcco_=false,navigateDudGa_=false,navigateBenGa_=false,navigateAlderMa_=false,navigateOdyMa_=false,navigateGasganoSa_=false,navigateMawhonicRa_=false,navigateTournamentTa_=false,navigateHallTa_=false;
+ bool navigateTournamentTa_=false,navigateHallTa_=false;
+ // Test only (common rewrite R11): after a race returned to a frontend screen, the run ends this
+ // many seconds later (RR_TEST_RETURN_HOLD_SECONDS) through the same clean wall-budget exit.
+ std::uint32_t returnHoldSeconds_=0;
  std::uint32_t videoHoldSeconds_=0;
  Clock::time_point baselineFinished_{};
  std::uint32_t wallSeconds_=180;
@@ -68,32 +71,28 @@ public:
   logsOnly_=option("RR_EVIDENCE_LOGS_ONLY");
   automatic_=option("RR_WINDOW_CAPTURE_AUTO");unattended_=option("RR_UNATTENDED_CAPTURE");
   const auto* route=std::getenv("RR_UNATTENDED_UI_ROUTE");
-  require(!route||std::string(route)=="main-rider-course-ta"||std::string(route)=="main-rider-course-sa"||
-      std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa"||std::string(route)=="main-mawhonic09-course-ra"||std::string(route)=="main-tournament-course-ta"||std::string(route)=="main-options-hall-ta",
-      "unsupported unattended original UI route");
+  // One free-play route for every course and pod (common rewrite B-C21): main-rider-course
+  // (main-rider-course-ta is the same route under its old name); the course, laps, event type
+  // and racer come from RR_TEST_COURSE / RR_TEST_COURSE_LAPS / RR_TEST_COURSE_SUBTYPE and the
+  // seeded save (original_ui_capture_navigation50la.h Route). The per-course routes are retired.
+  require(!route||std::string(route)=="main-rider-course"||std::string(route)=="main-rider-course-ta"||
+      std::string(route)=="main-tournament-course-ta"||std::string(route)=="main-options-hall-ta",
+      "unsupported unattended original UI route (per-course routes are retired: use main-rider-course with RR_TEST_COURSE)");
   navigate_=route!=nullptr;
   restartOnce_=option("RR_UNATTENDED_RESTART_ONCE");
   require(!restartOnce_||(enabled_&&automatic_&&unattended_&&navigate_),
       "native restart test requires an unattended automatic UI route");
-  navigateOcco_=route&&std::string(route)=="main-occo20-course-sa";
-  navigateDudGa_=route&&std::string(route)=="main-dud04-course-ga";
-  navigateBenGa_=route&&std::string(route)=="main-ben02-course-ga";
-  navigateAlderMa_=route&&std::string(route)=="main-alder10-course-ma";
-  navigateOdyMa_=route&&std::string(route)=="main-ody11-course-ma";
-  navigateGasganoSa_=route&&std::string(route)=="main-gasgano07-course-sa";
-  navigateMawhonicRa_=route&&std::string(route)=="main-mawhonic09-course-ra";
   navigateTournamentTa_=route&&std::string(route)=="main-tournament-course-ta";
   // PORT EXTENSION, NOT ORIGINAL: DLC Hall eye check (Main -> Options -> Hall TA, then hold).
   navigateHallTa_=route&&std::string(route)=="main-options-hall-ta";
-  const auto* testProfile=std::getenv("RR_ORIGINAL_TEST_PROFILE");
-  require(!navigateGasganoSa_||(testProfile&&std::string(testProfile)=="gasgano"),
-      "Gasgano/SA capture requires RR_ORIGINAL_TEST_PROFILE=gasgano");
-  require(!navigateMawhonicRa_||(testProfile&&std::string(testProfile)=="mawhonic-ryloth"),
-      "Mawhonic/RA capture requires RR_ORIGINAL_TEST_PROFILE=mawhonic-ryloth");
-  require(!testProfile||(navigateGasganoSa_&&std::string(testProfile)=="gasgano")||
-      (navigateMawhonicRa_&&std::string(testProfile)=="mawhonic-ryloth"),
-      "RR_ORIGINAL_TEST_PROFILE requires its exact bounded racer/course route");
-  navigateSa_=navigateOcco_||(route&&std::string(route)=="main-rider-course-sa");
+  require(!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
+      "RR_ORIGINAL_TEST_PROFILE is retired (common rewrite B-C21): pick the course on the Course screen with RR_TEST_COURSE");
+  if(const auto* hold=std::getenv("RR_TEST_RETURN_HOLD_SECONDS")){
+   std::uint32_t value=0;
+   for(const char* p=hold;*p;++p){require(*p>='0'&&*p<='9'&&value<=600u,"RR_TEST_RETURN_HOLD_SECONDS must be 1..600");value=value*10u+std::uint32_t(*p-'0');}
+   require(value>=1&&value<=600u&&unattended_,"RR_TEST_RETURN_HOLD_SECONDS must be 1..600 on an unattended run");
+   returnHoldSeconds_=value;
+  }
   require(enabled_||(!automatic_&&!unattended_&&!navigate_),"window capture options require RR_WINDOW_CAPTURE_DIR");
   require(!navigate_||(unattended_&&automatic_),"unattended original UI route requires unattended automatic capture");
   if(const auto* seconds=std::getenv("RR_UNATTENDED_SECONDS")){
@@ -101,7 +100,7 @@ public:
    // Software-rendered RA needs time for the unchanged original intro.
    // Default budgets and all Windows/other-route limits remain300 seconds.
 #if defined(__linux__)
-   const std::uint32_t maximum=navigateMawhonicRa_?1200u:300u;
+   const std::uint32_t maximum=300u;
 #else
    // Full-race test runs (three laps plus load and intro) need up to 600;
    // chained-course runs (one course's win, then the next course) up to 1800.
@@ -124,33 +123,31 @@ public:
    // Rooted TA/GA/MA menu routes retain the real human Player0. This permits
    // process-local menu navigation only; it neither supplies host input nor
    // claims a race is ready. Course Confirm still uses its actual destination.
-   // main-rider-course-sa and main-gasgano07-course-sa are free-play SA
-   // Single Race routes for the human Player0 too (stock SA checks).
-   const bool directHumanRoute=allAi&&std::string(allAi)=="0"&&navigate_&&
-       !navigateOcco_&&!navigateMawhonicRa_;
+   // main-rider-course is the free-play route for the human Player0 on every course.
+   const bool directHumanRoute=allAi&&std::string(allAi)=="0"&&navigate_;
    require((allAi&&std::string(allAi)=="1")||directHumanRoute,
        "unattended capture requires all-AI mode or an explicit supported direct-human menu route");
   }
   std::cerr<<platformName<<"_capture_run "<<Json{{"evidence_mode",evidenceMode()},{"automatic",automatic_},
-      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateHallTa_?"main-options-hall-ta":navigateTournamentTa_?"main-tournament-course-ta":navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
-      {"test_profile",testProfileName()},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
+      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateHallTa_?"main-options-hall-ta":navigateTournamentTa_?"main-tournament-course-ta":navigate_?"main-rider-course":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
+      {"return_hold_seconds",returnHoldSeconds_},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
  }
  bool logsOnly()const noexcept{return logsOnly_;}
  bool enabled()const noexcept{return enabled_;}
  bool automatic()const noexcept{return automatic_;}
  bool unattended()const noexcept{return unattended_;}
  bool navigate()const noexcept{return navigate_;}
- bool navigateSa()const noexcept{return navigateSa_;}
- bool navigateOcco()const noexcept{return navigateOcco_;}
- bool navigateDudGa()const noexcept{return navigateDudGa_;}
- bool navigateBenGa()const noexcept{return navigateBenGa_;}
- bool navigateAlderMa()const noexcept{return navigateAlderMa_;}
- bool navigateOdyMa()const noexcept{return navigateOdyMa_;}
- bool navigateGasganoSa()const noexcept{return navigateGasganoSa_;}
- bool navigateMawhonicRa()const noexcept{return navigateMawhonicRa_;}
  bool navigateTournamentTa()const noexcept{return navigateTournamentTa_;}
  bool navigateHallTa()const noexcept{return navigateHallTa_;}
- const char* testProfileName()const noexcept{return navigateMawhonicRa_?"mawhonic-ryloth":navigateGasganoSa_?"gasgano":"none";}
+ // A race returned to a frontend screen (frontend_race_return): with RR_TEST_RETURN_HOLD_SECONDS the
+ // wall budget ends that many seconds from now (never later than it already would).
+ void noteRaceReturn(){
+  if(!unattended_||!returnHoldSeconds_)return;
+  const auto elapsed=std::chrono::duration_cast<std::chrono::seconds>(Clock::now()-started_).count();
+  const auto until=static_cast<std::uint64_t>(elapsed)+returnHoldSeconds_;
+  if(until<wallSeconds_){wallSeconds_=static_cast<std::uint32_t>(until);
+   std::cerr<<platformName<<"_capture_return_hold seconds="<<returnHoldSeconds_<<" wall_budget_seconds="<<wallSeconds_<<'\n';}
+ }
  bool videoHoldComplete()const noexcept{return !videoHoldSeconds_||(!baselineFile_.empty()&&
      Clock::now()-baselineFinished_>=std::chrono::seconds(videoHoldSeconds_));}
  bool timedOut()const noexcept{return timeoutReported_;}
@@ -175,7 +172,7 @@ public:
   const auto file=directory_/(restartIssued_?"track-fps-baseline-restarted.json":"track-fps-baseline.json");
   require(baselineFile_.empty()&&!std::filesystem::exists(file),"track baseline receipt would overwrite an existing file");
   std::ofstream output(file,std::ios::binary);require(bool(output),"cannot open track FPS baseline receipt");
-  Json evidence=receipt;if(navigateGasganoSa_||navigateMawhonicRa_)evidence["test_profile"]=testProfileName();
+  Json evidence=receipt;
   output<<evidence.dump(2)<<'\n';output.close();require(bool(output),"track FPS baseline receipt write failed");
   baselineFinished_=Clock::now();baselineFile_=file;
  }
@@ -206,7 +203,6 @@ public:
       {"cleanup_complete",true},{"timed_out",timeoutReported_},{"baseline_file",baselineFile_.string()}};
   receipt["native_restart_test"]={{"requested",restartOnce_},{"issued",restartIssued_},
       {"first_race",firstRaceEvidence_},{"pause_menu_tested",false}};
-  if(navigateGasganoSa_||navigateMawhonicRa_)receipt["test_profile"]=testProfileName();
   for(const auto stage:{Stage::main,Stage::rider,Stage::course,Stage::race,Stage::hall}){
    if(stage==Stage::hall&&!navigateHallTa_)continue; // stock summaries unchanged
    const auto i=static_cast<std::size_t>(stage);
@@ -377,7 +373,6 @@ public:
 #else
   details["pixel_source"]="default_framebuffer_GL_FRONT_after_actual_SDL_window_swap";
 #endif
-  if(run_->navigateGasganoSa()||run_->navigateMawhonicRa())details["test_profile"]=run_->testProfileName();
   details["physical_desktop_scanout_verified"]=false;
   details["stage"]=stageName(stage);details["sequence"]=serial_+1;details["session"]=session_;
   details["settled"]=settled;

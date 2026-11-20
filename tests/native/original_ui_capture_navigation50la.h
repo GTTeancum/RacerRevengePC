@@ -9,23 +9,28 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
-// Opt-in native window evidence navigation only. This owner emits the same
-// original Confirm event as Enter, at most three times. SA adds one original
-// Next and optionally one Rider Next. Explicit rider/course navigation allows
-// at most 26 Rider Nexts, followed by the original course sequence. The free-play
-// add-on rider test (RR_TEST_ADDON_RIDER=<package>/<item> on main-rider-course-ta,
-// PORT EXTENSION, NOT ORIGINAL) presses Rider Next at most 26 + add-on count times
-// until that add-on is highlighted; RR_TEST_ADDON_RIDER_HOLD=1 then stops there.
-// RR_TEST_RIDER_HOLD=1 (no add-on) stops on the stock rider the route lands on
-// (no Confirm) so the run holds on the Rider screen until its wall budget. GA takes
-// three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one; the explicit Mawhonic9/RA fixture takes four.
-// The free-play add-on course test (RR_TEST_ADDON_COURSE_PICK=<package>/<item> on
-// main-rider-course-ta, PORT EXTENSION, NOT ORIGINAL) presses Course Next at most
-// 13 + add-on count times until that add-on course entry is highlighted (read from
-// dlc50DL::highlightedAddonCourse), then the original Course Confirm launches it;
-// RR_TEST_ADDON_COURSE_HOLD=1 stops there instead (no Confirm, the run holds on the
-// Course screen until its wall budget).
+// One free-play Course route for every course and every pod (common rewrite B-C21,
+// writer R11; replaces the per-course/per-rider selected routes main-rider-course-sa,
+// main-occo20-course-sa, main-dud04/ben02-course-ga, main-alder10/ody11-course-ma,
+// main-gasgano07-course-sa and main-mawhonic09-course-ra and their fixed Next counts).
+// Main (the profile's own slot 1) -> Rider (whatever racer the profile remembers for free
+// play: RR_TEST_PLAYER_RACER when the runner seeded one, else the fresh Rider19) -> Course,
+// where the route works the Course screen the way a player does, with the original inputs
+// only (0 Left, 1 Right/Next, 2 Up, 3 Down, 4 Confirm):
+//   * RR_TEST_COURSE_LAPS=<1..25>: Down to the laps row, Left/Right until it shows that many
+//     laps (the original moveLaps 1DF5C4/1DF310 path; Single Race event type);
+//   * RR_TEST_COURSE_SUBTYPE=<1|2|3>: the event-type row, Right until that type shows;
+//   * RR_TEST_COURSE=<code> (a stock code or an add-on course code, both data: stock codes
+//     from the original course descriptor rows, add-on codes from the registry) or
+//     RR_TEST_COURSE=<package>/<item> (also read from RR_TEST_ADDON_COURSE_PICK): Up to the
+//     course row, Course Next until that course is highlighted;
+//   * then Confirm. RR_TEST_ADDON_COURSE_HOLD=1 holds on the Course screen instead.
+// The add-on rider test (RR_TEST_ADDON_RIDER=<package>/<item>) presses Rider Next until that
+// add-on is highlighted; RR_TEST_ADDON_RIDER_HOLD=1 holds there, RR_TEST_RIDER_HOLD=1 holds on
+// the stock rider the route lands on. Which courses are available is the profile's own data
+// (availability 11018 from the save); the route never unlocks anything.
 // It does not write a profile, select a screen, advance a transition, control a racer, or admit a
 // missing destination. The caller owns the explicit native-window unattended opt-in,
 // shared wall-time deadline, actual framebuffer capture, and normal teardown.
@@ -51,35 +56,27 @@ class Route final {
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
     bool enabled_=false,awaitingDispatch_=false;
-    bool sa_=false,awaitingMove_=false,moved_=false;
-    bool occo_=false,awaitingRiderMove_=false,riderMoved_=false;
-    bool selectedRoute_=false,gasganoInitial_=false,mawhonicRa_=false;
-    std::uint32_t selectedRider_=4;
-    std::uint8_t targetCourseMoves_=3;
-    std::uint8_t riderMoves_=0,courseMoves_=0;
-    std::uint32_t priorRider_=19;
-    std::uint64_t priorRiderSource_=0,priorRiderPublication_=0;
     std::uint8_t issued_=0;
-    // PORT EXTENSION, NOT ORIGINAL (DLC add-on rider test, main-rider-course-ta only).
+    std::uint32_t entryRider_=19;
+    // PORT EXTENSION, NOT ORIGINAL (DLC add-on rider test).
     bool addon_=false,addonHold_=false,awaitingAddonMove_=false,addonHoldLogged_=false;
     bool stockHold_=false,stockHoldLogged_=false; // test eye check: hold on the landed stock Rider
     const char* addonKey_=nullptr;
     unsigned addonTarget_=0,priorHighlight_=0;
-    std::uint32_t addonMoves_=0;
+    std::uint32_t addonMoves_=0,priorRider_=19;
     std::uint64_t priorAddonSource_=0;
-    // PORT EXTENSION, NOT ORIGINAL (DLC add-on course test, main-rider-course-ta only).
-    bool addonCourse_=false,addonCourseHold_=false,awaitingAddonCourseMove_=false,addonCourseHoldLogged_=false;
-    const char* addonCourseKey_=nullptr;
-    unsigned addonCourseTarget_=0,priorCourseHighlight_=0;
-    std::uint32_t addonCourseMoves_=0,priorCourseSlot_=0;
+    // Course screen targets (data: a course code or add-on key, laps, event type).
+    struct CourseTarget { bool set=false,addon=false,resolved=false; unsigned number=0; std::string name; };
+    CourseTarget course_;
+    std::uint32_t lapsTarget_=0,subtypeTarget_=0;
+    bool courseHold_=false,courseHoldLogged_=false,awaitingCourseMove_=false,courseConfirmLogged_=false;
+    std::uint32_t courseMoves_=0;
+    int moveKind_=-1;                      // the original input of the pending Course move
+    std::int32_t priorGroup_=-1;
+    std::uint32_t priorSubtype_=0,priorLaps_=0,priorSlot_=0;
+    unsigned priorCourseHighlight_=0;
     std::uint64_t priorCourseRenders_=0;
-    // Event type for the free-play Course routes (147c, RR_TEST_COURSE_SUBTYPE=1..3;
-    // unset = the Course screen's own subtype, Single Race on a fresh profile).
-    // Before any course move: original Down to the event-type row, Right until that
-    // subtype shows, Up back to the course row. Same original inputs a player uses.
-    std::uint32_t addonCourseSubtype_=0,addonEventMoves_=0,priorEventSubtype_=0;
-    std::int32_t priorEventGroup_=-1;
-    bool awaitingAddonEventMove_=false,stockTypedLogged_=false;
+    static constexpr int proceed=100;      // not an original input: Course targets reached
 
     static void require(bool condition,const char* message) {
         if(!condition)throw std::runtime_error(message);
@@ -90,14 +87,82 @@ class Route final {
             if(const auto* pod=rr::game::dlc50DL::addonRiderAt(i);pod&&pod->key==key)return pod->number;
         return 0;
     }
+    static std::string lower(std::string s){for(char& c:s)if(c>='A'&&c<='Z')c=char(c-'A'+'a');return s;}
+    // The course named by RR_TEST_COURSE: a stock descriptor row (0..12, original table
+    // order, the number the Course screen's selectedCourse44 holds) or an admitted add-on
+    // course (registry number >= 32, the highlighted add-on entry). Data lookups only.
+    void resolveCourse() {
+        if(!course_.set||course_.resolved)return;
+        const std::string want=lower(course_.name);
+        if(want.find('/')!=std::string::npos){
+            for(std::size_t i=0;i<rr::game::dlc50DL::addonCourseCount();++i)
+                if(const auto* c=rr::game::dlc50DL::addonCourseAt(i);c&&c->key==want){course_.addon=true;course_.number=c->number;}
+        }else{
+            for(unsigned n=0;n<32u;++n){rr::assets::dlc50DL::CourseRow row;
+                if(!rr::assets::dlc50DL::courseRow(n,row)||row.addon)break;
+                if(row.code==want){course_.number=n;course_.resolved=true;return;}}
+            for(std::size_t i=0;i<rr::game::dlc50DL::addonCourseCount();++i)
+                if(const auto* c=rr::game::dlc50DL::addonCourseAt(i);c&&c->code==want){course_.addon=true;course_.number=c->number;}
+        }
+        require(course_.addon&&course_.number!=0,
+            "RR_TEST_COURSE is neither a stock course code nor an admitted add-on course (check RR_DLC_ROOT and the dlc_course lines)");
+        course_.resolved=true;
+    }
+    bool courseHighlighted(const Snapshot& s)const noexcept {
+        if(!course_.set)return true;
+        const auto addon=rr::game::dlc50DL::highlightedAddonCourse();
+        return course_.addon?addon==course_.number:(addon==0&&s.course.selectedCourse44==course_.number);
+    }
+    bool lapsReady(const Snapshot& s)const noexcept {return !lapsTarget_||s.course.laps14EC==lapsTarget_;}
+    bool subtypeReady(const Snapshot& s)const noexcept {return !subtypeTarget_||s.course.subtypeSlot14F4==subtypeTarget_;}
+    bool courseTargetsReady(const Snapshot& s)const noexcept {
+        return lapsReady(s)&&subtypeReady(s)&&courseHighlighted(s)&&(!courseMoves_||s.course.controllerGroup==1);
+    }
+    // Row move toward group g: Down (3) or Up (2).
+    static int towards(std::int32_t group,std::int32_t g)noexcept {return group<g?3:2;}
+    int arm(const Snapshot& s,int input) {
+        priorGroup_=s.course.controllerGroup;priorSubtype_=s.course.subtypeSlot14F4;priorLaps_=s.course.laps14EC;
+        priorSlot_=s.course.courseSlot14E4;priorCourseHighlight_=rr::game::dlc50DL::highlightedAddonCourse();
+        priorCourseRenders_=s.course.renders;moveKind_=input;awaitingCourseMove_=awaitingDispatch_=true;return input;
+    }
+    // Course stage: -1 wait, an original input (0..3), or proceed. The order is laps (on the
+    // Single Race type; the laps row is the entrants row in Practice and absent in Time
+    // Trial), then the event type, then the course, then back to the course row.
+    int pollCourse(const Snapshot& s,bool courseCaptured) {
+        resolveCourse();
+        if((course_.set||lapsTarget_||subtypeTarget_)&&!courseMoves_)
+            require(s.course.mode34==0,"Course route targets require the free-play Course screen");
+        if(courseMoves_&&s.course.renders<=priorCourseRenders_)return -1;
+        if(courseTargetsReady(s))return proceed;
+        require(!courseCaptured,"Course route captured the Course screen before its targets");
+        require(courseMoves_<64u+13u+rr::game::dlc50DL::addonCourseCount(),
+            "Course route targets were not reached within the bounded number of original moves");
+        const auto group=s.course.controllerGroup;
+        const auto subtype=s.course.subtypeSlot14F4;
+        if(!lapsReady(s)){
+            if(subtype!=1){if(group!=2)return arm(s,towards(group,2));return arm(s,1);}   // Single Race first
+            if(group!=3)return arm(s,towards(group,3));
+            return arm(s,s.course.laps14EC>lapsTarget_?0:1);
+        }
+        if(!subtypeReady(s)){if(group!=2)return arm(s,towards(group,2));return arm(s,1);}
+        if(group!=1)return arm(s,towards(group,1));
+        return arm(s,1);                                                                    // Course Next
+    }
+    static bool same(rr::game::OriginalUiTransitionRoute50KG a,
+        rr::game::OriginalUiTransitionRoute50KG b) noexcept {
+        return a.screen==b.screen&&a.page==b.page;
+    }
+    static bool open(const rr::game::OriginalUiApertureSnapshot50KG& a) noexcept {
+        return a.bound&&a.inputEnabled268&&a.state==Aperture::open;
+    }
     // Rider stage of the add-on test: -1 wait, 1 Rider Next, 2 go on to Confirm.
     int pollAddonRider(const Snapshot& s,bool riderCaptured,bool accepted,
         std::uint64_t source,std::uint64_t publication) {
         if(!addonTarget_){
             addonTarget_=addonNumber(addonKey_);
             require(addonTarget_!=0,"RR_TEST_ADDON_RIDER is not an admitted add-on pod (check RR_DLC_ROOT and the dlc_item lines)");
-            require(!addonMoves_&&s.rider.rider4C4==19&&s.rider.slot4C8==1,
-                "add-on rider route requires the actual fresh Rider19 entry");
+            require(!addonMoves_&&s.rider.rider4C4==entryRider_,
+                "add-on rider route requires the profile's remembered Rider entry");
         }
         if(!accepted||!source||!publication||source<=priorAddonSource_)return -1;
         const auto highlighted=rr::game::dlc50DL::highlightedAddonRider();
@@ -117,167 +182,38 @@ class Route final {
         }
         return 2;
     }
-    static unsigned addonCourseNumber(const char* key) noexcept {
-        if(!key)return 0;
-        for(std::size_t i=0;i<rr::game::dlc50DL::addonCourseCount();++i)
-            if(const auto* c=rr::game::dlc50DL::addonCourseAt(i);c&&c->key==key)return c->number;
-        return 0;
-    }
-    // Not an original input: the event-type stage sends Up, which is original input 2.
-    static constexpr int addonCourseProceed=100;
-    // Event-type stage (147c; add-on and stock free-play Course routes alike):
-    // with a requested subtype, original Down to the event-type row, Right until
-    // that subtype shows, Up back to the course row. addonCourseProceed when the
-    // course row holds the requested subtype (or none was requested).
-    bool eventTypeReady(const Snapshot& s)const noexcept {
-        return !addonCourseSubtype_||(s.course.subtypeSlot14F4==addonCourseSubtype_&&s.course.controllerGroup==1);
-    }
-    int pollEventType(const Snapshot& s,bool courseCaptured) {
-        if(eventTypeReady(s))return addonCourseProceed;
-        if(addonEventMoves_&&s.course.renders<=priorCourseRenders_)return -1;
-        require(!courseCaptured,"Course route captured the Course screen before its event type");
-        require(addonEventMoves_<8u,"Course route event type was not reached within 8 row/type moves");
-        const bool typed=s.course.subtypeSlot14F4==addonCourseSubtype_;
-        priorEventSubtype_=s.course.subtypeSlot14F4;priorEventGroup_=s.course.controllerGroup;
-        priorCourseRenders_=s.course.renders;awaitingAddonEventMove_=awaitingDispatch_=true;
-        const auto group=s.course.controllerGroup;
-        if(!typed&&group==2)return 1;                        // Right on the event-type row
-        if(!typed)return group<2?3:2;                        // Down / Up to the event-type row
-        return group>1?2:3;                                  // Up (Down) back to the course row
-    }
-    // Course stage of the add-on course test: -1 wait, 1 Course Next, addonCourseProceed
-    // (go on to Confirm), or (event type first, 147c) 3 Down / 1 Right / 2 Up on the rows.
-    int pollAddonCourse(const Snapshot& s,bool courseCaptured) {
-        if(!addonCourseTarget_){
-            addonCourseTarget_=addonCourseNumber(addonCourseKey_);
-            require(addonCourseTarget_!=0,"RR_TEST_ADDON_COURSE_PICK is not an admitted add-on course (check RR_DLC_ROOT and the dlc_course lines)");
-            require(s.course.mode34==0,"add-on course route requires free play");
-        }
-        if(!addonCourseMoves_){
-            const int action=pollEventType(s,courseCaptured);
-            if(action!=addonCourseProceed)return action;
-        }
-        // A frame rendered after the last move (an add-on step defers nothing).
-        if(addonCourseMoves_&&s.course.renders<=priorCourseRenders_)return -1;
-        const auto highlighted=rr::game::dlc50DL::highlightedAddonCourse();
-        if(highlighted!=addonCourseTarget_){
-            require(!courseCaptured,"add-on course route captured the Course screen before its add-on course");
-            require(addonCourseMoves_<13u+rr::game::dlc50DL::addonCourseCount(),
-                "add-on course was not reached within the stock courses plus the add-on count");
-            priorCourseSlot_=s.course.courseSlot14E4;priorCourseHighlight_=highlighted;priorCourseRenders_=s.course.renders;
-            awaitingAddonCourseMove_=awaitingDispatch_=true;return 1;
-        }
-        if(!courseCaptured)return -1;
-        if(addonCourseHold_){
-            if(!addonCourseHoldLogged_){addonCourseHoldLogged_=true;
-                std::cerr<<"addon_course_route hold key="<<addonCourseKey_<<" number="<<addonCourseTarget_<<" moves="<<addonCourseMoves_
-                    <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
-                    <<" (no Confirm; the run ends at its wall budget)\n";}
-            return -1;
-        }
-        std::cerr<<"addon_course_route confirm key="<<addonCourseKey_<<" number="<<addonCourseTarget_<<" moves="<<addonCourseMoves_
-            <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
-            <<" subtype="<<s.course.subtypeSlot14F4<<'\n';
-        return addonCourseProceed;
-    }
-    static bool same(rr::game::OriginalUiTransitionRoute50KG a,
-        rr::game::OriginalUiTransitionRoute50KG b) noexcept {
-        return a.screen==b.screen&&a.page==b.page;
-    }
-    static bool open(const rr::game::OriginalUiApertureSnapshot50KG& a) noexcept {
-        return a.bound&&a.inputEnabled268&&a.state==Aperture::open;
-    }
-    static bool selectedSa(const Snapshot& s) noexcept {
-        return s.course.courseSlot14E4==2&&s.course.selectedCourse44==11&&
-            s.course.selectedPlanet40==4&&s.course.subtypeSlot14F4==1&&
-            s.course.laps14EC==3&&s.course.entrants14F0==8;
-    }
-    static bool selectedOcco(const Snapshot& s) noexcept {
-        return s.rider.rider4C4==20&&s.rider.slot4C8==2;
-    }
-    bool freshOccoSource(bool accepted,std::uint64_t source,std::uint64_t publication)const noexcept {
-        // GPU publication identifies the retained bank, not a new rendered frame.
-        return accepted&&source>priorRiderSource_&&publication&&publication==priorRiderPublication_;
-    }
-    static bool selectedFreshCourse(const Snapshot& s,unsigned move) noexcept {
-        constexpr std::uint32_t courses[]{0,11,4,8,7},planets[]{0,4,5,1,2};
-        return move<5&&s.course.courseSlot14E4==move+1&&
-            s.course.selectedCourse44==courses[move]&&s.course.selectedPlanet40==planets[move]&&
-            s.course.subtypeSlot14F4==1&&s.course.laps14EC==3&&s.course.entrants14F0==8;
-    }
-    int pollSelectedRoute(const Snapshot& s,std::int32_t mainGroup,std::int32_t mainSlot,
-        bool mainCaptured,bool riderCaptured,bool courseCaptured,bool riderSourceAccepted,
-        bool courseReady,std::uint64_t riderSource,std::uint64_t riderPublication) {
-        require(!awaitingDispatch_,"selected-rider/course dispatch receipt was not verified");
-        require(!s.faulted&&!s.quitRequested,"selected-rider/course original UI became unavailable");
-        if(issued_==3)return -1;
-        const auto screen=static_cast<std::uint8_t>(4+issued_);
-        const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==issued_;
-        const bool outgoing=issued_&&s.route.screen==screen-1&&s.route.page==1&&s.switches==issued_-1;
-        require(expected||outgoing,"unattended UI left the bounded Main/selected-rider/Course route");
-        if(!expected||!settled(s))return -1;
-        if(issued_==0){
-            require(mainGroup==1&&mainSlot==1,"selected-rider/course requires fresh Main selection");
-            if(!mainCaptured)return -1;
-        }else if(issued_==1){
-            require(mainCaptured,"Selected Rider arrived without Main capture");
-            if(gasganoInitial_||mawhonicRa_)require(!riderMoves_&&s.rider.rider4C4==selectedRider_&&
-                s.rider.slot4C8==(mawhonicRa_?11u:10u),
-                "Explicit test profile requires its original remembered Rider/slot entry");
-            else if(!riderMoves_)require(s.rider.rider4C4==19&&s.rider.slot4C8==1,
-                "Selected route requires actual fresh Rider19 entry");
-            if(!riderSourceAccepted||!riderSource||!riderPublication)return -1;
-            if(riderMoves_&&!freshOccoSource(riderSourceAccepted,riderSource,riderPublication))return -1;
-            if(s.rider.rider4C4!=selectedRider_){
-                require(!riderCaptured&&riderMoves_<26,"Selected rider was not reached within original roster bound");
-                priorRider_=s.rider.rider4C4;
-                priorRiderSource_=riderSource;priorRiderPublication_=riderPublication;
-                awaitingRiderMove_=awaitingDispatch_=true;return 1;
-            }
-            if(!riderCaptured)return -1;
-        }else{
-            require(mainCaptured&&riderCaptured,"Selected Course arrived without Main/selected Rider captures");
-            require(selectedFreshCourse(s,courseMoves_),"Selected route course selection diverged from fresh original order");
-            if(courseMoves_<targetCourseMoves_){
-                require(!courseCaptured,"Selected route captured an intermediate course");
-                awaitingMove_=awaitingDispatch_=true;return 1;
-            }
-            if(!courseCaptured)return -1;
-            require(courseReady,mawhonicRa_?
-                "Mawhonic9 / Ryloth Brightlands UI reached course7/planet2/slot5; RA cold target/runtime readiness is unavailable. No race Confirm or substitute dispatched":
-                "Selected course original race prerequisites are unavailable");
-        }
-        ++issued_;awaitingDispatch_=true;return 4;
-    }
 public:
-    explicit Route(bool enabled,bool sa=false,bool occo=false,bool dudGa=false,bool benGa=false,bool alderMa=false,
-        bool odyMa=false,bool gasganoSa=false,bool mawhonicRa=false) noexcept:
-        enabled_(enabled),sa_(enabled&&(sa||occo)),occo_(enabled&&occo),selectedRoute_(enabled&&(dudGa||benGa||alderMa||odyMa||gasganoSa||mawhonicRa)),
-        gasganoInitial_(enabled&&gasganoSa),mawhonicRa_(enabled&&mawhonicRa),selectedRider_(mawhonicRa?9u:gasganoSa?7u:odyMa?11u:alderMa?10u:benGa?2u:4u),targetCourseMoves_(mawhonicRa?4u:gasganoSa?1u:(alderMa||odyMa)?2u:3u){
-        // Free-play TA route only (no SA/Occo/selected fixture). Unset = stock route unchanged.
+    explicit Route(bool enabled):enabled_(enabled){
+        if(!enabled_)return;
+        entryRider_=expectedEntryRider50LA();
         const char* key=std::getenv("RR_TEST_ADDON_RIDER");
-        addon_=enabled_&&!selectedRoute_&&!sa_&&!occo_&&key&&*key;
-        addonKey_=addon_?key:nullptr;
+        addon_=key&&*key;addonKey_=addon_?key:nullptr;
         const char* hold=std::getenv("RR_TEST_ADDON_RIDER_HOLD");
         addonHold_=addon_&&hold&&std::strcmp(hold,"1")==0;
-        const char* course=std::getenv("RR_TEST_ADDON_COURSE_PICK");
-        addonCourse_=enabled_&&!selectedRoute_&&!sa_&&!occo_&&course&&*course;
-        addonCourseKey_=addonCourse_?course:nullptr;
-        const char* courseHold=std::getenv("RR_TEST_ADDON_COURSE_HOLD");
-        addonCourseHold_=addonCourse_&&courseHold&&std::strcmp(courseHold,"1")==0;
-        // Free-play Course event type (147c): add-on or stock TA route alike.
-        const char* courseSubtype=std::getenv("RR_TEST_COURSE_SUBTYPE");
-        if(enabled_&&!selectedRoute_&&!sa_&&!occo_&&courseSubtype&&*courseSubtype){
-            if(courseSubtype[0]<'1'||courseSubtype[0]>'3'||courseSubtype[1])
-                throw std::runtime_error("RR_TEST_COURSE_SUBTYPE must be 1 (Single Race), 2 or 3 (Time Trial)");
-            addonCourseSubtype_=std::uint32_t(courseSubtype[0]-'0');
-        }
         const char* stockHold=std::getenv("RR_TEST_RIDER_HOLD");
-        stockHold_=enabled_&&!addon_&&!selectedRoute_&&!sa_&&!occo_&&stockHold&&std::strcmp(stockHold,"1")==0;
+        stockHold_=!addon_&&stockHold&&std::strcmp(stockHold,"1")==0;
+        const char* course=std::getenv("RR_TEST_COURSE");
+        if(!course||!*course)course=std::getenv("RR_TEST_ADDON_COURSE_PICK");
+        if(course&&*course){course_.set=true;course_.name=course;}
+        const char* courseHold=std::getenv("RR_TEST_ADDON_COURSE_HOLD");
+        courseHold_=course_.set&&courseHold&&std::strcmp(courseHold,"1")==0;
+        if(const char* subtype=std::getenv("RR_TEST_COURSE_SUBTYPE");subtype&&*subtype){
+            if(subtype[0]<'1'||subtype[0]>'3'||subtype[1])
+                throw std::runtime_error("RR_TEST_COURSE_SUBTYPE must be 1 (Single Race), 2 or 3 (Time Trial)");
+            subtypeTarget_=std::uint32_t(subtype[0]-'0');
+        }
+        if(const char* laps=std::getenv("RR_TEST_COURSE_LAPS");laps&&*laps){
+            std::uint32_t n=0;
+            for(const char* p=laps;*p;++p){
+                if(*p<'0'||*p>'9'||n>25)throw std::runtime_error("RR_TEST_COURSE_LAPS must be 1..25 (the original Duration range)");
+                n=n*10u+std::uint32_t(*p-'0');
+            }
+            if(n<1||n>25)throw std::runtime_error("RR_TEST_COURSE_LAPS must be 1..25 (the original Duration range)");
+            lapsTarget_=n;
+        }
     }
     bool enabled()const noexcept{return enabled_;}
-    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+addonCourseMoves_+addonEventMoves_+
-        (selectedRoute_?courseMoves_+riderMoves_:(moved_?1u:0u)+(riderMoved_?1u:0u)));}
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+courseMoves_);}
     // Dispatch completion is not proof of a loaded race or a captured track.
     bool actionsDispatched()const noexcept{return issued_==3&&!awaitingDispatch_;}
 
@@ -303,8 +239,7 @@ public:
         return false;
     }
 
-    // Gate requested captures too: initial Anakin/TA and intermediate refresh
-    // frames must never satisfy the explicit Occo/SA or selected-rider/course stage receipts.
+    // Gate requested captures too: intermediate refresh frames never satisfy a stage receipt.
     bool captureAllowed(const Snapshot& s,bool sourceAccepted=false,
         std::uint64_t source=0,std::uint64_t publication=0)const noexcept {
         // A published model can still be in its authored entrance animation.
@@ -315,73 +250,43 @@ public:
         if(addon_&&s.route.screen==5)return addonTarget_&&!awaitingDispatch_&&issued_==1&&
             rr::game::dlc50DL::highlightedAddonRider()==addonTarget_&&settled(s)&&
             sourceAccepted&&source>priorAddonSource_&&publication;
-        // Add-on course test: only the settled frame with the requested add-on course highlighted.
-        if(addonCourse_&&s.route.screen==6)return addonCourseTarget_&&!awaitingDispatch_&&issued_==2&&
-            rr::game::dlc50DL::highlightedAddonCourse()==addonCourseTarget_&&settled(s)&&
-            (!addonCourseMoves_||s.course.renders>priorCourseRenders_);
-        // Stock free-play Course with a requested event type: only once it is set.
-        if(!addonCourse_&&addonCourseSubtype_&&s.route.screen==6)
-            return !awaitingDispatch_&&issued_==2&&eventTypeReady(s)&&settled(s)&&
-                (!addonEventMoves_||s.course.renders>priorCourseRenders_);
-        if(selectedRoute_){
-            if(s.route.screen==5){
-                if(gasganoInitial_||mawhonicRa_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
-                    s.rider.rider4C4==selectedRider_&&s.rider.slot4C8==(mawhonicRa_?11u:10u)&&settled(s)&&
-                    sourceAccepted&&source&&publication;
-                return riderMoves_&&!awaitingDispatch_&&issued_==1&&
-                    s.rider.rider4C4==selectedRider_&&settled(s)&&freshOccoSource(sourceAccepted,source,publication);
-            }
-            if(s.route.screen==6)return courseMoves_==targetCourseMoves_&&!awaitingDispatch_&&issued_==2&&
-                selectedFreshCourse(s,targetCourseMoves_)&&settled(s);
-        }
-        if(occo_&&s.route.screen==5)return riderMoved_&&!awaitingDispatch_&&issued_==1&&
-            selectedOcco(s)&&settled(s)&&freshOccoSource(sourceAccepted,source,publication);
-        return !sa_||s.route.screen!=6||
-            (moved_&&!awaitingDispatch_&&issued_==2&&selectedSa(s)&&settled(s));
+        // Course: only the settled frame with every requested target shown.
+        if(s.route.screen==6&&(course_.set||lapsTarget_||subtypeTarget_))
+            return (!course_.set||course_.resolved)&&!awaitingDispatch_&&issued_==2&&courseTargetsReady(s)&&settled(s)&&
+                (!courseMoves_||s.course.renders>priorCourseRenders_);
+        return true;
     }
 
     // Call before the next update, using the previous completed frame. Capture
     // booleans mean successful file publication of the settled matching screen
     // in this frontend lifetime. courseReady is a host prerequisite check only;
     // the actual original Confirm dispatch retains all destination admission.
-    // Return -1 while waiting, original Confirm4, or a one-shot Rider/Course Next1. A rejected or
+    // Return -1 while waiting, original Confirm4, or a one-shot original move. A rejected or
     // changed route throws rather than retrying or choosing a substitute.
     int poll(const Snapshot& s,std::int32_t mainGroup,std::int32_t mainSlot,
         bool mainCaptured,bool riderCaptured,bool courseCaptured,
         bool riderSourceAccepted,bool courseReady,std::uint64_t riderSource=0,
         std::uint64_t riderPublication=0) {
         if(!enabled_)return -1;
-        if(selectedRoute_)return pollSelectedRoute(s,mainGroup,mainSlot,mainCaptured,riderCaptured,courseCaptured,
-            riderSourceAccepted,courseReady,riderSource,riderPublication);
         require(!awaitingDispatch_,"unattended UI dispatch receipt was not verified");
         require(!s.faulted&&!s.quitRequested,"unattended original UI became unavailable");
         if(issued_==3)return -1;
         const auto expectedScreen=static_cast<std::uint8_t>(4+issued_);
         const bool expected=s.route.screen==expectedScreen&&s.route.page==1&&s.switches==issued_;
         const bool outgoing=issued_&&s.route.screen==expectedScreen-1&&s.route.page==1&&s.switches==issued_-1;
-        require(expected||outgoing,occo_?"unattended UI left the bounded Main/Occo20/Course-SA route":sa_?"unattended UI left the bounded Main/Rider19/Course-SA route":
-            "unattended UI left the bounded Main/Rider19/Course-TA route");
+        require(expected||outgoing,"unattended UI left the bounded Main/Rider/Course route");
         if(!expected||!settled(s))return -1;
         if(issued_==0){
-            require(mainGroup==1&&mainSlot==1,"unattended Main requires its actual fresh group1/slot1 selection");
+            require(mainGroup==1&&mainSlot==1,"unattended Main requires its group1/slot1 selection (the runner seeds slot 1)");
             if(!mainCaptured)return -1;
         }else if(issued_==1){
             require(mainCaptured,"unattended Rider arrived without the completed Main screenshot");
             if(addon_){
                 const int action=pollAddonRider(s,riderCaptured,riderSourceAccepted,riderSource,riderPublication);
                 if(action!=2)return action;
-            }else if(occo_&&riderMoved_){
-                require(selectedOcco(s),"unattended Rider requires committed Occo20/slot2 selection");
-                if(!freshOccoSource(riderSourceAccepted,riderSource,riderPublication))return -1;
             }else{
-                require(s.rider.rider4C4==19&&s.rider.slot4C8==1,
-                    "unattended Rider requires the actual fresh Rider19 selection");
-                if(occo_){
-                    require(!riderCaptured,"unattended Occo route already captured another Rider");
-                    if(!riderSourceAccepted||!riderSource||!riderPublication)return -1;
-                    priorRiderSource_=riderSource;priorRiderPublication_=riderPublication;
-                    awaitingRiderMove_=awaitingDispatch_=true;return 1;
-                }
+                require(s.rider.rider4C4==entryRider_,
+                    "unattended Rider did not open on the profile's remembered free-play racer");
             }
             if(!riderCaptured||!riderSourceAccepted)return -1;
             if(stockHold_){
@@ -393,34 +298,24 @@ public:
         }else{
             require(mainCaptured&&riderCaptured,
                 "unattended Course arrived without the completed Main/Rider screenshots");
-            if(sa_&&moved_){
-                require(selectedSa(s),"unattended Course requires committed SA/3-lap/8-entrant selection");
-            }else if((addonCourse_&&addonCourseMoves_)||addonEventMoves_){
-                // The route has moved the event type or (add-on) the course row (stock moves, then add-on entries).
-                require(s.course.courseSlot14E4==1||addonCourse_,"stock Course route left the fresh TA course while setting the event type");
-            }else{
-                require(s.course.courseSlot14E4==1&&s.course.selectedCourse44==0&&
-                    s.course.selectedPlanet40==0&&s.course.subtypeSlot14F4==1&&
-                    s.course.laps14EC==3&&s.course.entrants14F0==8,
-                    "unattended Course requires actual fresh TA/3-lap/8-entrant selection");
-                if(sa_){
-                    require(!courseCaptured,"unattended SA route already captured another Course selection");
-                    require(courseReady,"unattended Course race prerequisites are unavailable");
-                    awaitingMove_=awaitingDispatch_=true;return 1;
-                }
-            }
-            if(addonCourse_){
-                const int action=pollAddonCourse(s,courseCaptured);
-                if(action!=addonCourseProceed)return action;
-            }else if(!sa_&&!occo_){
-                // Stock free-play Course (main-rider-course-ta): event type first, then TA Confirm.
-                const int action=pollEventType(s,courseCaptured);
-                if(action!=addonCourseProceed)return action;
-                if(addonCourseSubtype_&&courseCaptured&&!stockTypedLogged_){stockTypedLogged_=true;
-                    std::cerr<<"course_route_stock confirm course="<<s.course.selectedCourse44<<" slot="<<s.course.courseSlot14E4
-                        <<" subtype="<<s.course.subtypeSlot14F4<<" events="<<addonEventMoves_<<'\n';}
-            }
+            const int action=pollCourse(s,courseCaptured);
+            if(action!=proceed)return action;
             if(!courseCaptured)return -1;
+            if(courseHold_){
+                if(!courseHoldLogged_){courseHoldLogged_=true;
+                    std::cerr<<"addon_course_route hold key="<<course_.name<<" number="<<course_.number<<" moves="<<courseMoves_
+                        <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
+                        <<" (no Confirm; the run ends at its wall budget)\n";}
+                return -1;
+            }
+            if(!courseConfirmLogged_){courseConfirmLogged_=true;
+                if(course_.addon)std::cerr<<"addon_course_route confirm key="<<course_.name<<" number="<<course_.number<<" moves="<<courseMoves_
+                    <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
+                    <<" subtype="<<s.course.subtypeSlot14F4<<'\n';
+                std::cerr<<"course_route confirm course="<<(course_.set?course_.name:std::string("-"))<<" number="<<course_.number
+                    <<" addon="<<(course_.addon?1:0)<<" selected_course="<<s.course.selectedCourse44<<" slot="<<s.course.courseSlot14E4
+                    <<" subtype="<<s.course.subtypeSlot14F4<<" laps="<<s.course.laps14EC<<" entrants="<<s.course.entrants14F0
+                    <<" rider="<<entryRider_<<" moves="<<courseMoves_<<'\n';}
             require(courseReady,"unattended Course race prerequisites are unavailable");
         }
         ++issued_;awaitingDispatch_=true;return 4;
@@ -429,35 +324,20 @@ public:
     // Call immediately after originalMain.input(action), BEFORE update/render.
     // No successful dispatch is inferred from the host having issued an event.
     void validateDispatch(const Snapshot& s) {
-        if(awaitingAddonEventMove_){
+        if(awaitingCourseMove_){
             const auto& t=s.transition;
-            require(enabled_&&addonCourseSubtype_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
+            require(enabled_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
                 s.route.screen==6&&s.route.page==1&&s.switches==2&&t.bound&&same(t.current,s.route)&&
                 same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
                 !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
-                "Course route event-type move changed the route");
-            require(s.course.controllerGroup!=priorEventGroup_||s.course.subtypeSlot14F4!=priorEventSubtype_,
-                "add-on course route row/event-type move changed neither the row nor the event type");
-            ++addonEventMoves_;awaitingAddonEventMove_=awaitingDispatch_=false;
-            std::cerr<<"addon_course_route event_move="<<addonEventMoves_<<" row="<<s.course.controllerGroup
-                <<" subtype="<<s.course.subtypeSlot14F4<<" target_subtype="<<addonCourseSubtype_<<'\n';
-            return;
-        }
-        if(awaitingAddonCourseMove_){
-            const auto& t=s.transition;
-            require(enabled_&&addonCourse_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
-                s.route.screen==6&&s.route.page==1&&s.switches==2&&t.bound&&same(t.current,s.route)&&
-                same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
-                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
-                "add-on course route Course Next changed the route");
+                "Course route move changed the route");
             const auto highlighted=rr::game::dlc50DL::highlightedAddonCourse();
-            // Either the original stock move committed, or the port-owned add-on entry moved.
-            const bool stockMove=highlighted==0&&s.course.courseSlot14E4!=priorCourseSlot_&&
-                s.course.deferred14D0==3&&!s.course.framePublished;
-            const bool addonMove=highlighted!=0&&highlighted!=priorCourseHighlight_&&s.course.courseSlot14E4==priorCourseSlot_;
-            require(stockMove||addonMove,"add-on course route Course Next moved neither a stock course nor an add-on entry");
-            ++addonCourseMoves_;awaitingAddonCourseMove_=awaitingDispatch_=false;
-            std::cerr<<"addon_course_route move="<<addonCourseMoves_<<" slot="<<s.course.courseSlot14E4
+            const bool changed=s.course.controllerGroup!=priorGroup_||s.course.subtypeSlot14F4!=priorSubtype_||
+                s.course.laps14EC!=priorLaps_||s.course.courseSlot14E4!=priorSlot_||highlighted!=priorCourseHighlight_;
+            require(changed,"Course route original move changed neither the row, the event type, the laps nor the course");
+            ++courseMoves_;awaitingCourseMove_=awaitingDispatch_=false;
+            std::cerr<<"course_route move="<<courseMoves_<<" input="<<moveKind_<<" row="<<s.course.controllerGroup
+                <<" subtype="<<s.course.subtypeSlot14F4<<" laps="<<s.course.laps14EC<<" slot="<<s.course.courseSlot14E4
                 <<" course="<<s.course.selectedCourse44<<" addon="<<highlighted<<'\n';
             return;
         }
@@ -478,49 +358,6 @@ public:
             std::cerr<<"addon_rider_route move="<<addonMoves_<<" rider="<<s.rider.rider4C4<<" slot="<<s.rider.slot4C8
                 <<" addon="<<highlighted<<'\n';
             return;
-        }
-        if(selectedRoute_&&(awaitingRiderMove_||awaitingMove_)){
-            const auto& t=s.transition;
-            const bool rider=awaitingRiderMove_;
-            require(enabled_&&awaitingDispatch_&&!s.faulted&&!s.quitRequested&&
-                s.route.screen==(rider?5:6)&&s.route.page==1&&s.switches==(rider?1u:2u)&&
-                issued_==(rider?1u:2u)&&t.bound&&same(t.current,s.route)&&same(t.requested,s.route)&&
-                t.lifecycle==Life::idle&&t.phase==Phase::none&&!t.applicationRequestQueued&&
-                !t.initialRestartPending&&!s.deferredQueue,"selected-rider/course original Next changed the route");
-            if(rider){
-                require(s.rider.rider4C4!=priorRider_&&s.rider.slot4C8>0&&
-                    s.rider.selectionAttached&&s.rider.deferred4EC==3&&!s.rider.framePublished,
-                    "Selected rider original Next did not commit a fresh rider refresh");
-                ++riderMoves_;awaitingRiderMove_=false;
-            }else{
-                require(courseMoves_<targetCourseMoves_&&selectedFreshCourse(s,courseMoves_+1)&&
-                    s.course.deferred14D0==3&&!s.course.framePublished,
-                    "Selected course original Next did not commit the next authored course");
-                ++courseMoves_;awaitingMove_=false;
-            }
-            awaitingDispatch_=false;return;
-        }
-        if(awaitingRiderMove_){
-            const auto& t=s.transition;
-            require(enabled_&&occo_&&awaitingDispatch_&&!riderMoved_&&issued_==1&&
-                !s.faulted&&!s.quitRequested&&s.route.screen==5&&s.route.page==1&&s.switches==1&&
-                t.bound&&same(t.current,s.route)&&same(t.requested,s.route)&&
-                t.lifecycle==Life::idle&&t.phase==Phase::none&&
-                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue&&
-                selectedOcco(s)&&s.rider.selectionAttached&&s.rider.deferred4EC==3&&!s.rider.framePublished,
-                "unattended original Next did not commit Occo and its real deferred refresh");
-            riderMoved_=true;awaitingRiderMove_=awaitingDispatch_=false;return;
-        }
-        if(awaitingMove_){
-            const auto& t=s.transition;
-            require(enabled_&&sa_&&awaitingDispatch_&&!moved_&&issued_==2&&
-                !s.faulted&&!s.quitRequested&&s.route.screen==6&&s.route.page==1&&s.switches==2&&
-                t.bound&&same(t.current,s.route)&&same(t.requested,s.route)&&
-                t.lifecycle==Life::idle&&t.phase==Phase::none&&
-                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue&&
-                selectedSa(s)&&s.course.deferred14D0==3&&!s.course.framePublished,
-                "unattended original Next did not commit SA and its real deferred refresh");
-            moved_=true;awaitingMove_=awaitingDispatch_=false;return;
         }
         require(enabled_&&awaitingDispatch_&&issued_>=1&&issued_<=3,
             "unattended UI has no pending dispatch receipt");
