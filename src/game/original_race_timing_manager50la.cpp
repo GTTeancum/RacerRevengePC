@@ -133,7 +133,7 @@ bool OriginalRaceTimingManager50LA::continueNativeAssociation(OriginalRaceConstr
     if(p.cut==Impl::Cut::map){
         pc=0x1afb98;
         if(!actualMetadata.bound||actualMap.track.count<2u)return false;
-        //Actual retained RA MAP B8 scalar source; pure arithmetic shared with
+        //Actual retained MAP B8 scalar source; pure arithmetic shared with
         //legacy native initialization. Failure retains constructor/list effects.
         if(calculateOriginalAiTrackLength38(actualMetadata.nodes[1].distanceToFinish60,
             actualMap.track.nodes[0].position,actualMap.track.nodes[1].position,
@@ -218,9 +218,11 @@ bool OriginalRaceConstructor50LA::readResultsManagerFlags58(
     d={};d.status=OriginalResults104Diagnostic50LA::Status::owner;d.sourcePC=0x1c2124;
     d.operation="actual Race B4 manager flags58";
     if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
-    if(!timingB4_&&!world74_&&anyWorld()&&ownsNativeCameraAdapter34(session)){
-        // Common race: no counted 1AF7F0 object; the one native Setup
-        // manager borrowed by the end scope IS this race's B4 timing state.
+    if(!timingB4_&&anyWorld()&&ownsNativeCameraAdapter34(session)){
+        // PORT STAND-IN (flagged, R1 stand-ins list): a race whose counted
+        // 1AF7F0 B4 object was not initialized (1A7710 B4 runs for every race
+        // once I3/R10 land B-C06) reads the one native Setup manager borrowed by
+        // the end scope as its B4 timing state. Same rule on every course.
         const auto scope=endHud_.lock();
         if(!scope||!scope->endStateCurrent(*this,session)||!scope->manager_)return false;
         value=static_cast<std::uint8_t>(scope->manager_->manager.flags58);d={};return true;

@@ -1,18 +1,6 @@
 #include "original_results_feedback_scope50la.h"
 #include "terrain_interactive_continuation50du.h"
-#include "original_consumed_ra_stage50du.h"
-#include "original_consumed_ta_stage50du.h"
-#include "original_consumed_ga_stage50du.h"
-#include "original_consumed_sa_stage50du.h"
-#include "original_consumed_ma_stage50du.h"
-#include "original_consumed_mb_stage50du.h"
-#include "original_consumed_sc_stage50du.h"
-#include "original_consumed_gb_stage50du.h"
-#include "original_consumed_mc_stage50du.h"
-#include "original_consumed_tb_stage50du.h"
-#include "original_consumed_rc_stage50du.h"
-#include "original_consumed_tc_stage50du.h"
-#include "original_consumed_gc_stage50du.h"
+#include "original_consumed_stage50du.h"
 #include "original_race_constructor50la.h"
 #include "native_common_race50pd.h"
 #include "../../src/game/controller_feedback50kz.h"
@@ -33,18 +21,14 @@ void Scope::bindAfterPublication(::interactive_continuation50DU::Context& actual
 void Scope::attach(::interactive_continuation50DU::Context& actual,
     const native_racer50HN::Bank& bank)noexcept {
     const auto& application=actual.originalMainApplication;
-    // RA's world join or the common race (TA/GA/SA/MA/GC) with its own counted world.
-    const bool raRace=bool(actual.consumedRaStage.race());
-    const auto& race=raRace?actual.consumedRaStage.race():native_common_race50PD::race(actual);
-    // This is only an additional Results borrow. Legacy/non-RA paths keep
-    // their previous behavior, with NO registration, rather than acquiring
-    // a surrogate Race/manager or changing startup admission.
+    // The one consumed race with its one World over the running Track (every course).
+    const auto& race=native_common_race50PD::race(actual);
+    // This is only an additional Results borrow. Without the one counted race
+    // there is NO registration (no surrogate Race/manager, no admission change).
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
        application.race28C()!=race.get()||!race->counted_||race->rolledBack_||
        !race->entity_.sessionGeneration||race->application_!=application.entities()||
-       (raRace?(!actual.raWorld||race->world74_!=actual.raWorld):
-           (race->world74_||(race->taWorld74_?!actual.taOriginalWorld||race->taWorld74_!=actual.taOriginalWorld:
-               !native_common_race50PD::worldCurrent(actual,*race))))||!race->results104_||
+       !native_common_race50PD::worldCurrent(actual,*race)||!race->results104_||
        !race->resultsFeedback_.expired())return;
     try {
         // Construction uses precisely the borrowed setup array forwarded to

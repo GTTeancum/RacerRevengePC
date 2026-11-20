@@ -1,23 +1,11 @@
 #include "terrain_interactive_publication50du.h"
-#include "original_consumed_ra_stage50du.h"
-#include "original_consumed_ta_stage50du.h"
-#include "original_consumed_ga_stage50du.h"
-#include "original_consumed_sa_stage50du.h"
-#include "original_consumed_ma_stage50du.h"
-#include "original_consumed_mb_stage50du.h"
-#include "original_consumed_sc_stage50du.h"
-#include "original_consumed_gb_stage50du.h"
-#include "original_consumed_mc_stage50du.h"
-#include "original_consumed_tb_stage50du.h"
-#include "original_consumed_rc_stage50du.h"
-#include "original_consumed_tc_stage50du.h"
-#include "original_consumed_gc_stage50du.h"
+#include "original_consumed_stage50du.h"
 #include "native_common_race50pd.h"
 #include "original_race_constructor50la.h"
 #include "original_race_hud_scope50la.h"
 #include "original_position_stats_adapter50la.h"
 #include "original_race_display_lifetime50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_camera_session50kx.h"
 #include "../../src/game/original_pause_storage50la.h"
 
 namespace original_main_entry50KG {
@@ -31,19 +19,16 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
     //17D6A0. Only the actual Publication calls after its successful HUD bind.
     if(garageAudioOwnerThread_!=std::this_thread::get_id())
         return reject("Native human root requires Application owner thread");
-    if(&actual.originalMainApplication!=this||(!actual.sourceConsumedIntroActivation&&!native_common_race50PD::race(actual))||
+    if(&actual.originalMainApplication!=this||!native_common_race50PD::race(actual)||
        !actual.humanCourseEnabled)return reject("Native human root requires an actual accepted human race Publication");
     try {
-        // The same root for every race (1A8A40/17D6A0 are common). RA keeps
-        // its world join; TA/GA/SA/MA/GC use their own counted world and
-        // their course camera.
-        const bool raRace=bool(actual.consumedRaStage.race());
-        const auto& selected=raRace?actual.consumedRaStage.race():native_common_race50PD::race(actual);
+        // The same root for every race (1A8A40/17D6A0 are common): the one
+        // consumed race, its one World over the running Track, and the one
+        // Application-issued course camera.
+        const auto& selected=native_common_race50PD::race(actual);
         const auto race=sourceRace28COwner_;
         const auto camera=actual.sourceCameraSession;const auto display=raceDisplayOwner50LA_.lock();
-        const bool worldCurrent=raRace?actual.raWorld&&race&&race->world74_==actual.raWorld:
-            race&&!race->world74_&&(race->taWorld74_?actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld:
-                native_common_race50PD::worldCurrent(actual,*race));
+        const bool worldCurrent=race&&native_common_race50PD::worldCurrent(actual,*race);
         if(!race||race!=selected||raceConstructorColdOwner50LA_.lock()!=race)
             return reject("Native human root: selected course race is not the Application race");
         if(!worldCurrent)return reject("Native human root: race course world is not the running world");
@@ -64,20 +49,10 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
            !RaceDisplayLifetime50LA::uploadBindingLive(*display)||
            display->selectedGameplayCamera0_!=camera.get()||camera->selectedGameplayDisplay_.lock()!=display)
             return reject("Native human root actual Race/Profile/world/selected Camera/Display custody absent");
-        if(raRace){
-            // RA: the camera is the world join's own retained Session.
-            ra_cold_aggregate50LA::Diagnostic worldDiagnostic;
-            const auto borrowed=actual.raWorld->borrowRuntimeSourceCamera(actual.raWorld,worldDiagnostic);
-            const auto prefix=actual.raWorld->completedPrefixes();
-            if(!borrowed||borrowed.get()!=camera.get()||!prefix.staticWorldDrawPlan||!prefix.staticWorldImages||
-               !prefix.staticModelObservers||!prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager)
-                return reject("Native human root requires the RA world's own prepared Camera");
-        }
-        // The course Session issued for the world this race holds.
-        const auto course=raRace?rr::game::OriginalCameraStartCourse::ra:native_common_race50PD::course(*race);
+        // The course Session issued for THIS race and its one World.
         if(camera->closed_||camera->abandoned_||!camera->coldBound_||!camera->readsBound_||
            !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
-           camera->nativeTaIssuance_->course!=course||
+           !race->raceCamera34Issued(*camera)||
            camera->nativeTaIssuance_->generation!=race->entity_.sessionGeneration||
            camera->generation_!=race->entity_.sessionGeneration||camera->actual_.applicationEntities!=entitiesOwner_||
            &camera->actual_.bank!=&actual.racerBank||&camera->actual_.all8Manager!=&actual.originalAiSession.manager||

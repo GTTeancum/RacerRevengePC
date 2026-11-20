@@ -3,22 +3,11 @@
 #include "native_common_race50pd.h"
 #include "terrain_interactive_continuation50du.h"
 #include "terrain_interactive_publication50du.h"
-#include "original_consumed_ra_stage50du.h"
-#include "original_consumed_ta_stage50du.h"
-#include "original_consumed_ma_stage50du.h"
-#include "original_consumed_mb_stage50du.h"
-#include "original_consumed_sc_stage50du.h"
-#include "original_consumed_gb_stage50du.h"
-#include "original_consumed_mc_stage50du.h"
-#include "original_consumed_tb_stage50du.h"
-#include "original_consumed_rc_stage50du.h"
-#include "original_consumed_tc_stage50du.h"
-#include "original_consumed_sa_stage50du.h"
-#include "original_consumed_ga_stage50du.h"
-#include "original_consumed_gc_stage50du.h"
+#include "original_consumed_stage50du.h"
 #include "original_race_constructor50la.h"
-#include "ra_cold_aggregate50la.h"
-#include "original_world_cold_prefix50la.h"
+#include "original_race_world_join50la.h"
+#include "common_track50cr.h"
+#include "original_camera_session50kx.h"
 #include "../../src/game/lap_event6_subscriber50id.h"
 #include "../../src/game/dynamic_impact_events50iw.h"
 #include "../../src/game/lap_host_clock50id.h"
@@ -44,15 +33,10 @@ Registration::Registration(const original_main_entry50KG::Application& applicati
 
 Scope::Scope(::interactive_continuation50DU::Context& actual,const native_racer50HN::Bank& bank)noexcept {
     const auto& app=actual.originalMainApplication;
-    // RA or TA consumed race, each checked against its own retained world.
-    // The other consumed course races (GA/SA/MA/GC, same race class) are
-    // checked against their own course world the same way.
-    const bool ta=!actual.consumedRaStage.race();
-    const auto& race=ta?native_common_race50PD::race(actual):actual.consumedRaStage.race();
-    const bool worldCurrent=race&&(ta?
-        !race->world74_&&(race->taWorld74_?actual.taOriginalWorld&&race->taWorld74_==actual.taOriginalWorld:
-            native_common_race50PD::worldCurrent(actual,*race)):
-        actual.raWorld&&race->world74_==actual.raWorld);
+    // The one consumed race, checked against its one World and the running Track
+    // (the same rule on every course).
+    const auto& race=native_common_race50PD::race(actual);
+    const bool worldCurrent=race&&native_common_race50PD::worldCurrent(actual,*race);
     if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
        app.race28C()!=race.get()||!race->counted_||race->rolledBack_||
        !race->entity_.sessionGeneration||race->application_!=app.entities()||
@@ -113,17 +97,10 @@ void Registration::observeConstructed1A8CC4(::interactive_publication50DU::Conte
     //are owned by this same lexical thread, not an external cross-thread API.
     const auto* published=actual.originalMainApplication.race28C();
     if(!published||published->resultsFeedbackThread_!=std::this_thread::get_id())return;
-    //Successful HUD construction is shared by all these existing consumed
-    //courses. Select ONLY the actual published owner; unsupported non-RA
-    //construction must withdraw fresh-null knownness too, never gain a Scope.
-    const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>* selected=nullptr;
-    for(const auto* candidate:{&actual.consumedRaStage.race(),&actual.consumedTaStage.race(),
-        &actual.consumedMaStage.race(),&actual.consumedMbStage.race(),&actual.consumedScStage.race(),&actual.consumedGbStage.race(),&actual.consumedRcStage.race(),&actual.consumedTcStage.race(),&actual.consumedMcStage.race(),&actual.consumedTbStage.race(),&actual.consumedCommonRouteStage.race(),
-        &actual.consumedGaStage.race(),&actual.consumedGcStage.race()}){
-        if(candidate->get()==published){selected=candidate;break;}
-    }
-    if(!selected)return;
-    const auto& race=*selected;
+    //Successful HUD construction is common to every race. Select ONLY the
+    //actual published owner (the one consumed stage's race).
+    const auto& race=actual.consumedStage.race();
+    if(!race||race.get()!=published)return;
     if(!race->counted_||race->application_!=actual.originalMainApplication.entities()||race->rolledBack_)return;
     //The successful actual producer has passed the original text/gleam
     //stores. Even without a borrow registration these slots are no longer
@@ -192,8 +169,8 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
        race.entity_.sessionGeneration!=generation_||race.endHud_.lock().get()!=this||
        !race.hudTextSlots_||!race.anyWorld())return false;
     try {
-        //This existing synchronous borrow retains actual world/query/model
-        //backing (RA) or the issued Session (TA) during the HUD operation.
+        //This existing synchronous borrow retains the Application-issued
+        //Session bound as Camera34 during the HUD operation (every race).
         const auto camera=race.borrowRaceCamera34();
         if(!camera||camera.get()!=camera_)return false;
         if(!camera->coldBound_||!camera->readsBound_||camera->closed_||camera->abandoned_||
@@ -202,7 +179,7 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
            camera->actual_.humanCount34!=1u||(camera->raceFlags1B0_&3u)!=1u||
            !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=application_||
            camera->nativeTaIssuance_->generation!=generation_||
-           !race.raceCameraCourse34(camera->nativeTaIssuance_->course)||
+           !race.raceCamera34Issued(*camera)||
            !camera->identitiesCurrent()||
            !camera->viewport_.prepared||camera->viewport_.sessionGeneration!=generation_||
            !hud_->loaded()||hud_->viewCount()!=1u)return false;
@@ -700,24 +677,14 @@ bool Registration::invokeNativeLapEvent6(const rr::game::OriginalRaceConstructor
 }
 }
 
-//Private Race forwarding definitions; actual World remains owned by Race74.
+//Private Race forwarding definition; the one World remains owned by Race74.
 namespace rr::game {
-bool OriginalRaceConstructor50LA::endWorldCurrentNative()const noexcept {
-    return world74_&&!world74_->terminal_&&!world74_->closed_;
-}
-bool OriginalRaceConstructor50LA::endResetNativeTriggerList2DCC70(std::uint32_t& pc)noexcept {
-    return world74_->resetNativeTriggerList2DCC70(application_,entity_.sessionGeneration,pc);
-}
-bool OriginalRaceConstructor50LA::endResetNativeParticles161F60(std::uint32_t& pc)noexcept {
-    return world74_->resetNativeParticles161F60(application_,entity_.sessionGeneration,pc);
-}
-bool OriginalRaceConstructor50LA::endResetLiveWorldPhysics2702E0(std::uint32_t& pc)noexcept {
-    return world74_->resetLiveWorldPhysics2702E0(application_,entity_.sessionGeneration,pc);
-}
-
-ra_source_camera50LA::OwnershipBridge* OriginalRaceConstructor50LA::borrowEndRuntimeNative()const noexcept {
-    if(!world74_||world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_)return nullptr;
-    return world74_->runtimeQueries_.get();
+// One rule replacing raceCameraCourse34(course): the issued Session records
+// THIS race and ITS one World (R2's NativeTaIssuance race/world pair).
+bool OriginalRaceConstructor50LA::raceCamera34Issued(const original_camera_session50KX::Session& session)const noexcept {
+    const auto& issued=session.nativeTaIssuance_;
+    return world74_&&issued&&issued->race==this&&issued->world==world74_.get()&&
+        issued->generation==entity_.sessionGeneration;
 }
 
 }

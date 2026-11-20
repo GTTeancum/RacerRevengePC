@@ -13,7 +13,8 @@ bool OriginalRaceMusicManager50LA::beginSourceAfterLoadingCamera1A6C90(
     const auto& camera=race.loadingCamera34_;
     if(race.resultsFeedbackThread_!=std::this_thread::get_id()||race.application_!=app.entities()||
        race.profile_!=app.riderProfile||!race.counted_||race.rolledBack_||!race.nativeIntroRaceEntity()||
-       race.nativeTrackLoadStep_!=OriginalRaceConstructor50LA::NativeTrackLoadStep::unreached||
+       // 1A39F0 runs before the 1A9EE0 track load (PLAN 2.1 step 3 before 5).
+       !race.world74_||race.world74_->trackData()||
        race.cameraNativeAdapter34_||race.cameraInitStep_!=OriginalRaceConstructor50LA::CameraInitStep::nativePending||
        !camera.suffixReturned||camera.terminal||!camera.arrayPublished||camera.arrayWithdrawn||
        camera.stopPC!=0x1a9598||!race.loadingCameraSourceNullSuffixCurrent()||

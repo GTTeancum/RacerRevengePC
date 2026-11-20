@@ -2,7 +2,8 @@
 #include "original_race_f8_renderer50la.h"
 #include "original_race_constructor50la.h"
 #include "original_race_display_lifetime50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_race_world_join50la.h"
+#include "original_camera_session50kx.h"
 #include "../../src/game/original_race_f8_storage50la.h"
 #include "../../src/assets/original_standard_material_source50la.h"
 #include "../../platform/linux/native/native_camera_view50dx.h"
@@ -116,10 +117,10 @@ public:
 struct NativeF8BarPrefix50LA::Impl {
     const Application* issuer=nullptr;
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> race;
-    std::shared_ptr<ra_cold_aggregate50LA::Owner> world;
-    // Existing counted aggregate borrow: its custom-deleter control block
-    // retains the world; it never independently owns or deletes the Session.
-    std::shared_ptr<const original_camera_session50KX::Session> camera; //Common race: non-owning alias.
+    // The race's one World (identity retained for the frame) and the
+    // synchronous borrow of the Application-issued Camera34 Session.
+    std::shared_ptr<common_race_world50CR::World> world;
+    std::shared_ptr<const original_camera_session50KX::Session> camera;
     std::shared_ptr<RaceDisplayLifetime50LA> display;
     std::shared_ptr<RaceF8RendererLease50LA> rendererLease;
     rr::game::OriginalApplicationAnimationClockView50KG applicationLifetime;
@@ -284,7 +285,7 @@ bool Application::nativeF8BarsCurrent50LA(const NativeF8BarPrefix50LA& batch,
        n.camera->generation_!=n.race->entity_.sessionGeneration||n.camera->actual_.humanCount34!=1||
        n.camera->actual_.applicationEntities!=entitiesOwner_||!n.camera->nativeTaIssuance_||
        n.camera->nativeTaIssuance_->issuer!=this||n.camera->nativeTaIssuance_->generation!=n.camera->generation_||
-       (n.world&&n.camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
+       !n.race->raceCamera34Issued(*n.camera)||
        n.camera->publicationCount()!=n.cameraPublication||!frameMatrixCurrent(*n.camera,frame))return false;
     auto& p=*n.source->impl_;
     const auto font=p.fonts?p.fonts->find282210(rr::assets::OriginalApplicationFonts50LA::Name::denmark16):nullptr;
@@ -335,24 +336,24 @@ bool Application::prepareNativeF8Bars50LA(const original_camera_session50KX::Ses
        p.component.parent1C!=&race->entity_||p.component.mask20!=0xffffffffu||(p.component.flags29&9u)!=1u||
        !source.belongsTo(entitiesOwner_,race->entity_.sessionGeneration)||!std::isfinite(p.fields->transition1E0))
         return reject(d,0x199554,"F8 actual state/empty attached leaf required; no Session flag substitution");
-    const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-    std::shared_ptr<const original_camera_session50KX::Session> borrowed;
-    if(world)borrowed=world->borrowRuntimeSourceCamera(world,wd);
-    const auto* camera=world?borrowed.get():race->cameraNativeAdapter34_;
+    // One Camera for every race: the issued Session bound as Camera34.
+    const auto world=race->world74_;
+    const std::shared_ptr<const original_camera_session50KX::Session> borrowed=race->borrowRaceCamera34();
+    const auto* camera=borrowed.get();
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!camera||camera!=&expectedSession||
        camera->frameStage_!=original_camera_session50KX::Session::FrameStage::published||
        camera->generation_!=race->entity_.sessionGeneration||camera->actual_.humanCount34!=1||
        camera->actual_.applicationEntities!=entitiesOwner_||!camera->nativeTaIssuance_||
        camera->nativeTaIssuance_->issuer!=this||camera->nativeTaIssuance_->generation!=camera->generation_||
-       (world&&camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
+       !race->raceCamera34Issued(*camera)||
        !display->readGameplayViewport115990(*camera,rectangle,revision)||rectangle!=std::array<std::int32_t,4>{{0,0,640,448}}||
-       !frameMatrixCurrent(*camera,frame))return reject(d,0x115990,"F8 same counted current one-human RA Camera/Frame projection");
+       !frameMatrixCurrent(*camera,frame))return reject(d,0x115990,"F8 same counted current one-human course Camera/Frame projection");
     if(!p.rendererLease&&!retainConsumedF8Renderer50LA(d))return false;
     if(!p.rendererLease||!p.rendererLease->identityCurrent())return reject(d,0x141dd8,"F8 actual native renderer resource custody");
     try {
         auto batch=std::unique_ptr<NativeF8BarPrefix50LA>(new NativeF8BarPrefix50LA);auto& n=*batch->impl_;
-        n.issuer=this;n.race=race;n.world=world;n.camera=world?std::shared_ptr<const original_camera_session50KX::Session>(borrowed):std::shared_ptr<const original_camera_session50KX::Session>(std::shared_ptr<void>{},camera);n.display=display;n.source=&source;
+        n.issuer=this;n.race=race;n.world=world;n.camera=borrowed;n.display=display;n.source=&source;
         n.rendererLease=p.rendererLease;n.applicationLifetime=animationClock();
         n.selectionRevision=revision;n.rectangle=rectangle;n.cameraPublication=camera->publicationCount();
         n.displayGeneration=display->generation_;n.width=frame.width;n.height=frame.height;n.frame=&frame;

@@ -3,7 +3,8 @@
 #include "../../src/game/original_results104_storage50la.h"
 #include "original_native_collector_fifo50la.h"
 #include "original_race_constructor50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_race_world_join50la.h"
+#include "original_camera_session50kx.h"
 #include "../../src/game/original_race_f8_storage50la.h"
 #include <exception>
 #include <thread>
@@ -147,19 +148,17 @@ bool Application::retainConsumedF8Renderer50LA(D& d)const noexcept {
         return reject(d,0x198510,"F8 actual unbound loaded resource owner");
     for(std::size_t i=0;i<4;++i)if(!p.polygonCurrent(i)||p.polygons30[i]->nativePacketPins)
         return reject(d,0x2e1980,"F8 actual unborrowed polygon resources");
-    // RA: its world join's Session; every other course: the race's Camera34.
-    const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-    std::shared_ptr<const original_camera_session50KX::Session> borrowed;
-    if(world)borrowed=world->borrowRuntimeSourceCamera(world,wd);
-    const auto* camera=world?borrowed.get():race->cameraNativeAdapter34_;
+    // Every race: the Application-issued Session bound as the race's Camera34.
+    const std::shared_ptr<const original_camera_session50KX::Session> borrowed=race->borrowRaceCamera34();
+    const auto* camera=borrowed.get();
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!camera||camera->generation_!=race->entity_.sessionGeneration||
        camera->actual_.applicationEntities!=entitiesOwner_||camera->actual_.humanCount34!=1||
        !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
        camera->nativeTaIssuance_->generation!=camera->generation_||
-       (world&&camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
+       !race->raceCamera34Issued(*camera)||
        !display->readGameplayViewport115990(*camera,rectangle,revision))
-        return reject(d,0x26f940,"F8 real selected RA Camera required for native resource custody");
+        return reject(d,0x26f940,"F8 real selected course Camera required for native resource custody");
     try {
         // Allocate the control block BEFORE pinning. Allocation failure cannot
         // strand a Display pin or trigger a pretend resource retirement.

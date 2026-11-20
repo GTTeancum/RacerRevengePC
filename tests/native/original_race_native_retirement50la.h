@@ -19,7 +19,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
        !application_->entityAuthority_.canRetire(entity_)||raceGroupCount_>6||
        raceGroupsAttached_>raceGroupCount_||
        entity_.firstChild18!=(raceGroupsAttached_?raceGroups_[0]:nullptr))return false;
-    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||mcWorld74_||tbWorld74_||commonRouteWorld74_)){
+    if(raceAudio_&&(raceGroupCount_||raceAudio_->coldStarted_||world74_)){
         auto& audio=*raceAudio_;
         gate="race audio canonical identity/epoch/thread";
         if(audio.coldApplication_!=application_||audio.coldSession_!=entity_.sessionGeneration||
@@ -41,62 +41,14 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
         // provider preparation is handled by the same actual membership ledger.
         gate="native stopped voice membership retirement";
         if(audio.mixer_&&!audio.retireNativeVoiceBindings())return false;
-    }else if(raceGroupCount_||world74_||taWorld74_||gcWorld74_||gaWorld74_||maWorld74_||mbWorld74_||scWorld74_||gbWorld74_||rcWorld74_||tcWorld74_||mcWorld74_||tbWorld74_||commonRouteWorld74_){gate="missing audio owner with acquired race children";return false;}
+    }else if(raceGroupCount_||world74_){gate="missing audio owner with acquired race children";return false;}
     if(world74_){
-        // Actual aggregate borrows, renderer publication, runtime topology and
-        // resource gates remain authoritative. Failure retains this same owner.
-        gate="actual aggregate native loaded-world retirement";
-        nativeWater70Domain_.reset();nativeWater70Object_.reset();nativeWater70State_=NativeWater70State::withdrawn;
-        if(!world74_->closeNativeLoadedWorld())return false;
-        world74_.reset();
-    }
-    if(taWorld74_||taWorldCounted_){
-        gate="actual TA counted world-prefix retirement";
-        if(!retireNativeTaWorldPrefix(pc))return false;
-    }
-    if(gcWorld74_||gcWorldCounted_){
-        gate="actual GC counted world-prefix retirement";
-        if(!retireNativeGcWorldPrefix(pc))return false;
-    }
-    if(maWorld74_||maWorldCounted_){
-        gate="actual MA counted world-prefix retirement";
-        if(!retireNativeMaWorldPrefix(pc))return false;
-    }
-    if(mbWorld74_||mbWorldCounted_){
-        gate="actual MB counted world-prefix retirement";
-        if(!retireNativeMbWorldPrefix(pc))return false;
-    }
-    if(scWorld74_||scWorldCounted_){
-        gate="actual SC counted world-prefix retirement";
-        if(!retireNativeScWorldPrefix(pc))return false;
-    }
-    if(gbWorld74_||gbWorldCounted_){
-        gate="actual GB counted world-prefix retirement";
-        if(!retireNativeGbWorldPrefix(pc))return false;
-    }
-    if(mcWorld74_||mcWorldCounted_){
-        gate="actual MC counted world-prefix retirement";
-        if(!retireNativeMcWorldPrefix(pc))return false;
-    }
-    if(tbWorld74_||tbWorldCounted_){
-        gate="actual TB counted world-prefix retirement";
-        if(!retireNativeTbWorldPrefix(pc))return false;
-    }
-    if(rcWorld74_||rcWorldCounted_){
-        gate="actual RC counted world-prefix retirement";
-        if(!retireNativeRcWorldPrefix(pc))return false;
-    }
-    if(tcWorld74_||tcWorldCounted_){
-        gate="actual TC counted world-prefix retirement";
-        if(!retireNativeTcWorldPrefix(pc))return false;
-    }
-    if(commonRouteWorld74_||commonRouteWorldCounted_){
-        gate="actual SA counted world-prefix retirement";
-        if(!retireNativeCommonRouteWorldPrefix(pc))return false;
-    }
-    if(gaWorld74_||gaWorldCounted_){
-        gate="actual GA counted world-prefix retirement";
-        if(!retireNativeGaWorldPrefix(pc))return false;
+        // The one World's counted prefix (1B2870 dtor -> 235150 -> 1B5F64), the
+        // same retirement on every course. Its Track's role owners are released
+        // by the consumed stage after this close (common_track50CR::Track::release).
+        gate="actual counted World74 prefix retirement (1B2870)";
+        std::uint32_t worldPc=0;
+        if(!common_race_world50CR::retire1B2870(*this,*world74_,worldPc)){pc=worldPc;return false;}
     }
     // This existing native unwind kernel performs exact canonical detach and
     // actual acquired empty-group release, with retryable partial progress.

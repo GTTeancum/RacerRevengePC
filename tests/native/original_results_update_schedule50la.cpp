@@ -3,7 +3,7 @@
 #include "original_race_constructor50la.h"
 #include "original_camera_session50kx.h"
 #include "original_race_display_lifetime50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_race_world_join50la.h"
 #include "../../src/game/original_pause_storage50la.h"
 #include "../../src/game/original_results104_storage50la.h"
 #include "original_results_native_frame50la.h"
@@ -113,14 +113,13 @@ bool Application::updateNativeResultsAfterRace50LA(const original_camera_session
         return stop(S::incomplete,0,"Canonical Race end continuation has not returned; native Camera publication is not its receipt");
     try {
         const auto world=race->world74_;
-        if((!world&&!commonReplay)||race->cameraNativeAdapter34_!=&returnedCamera||
+        if(!world||race->cameraNativeAdapter34_!=&returnedCamera||
            !race->ownsNativeCameraAdapter34(returnedCamera)||
            race->cameraInitStep_!=Race::CameraInitStep::nativeReady)
             return stop(S::owner,0,"Native Results return lacks actual same-world Camera34 custody");
-        ra_cold_aggregate50LA::Diagnostic worldDiagnostic;
-        std::shared_ptr<const Camera> borrowed;
-        if(world)borrowed=world->borrowRuntimeSourceCamera(world,worldDiagnostic);
-        const Camera* camera=world?borrowed.get():&returnedCamera;
+        // Every race: the issued Session bound as Camera34 (synchronous borrow).
+        const std::shared_ptr<const Camera> borrowed=race->borrowRaceCamera34();
+        const Camera* camera=borrowed.get();
         if(!camera||camera!=&returnedCamera||camera->closed_||camera->abandoned_||
            !camera->coldBound_||!camera->readsBound_||camera->actual_.applicationEntities!=entitiesOwner_||
            camera->generation_!=nativeTaRootGeneration_||camera->frameStage_!=Camera::FrameStage::published||
@@ -170,8 +169,8 @@ struct NativeResultsFrame50LA::Impl {
     const std::thread::id thread=std::this_thread::get_id();
     const Application* issuer=nullptr;
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> race;
-    std::shared_ptr<ra_cold_aggregate50LA::Owner> world;
-    std::shared_ptr<const original_camera_session50KX::Session> camera; //Common race: non-owning alias.
+    std::shared_ptr<common_race_world50CR::World> world;
+    std::shared_ptr<const original_camera_session50KX::Session> camera;
     std::shared_ptr<RaceDisplayLifetime50LA> display;
     std::shared_ptr<ResultsRendererLease50LA> lease;
     std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> table;
@@ -292,7 +291,7 @@ bool Application::nativeResultsFinalCameraCurrent50LA(const rr::game::OriginalRa
        camera.actual_.humanCount34!=1||camera.actual_.applicationEntities!=entitiesOwner_||
        camera.generation_!=race.entity_.sessionGeneration||!camera.nativeTaIssuance_||
        camera.nativeTaIssuance_->issuer!=this||camera.nativeTaIssuance_->generation!=camera.generation_||
-       (race.world74_&&camera.nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
+       !race.raceCamera34Issued(camera)||
        camera.frameStage_!=original_camera_session50KX::Session::FrameStage::published||
        !camera.frameNumber_||camera.completedFrame_!=camera.frameNumber_||camera.pendingDisplayWork())return false;
     const auto display=raceDisplayOwner50LA_.lock();
@@ -376,17 +375,14 @@ bool Application::prepareNativeResultsFrame50LA(const original_camera_session50K
     if(pause&&(pause->component.flags29&1u))
         return resultsFrameReject(d,0x1a8690,"Results cannot skip active preceding Pause draw");
     try {
-        const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        // RA borrows its world join's Session; the common race uses the
-        // race's own Camera34 (lifetime held by the loop around this frame).
+        const auto world=race->world74_;
+        // Every race uses its own Camera34 (the Application-issued Session).
         std::shared_ptr<const original_camera_session50KX::Session> camera;
-        if(world)camera=world->borrowRuntimeSourceCamera(world,wd);
-        else if(race->cameraNativeAdapter34_==&expected)
-            camera=std::shared_ptr<const original_camera_session50KX::Session>(std::shared_ptr<void>{},&expected);
+        if(race->cameraNativeAdapter34_==&expected)camera=race->borrowRaceCamera34();
         std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
         if(!camera||camera.get()!=&expected||!race->ownsNativeCameraAdapter34(*camera)||
            camera->actual_.humanCount34!=1||!camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
-           (world&&camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)||
+           !race->raceCamera34Issued(*camera)||
            camera->generation_!=race->entity_.sessionGeneration||camera->actual_.applicationEntities!=entitiesOwner_||
            camera->frameStage_!=original_camera_session50KX::Session::FrameStage::published||camera->pendingDisplayWork()||
            !display->readGameplayViewport115990(*camera,rectangle,revision)||revision!=capture.acceptedDisplayRevision||

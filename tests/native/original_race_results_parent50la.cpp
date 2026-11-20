@@ -1,13 +1,11 @@
 #include "original_race_constructor50la.h"
 #include "../../src/game/original_pause_storage50la.h"
-#include "original_race_pause_world_authority50la.h"
+#include "original_race_world_join50la.h"
 namespace rr::game {
 bool OriginalRaceConstructor50LA::canRetainPause100()const noexcept {
-    // 1A8AB0 runs inside every race's load. The RA world join keeps its
-    // stronger same-world authority; every other course's race only needs
-    // its counted world slot (constructed by the same 1A6BC0 step).
-    const bool world=world74_?OriginalRacePauseWorldAuthority50LA::current(
-        *world74_,application_,raceAudio_,entity_.sessionGeneration):anyWorld();
+    // 1A8AB0 runs inside every race's load: the race's one World (the same
+    // 1A6BC0 step on every course), counted, prefix complete, same generation.
+    const bool world=nativeIntroWorldEntity()!=nullptr;
     return counted_&&!rolledBack_&&!pause100_&&!results104_&&world&&
         loadPrefixReached_&&resourcesPrepared_&&raceGroupsAttached_==6;
 }
