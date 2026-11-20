@@ -1,0 +1,44 @@
+Item (2): the original Pause owner on every counted race - plan (148r)
+======================================================================
+Today (wt-148r-6):
+- Every counted race loads Pause100 storage at the race load (1BA130, via
+  prewarmPauseCold50LA / the Results load) and the publication binds it for
+  presentation only (sourcePauseObservation.bindHost / bindHostNamed;
+  "original_pause_host bound=1"). The race loop opens it with the port's host
+  session menu (Page::Pause) and handles its rows itself
+  (terrain_interactive_loop50du.cpp: sessionMenu.pollOriginalPause, rows 0
+  CONTINUE, 1 RESTART -> session rebuild, 2..4 HUD, 5..8 volumes, 9 QUIT TO
+  MAIN -> port ReturnOriginalMain, 10 QUIT -> 1BDA74 Course branch (148r) or
+  the port Quit).
+- The original owner path - Pause attached to the race (attachNativeConsumedRacePause),
+  pad input 1A87A0 -> 1BD8CC row dispatch (original_pause_observation50la.h
+  dispatchNativeInputBatch, original_pause_input50la.inl beginNativePauseReturn50LA,
+  original_pause_main_transfer50la.inl) - runs only on the RA ALL8 spectator
+  route. Its RA-only gates:
+    original_pause_observation50la.h bindRace / raceIdentity (RA map, title 108),
+      openNativeAll8SpectatorMenu (humanCount34 == 0), :402 consumedRaAll8CameraCustody
+    original_pause_input50la.inl :38 / :124 consumedRaAll8ListenerCustody,
+      race->world74_, :140 world74_->borrowRuntimeSourceCamera
+    selection 10 admitted only for subtypes 1/2 (:63, :113).
+
+Steps (one header round, every course, no course key):
+1. bindRace on the race's own world/camera (race28C + its course world, the
+   Session the race issued; title = 17EA08 table by course id, registry name
+   for an add-on course) instead of the RA aggregate; RA keeps the same rule.
+2. Human open: 1A87A0 with humanCount34 == 1 (Start on the human pad) attaches
+   Pause to the race (the RA ALL8 attach generalised), App11C set by 1BD8CC.
+3. Row dispatch from the original owner for every row; the race loop stops
+   handling rows. RESTART (1BD930..1BD9B0: 1AC8E0(race,1)) keeps today's
+   rebuild until item (3) owns the in-place 1AC8E0. QUIT TO MAIN (1BD9B8) via
+   the existing pauseMenuTransfer; QUIT (1BDA74) admits subtype 3: 1ABFC0(1)
+   -> item (4) page 3, else 1BDB5C Course (17DE10(6,6,1)) through the same
+   transfer the 1AB908 race return uses.
+4. Camera/listener custody: replace consumedRaAll8*Custody with the counted
+   race's own camera adapter34 custody (the one Results already uses).
+5. Runner: RR_TEST_PAUSE_QUIT presses Start then Down x N / Cross on the
+   original pad path (no host menu).
+Headers touched: original_pause_observation50la.h, original_pause_input50la.inl
+(via original_results104_input50la.cpp), original_ui_main_entry50kg.h (Application
+methods) - the last is expensive (~150 TUs); batch all in one rebuild.
+Proof lines: pause_open owner=original course=.. subtype=..; pause_row row=N site=..;
+pause_quit row=10 site=1BDA74 ...; frontend_race_return screen=6.
