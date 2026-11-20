@@ -29,9 +29,19 @@ public:
         const SourceDependencies& dependencies,gameplay_binder_candidate_fixture::Diagnostic& d)noexcept {
         return source_.bind(slot,rig,state,frame,dependencies.templates,dependencies.materialRuntime,d);
     }
+    // Racers in this race's field: every loaded racer binds its own Binder
+    // (213A40 runs per racer slot, 0..count-1), so the bound slots are exactly
+    // the prefix 0..count-1. The field size is data of the race (8 for an
+    // ordinary race, 1 for a solo field such as Time Trial with AI 0, 1AD520);
+    // no slot count is assumed. 0 = not loaded or not a contiguous prefix.
+    std::uint32_t fieldRacers()const noexcept {
+        if(!loaded())return 0;
+        std::uint32_t n=0;while(n<8&&source_.bindings(n))++n;
+        for(std::uint32_t i=n;i<8;++i)if(source_.bindings(i))return 0;
+        return n;
+    }
     bool createGpu(const p::MaterialTextureGlRequest50EB& caller,p::MaterialTextureGlDiagnostic50EB& d)noexcept {
-        if(!loaded())return false;
-        for(unsigned i=0;i<8;++i)if(!source_.bindings(i))return false;
+        if(!loaded()||!fieldRacers())return false;
         std::array<p::MaterialTextureSampler50EB,10> samplers;
         for(auto& sampler:samplers)sampler={p::MaterialTextureFilter50EB::linear,p::MaterialTextureFilter50EB::linear,
             p::MaterialTextureWrap50EB::repeat,p::MaterialTextureWrap50EB::repeat};
@@ -79,10 +89,11 @@ public:
         return true;
     }
     bool bindRaceFrame(p::VehicleWindowFrame50DS& frame)const noexcept {
-        if(!gpu_.initialized()||frame.opponentCount!=7)return false;
-        for(bool ready:ready_)if(!ready)return false;
+        const auto racers=fieldRacers();
+        if(!gpu_.initialized()||!racers||frame.opponentCount+1u!=racers)return false;
+        for(unsigned slot=0;slot<racers;++slot)if(!ready_[slot])return false;
         std::uint32_t count=0;
-        for(unsigned slot=0;slot<8;++slot)
+        for(unsigned slot=0;slot<racers;++slot)
             for(unsigned pair=0;pair<source_.bindingCount(slot);++pair)published_[count++]=meshes_[slot][pair];
         frame.gameplayBinders=published_.data();frame.gameplayBinderCount=count;
         frame.gameplayBinderFrame=source_.selectedFrame();return frame.gameplayBinderFrame<10;

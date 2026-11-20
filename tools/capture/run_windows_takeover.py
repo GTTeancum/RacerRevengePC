@@ -271,11 +271,11 @@ def main():
                              'course arrow (Next) until this admitted add-on course is highlighted, then the original '
                              'Course Confirm (sets RR_TEST_ADDON_COURSE_PICK). Needs --env RR_DLC_ROOT=<DLC folder> and --route '
                              + ' / '.join(ADDON_COURSE_ROUTES))
-    parser.add_argument('--addon-course-mode', choices=['single', 'time_trial'],
-                        help='With --addon-course: on the Course screen first set the event type (original Down to the '
-                             'event-type row, Right until Single Race / Time Trial shows, Up back to the course row), '
-                             'then pick the add-on course (sets RR_TEST_ADDON_COURSE_SUBTYPE=1 or 3). Default: the '
-                             'event type the Course screen opens on (Single Race on a fresh profile)')
+    parser.add_argument('--course-mode', '--addon-course-mode', dest='course_mode', choices=['single', 'time_trial'],
+                        help='Free-play Course (--route main-rider-course-ta, stock TA or with --addon-course): first set '
+                             'the event type (original Down to the event-type row, Right until Single Race / Time Trial '
+                             'shows, Up back to the course row), then pick the course (sets RR_TEST_COURSE_SUBTYPE=1 or 3). '
+                             'Default: the event type the Course screen opens on (Single Race on a fresh profile)')
     parser.add_argument('--hold-course', action='store_true',
                         help='With --addon-course: stop on the Course screen with the add-on course highlighted (no Confirm, '
                              'sets RR_TEST_ADDON_COURSE_HOLD=1) and write that Course frame as an image for an eye check '
@@ -304,8 +304,8 @@ def main():
             parser.error('--addon-rider and --player-racer cannot be combined')
     if args.hold_course and args.addon_course is None:
         parser.error('--hold-course needs --addon-course')
-    if args.addon_course_mode and args.addon_course is None:
-        parser.error('--addon-course-mode needs --addon-course')
+    if args.course_mode and args.route != 'main-rider-course-ta':
+        parser.error('--course-mode works only with --route main-rider-course-ta')
     if args.hold_course and args.hold_rider:
         parser.error('--hold-course and --hold-rider cannot be combined (each stops its own screen)')
     if args.hold_rider and args.route not in ADDON_RIDER_ROUTES:
@@ -461,8 +461,8 @@ def main():
         env['RR_TEST_ADDON_COURSE_PICK'] = args.addon_course
     if args.hold_course:
         env['RR_TEST_ADDON_COURSE_HOLD'] = '1'
-    if args.addon_course_mode:
-        env['RR_TEST_ADDON_COURSE_SUBTYPE'] = '3' if args.addon_course_mode == 'time_trial' else '1'
+    if args.course_mode:
+        env['RR_TEST_COURSE_SUBTYPE'] = '3' if args.course_mode == 'time_trial' else '1'
         env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Course frame as an image
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
@@ -506,7 +506,7 @@ def main():
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
-                  addonCourseHold=args.hold_course, addonCourseMode=args.addon_course_mode,
+                  addonCourseHold=args.hold_course, courseMode=args.course_mode,
                   eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results, resultsHallCapture=args.hold_results_hall,
                   seedSlowHall=args.seed_slow_hall,
                   resultsExit=args.results_exit,

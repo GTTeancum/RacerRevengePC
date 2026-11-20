@@ -1,0 +1,23 @@
+Binder takes the race's own field size (a solo field is racer count 1), not a fixed eight; runner --course-mode single|time_trial for the stock free-play TA route too (build wt-147c-4, linked, not run)
+
+Evidence: evidence\c147-nv-tt3 (wt-147c-3, Time Trial on NV, AI 0 per 1AD520):
+"require_failed original Binder GPU bank rejected" at video_and_renderer_publication.
+gameplay_binder_window_candidate_fixture::Owner::createGpu required a bound Binder in
+all 8 slots and bindRaceFrame required opponentCount == 7. The original binds a Binder
+per loaded racer (213A40, per slot 0..count-1); the session already requires every
+loaded racer bound (racerBank.count() == raceRacerCount). Now one rule for any field:
+fieldRacers() = the bound slots, which must be the prefix 0..n-1 (n >= 1); createGpu
+needs n >= 1; bindRaceFrame needs opponentCount + 1 == n and draws those n. An
+8-racer race is unchanged. No course, pod or mode key.
+
+Runner (test only): --course-mode single|time_trial (alias --addon-course-mode) now
+also works on the stock main-rider-course-ta route without --addon-course: the same
+event-type stage (original Down / Right / Up) before the TA Confirm; the Course frame
+is captured only once the requested type is set. RR_TEST_COURSE_SUBTYPE replaces
+RR_TEST_ADDON_COURSE_SUBTYPE. Stock line: "course_route_stock confirm course=0 slot=1
+subtype=3 events=N".
+
+Headers: tests/native/gameplay_binder_window_candidate_fixture.h,
+tests/native/original_ui_capture_navigation50la.h. Relink wt-147c-4 on wt-147c-3: 5 TUs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

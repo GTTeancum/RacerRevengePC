@@ -3396,7 +3396,7 @@ void Context::run() {
      }
      require50DU(sourceApplicationTimestampPublished&&gameplayBinder.advanceRaceRender(sourceApplicationAnimation.current230),
          "original Binder render-time controller rejected application publication");
-     require50DU(gameplayBinder.bindRaceFrame(renderFrame),"Binder complete eight-racer frame join rejected");
+     require50DU(gameplayBinder.bindRaceFrame(renderFrame),"Binder complete race-field frame join rejected");
     }
     // Bounded existing render services consume a read of the actual owner.
     // Canonical callbacks must instead re-read the live capability at each

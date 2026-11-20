@@ -73,13 +73,13 @@ class Route final {
     unsigned addonCourseTarget_=0,priorCourseHighlight_=0;
     std::uint32_t addonCourseMoves_=0,priorCourseSlot_=0;
     std::uint64_t priorCourseRenders_=0;
-    // Event type for the add-on course test (147c, RR_TEST_ADDON_COURSE_SUBTYPE=1..3;
+    // Event type for the free-play Course routes (147c, RR_TEST_COURSE_SUBTYPE=1..3;
     // unset = the Course screen's own subtype, Single Race on a fresh profile).
     // Before any course move: original Down to the event-type row, Right until that
     // subtype shows, Up back to the course row. Same original inputs a player uses.
     std::uint32_t addonCourseSubtype_=0,addonEventMoves_=0,priorEventSubtype_=0;
     std::int32_t priorEventGroup_=-1;
-    bool awaitingAddonEventMove_=false;
+    bool awaitingAddonEventMove_=false,stockTypedLogged_=false;
 
     static void require(bool condition,const char* message) {
         if(!condition)throw std::runtime_error(message);
@@ -125,6 +125,26 @@ class Route final {
     }
     // Not an original input: the event-type stage sends Up, which is original input 2.
     static constexpr int addonCourseProceed=100;
+    // Event-type stage (147c; add-on and stock free-play Course routes alike):
+    // with a requested subtype, original Down to the event-type row, Right until
+    // that subtype shows, Up back to the course row. addonCourseProceed when the
+    // course row holds the requested subtype (or none was requested).
+    bool eventTypeReady(const Snapshot& s)const noexcept {
+        return !addonCourseSubtype_||(s.course.subtypeSlot14F4==addonCourseSubtype_&&s.course.controllerGroup==1);
+    }
+    int pollEventType(const Snapshot& s,bool courseCaptured) {
+        if(eventTypeReady(s))return addonCourseProceed;
+        if(addonEventMoves_&&s.course.renders<=priorCourseRenders_)return -1;
+        require(!courseCaptured,"Course route captured the Course screen before its event type");
+        require(addonEventMoves_<8u,"Course route event type was not reached within 8 row/type moves");
+        const bool typed=s.course.subtypeSlot14F4==addonCourseSubtype_;
+        priorEventSubtype_=s.course.subtypeSlot14F4;priorEventGroup_=s.course.controllerGroup;
+        priorCourseRenders_=s.course.renders;awaitingAddonEventMove_=awaitingDispatch_=true;
+        const auto group=s.course.controllerGroup;
+        if(!typed&&group==2)return 1;                        // Right on the event-type row
+        if(!typed)return group<2?3:2;                        // Down / Up to the event-type row
+        return group>1?2:3;                                  // Up (Down) back to the course row
+    }
     // Course stage of the add-on course test: -1 wait, 1 Course Next, addonCourseProceed
     // (go on to Confirm), or (event type first, 147c) 3 Down / 1 Right / 2 Up on the rows.
     int pollAddonCourse(const Snapshot& s,bool courseCaptured) {
@@ -133,19 +153,9 @@ class Route final {
             require(addonCourseTarget_!=0,"RR_TEST_ADDON_COURSE_PICK is not an admitted add-on course (check RR_DLC_ROOT and the dlc_course lines)");
             require(s.course.mode34==0,"add-on course route requires free play");
         }
-        if(addonCourseSubtype_&&!addonCourseMoves_){
-            if(addonEventMoves_&&s.course.renders<=priorCourseRenders_)return -1;
-            const bool typed=s.course.subtypeSlot14F4==addonCourseSubtype_;
-            if(!typed||s.course.controllerGroup!=1){
-                require(!courseCaptured,"add-on course route captured the Course screen before its event type");
-                require(addonEventMoves_<8u,"add-on course event type was not reached within 8 row/type moves");
-                priorEventSubtype_=s.course.subtypeSlot14F4;priorEventGroup_=s.course.controllerGroup;
-                priorCourseRenders_=s.course.renders;awaitingAddonEventMove_=awaitingDispatch_=true;
-                const auto group=s.course.controllerGroup;
-                if(!typed&&group==2)return 1;                        // Right on the event-type row
-                if(!typed)return group<2?3:2;                        // Down / Up to the event-type row
-                return group>1?2:3;                                  // Up (Down) back to the course row
-            }
+        if(!addonCourseMoves_){
+            const int action=pollEventType(s,courseCaptured);
+            if(action!=addonCourseProceed)return action;
         }
         // A frame rendered after the last move (an add-on step defers nothing).
         if(addonCourseMoves_&&s.course.renders<=priorCourseRenders_)return -1;
@@ -255,10 +265,11 @@ public:
         addonCourseKey_=addonCourse_?course:nullptr;
         const char* courseHold=std::getenv("RR_TEST_ADDON_COURSE_HOLD");
         addonCourseHold_=addonCourse_&&courseHold&&std::strcmp(courseHold,"1")==0;
-        const char* courseSubtype=std::getenv("RR_TEST_ADDON_COURSE_SUBTYPE");
-        if(addonCourse_&&courseSubtype&&*courseSubtype){
+        // Free-play Course event type (147c): add-on or stock TA route alike.
+        const char* courseSubtype=std::getenv("RR_TEST_COURSE_SUBTYPE");
+        if(enabled_&&!selectedRoute_&&!sa_&&!occo_&&courseSubtype&&*courseSubtype){
             if(courseSubtype[0]<'1'||courseSubtype[0]>'3'||courseSubtype[1])
-                throw std::runtime_error("RR_TEST_ADDON_COURSE_SUBTYPE must be 1 (Single Race), 2 or 3 (Time Trial)");
+                throw std::runtime_error("RR_TEST_COURSE_SUBTYPE must be 1 (Single Race), 2 or 3 (Time Trial)");
             addonCourseSubtype_=std::uint32_t(courseSubtype[0]-'0');
         }
         const char* stockHold=std::getenv("RR_TEST_RIDER_HOLD");
@@ -308,6 +319,10 @@ public:
         if(addonCourse_&&s.route.screen==6)return addonCourseTarget_&&!awaitingDispatch_&&issued_==2&&
             rr::game::dlc50DL::highlightedAddonCourse()==addonCourseTarget_&&settled(s)&&
             (!addonCourseMoves_||s.course.renders>priorCourseRenders_);
+        // Stock free-play Course with a requested event type: only once it is set.
+        if(!addonCourse_&&addonCourseSubtype_&&s.route.screen==6)
+            return !awaitingDispatch_&&issued_==2&&eventTypeReady(s)&&settled(s)&&
+                (!addonEventMoves_||s.course.renders>priorCourseRenders_);
         if(selectedRoute_){
             if(s.route.screen==5){
                 if(gasganoInitial_||mawhonicRa_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
@@ -380,8 +395,9 @@ public:
                 "unattended Course arrived without the completed Main/Rider screenshots");
             if(sa_&&moved_){
                 require(selectedSa(s),"unattended Course requires committed SA/3-lap/8-entrant selection");
-            }else if(addonCourse_&&(addonCourseMoves_||addonEventMoves_)){
-                // The add-on course route has moved the event type or the course row (stock moves, then add-on entries).
+            }else if((addonCourse_&&addonCourseMoves_)||addonEventMoves_){
+                // The route has moved the event type or (add-on) the course row (stock moves, then add-on entries).
+                require(s.course.courseSlot14E4==1||addonCourse_,"stock Course route left the fresh TA course while setting the event type");
             }else{
                 require(s.course.courseSlot14E4==1&&s.course.selectedCourse44==0&&
                     s.course.selectedPlanet40==0&&s.course.subtypeSlot14F4==1&&
@@ -396,6 +412,13 @@ public:
             if(addonCourse_){
                 const int action=pollAddonCourse(s,courseCaptured);
                 if(action!=addonCourseProceed)return action;
+            }else if(!sa_&&!occo_){
+                // Stock free-play Course (main-rider-course-ta): event type first, then TA Confirm.
+                const int action=pollEventType(s,courseCaptured);
+                if(action!=addonCourseProceed)return action;
+                if(addonCourseSubtype_&&courseCaptured&&!stockTypedLogged_){stockTypedLogged_=true;
+                    std::cerr<<"course_route_stock confirm course="<<s.course.selectedCourse44<<" slot="<<s.course.courseSlot14E4
+                        <<" subtype="<<s.course.subtypeSlot14F4<<" events="<<addonEventMoves_<<'\n';}
             }
             if(!courseCaptured)return -1;
             require(courseReady,"unattended Course race prerequisites are unavailable");
@@ -408,11 +431,11 @@ public:
     void validateDispatch(const Snapshot& s) {
         if(awaitingAddonEventMove_){
             const auto& t=s.transition;
-            require(enabled_&&addonCourse_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
+            require(enabled_&&addonCourseSubtype_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
                 s.route.screen==6&&s.route.page==1&&s.switches==2&&t.bound&&same(t.current,s.route)&&
                 same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
                 !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
-                "add-on course route event-type move changed the route");
+                "Course route event-type move changed the route");
             require(s.course.controllerGroup!=priorEventGroup_||s.course.subtypeSlot14F4!=priorEventSubtype_,
                 "add-on course route row/event-type move changed neither the row nor the event type");
             ++addonEventMoves_;awaitingAddonEventMove_=awaitingDispatch_=false;
