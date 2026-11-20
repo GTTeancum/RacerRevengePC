@@ -53,7 +53,10 @@ struct Binding {
     // after Mat_Stbl (addonShared: its copy of a shared original name).
     bool addon=false,addonShared=false;
 };
-struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;};
+struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;
+    // PORT EXTENSION (DLC): an add-on page packet sorts at this stock leaf (the
+    // anchor's own portrait/background row), not at its own add-on rank.
+    std::uint32_t sortLeaf=0xffffffffu;};
 struct Registration {
     std::uint32_t rank=0,pass=0;
     const assets::OriginalUiMaterialPass50KG* source=nullptr;
@@ -1316,6 +1319,22 @@ bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRide
             const auto* t=s.bank->images()->textures()->texture(map->combinedIndex);
             texture=t?&t->texture:nullptr;(void)name;
             return binding!=unresolved&&texture&&texture->width&&texture->height;};
+        // The stock leaf of the anchor's own portrait / background row (draw order only).
+        const auto stockLeaf=[&](const assets::OriginalUiMaterialPass50KG* pass,const assets::OriginalUiImageBankMapping50KG* map){
+            const auto b=pass&&map?s.find(pass,map->combinedIndex):unresolved;
+            return b==unresolved?unresolved:s.bindings[b].leaf;};
+        std::uint32_t portraitLeaf=unresolved,backgroundLeaf=unresolved;
+        if(addon->anchorRider>=1&&addon->anchorRider<=26){
+            const auto anchor=static_cast<std::uint8_t>(addon->anchorRider);
+            if(const auto* p=s.statAssets->portrait(anchor);p&&!p->images.empty()&&p->material.passes.size()==1)
+                portraitLeaf=stockLeaf(&p->material.passes[0],s.backend->staticImage(s.statOwner,p->images[0]));
+            if(const auto* g=s.resources->background(anchor);g&&g->material<s.resources->materials()->size()){
+                const auto& m=(*s.resources->materials())[g->material];
+                if(!m.images.empty()&&m.material.passes.size()==1)
+                    backgroundLeaf=stockLeaf(&m.material.passes[0],s.backend->staticImage(s.staticOwner,m.images[0]));
+            }
+        }
+        std::uint32_t sortLeaf=unresolved;
         const auto emit=[&](const std::array<game::OriginalUiOverlayVertex50KG,4>& v,std::uint32_t binding,float z)->bool{
             if(!s.capacity(1))return false;
             std::array<assets::Vertex48B,4> vertices{};constexpr unsigned order[]={0,1,3,2};
@@ -1324,16 +1343,16 @@ bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRide
                 out.color[0]=127;out.color[1]=127;out.color[2]=127;out.color[3]=63;}
             const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
             s.vertices.insert(s.vertices.end(),vertices.begin(),vertices.end());s.w.insert(s.w.end(),4,1.f);s.fog.insert(s.fog.end(),4,0.f);
-            s.packets.push_back({first,1,binding,static_cast<std::uint32_t>(s.packets.size())});return true;};
+            s.packets.push_back({first,1,binding,static_cast<std::uint32_t>(s.packets.size()),sortLeaf});return true;};
         if(row&&row->portraitReady){std::uint32_t binding=unresolved;const assets::Texture48B* t=nullptr;
             if(!bound(row->portraitName,row->portraitMaterial,row->portraitImage,binding,t))addon->pageRefused="portrait not bound";
-            else{const float x=250.f,y=300.f+input.panelY4DC,w=float(t->width),h=float(t->height);
+            else{const float x=250.f,y=300.f+input.panelY4DC,w=float(t->width),h=float(t->height);sortLeaf=portraitLeaf;
                 if(!std::isfinite(y)||!emit({{{x,y,0,0},{x+w,y,1,0},{x,y+h,0,1},{x+w,y+h,1,1}}},binding,16777214.f))return fail(d,E::capacity);
                 addon->portraitDrawn=true;}
         }
         if(row&&row->backgroundReady){std::uint32_t binding=unresolved;const assets::Texture48B* t=nullptr;
             if(!bound(row->backgroundName,row->backgroundMaterial,row->backgroundImage,binding,t))addon->pageRefused="background not bound";
-            else{const float u=319.f/float(t->width),v=223.f/float(t->height);
+            else{const float u=319.f/float(t->width),v=223.f/float(t->height);sortLeaf=backgroundLeaf;
                 const std::array<std::array<float,8>,4> q{{{0,0,320,224,0,0,u,v},{320,0,320,224,u,0,0,v},
                     {0,224,320,224,0,v,u,0},{320,224,320,224,u,v,0,0}}};
                 for(const auto& e:q){
@@ -1585,7 +1604,9 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         }
         //24B7B0 ascending groups,29C150 FIFO within the final redirect leaf.
         std::sort(s.order.begin(),s.order.end(),[&](std::uint32_t a,std::uint32_t b){
-            const auto left=s.bindings[s.packets[a].binding].leaf,right=s.bindings[s.packets[b].binding].leaf;
+            const auto& pa=s.packets[a];const auto& pb=s.packets[b];
+            const auto left=pa.sortLeaf!=unresolved?pa.sortLeaf:s.bindings[pa.binding].leaf;
+            const auto right=pb.sortLeaf!=unresolved?pb.sortLeaf:s.bindings[pb.binding].leaf;
             return left!=right?left<right:s.packets[a].ordinal<s.packets[b].ordinal;
         });
         s.orderedVertices.clear();s.orderedW.clear();s.orderedFog.clear();s.spans.clear();s.states.clear();

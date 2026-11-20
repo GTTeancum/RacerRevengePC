@@ -31,6 +31,7 @@ struct Overlay {
     std::uint16_t nameWidget=0;                  // suppressed[1]: venus16 name text
     std::array<Line,2> lines{};                  // pilot name, then package name under it
     std::uint32_t statRider=0;                   // the add-on's registry number the stats input carries
+    std::uint32_t anchorRider=0;                 // the stock rider the add-on block follows (draw-order reference)
     // Menu-art step A: add-on model table row drawn in place of the anchor pod
     // (podWidget = suppressed[0]); npos = no add-on model this frame.
     static constexpr std::size_t noRow=static_cast<std::size_t>(-1);

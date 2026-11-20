@@ -277,6 +277,24 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
                 p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,source.member))return true;
         return false;
     }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback&&p.archive&&
+       p.archive->id==OriginalUiArchiveId50KG::addonUi){
+        // PORT EXTENSION, NOT ORIGINAL (DLC): an add-on rider portrait, built by
+        // readOriginalUiAddonPortraitFallbackMaterial50DL. Its PST must be a member
+        // of that same add-on archive and one of that pod's ui.portraits.
+        if(!p.archive->discPath||originalUiAddonMemberArchive50DL(p.fallbackTexture)!=p.archive||
+           p.fallbackPageSource!=p.fallbackTexture||p.fallbackWidgetSource||p.sourceCallerPC!=0x1e9448||
+           p.attemptedPsmMember!=p.registeredName+".psm"||!p.fallbackTexture->name||
+           !same(p.fallbackTexture->name,(p.registeredName+".pst").c_str()))return false;
+        const auto slash=p.registeredName.find_last_of("\\/");
+        if(pass.textureName!=p.registeredName.substr(slash==std::string::npos?0:slash+1))return false;
+        for(std::size_t i=0;i<dlc50DL::addonPodCount();++i){const auto* pod=dlc50DL::addonPodAt(i);
+            if(!pod||pod->ui.archive!=p.archive->discPath)continue;
+            for(const auto& portrait:pod->ui.portraits)if(same(portrait,p.fallbackTexture->name))return true;
+            return false;
+        }
+        return false;
+    }
     if(p.origin==OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback){
         if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||p.fallbackWidgetSource||
             p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\uirider\\rider.dat")||

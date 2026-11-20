@@ -1718,7 +1718,7 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         auto& overlay=s->addonOverlay;overlay={};
         overlay.collector=&s->collector;overlay.suppressed=ids;overlay.nameWidget=ids[1];
         overlay.lines[0]={&s->addonText[0],&s->addonText[1]};overlay.lines[1]={&s->addonText[2],nullptr};
-        overlay.statRider=pod->number;
+        overlay.statRider=pod->number;overlay.anchorRider=s->state.rider4C4;
         // Menu-art step A: the add-on's own pod model in place of the anchor pod.
         if(s->addonModelRow(s->addonSlot))overlay.modelRow=s->addonSlot-1;
         else overlay.modelRefused="no ready add-on model row";
