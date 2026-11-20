@@ -297,161 +297,27 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             require(enabled,"RR_ORIGINAL_RIDER_PREVIEWS requires RR_ORIGINAL_MAIN_MENU=1");
             requestedPreviewRiders=(1u<<3)|(1u<<7)|(1u<<9)|(1u<<23)|(1u<<24);
         }
-        const char* visibleRiderSetting=std::getenv("RR_ORIGINAL_TEST_VISIBLE_RIDER");
-        std::uint32_t visibleRiderTest=0;
-        if(visibleRiderSetting){
-            const std::string value(visibleRiderSetting);
-            require(value=="3"||value=="8"||value=="22"||value=="14"||value=="21"||value=="25"||value=="26",
-                "RR_ORIGINAL_TEST_VISIBLE_RIDER must be exactly 3, 8, 22, 14, 21, 25 or 26; other gameplay owners are not admitted");
-            visibleRiderTest=value=="3"?3u:value=="8"?8u:value=="14"?14u:value=="21"?21u:value=="25"?25u:value=="26"?26u:22u;
-            require(enabled&&!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
-                "Visible Rider test override requires Main and excludes other test profiles");
-            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
-                "Visible Rider test override requires original-disc Rider decoding or an authenticated pixel cache");
-        }
-        const char* wanMbSetting=std::getenv("RR_ORIGINAL_TEST_WAN_MB");
-        const bool wanMbTest=wanMbSetting!=nullptr;
-        if(wanMbTest){
-            require(std::string(wanMbSetting)=="1",
-                "RR_ORIGINAL_TEST_WAN_MB must be exactly 1 when present");
-            require(enabled&&!visibleRiderSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
-                "Wan/MB test profile requires Main and excludes other test profiles");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Wan/MB test profile requires the normal human-controlled race");
-            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
-                "Wan/MB test profile requires original-disc Rider decoding or an authenticated pixel cache");
-        }
-        const char* gasganoScSetting=std::getenv("RR_ORIGINAL_TEST_GASGANO_SC");
-        const bool gasganoScTest=gasganoScSetting!=nullptr;
-        if(gasganoScTest){
-            require(std::string(gasganoScSetting)=="1",
-                "RR_ORIGINAL_TEST_GASGANO_SC must be exactly 1 when present");
-            require(enabled&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Gasgano/SC test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Gasgano/SC test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Gasgano/SC test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct SC provenance never impersonates the legacy Gasgano fixture.
-            requestedPreviewRiders|=1u<<7;
-        }
-        const char* tzidikTcSetting=std::getenv("RR_ORIGINAL_TEST_TZIDIK_TC");
-        const bool tzidikTcTest=tzidikTcSetting!=nullptr;
-        if(tzidikTcTest){
-            require(std::string(tzidikTcSetting)=="1",
-                "RR_ORIGINAL_TEST_TZIDIK_TC must be exactly 1 when present");
-            require(enabled&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Tzidik/TC test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Tzidik/TC test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Tzidik/TC test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct TC provenance never impersonates any earlier test fixture.
-            requestedPreviewRiders|=1u<<24;
-        }
-        const char* scorchRcSetting=std::getenv("RR_ORIGINAL_TEST_SCORCH_RC");
-        const bool scorchRcTest=scorchRcSetting!=nullptr;
-        if(scorchRcTest){
-            require(std::string(scorchRcSetting)=="1",
-                "RR_ORIGINAL_TEST_SCORCH_RC must be exactly 1 when present");
-            require(enabled&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Scorch/RC test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Scorch/RC test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Scorch/RC test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct RC provenance never impersonates any earlier test fixture.
-            requestedPreviewRiders|=1u<<17;
-        }
-        const char* sebulbaTbSetting=std::getenv("RR_ORIGINAL_TEST_SEBULBA_TB");
-        const bool sebulbaTbTest=sebulbaTbSetting!=nullptr;
-        if(sebulbaTbTest){
-            require(std::string(sebulbaTbSetting)=="1",
-                "RR_ORIGINAL_TEST_SEBULBA_TB must be exactly 1 when present");
-            require(enabled&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Sebulba/TB test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Sebulba/TB test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Sebulba/TB test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct TB provenance never impersonates any earlier test fixture.
-            requestedPreviewRiders|=1u<<18;
-        }
-        const char* kraidGbSetting=std::getenv("RR_ORIGINAL_TEST_KRAID_GB");
-        const bool kraidGbTest=kraidGbSetting!=nullptr;
-        if(kraidGbTest){
-            require(std::string(kraidGbSetting)=="1",
-                "RR_ORIGINAL_TEST_KRAID_GB must be exactly 1 when present");
-            require(enabled&&!sebulbaTbSetting&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Kraid/GB test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Kraid/GB test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Kraid/GB test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct GB provenance never impersonates any earlier test fixture.
-            requestedPreviewRiders|=1u<<23;
-        }
-        const char* youngAnakinMcSetting=std::getenv("RR_ORIGINAL_TEST_YOUNG_ANAKIN_MC");
-        const bool youngAnakinMcTest=youngAnakinMcSetting!=nullptr;
-        const std::uint32_t mcSelectedRider=visibleRiderTest?visibleRiderTest:1u;
-        if(youngAnakinMcTest){
-            require(std::string(youngAnakinMcSetting)=="1",
-                "RR_ORIGINAL_TEST_YOUNG_ANAKIN_MC must be exactly 1 when present");
-            require(enabled&&!kraidGbSetting&&!sebulbaTbSetting&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&(!visibleRiderSetting||mcSelectedRider==14||mcSelectedRider==21||mcSelectedRider==25||mcSelectedRider==26)&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
-                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
-                "Young Anakin/MC test profile requires human Main and excludes other test overrides and unattended routes");
-            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
-            require(!allAi||std::string(allAi)=="0",
-                "Young Anakin/MC test profile requires the normal human-controlled race");
-            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
-            require(decodeRiderImagesInProcess||(cache&&*cache),
-                "Young Anakin/MC test profile requires original-disc Rider decoding or an authenticated pixel cache");
-            // Explicit resource request precedes bind()'s population decision.
-            // Distinct MC provenance never impersonates any earlier test fixture.
-            requestedPreviewRiders|=1u<<mcSelectedRider;
-        }
-        const char* testProfileSetting=std::getenv("RR_ORIGINAL_TEST_PROFILE");
-        require(!testProfileSetting||std::string(testProfileSetting)=="gasgano"||std::string(testProfileSetting)=="mawhonic-ryloth",
-            "unsupported explicit test profile");
-        const bool gasganoTest=testProfileSetting&&std::string(testProfileSetting)=="gasgano";
-        const bool mawhonicRylothTest=testProfileSetting&&std::string(testProfileSetting)=="mawhonic-ryloth";
-        if(testProfileSetting){
-            const auto exact=[](const char* name,const char* value){
-                const auto* setting=std::getenv(name);return setting&&std::string(setting)==value;
-            };
-            const auto* captureDirectory=std::getenv("RR_WINDOW_CAPTURE_DIR");
-            require(enabled&&exact("RR_UNATTENDED_UI_ROUTE",mawhonicRylothTest?"main-mawhonic09-course-ra":"main-gasgano07-course-sa")&&
-                exact("RR_WINDOW_CAPTURE_AUTO","1")&&exact("RR_UNATTENDED_CAPTURE","1")&&
-                // Gasgano/SA also runs as the free-play direct-human route
-                // (Player0 human, RR_ORIGINAL_AI_ALL_RACERS=0); Mawhonic/RA stays all-AI.
-                (exact("RR_ORIGINAL_AI_ALL_RACERS","1")||(gasganoTest&&exact("RR_ORIGINAL_AI_ALL_RACERS","0")))&&
-                exact("RR_TRACK_FPS_BASELINE","1")&&
-                captureDirectory&&*captureDirectory,
-                "Explicit test profile requires the explicit complete original-AI window evidence route");
-            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
-                "Explicit test profile requires original-disc Rider decoding or an authenticated pixel cache");
-        }
+        // Common rewrite B-C21 (writer R11): the per-course and per-rider test profiles are
+        // retired. RR_ORIGINAL_TEST_{WAN_MB,GASGANO_SC,TZIDIK_TC,SCORCH_RC,SEBULBA_TB,KRAID_GB,
+        // YOUNG_ANAKIN_MC}, RR_ORIGINAL_TEST_PROFILE (gasgano, mawhonic-ryloth) and
+        // RR_ORIGINAL_TEST_VISIBLE_RIDER each forced one course's availability and one rider in
+        // process memory. Tests now race any course with any pod through the one free-play route
+        // (original_ui_capture_navigation50la.h Route: RR_TEST_COURSE, RR_TEST_COURSE_LAPS,
+        // RR_TEST_COURSE_SUBTYPE) on a save the runner seeds (availability 11018, remembered
+        // racer), the data the game itself writes. A stale script that still sets one is refused.
+        for(const char* retired:{"RR_ORIGINAL_TEST_VISIBLE_RIDER","RR_ORIGINAL_TEST_WAN_MB","RR_ORIGINAL_TEST_GASGANO_SC",
+                "RR_ORIGINAL_TEST_TZIDIK_TC","RR_ORIGINAL_TEST_SCORCH_RC","RR_ORIGINAL_TEST_SEBULBA_TB",
+                "RR_ORIGINAL_TEST_KRAID_GB","RR_ORIGINAL_TEST_YOUNG_ANAKIN_MC","RR_ORIGINAL_TEST_PROFILE"})
+            if(std::getenv(retired))throw std::runtime_error(std::string(retired)+
+                " is retired (common rewrite B-C21): race the course through the free-play Course route "
+                "(run_windows_takeover.py --route main-rider-course --course CODE --seed-save ...)");
+        // PORT STAND-IN (flagged, R11): the startup code after this section (rider profile
+        // initialisers and provenance checks, :500-580) still reads these names; they are
+        // constant false here, so those branches are dead. Their owners delete them
+        // (work\scratch\common-rewrite\writer-notes\r11.txt); then these constants go.
+        constexpr std::uint32_t visibleRiderTest=0,mcSelectedRider=1;
+        constexpr bool wanMbTest=false,gasganoScTest=false,tzidikTcTest=false,scorchRcTest=false,
+            sebulbaTbTest=false,kraidGbTest=false,youngAnakinMcTest=false,gasganoTest=false,mawhonicRylothTest=false;
         if(!enabled)return;
         const char* root=std::getenv("RR_ORIGINAL_UI_ROOT");
         require(root && *root,"RR_ORIGINAL_MAIN_MENU requires explicit RR_ORIGINAL_UI_ROOT");
