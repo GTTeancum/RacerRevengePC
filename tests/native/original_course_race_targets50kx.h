@@ -20,27 +20,32 @@ namespace original_main_entry50KG { struct Application; }
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace original_course_targets50KX {
 using Selection=rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection;
 using Track=rr::platform::HostTrack50IM;
-// Admission capability only, never proof of cold world/resource readiness.
-// Keep this set synchronized with the direct original human runtime owners.
-// Actual source profile visibility, rider/roster identity, mode2 and target
-// archive authentication remain independent requirements below.
+// Common rewrite (I1, PLAN B-C02): every course is admitted by ONE rule. The
+// original launches a race from the Course screen for any course (17C16C /
+// 17D678 -> 1A65C0); there is no admission list. A course is available when its
+// archive resolves (stock disc or the registry dlc:/ overlay) and its integrity
+// receipt is logged (course_archive_receipt50ci.h, receipt only). Course and
+// pod differ only in data: no target below selects code.
+// RETIRING (kept only for the R11 frontend / I3 publication readers until they
+// drop the call): every host selection is a direct human course now.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::RA||track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC||track==Track::Course;
-}
-inline constexpr bool directDiscTarget(Track track) noexcept {
-    return directHumanTrack(track)||track==Track::RA;
+    return static_cast<unsigned>(track)<=static_cast<unsigned>(Track::Course);
 }
 struct Target {
-    Track track;
+    Track track;    // host menu/harness selection key only (W0-HANDOFF 3.1); race code reads the code
     const track_session_assets50IG::SessionAssets* assets;
     std::uint32_t course,planet;
 };
+// The stock Course-screen table: UICourse course/planet number -> course row.
+// Data, like the original's course table (file selection by code, A4); the
+// rows carry no behaviour. Every row is admitted by the one rule above.
 inline const std::array<Target,13> targets{{
     {Track::TA,&track_session_assets50IG::retainedTA,0,0},
     {Track::SA,&track_session_assets50IG::retainedSA,11,4},
@@ -49,36 +54,27 @@ inline const std::array<Target,13> targets{{
     {Track::RA,&track_session_assets50IG::retainedRA,7,2},
     {Track::MB,&track_session_assets50IG::retainedMB,5,5},
     {Track::SC,&track_session_assets50IG::retainedSC,12,4},
-    // Authenticated UICourse Control11/Group1 slot11: Gamorr C, course10.
-    // Capability only. Actual locked profile/UI state must independently admit
-    // this destination. The genuine ALL8 world request or explicit diagnostic
-    // acknowledgement, plus mode2, is checked below; no profile is unlocked.
     {Track::GC,&track_session_assets50IG::retainedGC,10,1},
     {Track::TC,&track_session_assets50IG::retainedTC,2,0},
     {Track::RC,&track_session_assets50IG::retainedRC,3,2},
     {Track::TB,&track_session_assets50IG::retainedTB,1,0},
     {Track::GB,&track_session_assets50IG::retainedGB,9,1},
     {Track::MC,&track_session_assets50IG::retainedMC,6,5}}};
-// PORT EXTENSION, NOT ORIGINAL (146r): the ONE common-route target. A free-play
+// PORT EXTENSION, NOT ORIGINAL (A12, 146r): the ONE registry target. A free-play
 // launch with an add-on course selected (port-owned, dlc_course_entries50dl.h;
 // the profile's packed course/planet keep the last STOCK selection and are still
-// checked by the original encodings above) races that course on the common
-// route; its session row is built from the registry at consumption
-// (track_session_assets50IG::registrySession), never a stock row.
+// checked by the original encodings) races that course; its session row is built
+// from the registry at consumption (track_session_assets50IG::registrySession).
+// It differs from a stock row only in where the files come from (source=registry).
 inline const Target courseRouteTarget{Track::Course,nullptr,0xffffffffu,0xffffffffu};
-// The targets that run the ONE common route: stock SA (stock profile = receipts)
-// and the registry course target. Every other stock target keeps its own loader
-// (PORT STAND-INS, to retire onto this route).
-inline bool commonRouteTarget(const Target& t) noexcept {return t.track==Track::SA||t.track==Track::Course;}
 // Code of a target for log lines: the stock row's code, or "course" for the
-// common-route target (its row exists only once the launch is consumed).
+// registry target (its code is latched only once the launch is consumed).
 inline const char* targetCode(const Target& t) noexcept {return t.assets?t.assets->world->code:"course";}
 inline const Target* target(const Selection& s) noexcept {
     if(!rr::game::originalCourseSelectionEncoding50KG(s)||
        !rr::game::nativeSingleHumanCourseMode50KG(s))return nullptr;
     if(rr::game::dlc50DL::addonCourseForLaunch(s.mode34,s.subtype))return &courseRouteTarget;
-    for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet&&
-        (s.laps==3||directHumanTrack(t.track)))return &t;
+    for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet)return &t;
     return nullptr;
 }
 inline bool same(const Selection& a,const Selection& b) noexcept {
@@ -224,14 +220,11 @@ public:
                 else std::cerr<<"Course cold rider unavailable: "<<riders[i]<<" "<<error<<'\n';
             }
         }
+        // One rule for every course (B-C02): the rooted Course race reads the
+        // original disc (RR_ORIGINAL_ASSET_ROOT) in mode2; the archive must resolve.
+        const bool originalDisc=!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
         for(std::size_t i=0;i<targets.size();++i){const auto& t=targets[i];
-            if(directDisc_&&!directDiscTarget(t.track))continue;
-            // GA has no admitted legacy path. Every direct human target also
-            // requires explicit original-disc ownership; an absent generated
-            // roster alone must not opt TA/MA/SA into their direct loaders.
-            if((t.track==Track::GA||(directDisc_&&directHumanTrack(t.track)))&&
-               runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
-            if(!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
+            if(!originalDisc||!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
             try {
                 auto bytes=runtime_startup50fl::readBytes(t.assets->archive);
                 // Common rule for every course (course_archive_receipt50ci.h):
@@ -265,18 +258,16 @@ public:
         if(!rr::game::nativeSingleHumanCourseMode50KG(s))return A::unsupportedNativeMode;
         if(!attempted_)return A::hostNotReady;
         const Target* selected=nullptr;
-        // Common route (146r): the registry admitted the package file at startup
+        // Registry target (A12): the registry admitted the package file at startup
         // (listed size/SHA); the route availability is the only other condition.
         const bool addonCourse=rr::game::dlc50DL::addonCourseForLaunch(s.mode34,s.subtype)!=0;
+        if(runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())return A::courseResourcesUnavailable;
         if(addonCourse){
-            if(!rr::game::dlc50DL::addonCourseRoute().available||!directDisc_||
-               runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())return A::courseResourcesUnavailable;
+            if(!rr::game::dlc50DL::addonCourseRoute().available)return A::courseResourcesUnavailable;
             selected=&courseRouteTarget;
         }
         else for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet){selected=&t;break;}
         if(!selected)return A::courseResourcesUnavailable;
-        if((s.laps!=3&&!directHumanTrack(selected->track))||
-           (directDisc_&&!directDiscTarget(selected->track)))return A::unsupportedNativeMode;
         bool rosterPresent=false;
         // PORT EXTENSION, NOT ORIGINAL: a selected free-play add-on rider races
         // instead of the profile's stock rider; its row is the DLC registry's
@@ -310,34 +301,52 @@ class ConsumedLaunch final {
     Selection selection_{};
     const Target* target_=nullptr;
     std::uint64_t nextGeneration_=0;
+    // The launched course code as data (upper case + NUL): the stock row's code or
+    // the registry code latched at consumption. Written once, by ColdLoadRequest.
+    std::array<char,3> code_{};
     ConsumedLaunch()=default;
+    static char upper(char c) noexcept {return c>='a'&&c<='z'?static_cast<char>(c-'a'+'A'):c;}
+    // Bounds-checked: exactly two [A-Za-z0-9] characters, else refused (code_ stays clear).
+    bool latchCode(const char* code) noexcept {
+        code_={};
+        if(!code||!code[0]||!code[1]||code[2])return false;
+        for(unsigned i=0;i<2u;++i){
+            const char c=upper(code[i]);
+            if(!((c>='A'&&c<='Z')||(c>='0'&&c<='9'))){code_={};return false;}
+            code_[i]=c;
+        }
+        return true;
+    }
 public:
     ConsumedLaunch(const ConsumedLaunch&)=delete;
     ConsumedLaunch& operator=(const ConsumedLaunch&)=delete;
-    bool matches(const rr::platform::OriginalUiRiderProfileOwner50KG& actual,
-        std::uint64_t generation,Track loadedTrack,std::uint32_t loadedRacer)const noexcept {
+    // W0 freeze (I1): the course code of this launch, as data. Empty only for a
+    // launch that was never consumed (cannot be observed: only ColdLoadRequest mints).
+    std::string_view courseCode()const noexcept {return {code_.data(),code_[0]&&code_[1]?2u:0u};}
+    // W0 freeze (I1): true when the course's files come from the DLC registry (A12).
+    bool registryCourse()const noexcept {return target_==&courseRouteTarget;}
+    // W0 freeze (I1): the one launch match for every course, by course code
+    // (case-insensitive two-character compare), stock or registry row. Replaces
+    // matches(..., HostTrack50IM, ...). `racer` may be the latched free-play add-on
+    // (PORT EXTENSION): the profile's own stock rider is compared, never the add-on number.
+    bool matchesCourse(const rr::platform::OriginalUiRiderProfileOwner50KG& actual,
+        std::uint64_t session,std::string_view courseCode,std::uint32_t racer)const noexcept {
         Selection current;
-        // loadedRacer may be the latched free-play add-on (PORT EXTENSION):
-        // the profile's own stock rider is compared, never the add-on number.
-        return profile_.get()==&actual&&target_&&generation==nextGeneration_&&
-            target_->track==loadedTrack&&selection_.rider==rr::game::dlc50DL::profileRider(loadedRacer)&&
+        const auto own=this->courseCode();
+        return profile_.get()==&actual&&target_&&session==nextGeneration_&&
+            own.size()==2u&&courseCode.size()==2u&&upper(courseCode[0])==own[0]&&upper(courseCode[1])==own[1]&&
+            selection_.rider==rr::game::dlc50DL::profileRider(racer)&&
             actual.courseRaceSnapshot(current)&&sameLaunch1AD520(selection_,current)&&target(current)==target_;
     }
-    // Restart Race re-runs the SAME consumed race constructor. Mint an
-    // unclaimed launch for the next session only while the actual profile
-    // still holds this exact selection; never for a changed selection.
-    bool renewForRestart(std::uint64_t destroyedGeneration,std::unique_ptr<ConsumedLaunch>& result)const noexcept {
-        Selection current;
-        if(result||!profile_||!target_||destroyedGeneration!=nextGeneration_||
-           destroyedGeneration==std::numeric_limits<std::uint64_t>::max()||
-           !profile_->courseRaceSnapshot(current)||!sameLaunch1AD520(selection_,current)||target(current)!=target_)return false;
-        std::unique_ptr<ConsumedLaunch> renewed;
-        try {renewed.reset(new ConsumedLaunch);}catch(...){return false;}
-        renewed->profile_=profile_;renewed->selection_=selection_;renewed->target_=target_;
-        renewed->nextGeneration_=destroyedGeneration+1;
-        result=std::move(renewed);return true;
+    // RETIRING: the host-selection form, kept only so the existing caller
+    // (original_race_constructor50la.h, R1) compiles until it calls matchesCourse.
+    // It adds no rule of its own: the same launch match by the launch's course code.
+    bool matches(const rr::platform::OriginalUiRiderProfileOwner50KG& actual,
+        std::uint64_t generation,Track loadedTrack,std::uint32_t loadedRacer)const noexcept {
+        return target_&&target_->track==loadedTrack&&matchesCourse(actual,generation,courseCode(),loadedRacer);
     }
-    bool targetsTrack(Track track)const noexcept{return target_&&target_->track==track;}
+    // (B-C07: renewForRestart is deleted. Every restart is in place, 1AC8E0
+    // through common_race_start50CR; a launch is never renewed for a reload.)
 };
 class ColdLoadRequest final {
     Selection selection_{};
@@ -355,14 +364,14 @@ public:
         Selection current;
         if(!pending()||destroyedGeneration!=outgoingGeneration_||!actual.courseRaceSnapshot(current)||
            !same(selection_,current)||target(current)!=target_)return false;
-        // Common route (146r): latch the add-on code the session row is built from.
+        // Registry target (A12): latch the add-on code the session row is built from.
         if(target_==&courseRouteTarget){
             rr::game::dlc50DL::AddonCourseLoad load;
             const unsigned number=rr::game::dlc50DL::addonCourseForLaunch(current.mode34,current.subtype);
             if(!number||!rr::game::dlc50DL::addonCourseLoad(number,load)||
                !rr::platform::latchCourseRouteCode50IM(load.codeUpper.c_str()))return false;
             std::cerr<<"course_route_launch key="<<load.key<<" code="<<load.code<<" number="<<number
-                <<" route=common mode34="<<current.mode34<<" subtype="<<current.subtype
+                <<" source=registry mode34="<<current.mode34<<" subtype="<<current.subtype
                 <<" profile_course="<<current.course<<" profile_planet="<<current.planet<<'\n';
         }
         nextTrack=target_->track;nextRacer=current.rider;
@@ -380,6 +389,10 @@ public:
         try {retained.reset(new ConsumedLaunch);}catch(...){return false;}
         const auto selected=selection_;const auto* destination=target_;
         if(!consume(*actual,destroyedGeneration,nextTrack,nextRacer))return false;
+        // The course code as data: the stock row's code, or the registry code
+        // consume() just latched for the registry target.
+        if(!retained->latchCode(destination==&courseRouteTarget?rr::platform::courseRouteCode50IM():
+               destination->assets->world->code))return false;
         retained->profile_=std::move(actual);retained->selection_=selected;
         retained->target_=destination;retained->nextGeneration_=destroyedGeneration+1;
         result=std::move(retained);return true;
