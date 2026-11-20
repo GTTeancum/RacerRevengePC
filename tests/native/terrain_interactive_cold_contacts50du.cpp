@@ -7,16 +7,11 @@
 #include "native_racer_draw50hn_fixture.h"
 #include "native_racer_rig50hw_fixture.h"
 #include "original_racer_visual50hw_fixture.h"
-#include "gc_trigger_actions50kg_fixture.h"
-#include "ga_trigger_actions_fixture.h"
-#include "ma_trigger_actions_fixture.h"
-#include "sa_trigger_actions_fixture.h"
-#include "sc_trigger_actions_fixture.h"
-#include "mb_source_trigger50mb.h"
-#include "gb_query50gb.h"
-#include "mc_query50mc.h"
-#include "sc_runtime_ground50la.h"
-#include "gc_gate_audio50in_fixture.h"
+#include "track_collision_world50cr.h"            // track.roles.collision: Borrow::actions()
+#include "course_trigger_actions50ct.h"           // the one trigger action owner (2A00A0/2A0E20)
+#include "positional_sound_rows50sr.h"            // track.roles.sounds: Sound action sink
+#include "../../src/game/original_track_particle_cold50la.h" // track.roles.particles: Particles action sink
+#include "gc_gate_audio50in_fixture.h"            // triggerAudio: the one PodSound voice (shared kernel)
 #include "undertrack_owners50ew_fixture.h"
 #include "source_announcer50ie_fixture.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
@@ -65,218 +60,93 @@ void ContactsContext::run() {
    return row.state->lastShapeWorld;
   };
   // The neutral setup tick below performs genuine live trigger queries.
-  // Bind the shared action owner only after every actual rig and final grid
-  // pose exists, but before any tick can acquire its synchronous C80 lease.
-  // Material/GPU preparation remains at the later renderer boundary.
-  if(gcTriggerActions){
-   require50DU(nativeOriginalFleet&&originalAiEnabled&&
-       originalAiHumanCount==(humanCourseEnabled?1u:0u)&&racerBank.count()==raceRacerCount&&
-       navigationAI->track.count==195,"GC triggers require the actual selected roster and195-node AI spline");
-   std::array<gc_trigger_actions50KG::RacerIdentities,gc_trigger_actions50KG::racers> identities{};
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    identities[racer]={qfilter.identity,secondaryFilter.identity};
-   });
-   require50DU(static_cast<bool>(trackAnimations),"GC Gate trigger names an animation the course data does not author");
-   require50DU(gcTriggerActions->prepare(*gcTriggerAuthoring,*trackAnimations,identities,
-       navigationAI->track.count,gcGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),
-       "GC actual trigger/action destinations rejected");
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(gcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        gcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "GC trigger cold actual COL poses unavailable");
-   });
-   std::cerr<<"GC NATIVE TRIGGERS:9 authored spheres, method1 zones,16 actual COL identities; "
-       "source PLAYER-prefix-filtered LostAI branches, once-only Animation1 then BIGDOOR/World4D8; "
-       "source entry/exit lifecycle, native endpoint/swept-surface geometry; reverse108E90 parity unresolved.\n";
-   if(audioEnabled)std::cerr<<"GC BIGDOOR borrows the accepted native camera listener in XZ; original listener-object cadence parity remains unclaimed.\n";
-  }
-  if(isMbTrack){
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&mbAiView.runtimeValid()&&mbAiView.count()&&
-       mbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
-       "MB requires actual human and seven AI owners");
-   std::array<std::array<std::uint32_t,2>,8> identities{};
-   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){identities[slot]={qfilter.identity,secondaryFilter.identity};});
-   mbSourceTriggers=std::make_unique<mb_source_trigger50MB::Owner>();
-   require50DU(mbSourceTriggers->bind(racerBank,mbCollisionWorld,identities,originalAiHumanCount),
-       "MB genuine late trigger identity binding rejected");
-   mbColdBound=true;
-   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(mbSourceTriggers->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        mbSourceTriggers->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "MB actual cold query geometry observation rejected");
-   });
-  }
-  if(isMcTrack){
-   require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount,"MC actual human/seven-AI Bank roster required");
-   mcQueryBinding=std::make_unique<mc_query50MC::Binding>();
-   require50DU(mcQueryBinding->enroll(racerBank,mcCollisionWorld,mcNavigationOwner,qfilter.identity,
-       secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount,s,sessionRandom,applicationClock),"MC typed current Bank/C80 enrollment rejected");
-   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(mcQueryBinding->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        mcQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "MC actual cold Bank geometry observation rejected");
-   });
-  }else if(isGbTrack){
-   require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
-       originalAiOpponentCount==raceOpponentCount&&racerBank.count()==raceRacerCount,"GB actual human/seven-AI Bank roster required");
-   gbQueryBinding=std::make_unique<gb_query50GB::Binding>();
-   require50DU(gbQueryBinding->enroll(racerBank,gbCollisionWorld,gbNavigationOwner,qfilter.identity,
-       secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount),"GB typed current Bank/C80 enrollment rejected");
-   for(std::size_t slot=0;slot<raceRacerCount;++slot)racerBank.visit(slot,[&](){
-    require50DU(gbQueryBinding->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        gbQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "GB actual cold Bank geometry observation rejected");
-   });
-  }
-  if(tbTriggerActions){
-   require50DU(tbColdSources&&tbCollisionWorld->coldSource()==tbColdSources.get()&&
-       tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
-       tbAiView.runtimeValid()&&tbAiView.count()==269&&tbMapView.runtimeValid()&&tbMapView.count()==270&&
-       tbOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
-       "TB triggers require actual source/world/navigation and human/seven-AI ownership");
-   std::array<tb_trigger_actions50TB::RacerIdentities,tb_trigger_actions50TB::racers> identities{};
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    identities[slot]={qfilter.identity,secondaryFilter.identity};
-   });
-   const bool bound=tbTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
-   require50DU(bound,"TB genuine late trigger identity/action binding rejected");
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(tbTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        tbTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "TB actual cold query geometry unavailable");
-   });
-  }
-  if(tcTriggerActions){
-   require50DU(tcColdSources&&tcCollisionWorld->coldSource()==tcColdSources.get()&&
-       tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
-       tcAiView.runtimeValid()&&tcAiView.count()==293&&tcMapView.runtimeValid()&&tcMapView.count()==268&&
-       tcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
-       "TC triggers require actual source/world/navigation and human/seven-AI ownership");
-   std::array<tc_trigger_actions50TC::RacerIdentities,tc_trigger_actions50TC::racers> identities{};
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    identities[slot]={qfilter.identity,secondaryFilter.identity};
-   });
-   const bool bound=tcTriggerActions->bindRacerIdentities(identities,originalAiHumanCount,raceRacerCount);
-   require50DU(bound,"TC genuine late trigger identity/action binding rejected");
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(tcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        tcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "TC actual cold query geometry unavailable");
-   });
-  }
-  if(isRcTrack){
-   requireMbRuntimeNavigation50MB();
-   require50DU(rcTriggerActions&&rcTriggerAuthoring&&rcTriggerAuthoring->ready()&&
-       rcTriggerAuthoring->coldSource()==rcColdSources.get()&&rcWorldBorrow&&
-       rcWorldBorrow->world()==&liveWorld&&rcWorldBorrow->actions()==rcTriggerActions&&
-       originalAiEnabled&&racerBank.count()==raceRacerCount&&rcNavigationBorrow.ai().track.count==209&&
-       rcOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
-       "RC triggers require actual source/world/navigation and human/seven-AI ownership");
-   std::array<rc_trigger_actions::RacerIdentities,rc_trigger_actions::racers> identities{};
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    identities[slot]={qfilter.identity,secondaryFilter.identity};
-   });
-   require50DU(rcTriggerActions->prepare(rcTriggerAuthoring,identities,rcNavigationBorrow.ai().track.count,originalAiHumanCount,raceRacerCount),
-       "RC genuine late trigger identity/action binding rejected");
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(rcTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        rcTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "RC actual cold query geometry unavailable");
-   });
-  }
-  if(scTriggerActions){
-   require50DU(scColdSources&&scGround->coldSource()==scColdSources.get()&&originalAiEnabled&&racerBank.count()==raceRacerCount&&
-       navigationAI->track.count==180&&navigationAI->indicesPrepared&&navigationMap->track.count==179&&navigationMap->indicesPrepared&&
-       scOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount,
-       "SC triggers require actual source/navigation and human/seven-AI manager ownership");
-   std::array<sc_trigger_actions::RacerIdentities,sc_trigger_actions::racers> identities{};
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    identities[slot]={qfilter.identity,secondaryFilter.identity};
-   });
-   require50DU(scTriggerActions->prepare(scTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
-       "SC genuine late trigger identity/action binding rejected");
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    require50DU(scTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        scTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "SC actual cold query geometry unavailable");
-   });
-  }
-  if(maTriggerActions){
-   // LostAI targets are checked per trigger against the live AI spline when
-   // the actions bind below (no stock node-count equality).
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
-       ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
-        (maOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
-       "MA triggers require actual human/AI manager ownership and their original AI spline");
-   std::array<ma_trigger_actions::RacerIdentities,ma_trigger_actions::racers> identities{};
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    identities[racer]={qfilter.identity,secondaryFilter.identity};
-   });
-   require50DU(maTriggerActions->prepare(*maTriggerAuthoring,identities,navigationAI->track.count,originalAiHumanCount,raceRacerCount),
-       "MA actual trigger/action destinations rejected");
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(maTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        maTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "MA trigger cold actual COL poses unavailable");
-   });
-  }
-  if(commonRouteTriggerActions){
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
-       ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
-        (commonRouteOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
-       "common-route triggers require actual human/AI manager ownership and their original AI spline");
-   std::array<sa_trigger_actions::RacerIdentities,sa_trigger_actions::racers> identities{};
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    identities[racer]={qfilter.identity,secondaryFilter.identity};
-   });
-   require50DU(commonRouteTriggerActions->prepare(*commonRouteTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count,raceRacerCount),
-       "common-route actual trigger/action destinations rejected");
-   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(commonRouteTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        commonRouteTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "common-route trigger cold actual COL poses unavailable");
-   });
-  }
-  if(gaTriggerActions){
-   // The common trigger chain (GA, TA): the actual manager roster (one human
-   // and the AI field, or an all-AI race) and the live AI spline, as SA's.
-   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
+  // Bind the track's one trigger action owner (274E90 rows of
+  // track.roles.triggerSource over the one 2A00A0/2A0E20/2A0B30 group
+  // track.roles.triggers, lent by the one collision world) only after every
+  // actual rig and final grid pose exists, but before any tick can acquire its
+  // synchronous C80 lease. Material/GPU preparation remains at the later
+  // renderer boundary. One path for every course: a track that authors no
+  // trigger rows prepares an empty list, as 274E90 does.
+  {
+   require50DU(track.roles.collision&&track.roles.collision->geometryReady(),
+       "the track's collision world (05.04) is not ready for trigger binding");
+   require50DU(track.roles.triggerSource&&track.roles.triggers,
+       "the track's trigger list/group (05.09) is unavailable");
+   // Step 08 (2A1260/1ACF70) ran: LostAI targets are checked per action
+   // against the live AI spline's own node count (no stock count).
+   requireRuntimeNavigation();
+   require50DU(aiView.runtimeValid()&&mapView.runtimeValid()&&aiView.sameOwner(mapView)&&aiView.sameWorld(liveWorld),
+       "trigger LostAI targets require the step-08 map/AI views over the live world");
+   require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==raceRacerCount)||
         (humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
-       "common course triggers require the actual human/AI manager roster and the live AI spline");
+       "triggers require the actual human/AI manager roster and the live AI spline");
+   auto borrow=track.roles.collision->borrow();
+   require50DU(bool(borrow)&&borrow.world()==&liveWorld,"the track's collision world borrow is unavailable");
+   auto* actions=borrow.actions();
+   require50DU(actions!=nullptr,"the track's trigger action owner is unavailable");
+   // PodSound destination: the one gate/pod voice (triggerAudio, World4D8
+   // 1B5B00), present only when the trigger list authors a PodSound row.
+   // Muted audio admits the action as a no-op, as the original voice does.
+   course_trigger_actions50CT::ActionSink podSound{};
+   if(triggerAudio){
+    if(audioEnabled)podSound={.context=triggerAudio.get(),
+        .preflight=[](void* p,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{
+         const auto* voice=static_cast<const gc_gate_audio50IN::Owner*>(p);return voice->available()&&voice->ready();},
+        .apply=[](void* p,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{
+         auto* voice=static_cast<gc_gate_audio50IN::Owner*>(p);voice->start();return !voice->failed();},
+        .sourcePc=0x1b5b00u};
+    else podSound={.context=triggerAudio.get(),
+        .preflight=[](void*,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{return true;},
+        .apply=[](void*,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{return true;},
+        .sourcePc=0x1b5b00u};
+   }
+   const course_trigger_actions50CT::Destinations destinations{
+       .animations=track.roles.animation,
+       .podSound=podSound,
+       .sound=track.roles.sounds?track.roles.sounds->triggerSink():course_trigger_actions50CT::ActionSink{},
+       .particles=track.roles.particles?track.roles.particles->triggerSink():course_trigger_actions50CT::ActionSink{},
+       // LostAI Reset (1B5A60 pose reset, authored by MB's UpShaft) has no
+       // common sink yet: an authored Reset action is refused by prepare (logged).
+       .lostAiReset={}};
+   require50DU(actions->prepare(track.roles.triggerSource,track.roles.triggers,aiView.count(),destinations),
+       "trigger/action destinations rejected");
    // 2A00A0's chance draw: the one application RNG (308030) with its lazy
-   // seed/range slots and the application clock, as MC's chain binds them.
-   require50DU(gaTriggerActions->bindChance(gaTriggerAuthoring->code(),
-       {&s.noiseOwner().sharedRandomState,&sessionRandom,&applicationClock}),"common trigger chance binding rejected");
-   std::array<ga_trigger_actions::RacerIdentities,ga_trigger_actions::racers> triggerIdentities{};
+   // seed/range slots and the application clock; IgnoreTrigger PLAYER/AI
+   // lists (2DC630) from the manager+34 human prefix.
+   std::array<course_trigger_actions50CT::RacerIdentities,raceRacerCapacity> identities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    triggerIdentities[racer]={qfilter.identity,secondaryFilter.identity};
+    identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,trackAnimations.get(),triggerIdentities,
-       navigationAI->track.count,gaGateAudio.get(),!audioEnabled,originalAiHumanCount,raceRacerCount),gaTriggerActions->error().empty()?"common trigger/action destinations unavailable":gaTriggerActions->error().c_str());
+   require50DU(actions->bindRacerIdentities(identities,originalAiHumanCount,
+       {&s.noiseOwner().sharedRandomState,&sessionRandom,&applicationClock},racerBank.count()),
+       "trigger racer identity/chance binding rejected");
+   // Bound from here: the cold closer (I3) unbinds the action owner on failure.
+   coldNavigationBound=true;
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "GA trigger lifecycle cold actual COL poses unavailable");
+    require50DU(actions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        actions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
+        "trigger cold actual COL poses unavailable");
    });
-   std::cerr<<gaTriggerAuthoring->code()<<" NATIVE TRIGGERS:"<<gaTriggerAuthoring->liveCount()<<" authored spheres/boxes, method1 zones,16 actual racer COL identities; "
-       "unchanged GC endpoint/swept-surface geometry policy, original action/lifecycle semantics; reverse108E90 parity unresolved.\n";
-   if(audioEnabled&&gaGateAudio)std::cerr<<"GA BIGDOOR uses the existing shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
+   std::cerr<<"NATIVE TRIGGERS:"<<track.roles.triggerSource->liveCount()<<" authored rows, method1 zones, "
+       <<2*racerBank.count()<<" actual racer COL identities; one 274E90 list, 2A00A0/2A0E20 actions; reverse108E90 parity unresolved.\n";
+   if(audioEnabled&&triggerAudio)std::cerr<<"trigger PodSound uses the shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
   }
-  if(nativeSelectedLights&&!isRaTrack)for(std::size_t racer=0;racer<racerBank.count();++racer)
+  // The track's one lighting owner (SCB Lights, prepared once at step 05.13).
+  if(nativeSelectedLights)require50DU(track.roles.lights!=nullptr,"the track's lighting owner (05.13) is unavailable");
+  if(nativeSelectedLights)for(std::size_t racer=0;racer<racerBank.count();++racer)
    racerBank.visit(racer,[&](){
     // Only this genuine unadvanced cold generation owns source C30=4C0[0].
     // Rig installation and final per-racer grid placement already completed.
-    require50DU(completedFrames==0&&m.frameFactor==0.f&&gcGraphicsSequence[racer]==0,
-        "GC visibility creation requires final fresh grid before first graphics");
-    require50DU(gcLightOwner.attachFreshVehicle(static_cast<std::uint32_t>(racer),s,
-        x.bindings,x.parameters,gcLightDiagnostic),"actual cold GC racer7F0 registration failed");
+    require50DU(completedFrames==0&&m.frameFactor==0.f&&graphicsSequence[racer]==0,
+        "visibility creation requires final fresh grid before first graphics");
+    require50DU(track.roles.lights->attachFreshVehicle(static_cast<std::uint32_t>(racer),s,
+        x.bindings,x.parameters,lightDiagnostic),"actual cold racer7F0 registration failed");
     if(originalRecoveryEnabled){
-     // Only the admitted direct-GA Player0 uses the human constructor role.
+     // Only the rooted course race's Player0 uses the human constructor role.
      // Geometry comes from the same selected pod/probe owners as every AI;
      // neither source vehicle58 nor native AI ownership is rewritten.
-     const auto queryRole=directOriginalHuman&&humanCourseEnabled&&racer==0?
+     const auto queryRole=rootedCourseRace&&humanCourseEnabled&&racer==0?
          undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
          undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi;
      //This racer's own 694/7A4 rows (shared world: that slot's pair).

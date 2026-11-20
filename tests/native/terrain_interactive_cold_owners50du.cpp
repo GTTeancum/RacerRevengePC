@@ -8,16 +8,14 @@
 #include "native_racer_observation50iz_fixture.h"
 #include "native_ai_session50iv_fixture.h"
 #include "native_racer_rig50hw_fixture.h"
+#include "native_racer_handling50hw_fixture.h"
 #include "original_racer_visual50hw_fixture.h"
 #include "native_racer_cables50hw_fixture.h"
 #include "native_racer_model_lifetime50la_fixture.h"
-#include "ra_native_session50la.h"
-#include "original_consumed_ra_stage50du.h"
 #include "original_position_stats_prestage50la.h"
 #include "original_pause_cold_driver50la.h"
 #include "track_animation_binding50an.h"
-#include "mb_collision_world50mb.h"
-#include "sc_runtime_ground50la.h"
+#include "track_collision_world50cr.h"
 #include "terrain_probe_authoring50fq_fixture.h"
 #include "live_terrain_probe50fr_fixture.h"
 #include "undertrack_owners50ew_fixture.h"
@@ -88,68 +86,22 @@ void OwnersContext::run() {
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(bankWorldMemberships)for(auto& membership:gaTriggerMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(bankWorldMemberships)for(auto& membership:scTriggerMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(bankWorldMemberships)for(auto& membership:maTriggerMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(bankWorldMemberships)for(auto& membership:commonRouteTriggerMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(bankWorldMemberships)for(auto& membership:gcTriggerMembership)if(membership){
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
+  // One trigger-membership store for every course (274E90 rows), sized once from
+  // the track's live trigger count (BlockId::triggerMemberships); only its live
+  // prefix is read, every row must exist. Replaces the per-course arrays and borrows.
+  if(bankWorldMemberships){
+   require50DU(triggerMembership.sized(),"trigger membership store not sized from the track's trigger count");
+   for(std::size_t i=0;i<triggerMembership.size();++i){
+    auto* slot=triggerMembership.at(i);auto* membership=slot?slot->get():nullptr;
+    require50DU(membership,"actual trigger membership backing missing");
+    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+    racerBank.elements(membership->entries.data(),membership->entries.size());
+   }
   }
   // Each racer's own identities are banked on every course by
   // native_racer_owners50hn.inc (the former course list, which left TA's
   // racers sharing one 690/364 identity, is retired). Shared reciprocal
   // contacts, Gate fired/audio state and action counters never roll back.
-  if(isRaTrack)require50DU(raWorld->registerRuntimeQueryWorldOwners(racerBank,raDiagnostic),
-      raDiagnostic.failure?raDiagnostic.failure:"RA world registration rejected");
-  if(isMbTrack&&bankWorldMemberships)for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){
-   auto* membership=mbCollisionWorld->triggerMembership(i);
-   require50DU(membership,"MB actual trigger membership backing missing");
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(isTcTrack&&bankWorldMemberships)for(std::size_t i=0;i<tcWorldBorrow->triggerCount();++i){
-   auto* membership=tcWorldBorrow->triggerMembership(i);
-   require50DU(membership,"TC actual trigger membership backing missing");
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(isRcTrack&&bankWorldMemberships)for(std::size_t i=0;i<rc_trigger_authoring::count;++i){
-   auto* membership=rcWorldBorrow->triggerMembership(i);
-   require50DU(membership,"RC actual trigger membership backing missing");
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(isTbTrack&&bankWorldMemberships)for(std::size_t i=0;i<tbWorldBorrow->triggerCount();++i){
-   auto* membership=tbWorldBorrow->triggerMembership(i);
-   require50DU(membership,"TB actual trigger membership backing missing");
-   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-   racerBank.elements(membership->entries.data(),membership->entries.size());
-  }
-  if(isMcTrack){
-   if(bankWorldMemberships)for(std::size_t i=0;i<mcWorldBorrow->triggerCount();++i){auto* membership=mcWorldBorrow->triggerMembership(i);
-    require50DU(membership,"MC actual trigger membership backing missing");
-    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-    racerBank.elements(membership->entries.data(),membership->entries.size());}
-  }else if(isGbTrack){
-   // Live trigger memberships (stock 18; 0 when the TOB authors none).
-   if(bankWorldMemberships)for(std::size_t i=0;i<gbWorldBorrow->triggerCount();++i){auto* membership=gbWorldBorrow->triggerMembership(i);
-    require50DU(membership,"GB actual trigger membership backing missing");
-    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
-    racerBank.elements(membership->entries.data(),membership->entries.size());}
-  }
   // Track-animation lane memberships (every course on the lane route): banked per racer in a
   // legacy per-racer world, none in the shared world (track_animation_binding50an.h).
   if(trackAnimationBinding){const bool enrolled=trackAnimationBinding->enrollBank(racerBank,trackAnimationBindingDiagnostic);
@@ -165,111 +117,15 @@ void OwnersContext::run() {
        lapContinuity.state.vehicleCC8,lapContinuity.timing.wordCD4,
        originalAi,originalAiReceipt,x.diagnostic);
   }
-  if(isRaTrack){
-   require50DU(originalMainApplication.enabled,"RA requires the actual original Application");
-   // Video and the race display are already up (every course, roster stage).
-   openNativeVideo();
-   originalMainApplication.appStart(originalMainApplication.assetRoot);
-   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
-   const auto raMaterialContext=nativeVideo->standardMaterialConstructionContext(
-       nativeVideo,originalMainApplication);
-   // Stage every HUD source/reference before RA captures its real provider
-   // revision and performs the single combined final material population.
-   require50DU(originalMainApplication.stageSpeedBoostNativeCold50LA(
-       originalMainApplication.assetRoot,sessionIndex+1,sourceSpeedBoost),"RA Speed/Boost source staging failed");
-   require50DU(originalMainApplication.stageTimeStatsNativeCold50LA(
-       originalMainApplication.assetRoot,sessionIndex+1,sourceTimeStats,true),"RA TimeStats source staging failed");
-   if(allAiEnabled||humanCourseEnabled)require50DU(originalMainApplication.stageDamageNativeCold50LA(
-       originalMainApplication.assetRoot,sessionIndex+1,sourceDamage),"RA Damage source staging failed");
-   require50DU(sourcePositionStatsPrestage.stage(originalMainApplication,
-       originalMainApplication.assetRoot,raMaterialContext,sourcePositionStatsPrestageDiagnostic),
-       sourcePositionStatsPrestageDiagnostic.failure?sourcePositionStatsPrestageDiagnostic.failure:
-       "RA PositionStats native source preload rejected");
-   // Cold-only human loading: never changes spectator live Pause/audio/input
-   // policy. The same consumed RA Tournament owner already exists for intro.
-   const bool humanResultsCold=canonicalTournamentGrid&&humanCourseEnabled&&!allAiEnabled&&
-       bool(consumedRaStage.race());
-   if((sourceConsumedPauseActivation||humanResultsCold)&&consumedRaStage.race())
-    require50DU(originalMainApplication.prewarmPauseCold50LA(sourcePause),
-       "actual Pause canonical prewarm rejected");
-   {const bool mounted=raWorld->mountRetainedRuntimeRosterArchives(originalMainApplication,raDiagnostic);
-    if(!mounted)std::cerr<<"ra_roster_mount_rejected failure="<<(raDiagnostic.failure?raDiagnostic.failure:"")
-        <<" slot="<<raDiagnostic.rosterSlot<<" mount_status="<<static_cast<unsigned>(raDiagnostic.rosterMount.status)
-        <<" mount="<<raDiagnostic.rosterMount.mount<<" ordinal="<<raDiagnostic.rosterMount.ordinal<<'\n';
-    require50DU(mounted,raDiagnostic.failure?raDiagnostic.failure:"RA roster archive mounting rejected");}
-   std::array<std::vector<std::uint8_t>,6> crowdImages;
-   if(!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())
-    require50DU(raWorld->decodeCrowdImages(crowdImages,raDiagnostic),
-        raDiagnostic.failure?raDiagnostic.failure:"direct original RA crowd decode rejected");
-   else for(std::size_t i=0;i<crowdImages.size();++i)crowdImages[i]=runtime_startup50fl::readBytes(
-       "evidence/ra-crowd-original/crowd-frame"+std::to_string(i)+"-mip4.rrtex");
-   raSession=std::make_unique<ra_native_session50LA::Join>(raWorld,originalMainApplication,racerBank,sessionIndex+1);
-   const ra_cold_roster50LA::Arena arena{x,
-       {boostParameters,boostCoolingCF8,settings,response,secondarySettings,secondaryResponse},
-       selection,originalAi,originalAiSession,navigationProgress,lapContinuity,poseHistory,
-       rebaseModels,rebaseModelCount,rebaseWorkspace,rebaseBounds,rebaseDiagnostic,namesForEffects,
-       nativeEffects,nativeEffectCount,resetEffectBindings,resetEffectState,resetEffectWorkspace,
-       originalRecoveryModels,terrainBindings,coldFlame,nativeOrdinaryLaunch11258,
-       originalAiHumanCount,&authored,&authoredFinishSteering10A4,
-       humanCourseEnabled&&!allAiEnabled?
-           ra_cold_roster50LA::NativePlayerLoadCaller50LA(racerBank,controller,controllerActions,
-               controllerEvents,applicationEvents,playerEventChild,playerEvents,playerEnvironment,
-               authored,authoredFinishSteering10A4,actualRacer60ForResults,nativeHumanAudio,
-               nativeHumanSpeechCounts,speechState):ra_cold_roster50LA::NativePlayerLoadCaller50LA{}};
-   const bool raSessionReady=humanResultsCold?
-       raSession->constructHumanTournamentCold(arena,raFreshProbe,{endpoints,endpointScenes,movementSource},
-           raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners,
-           *consumedRaStage.race(),sourcePause,actualRacer60ForResults):
-       raSession->construct(arena,raFreshProbe,{endpoints,endpointScenes,movementSource},
-           raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners,
-           consumedRaStage.race().get(),sourceConsumedPauseActivation&&consumedRaStage.race()?&sourcePause:nullptr,
-           canonicalTournamentGrid);
-   if(!raSessionReady){
-    auto text=[](const char* p){return p?p:"";};
-    std::cerr<<"RA session failure operation="<<text(raSessionDiagnostic.operation)
-      <<" aggregate="<<text(raSessionDiagnostic.aggregate.failure)
-      <<" world="<<text(raSessionDiagnostic.aggregate.world.failure)
-      <<" static_models="<<text(raSessionDiagnostic.aggregate.staticModels.failure)
-      <<" roster="<<text(raSessionDiagnostic.roster.failure)
-      <<" roster_stage="<<text(raSessionDiagnostic.roster.stage)
-      <<" slot="<<raSessionDiagnostic.roster.slot
-      <<" detail="<<raSessionDiagnostic.roster.detail
-      <<" results="<<text(raSessionDiagnostic.results.operation)
-      <<" results_pc="<<std::hex<<raSessionDiagnostic.results.sourcePC<<std::dec
-      <<" results_status="<<static_cast<unsigned>(raSessionDiagnostic.results.status)<<'\n';
-    const auto& material=raSessionDiagnostic.aggregate.world.material;
-    rr::assets::OriginalStandardMaterialRowView50LA materialRow;
-    rr::assets::OriginalStandardTextureRowView50LA textureRow;
-    const auto failureDomain=originalMainApplication.standardMaterialDomain();
-    const bool hasMaterial=failureDomain->materials382B38()->row(material.row,materialRow);
-    const bool hasTexture=material.texture.row>=0&&material.texture.row<=32767&&
-        failureDomain->textures383400()->row(static_cast<std::int16_t>(material.texture.row),textureRow);
-    std::cerr<<"ra_population_diagnostic status="<<static_cast<unsigned>(material.status)
-        <<" pc="<<material.sourcePC<<" row="<<material.row
-        <<" name="<<(hasMaterial&&materialRow.name00?*materialRow.name00:std::string{})
-        <<" field="<<text(material.field)<<" pass="<<material.pass
-        <<" texture_status="<<static_cast<unsigned>(material.texture.status)
-        <<" texture_pc="<<material.texture.sourcePC<<" texture_row="<<material.texture.row
-        <<" texture_name="<<(hasTexture&&textureRow.name00?*textureRow.name00:std::string{})
-        <<" texture_offset="<<material.texture.byteOffset<<'\n';
-    require50DU(false,raSessionDiagnostic.failure?raSessionDiagnostic.failure:"RA actual cold session construction failed");
-   }
-   // The HUD owners' final shared-material verification follows the single
-   // population, at the population point every course uses (publication).
-   if(humanCourseEnabled)racerBank.visit(0,[&](){initializeOriginalHumanResetTimers50LC(playerEvents);});
-   contactBindings=nativeRosterOwners->contacts;
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerNames[slot]=racerVisuals[slot]->displayName;
-  }
-  // Alternate camera selections and every all-AI slot use their actual
-  // original-resource cold path before any tick. Only the legacy mixed POD01
-  // selection retains the fixture startup. No live identity is flipped.
-  if(isRcTrack)requireMbRuntimeNavigation50MB();
+  // Step 08 (2A1260/1ACF70) ran before the roster stage: the one map/AI view
+  // pair must be runtime-valid against the live world before any racer visit.
+  requireRuntimeNavigation();
   // One allocator for every course (native_racer_identities50pl.h): five
   // identities per racer (690, 364, 348, 694, 7A4), each assigned inside that
   // racer's own visit below. Checked against this course's static owners and
   // the cold seeds; a conflict or exhaustion is refused before any write.
   std::array<native_racer_identities50PL::RacerIdentities,native_racer_identities50PL::maxRacers> racerIdentities{};
-  if(!isRaTrack){
+  {
    const std::uint32_t seeds[]={qfilter.identity,secondaryFilter.identity,movement.filter.identity,
        terrainOwner.metadata.filter.identity,recoveryQueryOwners.podFilter.identity,
        recoveryQueryOwners.globals.identity[0],recoveryQueryOwners.globals.identity[1],
@@ -281,9 +137,10 @@ void OwnersContext::run() {
    };
    require50DU(native_racer_identities50PL::allocate(racerBank.count(),available,racerIdentities.data(),
        racerIdentities.size()),"racer identity allocation exhausted or conflicts with a course owner");
-   // Port stand-in (track_runtime_storage50IG::writeRosterPodExclusionStandIn):
-   // every racer's 690/364/7A4 excludes all roster racers' 694, written once
-   // here into the unbanked list sized before seal (same list for every racer).
+   // PORT STAND-IN: track_runtime_storage50IG::writeRosterPodExclusionStandIn stands in
+   // for the original's per-racer 694 exclusion (212984..21299C identity lists): every
+   // racer's 690/364/7A4 excludes all roster racers' 694, written once here into the
+   // unbanked list sized before seal (same list for every racer, every course).
    if(originalRecoveryEnabled){
     require50DU(racerBank.count()<=track_runtime_storage50IG::Storage::maximumRoster&&
         racerBank.count()<=racerIdentities.size(),"roster exceeds pod694 exclusion stand-in capacity");
@@ -293,11 +150,10 @@ void OwnersContext::run() {
         track_runtime_storage50IG::writeRosterPodExclusionStandIn(secondaryFilter,pods.data(),racerBank.count())&&
         track_runtime_storage50IG::writeRosterPodExclusionStandIn(movement.filter,pods.data(),racerBank.count()),
         "roster pod694 exclusion stand-in write rejected");
-    std::cerr<<"pod694_exclusion_standin racers="<<racerBank.count()<<" route=legacy\n";
+    std::cerr<<"pod694_exclusion_standin racers="<<racerBank.count()<<"\n";
    }
   }
-  // !isRaTrack: port stand-in (common-path rule); RA claims in its own constructor visit.
-  if(!isRaTrack)for(std::size_t racer=playerUsesRosterRig?0u:1u;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+  for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
    // This slot's first cold visit: the banked roster-slot lane names it from now on.
    require50DU(this->trackStorage.claimRosterSlot(racer),"actual track storage roster slot claim rejected");
    const auto& rig=*racerRigs[racer];const auto& collision=*racerCollisions[racer];
@@ -382,35 +238,11 @@ void OwnersContext::run() {
     require50DU(originalAi.fieldFE4==createIdentity.courseRecordMatchFE4,
         "selected course-record identity differs from original AI FE4");
     originalAiSession.packingReferences[racer]=-1;
-    if(isMcTrack){
-     requireMbRuntimeNavigation50MB();
-     AiColdTrackBindingsView50MC tracks{};
-     require50DU(bindAiColdTracks50IU(mcMapView,mcAiView,mcMapMetadata,
-         mcAiMetadata,navigationProgress,tracks),"original MC AI cold track owners unavailable");
-    }else if(isGbTrack){
-     requireMbRuntimeNavigation50MB();
-     AiColdTrackBindingsView50GB tracks{};
-     require50DU(bindAiColdTracks50IU(gbMapView,gbAiView,gbMapMetadata,
-         gbAiMetadata,navigationProgress,tracks),"original GB AI cold track owners unavailable");
-    }else if(isTbTrack){
-     requireMbRuntimeNavigation50MB();
-     AiColdTrackBindingsView50TB tracks{};
-     require50DU(bindAiColdTracks50IU(tbMapView,tbAiView,tbMapMetadata,
-         tbAiMetadata,navigationProgress,tracks),"original TB AI cold track owners unavailable");
-    }else if(isTcTrack){
-     requireMbRuntimeNavigation50MB();
-     AiColdTrackBindingsView50TC tracks{};
-     require50DU(bindAiColdTracks50IU(tcMapView,tcAiView,tcMapMetadata,
-         tcAiMetadata,navigationProgress,tracks),"original TC AI cold track owners unavailable");
-    }else if(isMbTrack){
-     AiColdTrackBindingsView50MB tracks{};
-     require50DU(bindAiColdTracks50IU(mbMapView,mbAiView,mbMapMetadata,
-         mbAiMetadata,navigationProgress,tracks),"original MB AI cold track owners unavailable");
-    }else{
-     AiColdTrackBindings50IU tracks{};
-     require50DU(bindAiColdTracks50IU(*navigationMap,*navigationAI,selectedOriginalAiMapMetadata,
-         selectedOriginalAiMetadata,navigationProgress,tracks),"original AI cold track owners unavailable");
-    }
+    // One map/AI view pair for every course (16E4EC/16E4F4 FF0/FF4 borrow the
+    // step-08 navigation store; metadata is the view's own).
+    AiColdTrackBindingsView50CR tracks{};
+    require50DU(bindAiColdTracks50IU(mapView,aiView,navigationProgress,tracks),
+        "original AI cold track owners unavailable");
     s.fields.vehicle58=1u;s.fields.nativeAiOwnersBound50IV=true;s.fields.applicationByte58=0u;
     x.parameters.rates.x=4.f;
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
@@ -519,15 +351,8 @@ void OwnersContext::run() {
     authoredFinishSteering10A4=x.parameters.bodies.main.aero.steering100;
     // Recovery's cold scene carries the human lift admission. Terrain owners
     // and mesh data remain unchanged; opponent grid queries pass their own lift.
-    if(isRcTrack)require50DU(rcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"RC actual selected/class-applied human lift rejected");
-    if(isMcTrack)require50DU(mcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"MC actual selected/class-applied human lift rejected");
-    if(isGbTrack)require50DU(gbCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"GB actual selected/class-applied human lift rejected");
-    if(isTbTrack)require50DU(tbCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"TB actual selected/class-applied human lift rejected");
-    else if(isTcTrack)require50DU(tcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"TC actual selected/class-applied human lift rejected");
-    else if(isMbTrack)require50DU(mbCollisionWorld->setHumanLift(x.parameters.visual.verticalLimit7EC),"MB genuine human lift update rejected");
-    else if(isScTrack)require50DU(scGround->bindHumanLift(*scColdSources,x.parameters.visual.verticalLimit7EC),
-        "SC actual selected/class-applied human lift rejected");
-    else legacyGround.lift=x.parameters.visual.verticalLimit7EC;
+    require50DU(track.roles.collision&&track.roles.collision->bindHumanLift(x.parameters.visual.verticalLimit7EC),
+        "actual selected/class-applied human lift rejected");
    }
    std::cerr<<"ORIGINAL RACER "<<racer<<": "<<racerNames[racer]<<" ["<<rig.podId
        <<"] nodes="<<s.sceneNodeCount<<" mass="<<x.parameters.bodies.main.body.mass
@@ -543,15 +368,14 @@ void OwnersContext::run() {
   // Stage A pass mark, read back from each racer's saved slot (not from the
   // allocator): every racer's own 690/694/7A4/348 and how many other racers
   // share its 694 (must be 0 on every course).
-  if(!isRaTrack&&originalRecoveryEnabled){
+  if(originalRecoveryEnabled){
    const auto mainLane=racerBank.bindRead(qfilter.identity);
    const auto podLane=racerBank.bindRead(recoveryQueryOwners.podFilter.identity);
    const auto movementLane=racerBank.bindRead(movement.filter.identity);
    const auto terrainLane=racerBank.bindRead(terrainOwner.metadata.filter.identity);
-   const std::size_t first=playerUsesRosterRig?0u:1u;
-   for(std::size_t racer=first;racer<racerBank.count();++racer){
+   for(std::size_t racer=0;racer<racerBank.count();++racer){
     const auto own=racerBank.read(racer,podLane);std::size_t shared=0;
-    for(std::size_t other=first;other<racerBank.count();++other)
+    for(std::size_t other=0;other<racerBank.count();++other)
      if(other!=racer&&racerBank.read(other,podLane)==own)++shared;
     char line[200];
     std::snprintf(line,sizeof line,"racer_identity_lane slot=%zu own690=%08x own694=%08x own7A4=%08x own348=%08x shared694=%zu\n",
