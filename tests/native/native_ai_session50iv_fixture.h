@@ -1,9 +1,7 @@
 #pragma once
 #include <type_traits>
-#include "../../src/game/track_navigation_view50tc.h"
-#include "../../src/game/track_navigation_view50tb.h"
-#include "../../src/game/track_navigation_view50gb.h"
 #include "../../src/game/ai_runtime50iv.h"
+#include "../../src/game/navigation_view50cr.h"
 #include "../../src/game/ai_race_rank50iv.h"
 #include "../../src/game/ai_packing_reference50iu.h"
 #include "../../src/game/original_shared_rng50iu.h"
@@ -34,43 +32,15 @@ namespace detail {
 template<class Map,class Metadata>
 concept ExactObservationPair50TC=
  (std::is_same_v<Map,TrackNavigation50EU>&&std::is_same_v<Metadata,AiTrackMetadata50IU>)||
- (std::is_same_v<Map,TrackNavigationView50EU>&&std::is_same_v<Metadata,AiTrackMetadataView50IU>)||
- (std::is_same_v<Map,TrackNavigationView50TC>&&std::is_same_v<Metadata,AiTrackMetadataView50TC>)||
- (std::is_same_v<Map,TrackNavigationView50TB>&&std::is_same_v<Metadata,AiTrackMetadataView50TB>)||
- (std::is_same_v<Map,TrackNavigationView50GB>&&std::is_same_v<Metadata,AiTrackMetadataView50GB>)||
- (std::is_same_v<Map,TrackNavigationView50MC>&&std::is_same_v<Metadata,AiTrackMetadataView50MC>);
+ (std::is_same_v<Map,NavigationView50CR>&&std::is_same_v<Metadata,AiTrackMetadataView50IU>);
 inline bool mapReady(const TrackNavigation50EU&,const AiTrackMetadata50IU& m)noexcept{return m.bound;}
-inline bool mapReady(const TrackNavigationView50EU& map,const AiTrackMetadataView50IU& m)noexcept{
- return map.runtimeValid()&&map.role()==NavigationRole50MB::Map&&m.matches(map);
+inline bool mapReady(const NavigationView50CR& map,const AiTrackMetadataView50IU& m)noexcept{
+ return map.runtimeValid()&&map.role()==NavigationRole50CR::map&&m.matches(map);
 }
-inline bool mapReady(const TrackNavigationView50TC& map,const AiTrackMetadataView50TC& m)noexcept{
- return map.runtimeValid()&&map.role()==NavigationRole50TC::Map&&m.matches(map);
-}
-inline std::uint32_t mapCount(const TrackNavigationView50TC& m)noexcept{return m.count();}
-inline const TrackNavigationNode50EU* mapNodes(const TrackNavigationView50TC& m)noexcept{return m.nodes();}
-inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadataView50TC& m)noexcept{return m.nodes();}
-inline bool mapReady(const TrackNavigationView50TB& map,const AiTrackMetadataView50TB& m)noexcept{
- return map.runtimeValid()&&map.role()==NavigationRole50TB::Map&&m.matches(map);
-}
-inline bool mapReady(const TrackNavigationView50GB& map,const AiTrackMetadataView50GB& m)noexcept{
- return map.runtimeValid()&&map.role()==NavigationRole50GB::Map&&m.matches(map);
-}
-inline bool mapReady(const TrackNavigationView50MC& map,const AiTrackMetadataView50MC& m)noexcept{
- return map.runtimeValid()&&map.role()==NavigationRole50MC::Map&&m.matches(map);
-}
-inline std::uint32_t mapCount(const TrackNavigationView50TB& m)noexcept{return m.count();}
-inline std::uint32_t mapCount(const TrackNavigationView50GB& m)noexcept{return m.count();}
-inline std::uint32_t mapCount(const TrackNavigationView50MC& m)noexcept{return m.count();}
-inline const TrackNavigationNode50EU* mapNodes(const TrackNavigationView50TB& m)noexcept{return m.nodes();}
-inline const TrackNavigationNode50EU* mapNodes(const TrackNavigationView50GB& m)noexcept{return m.nodes();}
-inline const TrackNavigationNode50EU* mapNodes(const TrackNavigationView50MC& m)noexcept{return m.nodes();}
-inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadataView50TB& m)noexcept{return m.nodes();}
-inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadataView50GB& m)noexcept{return m.nodes();}
-inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadataView50MC& m)noexcept{return m.nodes();}
 inline std::uint32_t mapCount(const TrackNavigation50EU& m)noexcept{return m.track.count;}
-inline std::uint32_t mapCount(const TrackNavigationView50EU& m)noexcept{return m.count();}
+inline std::uint32_t mapCount(const NavigationView50CR& m)noexcept{return m.count();}
 inline const TrackNavigationNode50EU* mapNodes(const TrackNavigation50EU& m)noexcept{return m.nodes;}
-inline const TrackNavigationNode50EU* mapNodes(const TrackNavigationView50EU& m)noexcept{return m.nodes();}
+inline const TrackNavigationNode50EU* mapNodes(const NavigationView50CR& m)noexcept{return m.gates();}
 inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadata50IU& m)noexcept{return m.nodes;}
 inline const AiTrackNodeMetadata50IU* metadataNodes(const AiTrackMetadataView50IU& m)noexcept{return m.nodes();}
 }
@@ -106,27 +76,7 @@ inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W
 }
 inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W& frame,
  const VehicleFrameBindings49W& bindings,const TrackNavigationProgress50EU& progress,
- std::uint32_t lapCC8,std::uint32_t retirementCD4,const TrackNavigationView50EU& map,const AiTrackMetadataView50IU& metadata){
- observeTyped(session,slot,frame,bindings,progress,lapCC8,retirementCD4,map,metadata);
-}
-inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W& frame,
- const VehicleFrameBindings49W& bindings,const TrackNavigationProgress50EU& progress,
- std::uint32_t lapCC8,std::uint32_t retirementCD4,const TrackNavigationView50TC& map,const AiTrackMetadataView50TC& metadata){
- observeTyped(session,slot,frame,bindings,progress,lapCC8,retirementCD4,map,metadata);
-}
-inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W& frame,
- const VehicleFrameBindings49W& bindings,const TrackNavigationProgress50EU& progress,
- std::uint32_t lapCC8,std::uint32_t retirementCD4,const TrackNavigationView50TB& map,const AiTrackMetadataView50TB& metadata){
- observeTyped(session,slot,frame,bindings,progress,lapCC8,retirementCD4,map,metadata);
-}
-inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W& frame,
- const VehicleFrameBindings49W& bindings,const TrackNavigationProgress50EU& progress,
- std::uint32_t lapCC8,std::uint32_t retirementCD4,const TrackNavigationView50GB& map,const AiTrackMetadataView50GB& metadata){
- observeTyped(session,slot,frame,bindings,progress,lapCC8,retirementCD4,map,metadata);
-}
-inline void observe(Session& session,std::size_t slot,const VehicleFrameState49W& frame,
- const VehicleFrameBindings49W& bindings,const TrackNavigationProgress50EU& progress,
- std::uint32_t lapCC8,std::uint32_t retirementCD4,const TrackNavigationView50MC& map,const AiTrackMetadataView50MC& metadata){
+ std::uint32_t lapCC8,std::uint32_t retirementCD4,const NavigationView50CR& map,const AiTrackMetadataView50IU& metadata){
  observeTyped(session,slot,frame,bindings,progress,lapCC8,retirementCD4,map,metadata);
 }
 inline bool rank(Session&session,std::size_t count) noexcept {
@@ -190,23 +140,7 @@ struct ObservationReads {
     }
 
     void observe(Session& session,std::size_t slot,const native_racer50HN::Bank& bank,
-     const native_racer50IZ::FrameReads& frame,const TrackNavigationView50EU& map,const AiTrackMetadataView50IU& metadata)const{
-     observeTyped(session,slot,bank,frame,map,metadata);
-    }
-    void observe(Session& session,std::size_t slot,const native_racer50HN::Bank& bank,
-     const native_racer50IZ::FrameReads& frame,const TrackNavigationView50TC& map,const AiTrackMetadataView50TC& metadata)const{
-     observeTyped(session,slot,bank,frame,map,metadata);
-    }
-    void observe(Session& session,std::size_t slot,const native_racer50HN::Bank& bank,
-     const native_racer50IZ::FrameReads& frame,const TrackNavigationView50TB& map,const AiTrackMetadataView50TB& metadata)const{
-     observeTyped(session,slot,bank,frame,map,metadata);
-    }
-    void observe(Session& session,std::size_t slot,const native_racer50HN::Bank& bank,
-     const native_racer50IZ::FrameReads& frame,const TrackNavigationView50GB& map,const AiTrackMetadataView50GB& metadata)const{
-     observeTyped(session,slot,bank,frame,map,metadata);
-    }
-    void observe(Session& session,std::size_t slot,const native_racer50HN::Bank& bank,
-     const native_racer50IZ::FrameReads& frame,const TrackNavigationView50MC& map,const AiTrackMetadataView50MC& metadata)const{
+     const native_racer50IZ::FrameReads& frame,const NavigationView50CR& map,const AiTrackMetadataView50IU& metadata)const{
      observeTyped(session,slot,bank,frame,map,metadata);
     }
 

@@ -166,11 +166,20 @@ template<std::size_t N,class Track> inline bool advanceOne(const Track& t,const 
             if(map||!(meta.flags79&64u))previous=i;current=t.track.nodes[i].next[0];++scanned;}}
     return true;
 }
+// In-place value reset of a navigation scratch (same effect as `scratch={}`;
+// see undertrack_detail50MB::clearReader).
+template<class Navigation> inline void clearNavigation(Navigation& n) noexcept {
+    undertrack_detail50MB::clearGraph(n.track);
+    for(auto& node:n.nodes)node=TrackNavigationNode50EU{};
+    std::memset(n.nodeIndex78,0,sizeof n.nodeIndex78);
+    n.gatesPrepared=false;n.indicesPrepared=false;
+}
 template<std::size_t N,class Scratch,class Track> inline bool read(const char* text,std::size_t bytes,SourceLibmState49T& libm,
     Scratch& scratch,Track& out,TrackNavigationDiagnostic50EU& d) noexcept {
     if(&scratch.candidate==&out)return fail(d,E::Input,0x2a1260);
     if(std::fegetround()!=FE_TONEAREST)return fail(d,E::Arithmetic,0x2a1260);
-    scratch={};UndertrackDiagnostic50ET td{};
+    undertrack_detail50MB::clearReader(scratch.reader);clearNavigation(scratch.candidate);
+    std::memset(scratch.fieldMask,0,sizeof scratch.fieldMask);UndertrackDiagnostic50ET td{};
     if(!undertrack_detail50MB::read<N>(text,bytes,scratch.reader,scratch.candidate.track,td))return fail(d,E::Text,td.sourcePC);
     if(!validTrack<N>(scratch.candidate))return fail(d,E::Track,0x2a1b7c);
     if(!supplement(text,bytes,scratch,d))return false;

@@ -16,7 +16,7 @@
 #include <cstring>
 #include <limits>
 #include <type_traits>
-#include "../../src/game/track_navigation_view50mb.h"
+#include "../../src/game/navigation_view50cr.h"
 
 namespace native_original_ai_recovery {
 using namespace rr::game;
@@ -116,8 +116,10 @@ struct Owners {
     EffectOwner50BE* effectOwners=nullptr;
     std::size_t effectOwnerCount=0;
 };
-// The selected final view is retained by value and cannot be reseated inside
-// this owner. Keep the same immutable selection across an unfinished State;
+// Common rewrite (R4): the ONE recovery owner set for every course. The AI
+// track is the AI view of the one navigation store, retained by value; it
+// cannot be reseated inside this owner. (Owners50MB keeps its name; it is no
+// longer one course's.) Keep the same immutable selection across an unfinished State;
 // State itself remains the original bank-safe scalar continuation.
 struct Owners50MB {
     visibility::Owner& visibility;
@@ -127,7 +129,7 @@ struct Owners50MB {
     // actual session PodRaceAudioManager row, not a bank-local temporary.
     std::uint8_t& aiEmitterD40Flags22C;
     std::uint32_t& materialD44Field24C;
-    const TrackNavigationView50EU aiTrack;
+    const NavigationView50CR aiTrack;
     const UndertrackPhysicsDomain50EW& height;
     const SecondaryActivationGlobals49V& activation;
     const ResetLifecycleGlobals50AT& lifecycle;
@@ -142,214 +144,28 @@ struct Owners50MB {
     EffectOwner50BE* effectOwners=nullptr;
     std::size_t effectOwnerCount=0;
 };
-// TC-CONSUMER-BEGIN 0
-struct Owners50TC {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Real sourceD40 presence is required for this admitted ALL8/native-audio
-    // path. No controller1A0240/player prefix is called. D44 belongs to the
-    // actual session PodRaceAudioManager row, not a bank-local temporary.
-    std::uint8_t& aiEmitterD40Flags22C;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigationView50TC aiTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// TC-CONSUMER-END 0
-
-// TB-CONSUMER-BEGIN 0
-struct Owners50TB {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Real sourceD40 presence is required for this admitted ALL8/native-audio
-    // path. No controller1A0240/player prefix is called. D44 belongs to the
-    // actual session PodRaceAudioManager row, not a bank-local temporary.
-    std::uint8_t& aiEmitterD40Flags22C;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigationView50TB aiTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// TB-CONSUMER-END 0
-
-// GB-CONSUMER-BEGIN 0
-struct Owners50GB {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Real sourceD40 presence is required for this admitted ALL8/native-audio
-    // path. No controller1A0240/player prefix is called. D44 belongs to the
-    // actual session PodRaceAudioManager row, not a bank-local temporary.
-    std::uint8_t& aiEmitterD40Flags22C;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigationView50GB aiTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// GB-CONSUMER-END 0
-
-// MC-CONSUMER-BEGIN 0
-struct Owners50MC {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Real sourceD40 presence is required for this admitted ALL8/native-audio
-    // path. No controller1A0240/player prefix is called. D44 belongs to the
-    // actual session PodRaceAudioManager row, not a bank-local temporary.
-    std::uint8_t& aiEmitterD40Flags22C;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigationView50MC aiTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// MC-CONSUMER-END 0
 
 // Exact-type navigation access adapters. Legacy calls retain their original
 // fixed owner and table-binding order; MB calls use only issued strong views.
 namespace ordinary_navigation_detail50MB {
 inline bool indicesPrepared(const TrackNavigation50EU& t) noexcept {return t.indicesPrepared;}
-inline bool indicesPrepared(const TrackNavigationView50EU& t) noexcept {return t.indicesPrepared();}
-// TC-CONSUMER-BEGIN 1
-inline bool indicesPrepared(const TrackNavigationView50TC& t) noexcept {return t.indicesPrepared();}
-// TC-CONSUMER-END 1
-
-// TB-CONSUMER-BEGIN 1
-inline bool indicesPrepared(const TrackNavigationView50TB& t) noexcept {return t.indicesPrepared();}
-// TB-CONSUMER-END 1
-
-// GB-CONSUMER-BEGIN 1
-inline bool indicesPrepared(const TrackNavigationView50GB& t) noexcept {return t.indicesPrepared();}
-// GB-CONSUMER-END 1
-
-// MC-CONSUMER-BEGIN 1
-inline bool indicesPrepared(const TrackNavigationView50MC& t) noexcept {return t.indicesPrepared();}
-// MC-CONSUMER-END 1
+inline bool indicesPrepared(const NavigationView50CR& t) noexcept {return t.indicesPrepared();}
 
 inline bool gatesPrepared(const TrackNavigation50EU& t) noexcept {return t.gatesPrepared;}
-inline bool gatesPrepared(const TrackNavigationView50EU& t) noexcept {return t.gatesPrepared();}
-// TC-CONSUMER-BEGIN 2
-inline bool gatesPrepared(const TrackNavigationView50TC& t) noexcept {return t.gatesPrepared();}
-// TC-CONSUMER-END 2
-
-// TB-CONSUMER-BEGIN 2
-inline bool gatesPrepared(const TrackNavigationView50TB& t) noexcept {return t.gatesPrepared();}
-// TB-CONSUMER-END 2
-
-// GB-CONSUMER-BEGIN 2
-inline bool gatesPrepared(const TrackNavigationView50GB& t) noexcept {return t.gatesPrepared();}
-// GB-CONSUMER-END 2
-
-// MC-CONSUMER-BEGIN 2
-inline bool gatesPrepared(const TrackNavigationView50MC& t) noexcept {return t.gatesPrepared();}
-// MC-CONSUMER-END 2
+inline bool gatesPrepared(const NavigationView50CR& t) noexcept {return t.gatesPrepared();}
 
 inline std::uint32_t count(const TrackNavigation50EU& t) noexcept {return t.track.count;}
-inline std::uint32_t count(const TrackNavigationView50EU& t) noexcept {return t.count();}
-// TC-CONSUMER-BEGIN 3
-inline std::uint32_t count(const TrackNavigationView50TC& t) noexcept {return t.count();}
-// TC-CONSUMER-END 3
-
-// TB-CONSUMER-BEGIN 3
-inline std::uint32_t count(const TrackNavigationView50TB& t) noexcept {return t.count();}
-// TB-CONSUMER-END 3
-
-// GB-CONSUMER-BEGIN 3
-inline std::uint32_t count(const TrackNavigationView50GB& t) noexcept {return t.count();}
-// GB-CONSUMER-END 3
-
-// MC-CONSUMER-BEGIN 3
-inline std::uint32_t count(const TrackNavigationView50MC& t) noexcept {return t.count();}
-// MC-CONSUMER-END 3
+inline std::uint32_t count(const NavigationView50CR& t) noexcept {return t.count();}
 
 inline const UndertrackNode50ET& node(const TrackNavigation50EU& t,std::uint32_t index) noexcept {
     return t.track.nodes[index];
 }
-inline const UndertrackNode50ET& node(const TrackNavigationView50EU& t,std::uint32_t index) noexcept {
-    return t.track().nodes()[index];
+inline const UndertrackNode50ET& node(const NavigationView50CR& t,std::uint32_t index) noexcept {
+    return t.nodes()[index];
 }
-// TC-CONSUMER-BEGIN 4
-inline const UndertrackNode50ET& node(const TrackNavigationView50TC& t,std::uint32_t index) noexcept {
-    return t.track().nodes()[index];
-}
-// TC-CONSUMER-END 4
-
-// TB-CONSUMER-BEGIN 4
-inline const UndertrackNode50ET& node(const TrackNavigationView50TB& t,std::uint32_t index) noexcept {
-    return t.track().nodes()[index];
-}
-// TB-CONSUMER-END 4
-
-// GB-CONSUMER-BEGIN 4
-inline const UndertrackNode50ET& node(const TrackNavigationView50GB& t,std::uint32_t index) noexcept {
-    return t.track().nodes()[index];
-}
-// GB-CONSUMER-END 4
-
-// MC-CONSUMER-BEGIN 4
-inline const UndertrackNode50ET& node(const TrackNavigationView50MC& t,std::uint32_t index) noexcept {
-    return t.track().nodes()[index];
-}
-// MC-CONSUMER-END 4
 
 inline const UndertrackTrack50ET& track(const TrackNavigation50EU& t) noexcept {return t.track;}
-inline UndertrackTrackView50ET track(const TrackNavigationView50EU& t) noexcept {return t.track();}
-// TC-CONSUMER-BEGIN 5
-inline UndertrackTrackView50TC track(const TrackNavigationView50TC& t) noexcept {return t.track();}
-// TC-CONSUMER-END 5
-
-// TB-CONSUMER-BEGIN 5
-inline UndertrackTrackView50TB track(const TrackNavigationView50TB& t) noexcept {return t.track();}
-// TB-CONSUMER-END 5
-
-// GB-CONSUMER-BEGIN 5
-inline UndertrackTrackView50GB track(const TrackNavigationView50GB& t) noexcept {return t.track();}
-// GB-CONSUMER-END 5
-
-// MC-CONSUMER-BEGIN 5
-inline UndertrackTrackView50MC track(const TrackNavigationView50MC& t) noexcept {return t.track();}
-// MC-CONSUMER-END 5
+inline const NavigationView50CR& track(const NavigationView50CR& t) noexcept {return t;}
 
 inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigation50EU& navigation,
     const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
@@ -358,78 +174,19 @@ inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNa
     return undertrackBindings50EU(navigation,visibilityRows,collisionRows,count,tables)&&
         bindUndertrackPlacement50ET(selection,tables,placement,diagnostic);
 }
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigationView50EU& navigation,
+inline bool bindPlacement(const UndertrackSelection50ET& selection,const NavigationView50CR& navigation,
     const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
     UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
     return bindUndertrackPlacement50ET(selection,navigation,visibilityRows,collisionRows,count,placement,diagnostic);
 }
-// TC-CONSUMER-BEGIN 6
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigationView50TC& navigation,
-    const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
-    UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
-    return bindUndertrackPlacement50ET(selection,navigation,visibilityRows,collisionRows,count,placement,diagnostic);
-}
-// TC-CONSUMER-END 6
-
-// TB-CONSUMER-BEGIN 6
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigationView50TB& navigation,
-    const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
-    UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
-    return bindUndertrackPlacement50ET(selection,navigation,visibilityRows,collisionRows,count,placement,diagnostic);
-}
-// TB-CONSUMER-END 6
-
-// GB-CONSUMER-BEGIN 6
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigationView50GB& navigation,
-    const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
-    UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
-    return bindUndertrackPlacement50ET(selection,navigation,visibilityRows,collisionRows,count,placement,diagnostic);
-}
-// GB-CONSUMER-END 6
-
-// MC-CONSUMER-BEGIN 6
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigationView50MC& navigation,
-    const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
-    UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
-    return bindUndertrackPlacement50ET(selection,navigation,visibilityRows,collisionRows,count,placement,diagnostic);
-}
-// MC-CONSUMER-END 6
 
 } // namespace ordinary_navigation_detail50MB
 // Constant-true legacy admission leaves every original guard/effect ordered.
 inline bool navigationReadyOrdinaryShared50MB(const Owners&) noexcept {return true;}
 inline bool navigationReadyOrdinaryShared50MB(const Owners50MB& owners) noexcept {
-    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50MB::Ai&&
+    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50CR::ai&&
         owners.aiTrack.sameWorld(owners.collisionWorld);
 }
-// TC-CONSUMER-BEGIN 7
-inline bool navigationReadyOrdinaryShared50MB(const Owners50TC& owners) noexcept {
-    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50TC::Ai&&
-        owners.aiTrack.sameWorld(owners.collisionWorld);
-}
-// TC-CONSUMER-END 7
-
-// TB-CONSUMER-BEGIN 7
-inline bool navigationReadyOrdinaryShared50MB(const Owners50TB& owners) noexcept {
-    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50TB::Ai&&
-        owners.aiTrack.sameWorld(owners.collisionWorld);
-}
-// TB-CONSUMER-END 7
-
-// GB-CONSUMER-BEGIN 7
-inline bool navigationReadyOrdinaryShared50MB(const Owners50GB& owners) noexcept {
-    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50GB::Ai&&
-        owners.aiTrack.sameWorld(owners.collisionWorld);
-}
-// GB-CONSUMER-END 7
-
-// MC-CONSUMER-BEGIN 7
-inline bool navigationReadyOrdinaryShared50MB(const Owners50MC& owners) noexcept {
-    return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50MC::Ai&&
-        owners.aiTrack.sameWorld(owners.collisionWorld);
-}
-// MC-CONSUMER-END 7
-
 
 inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
     d.sourcePC=pc;d.message=message;return false;
@@ -439,9 +196,7 @@ inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
 // slices/cursors survive failures. No earlier AI navigation/packing/repair/
 //16E830 or completed reset slice is replayed. No allocation or guest execution.
 template<class OwnersT>
-concept AiRecoveryOwners50UT=std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||
-    std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>||
-    std::is_same_v<OwnersT,Owners50GB>||std::is_same_v<OwnersT,Owners50MC>;
+concept AiRecoveryOwners50UT=std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>;
 template<AiRecoveryOwners50UT OwnersT>
 inline bool registered694Bound50UT(const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,const OwnersT& owners) noexcept {
@@ -692,40 +447,5 @@ inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
     Owners50MB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
 }
-// TC-CONSUMER-BEGIN 8
-inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    Owners50TC& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
-}
-// TC-CONSUMER-END 8
-
-// TB-CONSUMER-BEGIN 8
-inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    Owners50TB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
-}
-// TB-CONSUMER-END 8
-
-// GB-CONSUMER-BEGIN 8
-inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    Owners50GB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
-}
-// GB-CONSUMER-END 8
-
-// MC-CONSUMER-BEGIN 8
-inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    Owners50MC& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
-}
-// MC-CONSUMER-END 8
 
 } // namespace native_original_ai_recovery

@@ -9,18 +9,15 @@ class SelectedMapGrid final {
     const void* map_=nullptr;
     bool (*prepare_)(const void*,std::uint32_t,GridCenterResult50AC&) noexcept=nullptr;
 public:
-    template<class View> bool bindView(const View& view) noexcept {
-        using Role=decltype(view.role());
-        if(map_||!view.gatesPrepared()||view.role()!=Role::Map||
+    // The one common map view (R4). The bound view object must outlive this.
+    bool bindView(const NavigationView50CR& view) noexcept {
+        if(map_||!view.gatesPrepared()||view.role()!=NavigationRole50CR::map||
             view.count()<2||view.count()>view.capacity())return false;
         map_=&view;
         prepare_=[](const void* p,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
-            const auto& v=*static_cast<const View*>(p);
-            if(!v.gatesPrepared()||v.role()!=Role::Map||v.count()<2||v.count()>v.capacity())return false;
-            struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
-            struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
-            const Navigation map{{v.track().nodes(),v.count()},v.nodes(),true};
-            return detail::prepare(map,v.capacity(),rank,out);
+            const auto& v=*static_cast<const NavigationView50CR*>(p);
+            if(v.count()<2)return false;
+            return source_grid50IG::prepare(v,rank,out);
         };
         return true;
     }

@@ -1,25 +1,24 @@
 #pragma once
-// ONE ordered topology check for every navigation owner of the 50MB spline
-// family (MB, GB, MC, TB, TC). The live collision world is built from the
-// course SCB's own portals; navigation binds only to a world whose heads,
-// links and portal geometry equal what those same authored portals produce.
-// Counts are the SCB's (live), bounded by the shared navigation capacity
-// (track_navigation_view50mb.h); no stock zone/portal count is checked here.
-#include "../../src/game/track_navigation_view50mb.h"
+// ONE ordered topology check for the one navigation store (common rewrite R4,
+// common_navigation50cr.cpp): the 1ACF70 zone index binds only to a live
+// collision world whose heads, links and portal geometry equal what the
+// course SCB's own authored portals produce. Counts are the SCB's (live); the
+// zone limit is the live-world rule (<=256, nodeIndex78 is one byte). No stock
+// zone/portal count and no fixed portal capacity is checked here.
+#include "../../src/game/live_zone_membership50en.h"
 #include <cstring>
 #include <vector>
 
 namespace course_navigation_topology50NT {
 namespace g=rr::game;
-// Worst-case ephemeral scratch for one check (heap; charged by callers).
-inline constexpr std::size_t scratchBytes() noexcept {
-    return 256u*sizeof(g::CollectionRef50BX)+
-        2u*g::courseNavigationPortalCapacity50MB*sizeof(g::LiveZonePortalLink50EN)+
-        g::courseNavigationPortalCapacity50MB*sizeof(g::PortalGeometry50EO)+sizeof(g::LiveZoneWorld50EN);
+// Ephemeral heap scratch for one check of `zones`/`portals` (the SCB's counts).
+inline std::size_t scratchBytes(std::size_t zones,std::size_t portals) noexcept {
+    return zones*sizeof(g::CollectionRef50BX)+(2u*portals+1u)*sizeof(g::LiveZonePortalLink50EN)+
+        (portals+1u)*sizeof(g::PortalGeometry50EO)+sizeof(g::LiveZoneWorld50EN);
 }
 inline bool matches(const g::LiveZonePortalInput50EN* authored,std::size_t portals,std::size_t zones,
     const g::LiveZoneWorld50EN& actual) noexcept {
-    if(!authored||!zones||zones>256||portals>g::courseNavigationPortalCapacity50MB||
+    if((portals&&!authored)||!zones||zones>256||
        actual.zoneCount!=zones||actual.portalCount!=portals||!actual.portalHeads||
        (actual.portalLinkCount&&!actual.portalLinks)||(portals&&!actual.portals))return false;
     try {

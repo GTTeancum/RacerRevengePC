@@ -21,7 +21,7 @@ struct AiCombatCandidateInput50LH {
 };
 // Strong immutable MB views retain their authentic storage and final world.
 struct AiCombatCandidateInput50MB {
-    TrackNavigationView50EU trackFF4{};
+    NavigationView50CR trackFF4{};
     AiTrackMetadataView50IU metadata{};
     const AiObservedRacer50IV* target=nullptr;
     const float* selfPosition190=nullptr;
@@ -31,61 +31,6 @@ struct AiCombatCandidateInput50MB {
     ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
     void* diagnosticContext=nullptr;
 };
-// TC-CONSUMER-BEGIN 0
-struct AiCombatCandidateInput50TC {
-    TrackNavigationView50TC trackFF4{};
-    AiTrackMetadataView50TC metadata{};
-    const AiObservedRacer50IV* target=nullptr;
-    const float* selfPosition190=nullptr;
-    std::uint32_t selfNodeC80=0;
-    std::int32_t selfLapCC8=0,selfPlaceCCC=0;
-    float combatZoneLength107C=0.f;
-    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
-    void* diagnosticContext=nullptr;
-};
-// TC-CONSUMER-END 0
-
-// TB-CONSUMER-BEGIN 0
-struct AiCombatCandidateInput50TB {
-    TrackNavigationView50TB trackFF4{};
-    AiTrackMetadataView50TB metadata{};
-    const AiObservedRacer50IV* target=nullptr;
-    const float* selfPosition190=nullptr;
-    std::uint32_t selfNodeC80=0;
-    std::int32_t selfLapCC8=0,selfPlaceCCC=0;
-    float combatZoneLength107C=0.f;
-    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
-    void* diagnosticContext=nullptr;
-};
-// TB-CONSUMER-END 0
-
-// GB-CONSUMER-BEGIN 0
-struct AiCombatCandidateInput50GB {
-    TrackNavigationView50GB trackFF4{};
-    AiTrackMetadataView50GB metadata{};
-    const AiObservedRacer50IV* target=nullptr;
-    const float* selfPosition190=nullptr;
-    std::uint32_t selfNodeC80=0;
-    std::int32_t selfLapCC8=0,selfPlaceCCC=0;
-    float combatZoneLength107C=0.f;
-    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
-    void* diagnosticContext=nullptr;
-};
-// GB-CONSUMER-END 0
-
-// MC-CONSUMER-BEGIN 0
-struct AiCombatCandidateInput50MC {
-    TrackNavigationView50MC trackFF4{};
-    AiTrackMetadataView50MC metadata{};
-    const AiObservedRacer50IV* target=nullptr;
-    const float* selfPosition190=nullptr;
-    std::uint32_t selfNodeC80=0;
-    std::int32_t selfLapCC8=0,selfPlaceCCC=0;
-    float combatZoneLength107C=0.f;
-    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
-    void* diagnosticContext=nullptr;
-};
-// MC-CONSUMER-END 0
 
 struct AiCombatCandidateReceipt50LH {
     bool accepted=false,clearRouteChoices=false;
@@ -143,24 +88,9 @@ inline bool gateDistance(const TrackNavigation50EU& track,std::uint32_t node,
 }
 inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50LH&) noexcept {return true;}
 inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50MB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
-// TC-CONSUMER-BEGIN 1
-inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50TC& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
-// TC-CONSUMER-END 1
-
-// TB-CONSUMER-BEGIN 1
-inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50TB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
-// TB-CONSUMER-END 1
-
-// GB-CONSUMER-BEGIN 1
-inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50GB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
-// GB-CONSUMER-END 1
-
-// MC-CONSUMER-BEGIN 1
-inline bool evaluateAiCombatCandidate50LHAdmission50MB(const AiCombatCandidateInput50MC& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
-// MC-CONSUMER-END 1
 
 template<class Input>
-    requires (std::is_same_v<Input,AiCombatCandidateInput50LH>||std::is_same_v<Input,AiCombatCandidateInput50MB>||std::is_same_v<Input,AiCombatCandidateInput50TC>||std::is_same_v<Input,AiCombatCandidateInput50TB>||std::is_same_v<Input,AiCombatCandidateInput50GB>||std::is_same_v<Input,AiCombatCandidateInput50MC>)
+    requires (std::is_same_v<Input,AiCombatCandidateInput50LH>||std::is_same_v<Input,AiCombatCandidateInput50MB>)
 inline bool evaluateAiCombatCandidate50LHShared50MB(const Input& input,
     AiCombatCandidateReceipt50LH& receipt,AiDrivingDiagnostic50IV& diagnostic) noexcept {
     // MB admission is sealed at the shared entry, before source effects.
@@ -216,44 +146,5 @@ inline bool evaluateAiCombatCandidate50LH(const AiCombatCandidateInput50MB& inpu
     }
     return evaluateAiCombatCandidate50LHShared50MB(input,receipt,diagnostic);
 }
-// TC-CONSUMER-BEGIN 2
-inline bool evaluateAiCombatCandidate50LH(const AiCombatCandidateInput50TC& input,
-    AiCombatCandidateReceipt50LH& receipt,AiDrivingDiagnostic50IV& diagnostic) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
-        receipt={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x1706c0u);
-    }
-    return evaluateAiCombatCandidate50LHShared50MB(input,receipt,diagnostic);
-}
-// TC-CONSUMER-END 2
-
-// TB-CONSUMER-BEGIN 2
-inline bool evaluateAiCombatCandidate50LH(const AiCombatCandidateInput50TB& input,
-    AiCombatCandidateReceipt50LH& receipt,AiDrivingDiagnostic50IV& diagnostic) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
-        receipt={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x1706c0u);
-    }
-    return evaluateAiCombatCandidate50LHShared50MB(input,receipt,diagnostic);
-}
-// TB-CONSUMER-END 2
-
-// GB-CONSUMER-BEGIN 2
-inline bool evaluateAiCombatCandidate50LH(const AiCombatCandidateInput50GB& input,
-    AiCombatCandidateReceipt50LH& receipt,AiDrivingDiagnostic50IV& diagnostic) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
-        receipt={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x1706c0u);
-    }
-    return evaluateAiCombatCandidate50LHShared50MB(input,receipt,diagnostic);
-}
-// GB-CONSUMER-END 2
-
-// MC-CONSUMER-BEGIN 2
-inline bool evaluateAiCombatCandidate50LH(const AiCombatCandidateInput50MC& input,
-    AiCombatCandidateReceipt50LH& receipt,AiDrivingDiagnostic50IV& diagnostic) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
-        receipt={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x1706c0u);
-    }
-    return evaluateAiCombatCandidate50LHShared50MB(input,receipt,diagnostic);
-}
-// MC-CONSUMER-END 2
 
 } //namespace rr::game
