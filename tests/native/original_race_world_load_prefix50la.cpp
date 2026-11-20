@@ -183,140 +183,7 @@ bool Owner::bindNativeTrackScb34(const original_main_entry50KG::Application& app
 }
 }
 
-namespace rr::game {
-bool OriginalRaceConstructor50LA::nativeTrackArchiveCurrent(
-    const original_main_entry50KG::Application& app)const noexcept {
-    return resultsFeedbackThread_==std::this_thread::get_id()&&nativeIntroWorldEntity()&&
-        world74_&&world74_->nativeTrackArchiveCurrent(app);
-}
-bool OriginalRaceConstructor50LA::bindNativeTrackScb34(
-    const original_main_entry50KG::Application& app,std::uint32_t& pc)noexcept {
-    return resultsFeedbackThread_==std::this_thread::get_id()&&nativeIntroWorldEntity()&&
-        world74_&&world74_->bindNativeTrackScb34(app,pc);
-}
-}
-
-namespace original_main_entry50KG {
-bool Application::completeConsumedRaWorldNativePrefix1A9EE0(
-    original_camera_session50KX::Session& session,std::uint32_t& pc)const noexcept {
-    using Step=rr::game::OriginalRaceConstructor50LA::NativeTrackLoadStep;
-    pc=0x1a6cc8;
-    //Immutable affinity checks precede every mutable Application/Race borrow.
-    if(garageAudioOwnerThread_!=std::this_thread::get_id()||
-       !session.onOwnerThread())return false;
-    if(session.coldPhase_!=1u)return false;
-    const auto race=sourceRace28COwner_;
-    //Preserve the existing explicitly unprepared native-only route. This
-    //predicate proves same custody plus NEVER-attempted providers and no10C;
-    //false currentness alone is never permission to skip a stale/partial load.
-    if(consumedRaMusicNativeOnlyNoPreparation(session))
-        return race&&race->nativeTrackLoadStep_==Step::unreached;
-    if(!consumedRaMusicNative10CCurrent(session))return false;
-    if(!race||race->resultsFeedbackThread_!=std::this_thread::get_id()||
-       !race->ownsNativeCameraAdapter34(session)||race->profile_!=riderProfile||
-       !riderProfile)return false;
-    try {
-        std::array<char,3> name{};
-        pc=0x1a6d00;
-        if(!riderProfile->selectedTrackName187330(name)||name!=std::array<char,3>{{'r','a','\0'}})
-            return false; //This real retained loader is RA-only, not a numeric track projection.
-        pc=0x1a6d48; //Native archive replacement interval, not an EE cache receipt.
-        if(race->nativeTrackLoadStep_==Step::unreached){
-            //Explicit Windows/Linux adaptation: bounded native progress and
-            //the ALREADY authenticated retained provider replace Application330
-            //and the EE archive-cache protocol. No source330 null or success is
-            //invented; no remount/redecode mutates current material borrowers.
-            if(trackDirectory36B640_!="tracks\\"||!race->nativeTrackArchiveCurrent(*this))return false;
-            race->nativeTrackName_=name;
-            race->nativeTrackLoadStep_=Step::archive;
-        }else if(race->nativeTrackName_!=name||!race->nativeTrackArchiveCurrent(*this))return false;
-        if(race->nativeTrackLoadStep_==Step::archive){
-            //1A9F68..A8 saves min(strlen,259) bytes and a terminator BEFORE
-            //the reached2E0 read. Native retry retains that exact preimage.
-            const auto nul=modelDirectory36B860_.find('\0');
-            const auto sourceLength=nul==std::string::npos?modelDirectory36B860_.size():nul;
-            const auto length=sourceLength<259u?sourceLength:259u;
-            std::memcpy(race->savedModelDirectory1A9EE0_.data(),modelDirectory36B860_.data(),length);
-            race->savedModelDirectory1A9EE0_[length]='\0';
-            race->nativeTrackLoadStep_=Step::savedDirectory;
-        }
-        if(race->nativeTrackLoadStep_==Step::savedDirectory){
-            pc=0x1a9fb0;
-            //Only the genuine normal-UI startup producer is admitted. Native
-            //CLI arguments never become the original predefined-track path.
-            if(!sourceUseProfile2E0_||*sourceUseProfile2E0_!=1u)return false;
-            trackDirectory36B640_="tracks\\"; //Both original branches set this literal.
-            pc=0x1a9fe0;
-            if(!riderProfile->selectedTrackName187330(name)||name!=race->nativeTrackName_)return false;
-            //World slot30 would clear source publication fields. This native
-            //backend already owns populated topology/resources, so lifecycle-
-            //checked same-owner adoption REPLACES that reset; it never replays
-            //270550 over live4C0/4C4/particle/geometry owners.
-            race->nativeTrackLoadStep_=Step::scb;
-        }
-        if(race->nativeTrackLoadStep_==Step::scb){
-            pc=0x1aa050; //Second actual Profile187330 read before slot7C.
-            if(!riderProfile->selectedTrackName187330(name)||name!=race->nativeTrackName_||
-               !race->bindNativeTrackScb34(*this,pc))return false;
-        }
-        //The native cursor never republishes SCB after its real temporary-role
-        //withdrawal. Reviewed same-owner SceneInfo adoption precedes that cut.
-        //Only the represented native-adapted1A9EE0 route may return here.
-        //Actual Race30/114770 and1A95B0 remain separate owner obligations.
-        if(!race->continueNativeTrackAfterScb(*this,pc)){
-            std::fprintf(stderr,"ra_native_track_load_stopped pc=%x step=%u",unsigned(pc),unsigned(race->nativeTrackLoadStep_));
-            std::fputc(10,stderr);return false;}
-        pc=0x1a6d98;
-        // Native preparation only. The orchestration's bool is not a loader
-        // completion token: demand its exact retained terminal cursor AND
-        // the completed same-owner tail observation before touching Session.
-        if(race->nativeTrackLoadStep_!=Step::nativeAdaptedReturn){
-            std::fprintf(stderr,"ra_native_track_load_step_unfinished step=%u",unsigned(race->nativeTrackLoadStep_));
-            std::fputc(10,stderr);return false;}
-        std::uint32_t tailPC=0;
-        if(!race->continueNativeTrackAfterWater(*this,tailPC)||tailPC!=0x1aa508){
-            std::fprintf(stderr,"ra_native_track_after_water_stopped pc=%x",unsigned(tailPC));
-            std::fputc(10,stderr);pc=tailPC;return false;}
-        // 1A9EE0 returned (1AA508). The camera controller load that follows
-        // (1A6D98 -> 1A95B0 -> 174DF0) now runs on the Session's existing
-        // never-adopted native staging, the same 174DF0/174A30 path every
-        // other course uses (it already carries RA's 78/7C children). The
-        // route-2 source-adopted owned preparation (never completed past
-        // 2C1170) is retired with its test switch.
-        std::fprintf(stderr,"ra_native_track_load_complete pc=1aa508 controller_load=existing_native_staging");
-        std::fputc(10,stderr);pc=0x1a6d98;return true;
-    }catch(...){return false;}
-}
-}
-
-namespace original_camera_session50KX {
-bool Session::completeCountedRaceWorldNativePrefix1A9EE0(std::uint32_t& pc)noexcept {
-    pc=0x1a6cc8;
-    if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
-    std::uint32_t pause=0;
-    return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
-        nativeTaIssuance_->issuer->completeConsumedRaWorldNativePrefix1A9EE0(*this,pc);
-}
-}
-
-namespace rr::game {
-bool OriginalRaceConstructor50LA::readSameControllerWorldCount174E48(
-    const original_camera_session50KX::Session& session,std::uint32_t& count,std::uint32_t& pc)const noexcept {
-    pc=0x174e48;
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!world74_||!application_||
-       !ownsNativeCameraAdapter34(session)||world74_->terminal_||world74_->closed_||
-       world74_->worldApplication_!=application_||
-       world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration||
-       !world74_->nativeCsCameraCount3E4_||!world74_->nativeCsCameraTable3E4_||
-       !world74_->nativeCsCameraZones3E8_)return false;
-    const auto& table=*world74_->nativeCsCameraTable3E4_;
-    if(table.sourceMode||table.session!=&session||table.authoring!=session.taCutAuthoring()||
-       table.next!=table.zones.size()||*world74_->nativeCsCameraZones3E8_!=&table.zones)return false;
-    //Read actual World lane published2723FC; authoring alone is NOT this value.
-    count=*world74_->nativeCsCameraCount3E4_;return true;
-}
-}
+// Common rewrite (R3): removed - the RA-only 1A9EE0 entry. The one track load is common_track50CR::Load (common_track_load50cr.cpp), run before the camera session for every course.
 
 // Separate native cold inventory/query lifecycle. These hooks do not execute
 //2129C0's source allocations or publish racer374, collection38, or any pieceD0.
@@ -425,30 +292,7 @@ bool OwnershipBridge::retireNativeRetainedWreckCold(original_camera_session50KX:
 }
 }
 
-namespace rr::game {
-bool OriginalRaceConstructor50LA::stageNativeFirstWreckLoad(
-    const original_main_entry50KG::Application& app,original_camera_session50KX::Session& session,
-    ra_source_camera50LA::OwnershipBridge& bridge,std::uint32_t& pc)noexcept {
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!ownsNativeCameraAdapter34(session)||
-       !world74_||!world74_->source_||!world74_->source_->sourcesDecoded())return false;
-    std::uint32_t tail=0;
-    if(!continueNativeTrackAfterWater(app,tail)||tail!=0x1aa508||
-       nativeWater70State_!=NativeWater70State::published||!nativeWater70Object_||
-       nativeWater70Domain_.expired())return false;
-    const auto& heights=world74_->source_->sourcesDecoded()->height.sourceDomain;
-    //The same native Race70 copy, not merely an immutable no-water descriptor,
-    //authorizes this private210804 alias before the2129C0 load sequence.
-    if(!world74_->worldWater3FC_||*world74_->worldWater3FC_||!world74_->nativeWaterNone274570_)return false;
-    const auto state=app.state;
-    if(!state||!bridge.nativeFirstWreckApplicationCurrent(session,app))return false;
-    // Synchronous borrow of this SAME live App state. No copied seed/facade,
-    // no retained raw pointer, and failure never rolls back consumed draws.
-    // PodLoad for every slot in manager order; this track's data through the
-    // one provider interface (original_pod_load50pl.h).
-    return bridge.loadPodRosterFromScene2129C0(session,*this,*world74_,*world74_->worldWater3FC_,heights,
-        app.materialDirectory36B970(),app.particleDirectory36B530(),state->rawRandom308030,pc);
-}
-}
+// Common rewrite (R3): removed - the RA-only 1A9EE0 entry. The one track load is common_track50CR::Load (common_track_load50cr.cpp), run before the camera session for every course.
 namespace ra_source_camera50LA {
 bool OwnershipBridge::nativeFirstWreckApplicationCurrent(
     const original_camera_session50KX::Session& session,
@@ -782,37 +626,7 @@ bool Owner::loadSourceTrackSegment1A6D48(const rr::game::OriginalRaceConstructor
     return loadSourceWorld1B3880(pc);
 }
 }
-namespace rr::game {
-bool OriginalRaceConstructor50LA::loadSourceTrackSegment1A6D48(
-    const original_main_entry50KG::Application& app,const std::string& modelDirectory,
-    std::string& trackDirectory,std::uint32_t& pc)noexcept {
-    pc=0;
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!world74_||!counted_||rolledBack_||
-       application_!=app.entities()||profile_!=app.riderProfile||!nativeIntroRaceEntity()||
-       nativeTrackLoadStep_!=NativeTrackLoadStep::unreached||cameraNativeAdapter34_||
-       !loadingCamera34_.suffixReturned||loadingCamera34_.terminal||
-       loadingCamera34_.stopPC!=0x1a9598||loadingCamera34_.arrayWithdrawn||
-       !loadingCameraSourceNullSuffixCurrent())return false;
-    return world74_->loadSourceTrackSegment1A6D48(*this,app,modelDirectory,trackDirectory,pc);
-}
-}
-namespace original_main_entry50KG {
-bool Application::loadRetainedSourceTrackSegment1A6CF4(std::uint32_t& pc)const noexcept {
-    pc=0; // This private segment has no upstream caller: music1A3C00 is unjoined.
-    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!sourceRace28COwner_||
-       raceConstructorColdOwner50LA_.lock()!=sourceRace28COwner_||!riderProfile||
-       !sourceUseProfile2E0_||*sourceUseProfile2E0_!=1u||!sourceLoading330Owner_)return false;
-    const auto& loader=*sourceLoading330Owner_;
-    // Exact constructor/initializer-produced null-mode branch of1A6CD4. No
-    // progress display or nonzero30 branch is accepted from native observations.
-    if(!loader.current()||loader.issuer_!=this||!loader.managerInitialized_||
-       !loader.slot330Published_||loader.retiring_||loader.retired_||loader.mode30_!=0u)return false;
-    try {
-        return sourceRace28COwner_->loadSourceTrackSegment1A6D48(*this,
-            modelDirectory36B860_,trackDirectory36B640_,pc);
-    }catch(...){return false;}
-}
-}
+// Common rewrite (R3): removed - the RA-only 1A9EE0 entry. The one track load is common_track50CR::Load (common_track_load50cr.cpp), run before the camera session for every course.
 
 namespace ra_cold_aggregate50LA {
 bool Owner::continueSourceWorldLog1B3AAC(std::uint32_t& pc)noexcept {

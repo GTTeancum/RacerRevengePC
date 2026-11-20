@@ -145,69 +145,7 @@ bool Owner::continueNativeTob1B4330(const original_main_entry50KG::Application& 
 }
 }
 
-namespace rr::game {
-bool OriginalRaceConstructor50LA::continueNativeTrackAfterScb(
-    const original_main_entry50KG::Application& app,std::uint32_t& pc)noexcept {
-    using Step=NativeTrackLoadStep;
-    pc=0x1aa078;
-    const auto bad=[&](int line)noexcept{std::fprintf(stderr,"ra_track_after_scb_rejected line=%d step=%u pc=%x",line,unsigned(nativeTrackLoadStep_),unsigned(pc));std::fputc(10,stderr);return false;};
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!nativeIntroWorldEntity()||
-       !world74_||!profile_)return bad(152);
-    if(nativeTrackLoadStep_==Step::nativeAdaptedA4||nativeTrackLoadStep_==Step::tobRetired||
-       nativeTrackLoadStep_==Step::aub||nativeTrackLoadStep_==Step::aubRetired||
-       nativeTrackLoadStep_==Step::nativeAdaptedReturn)return continueNativeTrackAfterTob(app,pc);
-    if(nativeTrackLoadStep_==Step::scb){
-        if(!world74_->continueNativeSceneInfo270900(app,pc))return bad(157);
-        nativeTrackLoadStep_=Step::sceneInfo;
-    }
-    if(nativeTrackLoadStep_==Step::sceneInfo){
-        if(!world74_->withdrawNativeScb34_271C10(app,pc))return bad(161);
-        nativeTrackLoadStep_=Step::scbRetired;
-    }
-    if(nativeTrackLoadStep_!=Step::scbRetired&&nativeTrackLoadStep_!=Step::tob)return bad(164);
-    if(!world74_->continueNativeTob1B4330(app,*profile_,pc))return bad(165);
-    nativeTrackLoadStep_=Step::tob;
-    if(!world74_->continueNativeTerrain271370(app,pc))return bad(167);
-    if(!world74_->nativeEmptyAnimations2713E0Complete_){
-        if(!world74_->loadNativeEmptyAnimations2713E0(*world74_->nativeTob34_->document,pc))return bad(169);
-        world74_->nativeEmptyAnimations2713E0Complete_=true;
-    }
-    if(!world74_->continueNativeTriggers1B5000(app,pc))return bad(172);
-    if(!world74_->continueNativePhysicsObjects2718C0(app,pc))return bad(173);
-    pc=0x271d64;
-    if(!world74_->runtimeQueries_||!world74_->runtimeQueries_->camera_||
-       world74_->runtimeQueries_->camera_->session.get()!=cameraNativeAdapter34_||
-       !cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*cameraNativeAdapter34_))return bad(177);
-    if(!world74_->continueNativeCsCameras272380(app,*cameraNativeAdapter34_,pc))return bad(178);
-    const bool completed=world74_->continueNativeSunFlareRead1B46E0(app,*profile_,pc);
-    if(completed)return true;
-    if(pc!=0x2c5c34||!loadDisplay_)return bad(181);
-    auto camera=world74_->borrowNativeLoadCamera(world74_,*cameraNativeAdapter34_);
-    if(!camera||camera.get()!=cameraNativeAdapter34_||!ownsNativeCameraAdapter34(*camera))return bad(183);
-    if(world74_->buildNativeSunFlarePacket2E6060(app,*loadDisplay_,*camera,pc))return true;
-    if(pc!=0x2c5c44)return bad(185);
-    if(world74_->loadNativeSunFlareResources2C5C44(app,pc))return true;
-    if(pc!=0x2c5cb4)return bad(187);
-    if(world74_->loadNativeSunFlareDepth2C5CF0(app,*loadDisplay_,*camera,pc))return true;
-    if(pc!=0x2720d0)return bad(189);
-    if(world74_->loadNativeSunFlareSaturation2720D0(app,pc))return true;
-    if(pc!=0x271d88)return bad(191);
-    if(world74_->loadNativeParticleDescriptors2722F0(app,pc))return true;
-    if(pc!=0x271d98)return bad(193);
-    if(world74_->loadNativeEmptyBuoys1B5090(app,pc))return true;
-    if(pc!=0x271da8)return bad(195);
-    if(world74_->loadNativeStaticModelParams271A00(app,pc))return true;
-    if(pc!=0x271db0||!world74_->nativeStaticModelParamEffectsComplete_||
-       world74_->nativeStaticModelParamsNext_!=673)return bad(198);
-    //271DB0 li v0,1;271DBC returns this represented native-adapted A4 route.
-    //No claim that earlier270900/fullWorld source services all ran.
-    nativeTrackLoadStep_=Step::nativeAdaptedA4;
-    // The sun-flare load borrow ends with those loads (A4 returned). The
-    // following 2729E0/273C30 services require no live camera/world borrow.
-    camera.reset();
-    return continueNativeTrackAfterTob(app,pc);
-}
-}
+// Common rewrite (R3): removed - the RA-only 1A9EE0 entry. The one track load is common_track50CR::Load (common_track_load50cr.cpp), run before the camera session for every course.
 
 namespace ra_cold_aggregate50LA {
 bool Owner::continueNativeTerrain271370(const original_main_entry50KG::Application& app,
@@ -1371,41 +1309,7 @@ bool Owner::loadNativeStaticModelParams271A00(const original_main_entry50KG::App
 }
 }
 
-namespace rr::game {
-bool OriginalRaceConstructor50LA::continueNativeTrackAfterTob(
-    const original_main_entry50KG::Application& app,std::uint32_t& pc)noexcept {
-    using Step=NativeTrackLoadStep;
-    pc=0x1aa0e0;
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!nativeIntroWorldEntity()||!world74_||
-       !profile_||nativeTrackName_!=std::array<char,3>{{'r','a','\0'}}||!nativeTrackArchiveCurrent(app))return false;
-    if(nativeTrackLoadStep_==Step::nativeAdaptedReturn)return continueNativeTrackAfterWater(app,pc);
-    if(nativeTrackLoadStep_==Step::aubRetired){
-        if(!world74_->nativeAubRoleRetired272930_||world74_->nativeAub38_)return false;
-        if(world74_->continueNativeZoneServices2729E0(app,pc))return true;
-        if(pc!=0x1aa400)return false;
-        return continueNativeTrackAfterWater(app,pc); //No reader republication.
-    }
-    if(nativeTrackLoadStep_==Step::nativeAdaptedA4){
-        if(!world74_->withdrawNativeTob34_272800(app,pc))return false;
-        nativeTrackLoadStep_=Step::tobRetired;
-    }
-    if(nativeTrackLoadStep_!=Step::tobRetired&&nativeTrackLoadStep_!=Step::aub)return false;
-    if(!world74_->bindNativeAub38_1B4720(app,pc))return false;
-    nativeTrackLoadStep_=Step::aub;
-    if(world74_->loadNativeEmptyAmbient271470(app,pc))return true;
-    if(pc!=0x2714d8)return false;
-    if(world74_->loadNativeSoulTreeSoundDescriptors2714D8(app,pc))return true;
-    if(pc!=0x271530)return false;
-    if(world74_->loadNativeMaterialSoundDescriptors271530(app,pc))return true;
-    if(pc!=0x2715e4||!world74_->completeNativeAudio2728E0(app,pc))return false;
-    if(!world74_->withdrawNativeAub38_272930(app,pc))return false;
-    nativeTrackLoadStep_=Step::aubRetired;
-    if(world74_->continueNativeZoneServices2729E0(app,pc))return true;
-    if(pc!=0x1aa400)return false;
-    return continueNativeTrackAfterWater(app,pc);
-
-}
-}
+// Common rewrite (R3): removed - the RA-only 1A9EE0 entry. The one track load is common_track50CR::Load (common_track_load50cr.cpp), run before the camera session for every course.
 namespace ra_cold_aggregate50LA {
 bool Owner::withdrawNativeTob34_272800(const original_main_entry50KG::Application& app,
     std::uint32_t& pc)noexcept {
@@ -3756,7 +3660,7 @@ bool RaceDisplayLifetime50LA::nativeSkyMetadataCurrent129280(
     // sky must be exactly this mesh and bank.
     if(!created_&&!attempted_&&renderer_.broughtUp()&&!renderer_.initialized())return true;
     rr::platform::VehicleWindowDiagnostic50DS diagnostic;
-    return renderer_.raSkySourceCurrent129280(mesh,bank,this,diagnostic);
+    return renderer_.skySourceCurrent129280(mesh,bank,this,diagnostic);
 }
 }
 #include "original_world_sky_prefix50la.inl"
