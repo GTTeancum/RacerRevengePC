@@ -24,27 +24,13 @@
 #include <cstdint>
 #include <memory>
 
-namespace ra_cold_aggregate50LA { class Owner; }
 namespace rr::game { class OriginalResults10450LA; }
-namespace rc_crystal50RC { class Owner; }
-namespace tb_original_world50LM { class Owner; }
-namespace rc_particle_visual50RC { class Window; }
-namespace rc_particle_render50RC { class Owner; }
-namespace gb_particle_visual50GB { class Window; }
-namespace mc_particle_visual50MC { class Window; }
-namespace gb_particle_render50GB { class Owner; }
-namespace mc_particle_render50MC { class Owner; }
+// The one track load (PLAN 2.2). The renderer only retains it as a lease.
+namespace common_track50CR { class Track; }
 namespace original_main_entry50KG { struct Application; class NativeVideoPacketInvocation50LA; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; class ResultsRendererLease50LA; class NativeResultsFrame50LA; }
-namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalRaceStartOverlay50HU; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; struct OriginalProjectedShadowFrame50PS; }
 namespace rr::platform {
-// Precharged common named-payload allowance for the GB binding metadata added
-// to the renderer Storage plus its retained Request, one input Request/Frame
-// and Diagnostic. Applies on every renderer route, including frontend/legacy.
-// This is not a claim about driver/allocator overhead or stack high-water use.
-inline constexpr std::size_t gbParticleRendererMetadataReservation50DS=256;
-inline constexpr std::size_t mcParticleRendererMetadataReservation50DS=256;
 class GameHost50ER;
 class OriginalUiGarageDrawContribution50KG;
 class OriginalUiSharedDialogs50KG;
@@ -63,7 +49,7 @@ enum class VehicleWindowOutput50DS : std::uint8_t {
 // Explicit native replacement of the existing opaque-textured host light.
 // This does not claim original material, normal, fog, alpha or specular parity.
 enum class NativeRacerLightingPolicy50DS : std::uint8_t {
-    unchangedHost, nativeGcSelectedLights
+    unchangedHost, nativeSelectedLights
 };
 constexpr std::uint32_t maxVehicleWindowMaterials50DS = 4096; // RRSCENE1 per-component cap.
 constexpr std::uint32_t maxVehicleWindowTrackSpans50DS = 65536;
@@ -170,8 +156,9 @@ struct VehicleWindowMaterials50DS {
 // AA field and map it here only after authentic material admission.
 enum class NativeTrackCoverage50DS : std::uint8_t { aa0, fourSampleAa1 };
 // Explicit native track-only UV policy; old callers retain the one-pass guard.
-// scLavaTwoPass is issued by the authenticated SC lava association owner.
-enum class NativeTrackUvPolicy50DS : std::uint8_t { legacySinglePass, scLavaTwoPass };
+// uvScrollTwoPass is issued by the one texture-scroll owner (29B1D0/29B050,
+// track_uv_animation50uv_fixture) for a two-pass scrolled surface, any course.
+enum class NativeTrackUvPolicy50DS : std::uint8_t { legacySinglePass, uvScrollTwoPass };
 struct VehicleWindowTrackSpan50DS {
     // Source-ordered triangle/vertex ranges into the unchanged flattened mesh.
     // First material passes partition both arrays contiguously, from zero;
@@ -218,9 +205,9 @@ struct VehicleWindowTrackSpan50DS {
     // by course or material name.
     std::uint8_t gsDestinationAlphaPass = 0;
     // Pass program EnvironmentMapCompressed: per-frame projected UVs from
-    // sidecar XY and the current ambient row as vertex colour. Today only
-    // the retained rc_crystal50RC owner produces these UVs (stand-in: the
-    // only environment-map program in course data is RC crystal01 pass 2).
+    // sidecar XY and the current ambient row as vertex colour. The UVs come
+    // from track.environmentUv, the track load's producer for every pass whose
+    // material data names this program (any course; none is named here).
     bool sourceEnvironmentMap = false;
     // Authored zone of this span's static model (SCB "ZoneN-ModelM", one-based
     // World48F instance zone). 0 = not zoned: never hidden by zone visibility.
@@ -241,13 +228,13 @@ struct VehicleWindowTrackZone50DS {
 };
 constexpr std::uint32_t maxVehicleWindowTrackZones50DS = 64;
 // Pure cold validation of the only newly admitted two-pass UV presentation.
-// Authentic source provenance is supplied by sc_lava_uv_fixture::Owner; this
+// Source provenance is the one texture-scroll owner (29B1D0); this
 // checks its lowered render values and is also used by renderer preflight.
-inline bool validScLavaUvPair50DS(const VehicleWindowTrackSpan50DS& first,
+inline bool validUvScrollTwoPassPair50DS(const VehicleWindowTrackSpan50DS& first,
     const VehicleWindowTrackSpan50DS& second) noexcept {
     const auto policy=[](const VehicleWindowTrackSpan50DS& s,bool secondPass) {
         const auto& m=s.material;
-        return s.sourceUvPolicy==NativeTrackUvPolicy50DS::scLavaTwoPass &&
+        return s.sourceUvPolicy==NativeTrackUvPolicy50DS::uvScrollTwoPass &&
             s.sourceUvAnimation && s.sourcePass==(secondPass?2u:1u) && s.sourcePassCount==2 &&
             !s.projectionPass && m.mode==VehicleWindowMaterialMode50DS::requiredTexture &&
             m.textureIndex!=assets::unresolvedMaterialTexture50EA && m.depthWrite && m.depthEqual &&
@@ -305,6 +292,29 @@ struct VehicleWindowWorldFog50DS {
     bool enabled = false;
     float color[3]{};
     float start = 0.f, end = 1.f;
+};
+struct VehicleWindowTrack50DS;
+// Environment-map UV producer (pass program EnvironmentMapCompressed). The
+// track load owns it and builds it from the world's own environment-mapped
+// sources; any course whose material data has such a pass supplies one, and
+// a track without one supplies none. The renderer borrows it through checked
+// retirement, copies nothing from it cold, and calls project() once per frame.
+class VehicleWindowEnvironmentUv50DS {
+public:
+    struct Range { std::uint32_t vertexStart = 0, vertexCount = 0; };
+    virtual ~VehicleWindowEnvironmentUv50DS() = default;
+    virtual bool ready() const noexcept = 0;
+    // Ascending, disjoint vertex ranges of the uploaded track mesh. Their
+    // vertex counts sum to uvCount(); the producer reads that count from data.
+    virtual const Range* ranges() const noexcept = 0;
+    virtual std::size_t rangeCount() const noexcept = 0;
+    virtual std::size_t uvCount() const noexcept = 0;
+    // Cold: the exact descriptor (mesh, spans, bank, pass marks) it was built for.
+    virtual bool validate(const VehicleWindowTrack50DS&) const noexcept = 0;
+    // Per frame: uvCount() UVs in range order, and the current ambient row
+    // bytes. A rejected call leaves nothing to upload or draw.
+    virtual bool project(const game::CameraViewOutput49F& camera, std::array<float, 2>* uvs,
+        std::size_t capacity, std::array<std::uint8_t, 4>& ambient) const noexcept = 0;
 };
 struct VehicleWindowTrack50DS {
     // Optional actual visual triangle mesh, already in world space. Borrowed
@@ -369,24 +379,12 @@ struct VehicleWindowTrack50DS {
     // Static-world opaque depth-writing surfaces and admitted projected pairs
     // only. Does not apply to sky, pod effects, UI or dynamic-world owners.
     VehicleWindowWorldFog50DS worldFog{};
-    // Optional bounded four-span native FireP0t publication. No RA admission.
-    // Actual renderer and image owners retain private source leases until
-    // checked retirement; caller cannot close canonical facets underneath them.
-    std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFire;
-    // Actual RC source/world/lighting lifetime; excludes generic projection.
-    // Exact float2 GPU capacity and compact CPU staging are caller charged.
-    std::shared_ptr<rc_crystal50RC::Owner> rcCrystal;
-    // Same authenticated immutable TB world retained through renderer retirement.
-    // Cold validation binds exact mesh, projection, spans and source texture bank.
-    std::shared_ptr<const tb_original_world50LM::Owner> tbWorld;
-    std::size_t maximumRcProjectionBytes=0,maximumRcStagingBytes=0;
-    // Exact RC world/attachment owner, retained through actual GPU retirement.
-    // Native per-instance completion policy: private gameplay draw attempts,
-    // never a caller-authored scene stamp or source portal-stamp equivalence.
-    std::shared_ptr<rc_particle_visual50RC::Window> rcParticleWindow;
-    // Exact 55-placement GB static-world/material/complete-span authority.
-    std::shared_ptr<gb_particle_visual50GB::Window> gbParticleWindow;
-    std::shared_ptr<mc_particle_visual50MC::Window> mcParticleWindow;
+    // Optional environment-map UV producer (see above), retained through
+    // checked retirement. Requires environment-marked spans and the coverage
+    // targets of their destination-alpha pair. The float2 GPU stream (one per
+    // mesh vertex) and the compact CPU staging (uvCount) are caller charged.
+    std::shared_ptr<const VehicleWindowEnvironmentUv50DS> environmentUv;
+    std::size_t maximumEnvironmentUvBytes = 0, maximumEnvironmentStagingBytes = 0;
 };
 // Narrow mutable world path for caller-animated authentic scene owners. The
 // aggregate retains one fixed source topology/material table across the session.
@@ -479,16 +477,23 @@ struct VehicleWindowWater50DS {
     std::uint32_t maximumStrips = 0;
 };
 inline constexpr std::uint32_t vehicleWindowWaterStripVertices50DS = 34;
-// One-player MC: (256-1) rows x 4 bands = 1020 strips.
+// Allocation ceiling (largest stock: one player, (256-1) rows x 4 bands =
+// 1020 strips); the caller sizes maximumStrips from the track's water data.
 inline constexpr std::uint32_t maxVehicleWindowWaterStrips50DS = 1024;
 struct VehicleWindowRequest50DS {
     // Actual display-sealed direct-transfer binding, retained through local HUD uploads.
     std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> originalUploadBinding;
-    // Actual retained RA aggregate and its complete immutable 49-image GPU bank.
-    // This selects the dedicated byte-material world path, never legacy track
-    // shading. Prepare current native lighting/diffuse/fog bindings before submit.
-    std::shared_ptr<ra_cold_aggregate50LA::Owner> raStaticWorld;
-    const MaterialTextureGl50EB* raStaticWorldTextures = nullptr;
+    // The one track load of this race (PLAN 2.2), every course alike. The
+    // renderer retains it, and the role owners whose data the track/sky/water/
+    // animation/particle descriptors below borrow (static world, sky, fog,
+    // water, ATM, UV and track animation, particles), through checked GPU
+    // retirement, so Track::release cannot close them underneath the GPU.
+    // With it, track.mesh/spans/textures must be roles.staticWorld's own mesh,
+    // span table and bank (that mesh stays readable through the lease), and
+    // sky/water/particle/animation descriptors must be those roles' data.
+    // Null for frontend, viewer and host-check routes (no race track load).
+    // (Named commonTrack: `track` is the VehicleWindowTrack50DS descriptor.)
+    std::shared_ptr<const common_track50CR::Track> commonTrack;
 
     // Borrowed until close. isCurrent must check this exact live desktop GL
     // context AND its host surface/currentness contract, on the creating thread,
@@ -542,7 +547,7 @@ struct VehicleWindowRequest50DS {
     const MaterialTextureGl50EB* originalUiTextures = nullptr;
     VehicleWindowSky50DS sky{};
     // Original projected pod shadows: per static world instance (the index in
-    // VehicleWindowTrackSpan50DS::worldInstance and the RA surface plan), the
+    // VehicleWindowTrackSpan50DS::worldInstance), the
     // TOB AllowShadowReceiving value and the instance zone. Borrowed only
     // during create() and copied. Zero count: no receivers, no shadows drawn.
     const std::uint32_t* staticShadowReceiving = nullptr;
@@ -580,11 +585,12 @@ struct VehicleWindowRequest50DS {
     // Requires caller-material track program and cable storage. Uses authored
     // world fog by default and honors its explicit diagnostic opt-out.
     const MaterialTextureGl50EB* gameplayBinderTextures = nullptr;
-    // Genuine shared GC manager material/atlas. CPU/GPU publication and parsed
-    // material stay alive unchanged through close. No UI scene is authorized.
-    const assets::MaterialTextureAssets50EA* gcParticleCpuTextures = nullptr;
-    const MaterialTextureGl50EB* gcParticleTextures = nullptr;
-    const assets::OriginalGcParticleMaterial50KG* gcParticleMaterial = nullptr;
+    // The one track particle manager's material/atlas (1B4DC0 over the 27DE00
+    // reader; the track's own PSM/PST), every course alike. CPU/GPU publication
+    // and parsed material stay alive unchanged through close. No UI scene.
+    const assets::MaterialTextureAssets50EA* particleCpuTextures = nullptr;
+    const MaterialTextureGl50EB* particleTextures = nullptr;
+    const assets::OriginalGcParticleMaterial50KG* particleMaterial = nullptr;
     // Optional cold debris pieces; absent mesh draws none.
     VehicleWindowDebris50DS debris{};
     // Optional wreck particle atlas; zero texture draws no effects.
@@ -814,9 +820,9 @@ struct VehicleWindowFrame50DS {
     // No-request queue retains the video owner's previous coefficient/rectangle.
     const GameplayBlurFrame50DS* gameplayBlur = nullptr;
     const VehicleWindowTrackUvFrame50DS* trackUvAnimation = nullptr;
-    //Actual shared manager packets, borrowed through this one transaction;
-    //all5000 slots can draw. Drawn after Binder, before HUD/display blur.
-    const game::OriginalGcParticleDraw50KG* gcParticles = nullptr;
+    //Actual track particle manager packets, borrowed through this one
+    //transaction; all5000 slots can draw. Drawn after Binder, before HUD/blur.
+    const game::OriginalGcParticleDraw50KG* particles = nullptr;
     // Optional genuine single-view lap text/gleam owner bound by the method
     // below. Native gauges/countdown remain. Unsupported live states skip
     // only this layer; no empty batch counts as an original GPU submission.
@@ -845,12 +851,6 @@ struct VehicleWindowFrame50DS {
     // actual optional lower left/right (null for three-model pods).
     // Borrow only through submit, paired with each component's successful batch.
     std::array<game::OriginalRacerModelPackets50LA*, game::maxVehicleDrawComponents50CM> sourceBodyModelPackets50LA{};
-    // Actual RC numeric owner, accepted only within its private withDraw
-    // borrow and the same Window's canonical material/atlas callback.
-    // It lends no caller-authored OriginalGcParticleDraw receipt.
-    std::shared_ptr<rc_particle_render50RC::Owner> rcParticles;
-    std::shared_ptr<gb_particle_render50GB::Owner> gbParticles;
-    std::shared_ptr<mc_particle_render50MC::Owner> mcParticles;
     // Optional synchronous native F8 bars/icon/text borrow. Only its actual private
     // Application factory issues this batch. No140230/199500/FIFO completion
     // or live end-flow admission follows from a successful native submission.
@@ -942,7 +942,7 @@ struct VehicleWindowDiagnostic50DS {
     // draw renders both actual cable strips, after the pod, before commit.
     std::uint32_t cableDraws = 0, cableVertices = 0, cableIndices = 0;
     std::uint32_t gameplayBinderDraws = 0;
-    std::uint32_t gcParticleDraws = 0,gcParticleAlphaDraws = 0,gcParticleQuads = 0;
+    std::uint32_t particleDraws = 0,particleAlphaDraws = 0,particleQuads = 0;
     std::uint32_t gameplayBlurDraws = 0;
     // Checked native bar commands only; require batchAccepted for publication.
     // Icon/text native commands also do not complete a source callback.
@@ -1025,17 +1025,14 @@ struct VehicleWindowDiagnostic50DS {
     // still abort the complete frame before the existing publication point.
     std::uint32_t sourceSpecularBaseGroups50LA = 0, sourceSpecularSecondTriangles50LA = 0;
     std::uint32_t sourceSpecularSkippedGroups50LA = 0;
-    // RC source-selected triangle work after ordinary frustum/chunk culling.
-    // Compositions are issued GL calls, never surviving-fragment counts.
-    // Wall time is CPU submit time only, measured iff the existing opt-in is on.
-    std::uint32_t rcCrystalTriangles = 0, rcCrystalEmptyTriangles = 0;
-    std::uint32_t rcCrystalCompositionsIssued = 0, rcCrystalFullRectangles = 0;
-    std::uint64_t rcCrystalSubmissionWallUs = 0;
-    bool rcCrystalWallMeasured = false;
-    // Actual RC particle kernel counters; no GC source-identity claim.
-    std::uint32_t rcParticleDraws = 0,rcParticleAlphaDraws = 0,rcParticleQuads = 0;
-    std::uint32_t gbParticleDraws = 0,gbParticleAlphaDraws = 0,gbParticleQuads = 0;
-    std::uint32_t mcParticleDraws = 0,mcParticleAlphaDraws = 0,mcParticleQuads = 0;
+    // GS destination-alpha pair triangle work (any course whose material
+    // data has the pair) after ordinary frustum/chunk culling. Compositions
+    // are issued GL calls, never surviving-fragment counts. Wall time is CPU
+    // submit time only, measured iff the existing opt-in is on.
+    std::uint32_t destinationAlphaTriangles = 0, destinationAlphaEmptyTriangles = 0;
+    std::uint32_t destinationAlphaCompositionsIssued = 0, destinationAlphaFullRectangles = 0;
+    std::uint64_t destinationAlphaSubmissionWallUs = 0;
+    bool destinationAlphaWallMeasured = false;
 };
 
 // Unforgeable renderer-issued value. The live renderer revalidates its weak
@@ -1575,15 +1572,12 @@ public:
     std::uint32_t racerGpuSkinMask50LA(std::uint32_t archetype) const noexcept;
     // Original caster LOD count (+1B4 -> +10) of one racer part, 0 if none.
     std::uint32_t racerShadowLodCount50PS(std::uint32_t archetype, std::uint32_t component) const noexcept;
-    // Optional source/GPU-storage provenance of the retained accepted RA frame. Call at
-    // capture selection, after excluding capture work from FPS measurement.
-    // RR_RA_PIXEL_PROVENANCE=1 enables a bounded log and six fog buffer reads; no draws.
-    // Reports conservative candidates, never final GPU pixel ownership.
-    void logRaCapturePixelProvenance() noexcept;
-    // Current GPU-completed native FireP0t publication. No caller supplies
-    // span bits, generation or completion evidence; no particle activation.
-    bool completedRaStaticFire(ra_static_fire_visual50LA::CompletedDrawReceipt&,
-        VehicleWindowDiagnostic50DS&) const noexcept;
+    // Optional source provenance of the retained accepted gameplay frame, any
+    // course. Call at capture selection, after excluding capture work from FPS
+    // measurement. RR_PIXEL_PROVENANCE=1 (default off) enables one bounded log
+    // of the track triangles whose conservative raster region holds the probe
+    // pixel; no draws, no GPU reads. Never final GPU pixel ownership.
+    void logCapturePixelProvenance() noexcept;
     // Copy requested source-span submitted bits (0/1) from the last completed
     // gameplay render. No guessed culling result, GL work, allocation, mutation
     // or new receipt. Before the first completion, returns noImage. Menus/fades
@@ -1672,7 +1666,7 @@ private:
         OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     // Private original-producer observation, not a new render/upload path.
-    bool raSkySourceCurrent129280(const assets::Mesh48B&,
+    bool skySourceCurrent129280(const assets::Mesh48B&,
         const assets::MaterialTextureAssets50EA&,const void* actualDisplay,
         VehicleWindowDiagnostic50DS&)const noexcept;
     // Actual session owner alone admits the source reset between submissions.

@@ -1,208 +1,50 @@
 #include "vehicle_window_gl50ds_storage.h"
 #include <cstdlib>
-#include "../../../tests/native/ra_static_fire_visual50la.h"
-#include "../../../tests/native/rc_particle_visual50rc.h"
-#include "../../../tests/native/gb_particle_visual50gb.h"
-#include "../../../tests/native/mc_particle_visual50mc.h"
 
 namespace rr::platform {
 
-bool VehicleWindowGl50DS::raSkySourceCurrent129280(const assets::Mesh48B& mesh,
+bool VehicleWindowGl50DS::skySourceCurrent129280(const assets::Mesh48B& mesh,
     const assets::MaterialTextureAssets50EA& bank,const void* actualDisplay,
     VehicleWindowDiagnostic50DS& d)const noexcept {
+    // The one track sky (274AE0, any course): the original producer checks
+    // that its own cold mesh/bank is what this renderer uploaded. Counts are
+    // the mesh's and bank's own, never a course's literal extents.
     d={};
     if(!actualDisplay||sessionDisplayOwner50LA_!=actualDisplay||!storage_||
        !storage_->initialized||storage_->frontendOnly)
-        return fail(d,VehicleWindowError50DS::notInitialized,"RA sky requires actual initialized gameplay Display");
+        return fail(d,VehicleWindowError50DS::notInitialized,"track sky requires actual initialized gameplay Display");
     const auto& s=*storage_;
     if(!s.current(d))return false;
     if(s.active||s.frameSet||s.diagnostic)
-        return fail(d,VehicleWindowError50DS::frame,"RA sky source inspection requires idle original renderer");
+        return fail(d,VehicleWindowError50DS::frame,"track sky source inspection requires idle original renderer");
     // Identity comparison only. Never read through the saved CPU address.
     if(s.nativeSkyMeshIdentity129280!=&mesh||!s.skyVertexBuffer||!s.skyIndexBuffer||
-       !s.skyVertexArray||s.skyIndexCount!=288||s.skySpanCount!=48u||!s.skySpans||
-       !bank.loaded()||bank.textureCount()!=48u||bank.slotCount()!=48u||
-       mesh.vertices.size()!=192u||mesh.indices.size()!=288u)
-        return fail(d,VehicleWindowError50DS::assets,"RA sky differs from actual cold geometry publication");
+       !s.skyVertexArray||mesh.indices.empty()||mesh.vertices.empty()||
+       mesh.indices.size()>std::size_t(std::numeric_limits<I>::max())||
+       s.skyIndexCount!=I(mesh.indices.size())||!s.skySpanCount||!s.skySpans||
+       !bank.loaded()||!bank.textureCount())
+        return fail(d,VehicleWindowError50DS::assets,"track sky differs from actual cold geometry publication");
     const auto* gpu=s.request.sky.textures;
-    if(!gpu||!s.skyTexturePublication||gpu->textureCount()!=48u||
+    if(!gpu||!s.skyTexturePublication||gpu->textureCount()!=bank.textureCount()||
        !gpu->matchesSourceBank(bank,s.skyTexturePublication)||
        !gpu->validBorrow(s.request.context,s.request.isCurrent,s.skyTexturePublication))
-        return fail(d,VehicleWindowError50DS::material,"RA sky requires same original bank/GPU/context publication");
-    for(std::uint32_t i=0;i<48u;++i){const auto& span=s.skySpans[i];
-        const auto& material=span.material;const auto* image=bank.texture(i);
-        if(!image||image->identity!=i||span.indexStart!=6u*i||span.indexCount!=6u||
-           material.textureIndex!=i||material.policy.textureIndex!=i||
+        return fail(d,VehicleWindowError50DS::material,"track sky requires same original bank/GPU/context publication");
+    for(std::uint32_t i=0;i<s.skySpanCount;++i){const auto& span=s.skySpans[i];
+        const auto& material=span.material;
+        if(material.textureIndex>=bank.textureCount()||!bank.texture(material.textureIndex)||
+           std::uint64_t(span.indexStart)+span.indexCount>mesh.indices.size()||
+           material.policy.textureIndex!=material.textureIndex||
            material.policy.mode!=VehicleWindowMaterialMode50DS::requiredTexture||
            material.policy.depthWrite||!material.policy.unlit||
-           !material.name||material.name!=gpu->texture(i))
-            return fail(d,VehicleWindowError50DS::material,"RA sky copied span/image differs from original upload");
+           !material.name||material.name!=gpu->texture(material.textureIndex))
+            return fail(d,VehicleWindowError50DS::material,"track sky copied span/image differs from original upload");
     }
     return true;
 }
-void VehicleWindowGl50DS::Storage::retireRaStaticFirePublication() noexcept {
-        if(raStaticFireOwner){
-            raStaticFireOwner->retireRenderer(raStaticFireRenderer);
-            raStaticFireOwner.reset();raStaticFireRenderer=nullptr;raStaticFirePublicationSerial=0;
-        }
-    }
-
-bool VehicleWindowGl50DS::Storage::cancelRcParticleAttempt() noexcept {
-        if(!rcParticleWindow||!rcParticlePendingAttempt)return true;
-        if(rcParticleWindow->renderer_!=rcParticleRenderer||
-           rcParticleWindow->lastAttempt_!=rcParticlePendingAttempt)return false;
-        if(rcParticleWindow->attemptActive_&&
-           !rcParticleWindow->failRenderAttempt(rcParticleRenderer,rcParticlePendingAttempt))return false;
-        rcParticlePendingAttempt=0;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::beginRcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!rcParticleWindow)return true;
-        if(!cancelRcParticleAttempt())return fail(d,VehicleWindowError50DS::frame,"RC prior particle draw attempt could not retire");
-        if(rcParticleAttempt==std::numeric_limits<std::uint64_t>::max()){
-            if(!rcParticleWindow->invalidateRenderPublication(rcParticleRenderer))d.cleanupIncomplete=true;
-            return fail(d,VehicleWindowError50DS::limits,"RC particle draw generation exhausted");
-        }
-        const auto attempt=++rcParticleAttempt;
-        if(!rcParticleWindow->beginRenderAttempt(rcParticleRenderer,attempt))
-            return fail(d,VehicleWindowError50DS::frame,"RC particle draw attempt owner rejected");
-        rcParticlePendingAttempt=attempt;rcParticleCompletedBefore=trackVisibilityCompletedGeneration;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::completeRcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!rcParticleWindow||!rcParticlePendingAttempt)return true;
-        if(active||frameSet||diagnostic||!current(d)||!texturesCurrent(d)||
-           !trackVisibilityCompletedValid||trackVisibilityCompletedGeneration<=rcParticleCompletedBefore)
-            return fail(d,VehicleWindowError50DS::frame,"RC particle completion requires the same idle current completed draw");
-        std::array<bool,4> submitted{};
-        for(std::size_t i=0;i<submitted.size();++i){
-            if(rcParticleWindow->spans_[i].empty())return fail(d,VehicleWindowError50DS::frame,"RC source instance has no authenticated spans");
-            submitted[i]=true;
-            for(const auto span:rcParticleWindow->spans_[i]){
-                if(span>=trackSpanCount)return fail(d,VehicleWindowError50DS::frame,"RC source instance span exceeds retained renderer table");
-                submitted[i]=submitted[i]&&trackSpans[span].submittedCompletedGameplay;
-            }
-        }
-        if(!rcParticleWindow->recordCompleted(rcParticleRenderer,rcParticlePendingAttempt,
-            trackVisibilityCompletedGeneration,submitted))
-            return fail(d,VehicleWindowError50DS::frame,"RC actual particle instance completion publication rejected");
-        rcParticlePendingAttempt=0;return true;
-    }
-
-void VehicleWindowGl50DS::Storage::retireRcParticlePublication() noexcept {
-        if(rcParticleWindow){
-            if(!cancelRcParticleAttempt())std::terminate();
-            rcParticleWindow->retireRenderer(rcParticleRenderer);
-            rcParticleWindow.reset();rcParticleRenderer=nullptr;
-        }
-    }
-
-bool VehicleWindowGl50DS::Storage::cancelGbParticleAttempt() noexcept {
-        if(!gbParticleWindow||!gbParticlePendingAttempt)return true;
-        if(gbParticleWindow->renderer_!=gbParticleRenderer||
-           gbParticleWindow->lastAttempt_!=gbParticlePendingAttempt)return false;
-        if(gbParticleWindow->attemptActive_&&
-           !gbParticleWindow->failRenderAttempt(gbParticleRenderer,gbParticlePendingAttempt))return false;
-        gbParticlePendingAttempt=0;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::beginGbParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!gbParticleWindow)return true;
-        if(!cancelGbParticleAttempt())return fail(d,VehicleWindowError50DS::frame,"GB prior particle draw attempt could not retire");
-        if(gbParticleAttempt==std::numeric_limits<std::uint64_t>::max()){
-            if(!gbParticleWindow->invalidateRenderPublication(gbParticleRenderer))d.cleanupIncomplete=true;
-            return fail(d,VehicleWindowError50DS::limits,"GB particle draw generation exhausted");
-        }
-        const auto attempt=++gbParticleAttempt;
-        if(!gbParticleWindow->beginRenderAttempt(gbParticleRenderer,attempt))
-            return fail(d,VehicleWindowError50DS::frame,"GB particle draw attempt owner rejected");
-        gbParticlePendingAttempt=attempt;gbParticleCompletedBefore=trackVisibilityCompletedGeneration;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::completeGbParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!gbParticleWindow||!gbParticlePendingAttempt)return true;
-        if(active||frameSet||diagnostic||!current(d)||!texturesCurrent(d)||
-           !trackVisibilityCompletedValid||trackVisibilityCompletedGeneration<=gbParticleCompletedBefore)
-            return fail(d,VehicleWindowError50DS::frame,"GB particle completion requires the same idle current completed draw");
-        std::array<bool,gb_particle_attachments50GB::placementCount> submitted{};
-        for(std::size_t i=0;i<submitted.size();++i){
-            const auto association=gbParticleWindow->representative_[i];
-            const auto count=gbParticleWindow->attachments_->spanCount(association);
-            const auto* spans=gbParticleWindow->attachments_->spanIndices(association);
-            if(!count||!spans)return fail(d,VehicleWindowError50DS::frame,"GB source instance has no authenticated spans");
-            submitted[i]=true;
-            for(std::size_t n=0;n<count;++n){const auto span=spans[n];
-                if(span>=trackSpanCount)return fail(d,VehicleWindowError50DS::frame,"GB source instance span exceeds retained renderer table");
-                submitted[i]=submitted[i]&&trackSpans[span].submittedCompletedGameplay;
-            }
-        }
-        if(!gbParticleWindow->recordCompleted(gbParticleRenderer,gbParticlePendingAttempt,
-            trackVisibilityCompletedGeneration,submitted))
-            return fail(d,VehicleWindowError50DS::frame,"GB actual particle instance completion publication rejected");
-        gbParticlePendingAttempt=0;return true;
-    }
-
-void VehicleWindowGl50DS::Storage::retireGbParticlePublication() noexcept {
-        if(gbParticleWindow){
-            if(!cancelGbParticleAttempt())std::terminate();
-            gbParticleWindow->retireRenderer(gbParticleRenderer);
-            gbParticleWindow.reset();gbParticleRenderer=nullptr;
-        }
-    }
-
-bool VehicleWindowGl50DS::Storage::cancelMcParticleAttempt() noexcept {
-        if(!mcParticleWindow||!mcParticlePendingAttempt)return true;
-        if(mcParticleWindow->renderer_!=mcParticleRenderer||
-           mcParticleWindow->lastAttempt_!=mcParticlePendingAttempt)return false;
-        if(mcParticleWindow->attemptActive_&&
-           !mcParticleWindow->failRenderAttempt(mcParticleRenderer,mcParticlePendingAttempt))return false;
-        mcParticlePendingAttempt=0;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::beginMcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!mcParticleWindow)return true;
-        if(!cancelMcParticleAttempt())return fail(d,VehicleWindowError50DS::frame,"MC prior particle draw attempt could not retire");
-        if(mcParticleAttempt==std::numeric_limits<std::uint64_t>::max()){
-            if(!mcParticleWindow->invalidateRenderPublication(mcParticleRenderer))d.cleanupIncomplete=true;
-            return fail(d,VehicleWindowError50DS::limits,"MC particle draw generation exhausted");
-        }
-        const auto attempt=++mcParticleAttempt;
-        if(!mcParticleWindow->beginRenderAttempt(mcParticleRenderer,attempt))
-            return fail(d,VehicleWindowError50DS::frame,"MC particle draw attempt owner rejected");
-        mcParticlePendingAttempt=attempt;mcParticleCompletedBefore=trackVisibilityCompletedGeneration;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::completeMcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!mcParticleWindow||!mcParticlePendingAttempt)return true;
-        if(active||frameSet||diagnostic||!current(d)||!texturesCurrent(d)||
-           !trackVisibilityCompletedValid||trackVisibilityCompletedGeneration<=mcParticleCompletedBefore)
-            return fail(d,VehicleWindowError50DS::frame,"MC particle completion requires the same idle current completed draw");
-        std::array<bool,mc_particle_attachments50MC::placementCount> submitted{};
-        for(std::size_t i=0;i<submitted.size();++i){
-            const auto association=mcParticleWindow->representative_[i];
-            // A placement slot the live emitter table does not use stays unsubmitted.
-            if(association>=mc_particle_attachments50MC::associationCount)continue;
-            const auto count=mcParticleWindow->attachments_->spanCount(association);
-            const auto* spans=mcParticleWindow->attachments_->spanIndices(association);
-            if(!count||!spans)return fail(d,VehicleWindowError50DS::frame,"MC source instance has no authenticated spans");
-            submitted[i]=true;
-            for(std::size_t n=0;n<count;++n){const auto span=spans[n];
-                if(span>=trackSpanCount)return fail(d,VehicleWindowError50DS::frame,"MC source instance span exceeds retained renderer table");
-                submitted[i]=submitted[i]&&trackSpans[span].submittedCompletedGameplay;
-            }
-        }
-        if(!mcParticleWindow->recordCompleted(mcParticleRenderer,mcParticlePendingAttempt,
-            trackVisibilityCompletedGeneration,submitted))
-            return fail(d,VehicleWindowError50DS::frame,"MC actual particle instance completion publication rejected");
-        mcParticlePendingAttempt=0;return true;
-    }
-
-void VehicleWindowGl50DS::Storage::retireMcParticlePublication() noexcept {
-        if(mcParticleWindow){
-            if(!cancelMcParticleAttempt())std::terminate();
-            mcParticleWindow->retireRenderer(mcParticleRenderer);
-            mcParticleWindow.reset();mcParticleRenderer=nullptr;
-        }
+void VehicleWindowGl50DS::Storage::retireTrackLeases() noexcept {
+        // Only after checked GPU retirement (callers): the role owners and the
+        // environment-map producer may then close under Track::release.
+        retainedTrackMesh=nullptr;trackRoleLeases={};request.track.environmentUv.reset();request.commonTrack.reset();
     }
 
 bool VehicleWindowGl50DS::Storage::podMaterialUsesNormals(const VehicleWindowMaterialBinding50DS& policy) noexcept {
@@ -248,22 +90,9 @@ bool VehicleWindowGl50DS::Storage::current(VehicleWindowDiagnostic50DS& d,
     }
 
 bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& d) const noexcept {
-        if(!currentRaStaticFire(request.track,d))return false;
-        if(rcParticleWindow&&(!rcParticleWindow->ready()||
-           !rcParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,rcParticlePublication)||
-           !rcParticleWindow->gpu_.matchesSourceBank(rcParticleWindow->bank_,rcParticlePublication)))
-            return fail(d,VehicleWindowError50DS::material,"RC particle actual atlas publication/context changed");
-        if(gbParticleWindow&&(!gbParticleWindow->ready()||
-           !gbParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,gbParticlePublication)||
-           !gbParticleWindow->gpu_.matchesSourceBank(gbParticleWindow->bank_,gbParticlePublication)))
-            return fail(d,VehicleWindowError50DS::material,"GB particle actual atlas publication/context changed");
-        if(mcParticleWindow&&(!mcParticleWindow->ready()||
-           !mcParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,mcParticlePublication)||
-           !mcParticleWindow->gpu_.matchesSourceBank(mcParticleWindow->bank_,mcParticlePublication)))
-            return fail(d,VehicleWindowError50DS::material,"MC particle actual atlas publication/context changed");
-        if(request.gcParticleTextures&&!request.gcParticleTextures->validBorrow(
+        if(request.particleTextures&&!request.particleTextures->validBorrow(
             request.context,request.isCurrent,gcParticlePublication))
-            return fail(d,VehicleWindowError50DS::material,"GC particle atlas publication/context changed");
+            return fail(d,VehicleWindowError50DS::material,"track particle atlas publication/context changed");
         if(request.gameplayBinderTextures&&!request.gameplayBinderTextures->validBorrow(
             request.context,request.isCurrent,gameplayBinderPublication))
             return fail(d,VehicleWindowError50DS::material,"Binder immutable texture publication expired");
@@ -333,7 +162,6 @@ bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& 
                         "racer cable texture is no longer the retained publication");
             }
         }
-        if(!raWorldCurrent(d))return false;
         if (request.track.mode == VehicleWindowMode50DS::callerMaterialTextures &&
             (!request.track.textures || !request.track.textures->validBorrow(
                 request.context, request.isCurrent, trackTexturePublication)))
@@ -360,13 +188,12 @@ bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& 
 
 bool VehicleWindowGl50DS::Storage::usesTextures() const noexcept {
         if(hasNativeResultsResources())return true;
-        if(request.raStaticWorld)return true;
         for (U i = 0; i < racerArchetypeCount; ++i)
             if (racerArchetypes[i].cables.textures) return true;
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
             request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi ||
-            request.enableOriginalGameplayBlur || request.gcParticleTextures || request.track.rcParticleWindow || request.track.gbParticleWindow || request.track.mcParticleWindow || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources());
+            request.enableOriginalGameplayBlur || request.particleTextures || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources());
     }
 
 bool VehicleWindowGl50DS::Storage::usesTrackShader() const noexcept {
@@ -394,6 +221,7 @@ bool VehicleWindowGl50DS::Storage::createTrackMaterials(const VehicleWindowTrack
             // composes per sample, so any GS C=Ad pair also needs these targets.
             coverageDemand = coverageDemand || source.nativeCoverage == NativeTrackCoverage50DS::fourSampleAa1 ||
                 source.gsDestinationAlphaPass != 0;
+            destinationAlphaSpans = destinationAlphaSpans || source.gsDestinationAlphaPass != 0;
             target.sourceAlphaTest = source.sourceAlphaTest;
             target.sourceAlphaReference = source.sourceAlphaReference;
             target.sourceUvAnimation = source.sourceUvAnimation;
@@ -797,7 +625,6 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         if(hasNativeF8BarResources())return true;
         if(garagePollFence50KG||garageTargetFence50KG)return true;
         for(U name:garageSamplers50KG)if(name)return true;
-        if(hasRaWorldResources())return true;
         if(hasCoverageResources()||uiCoverage.owns())return true;
         if(hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
@@ -928,7 +755,7 @@ bool VehicleWindowGl50DS::Storage::loadFunctions() noexcept {
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud || request.enableOriginalUi || request.enableOriginalGameplayBlur) {
             LOAD(gl, blitFramebuffer, BlitFramebuffer);
         }
-        if (request.enableOriginalUi || request.gcParticleTextures || request.track.rcParticleWindow || request.track.gbParticleWindow || request.track.mcParticleWindow) {
+        if (request.enableOriginalUi || request.particleTextures) {
             LOAD(gl, scissor, Scissor); LOAD(gl, getTexParameteriv, GetTexParameteriv);
         }
         if (usesTextures()) {
@@ -1627,7 +1454,7 @@ bool VehicleWindowGl50DS::Storage::createRacerNormals(const VehicleGlResources50
     }
 
 bool VehicleWindowGl50DS::Storage::createTrackProjection(const VehicleWindowTrack50DS& track) noexcept {
-        if(track.rcCrystal)return createRcCrystalProjection(track);
+        if(track.environmentUv)return createEnvironmentUvProjection(track);
         if (!track.sourceProjectionUvs) return true;
         const std::size_t bytes = std::size_t(track.sourceProjectionCount) * sizeof(assets::TrackProjectedUv);
         gl.genBuffers(1, &trackProjectionBuffer);
@@ -2044,7 +1871,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
         resources.componentCount = owner.componentCount();
         if (input.enableOriginalUiSourceRgba && !input.enableOriginalUi)
             return fail(*diagnostic,VehicleWindowError50DS::request,"source UI requires original UI opt-in");
-        if (!validateOriginalUiBank(input) || !validateGcParticleBank(input) || !validateRcParticleBank(input) || !validateGbParticleBank(input) || !validateMcParticleBank(input)) return false;
+        if (!validateOriginalUiBank(input) || !validateGcParticleBank(input)) return false;
         uiTexturePublication = input.originalUiTextures ? input.originalUiTextures->publicationToken() : 0;
         request.racerArchetypes = nullptr; // Cold descriptors are never retained.
         request.trackAnimations = nullptr;
@@ -2053,7 +1880,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
         // They stay readable until this call returns (every exit): the
         // original shadow receivers (createOriginalShadows, the last cold
         // step) read the static spans' world instances and vertices. Clearing
-        // them up front left every non-RA course with no receiver ground.
+        // them up front left the static world with no receiver ground.
         struct TrackBorrow {
             VehicleWindowTrack50DS& track;
             ~TrackBorrow() {
@@ -2123,7 +1950,6 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             diffuseWorkspace50LA.reset(new(std::nothrow) game::original_racer_diffuse50LA::Workspace);
             if(!frameDiffuseFog50LA||!diffuseWorkspace50LA)return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate bounded single diffuse fog workspace");
         }
-        coverageDemand = coverageDemand || bool(request.raStaticWorld);
         if (!loadFunctions() || !check("initial GL error state") || !checkContext()) return false;
         shader.reset(new (std::nothrow) VehicleGlShader50CZ(shaderGl));
         if (!shader) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate shader owner");
@@ -2151,7 +1977,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createRaWorld() || !createOriginalShadows()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createOriginalShadows()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2222,35 +2048,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::wrongThread, "cleanup requires creating thread");
         }
-        if(rcParticleWindow && (rcParticleWindow->material_->active || active || frameSet || diagnostic)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"RC renderer close requires ended synchronous draw/material borrowers");
-        }
-        if(!cancelRcParticleAttempt()){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"RC pending draw attempt could not retire before cleanup");
-        }
-        if(rcParticleWindow&&!rcParticleWindow->invalidateRenderPublication(rcParticleRenderer)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"RC prior particle completion could not invalidate");
-        }
-        if(gbParticleWindow && (gbParticleWindow->material_->active || active || frameSet || diagnostic)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"GB renderer close requires ended synchronous draw/material borrowers");
-        }
-        if(!cancelGbParticleAttempt()){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"GB pending draw attempt could not retire before cleanup");
-        }
-        if(gbParticleWindow&&!gbParticleWindow->invalidateRenderPublication(gbParticleRenderer)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"GB prior particle completion could not invalidate");
-        }
-        if(mcParticleWindow && (mcParticleWindow->material_->active || active || frameSet || diagnostic)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"MC renderer close requires ended synchronous draw/material borrowers");
-        }
-        if(!cancelMcParticleAttempt()){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"MC pending draw attempt could not retire before cleanup");
-        }
-        if(mcParticleWindow&&!mcParticleWindow->invalidateRenderPublication(mcParticleRenderer)){
-            d.cleanupIncomplete=true;return fail(d,VehicleWindowError50DS::cleanup,"MC prior particle completion could not invalidate");
-        }
         if (hasGlResources() && !current(d)) { d.cleanupIncomplete = true; return false; }
-        if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
         initialized = false; active = frameSet = imageCommitted = false;
         // Invalidate native observations, but retain the exact sync for cleanup.
         nativeVideoFinishState50LA=NativeVideoPacketFinishState50LA::cancelled;
@@ -2271,7 +2069,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         game::clearGameplayBlurVideoStrengths(gameplayBlurVideo);
         uiPrivatePublicationGeneration=0;
         adapter.reset();
-        if (!hasGlResources()) { shader.reset(); retireRaWorldPublication(); retireRaStaticFirePublication(); retireRcParticlePublication();retireGbParticlePublication();retireMcParticlePublication(); d.cleanupIncomplete = false; return true; }
+        if (!hasGlResources()) { shader.reset(); retireTrackLeases(); d.cleanupIncomplete = false; return true; }
         // All functions were loaded before the first name could be allocated.
         if (!drainCleanupErrors(d)) {
             d.cleanupIncomplete = true;
@@ -2302,7 +2100,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         }
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
-        if (hasNativeResultsResources() || hasNativeF8BarResources() || riderTextureBorrow || raWorld || raStaticFireOwner || rcParticleWindow || gbParticleWindow || mcParticleWindow || hasDisplayFadeNames() || uiCoverage.owns() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
+        if (hasNativeResultsResources() || hasNativeF8BarResources() || riderTextureBorrow || request.commonTrack || hasDisplayFadeNames() || uiCoverage.owns() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
             uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || hasFxaaResources() || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){nativeGlFaultObserved50KG=true;if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
@@ -2322,7 +2120,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,0);
         }
         if (usesTextures() || hasDisplayFadeNames()) {
-            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || destinationAlphaSpans) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -2451,7 +2249,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
             if (!deleteName(skyVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(skyVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(skyIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
-            if (!deleteRaWorldResources(d) || !deleteCoverageResources(d)) goto incomplete;
+            if (!deleteCoverageResources(d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(targets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(colors[b], gl.deleteRenderbuffers, d) ||
@@ -2461,7 +2259,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
                     !deleteName(menuColors[b], gl.deleteRenderbuffers, d)) goto incomplete;
         }
         d.cleanupIncomplete = hasGlResources();
-        if(!d.cleanupIncomplete){retireRaStaticFirePublication();retireRaWorldPublication();retireRcParticlePublication();retireGbParticlePublication();retireMcParticlePublication();}
+        if(!d.cleanupIncomplete)retireTrackLeases();
         if (d.cleanupIncomplete || !complete)
             return fail(d, VehicleWindowError50DS::cleanup, "renderer cleanup incomplete");
         shader.reset();
