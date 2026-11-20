@@ -1,0 +1,105 @@
+Zero-cut counted race (Free Play Single Race) - work plan
+=========================================================
+Base: dlc-146p-zerocut at 744a196. Goal: a Free Play Single Race (subtype 1,
+P+34 0, App+350 0) runs the same race root, Results104, 1AB5BC, 1AC440, save
+and Hall return as the Tournament, with the original's zero cut count.
+
+1. What the original does (SLUS_202.68, work\scratch\dis_all.txt)
+------------------------------------------------------------------
+1A95B0 (called from the race load at 1A6DC0), once per human (race+1B0 low2):
+  alloc 0xB0 -> 174A30 controller ctor (a1=1)  -> race+48 (+4C/+50/+54 for
+  humans 2..4); then 174DF0(controller, race+34.., race+8C). A 174DF0 failure
+  asserts (1336C0) and returns 0.
+174DF0 (body 174DF0..175094):
+  174E48..174EC4  cut count A8 bits4..8 := World+3E4 & 1F; then
+                  subtype 2/3 -> 0 (174EA8); subtype 1 -> keep only if
+                  P+34 == 2 (174E90) or App+350 != 0 (174E9C), else 0.
+  174EC8  alloc 0x1B0 -> 179320 -> +64 (follow)
+  174EE4  alloc 0x150 -> 22CF20 -> +68 (attached), 22D1C0 init (fail -> 0)
+  174F50  alloc 0x40  -> 13DCA0 -> +6C
+  174F6C  alloc 0xE0  -> 118A10 -> +70 (cinematographer)
+  174F88..174F9C  count <= 0 -> 175044 (skip all cut work)
+  174FA4..175030  count > 0: alloc count*4 -> +74, per cut 282860/282990
+  175038  177750 (intro audio entity, +80) - ONLY in the count > 0 branch
+  175044  alloc 0xF0  -> 2D2870 -> +78 (TV)
+  175060  alloc 0x270 -> 2D4B90 -> +7C (start camera)
+So with count 0 the controller and +64/+68/+6C/+70/+78/+7C exist; +74 and the
+177750 intro audio entity (+80) do not. The race root 140CE0 and Results run
+on that same controller (race+48) in every mode.
+
+2. Where the port diverges (all verified by reading)
+----------------------------------------------------
+a) Controller construction exists only inside the intro:
+   Application::constructNativeTaIntroCamera50LA = retainNativeTaCutAuthoring50LA
+   + constructNativeTaController174A30 (original_ta_camera_issuer_candidate.h
+   :1000/:1098); the latter = Session::constructColdController174A30 +
+   constructTaOwners174FA4, which requires P+34 == 2, launch 1 and cut
+   authoring (original_ta_camera_lifecycle.inl:5-8).
+   -> need Application::constructNativeCountedController174A30() for count 0:
+      freshNative...CameraSession admission WITHOUT nativeTaCutAuthoring_
+      (today freshNativeTaCameraSession50LA requires it for the TA tail), then
+      Session::constructColdController174A30 only. Children: on non-RA courses
+      the port's +70/+78/+7C are native "unused" RA-only prefixes
+      (original_camera_unused_children50la.inl: constructNativeRa* return true
+      unless course == RA); the live start camera start_ is the procedural
+      numeric owner. So for non-RA courses count 0 = controller entity only.
+b) slot48: publication.cpp:2226-2227 publishes race slot48 only inside
+   if(taIntroAuthoring). -> publish for every counted race (after (a)).
+c) Root 140CE0: continuation.cpp:3397 beginTaRoot returns early without
+   taIntroAuthoring. -> gate on nativeIntroController().
+d) Aural: the root and Results schedule require the race-intro transport:
+   beginTaRoot calls groups->serviceTaIntro235720 (requires taIntroReady());
+   update_schedule.cpp:75, ta_root_audio50la.h:73/:100 require
+   sourceAural00Owner_->raceIntroPublicationServiced(timing,serial), which
+   needs (**interfaceA0_).raceIntroLease (native_race_intro_transport50la.inl
+   :58). The lease/transport is created by the intro PCM preparation
+   (publication.cpp prepareIntroAuthoring -> prepareOriginalTaIntroPcm50LA).
+   In the original 235720 is the Announcer120 group update, which runs every
+   race frame whether or not intro lines exist. -> the transport must be
+   created for every counted race with an EMPTY intro event set (no PCM, no
+   177750 entity), and serviceTaIntro235720 must accept "no intro lines"
+   (taIntroReady() today implies authored lines). This is the largest item:
+   it touches platform/linux/native race_audio_groups50ic.h (+ ta_intro .inl),
+   original_application_aural50kg.h, native_race_intro_transport50la.inl.
+e) Session prepare (original_camera_session50kx.h ~:1900-2010): with
+   coldController_.started and count 0 the existing branch already skips the
+   cut path (controllerCutCountA8()==0) and publishNeverAdoptedNativeIntro
+   returns true with no reserved intro audio. To verify by reading each
+   coldController_ consumer in the per-frame camera (175D70 cut cursor,
+   script5C, children64[7]) that a started controller with count 0 takes the
+   non-cut route, as 175D70 does in the original.
+f) RA stays Tournament-only until its consumed prefix is separated from the
+   intro (session.cpp:737, ra_source_camera_factory50la.h:174).
+
+3. Commit plan (one header round)
+---------------------------------
+ 1. Application::constructNativeCountedController174A30 + fresh admission
+    variant without cut authoring (original_ui_main_entry50kg.h decl,
+    original_ta_camera_issuer_candidate.h body). Tournament path unchanged:
+    the intro path keeps calling constructNativeTaIntroCamera50LA.
+ 2. publication.cpp: if a counted race exists and !taIntroAuthoring, call (1)
+    and retainNativeIntroControllerSlot48.
+ 3. continuation.cpp beginTaRoot/finishTaRoot: gate on the controller.
+ 4. Race audio: zero-line intro transport for every counted race; service
+    235720 with no lines; raceIntroPublicationServiced unchanged (lease exists).
+ 5. Read-and-fix any coldController_ consumer that assumes cuts (item e).
+ Headers: original_ui_main_entry50kg.h (~150 TUs), race_audio_groups50ic.h,
+ original_application_aural50kg.h (platform set, ~120 TUs, overlapping).
+ Tournament with authored intro: every new branch is taken only when
+ taIntroAuthoring is empty, so its calls and bytes are unchanged.
+
+4. Proof lines expected on a free-play TA run
+---------------------------------------------
+ consumed_ta_gate ... mode34=0 subtype=1 admitted=1
+ (new) counted_controller course=TA cuts=0 slot48=1
+ race_replay results ... updated=1 (no "Results not scheduled")
+ race_replay results_input okay=1
+ race_replay acknowledged ...; race_ack route=hall ... mode34=0 record7E4=1
+ race_ack request queued screen=11; frontend_race_return first_screen=11
+ saves\progress-v1.bin changed; test_results_hall_capture armed; hall-N.ppm
+
+5. Unproven / risks
+-------------------
+ - Item 4 (audio transport without lines) and item 5 (camera consumers) can
+   only be settled by reading every consumer; a wrong guess costs a relink.
+ - The Results104 page set in mode0 is still unexercised.
