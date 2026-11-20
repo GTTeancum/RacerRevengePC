@@ -18,7 +18,9 @@ struct NativeResultsHallTransfer50LA final {
     bool routeCurrent()const noexcept {
         if(flags30!=6u||page38!=1u)return false;
         if(!acknowledgement1AB5BC)return screen34==11u;
-        return screen34==13u||screen34==10u||screen34==11u||screen34==7u||screen34==6u;
+        // 13 Garage, 10 Unlock, 11 Hall, 7 Win, 6 Course (1AB5BC rows); 4 Main
+        // menu: Pause row 9 1BDA64 17DE10(App,6,4,1) (common_race_end50CR depart).
+        return screen34==13u||screen34==10u||screen34==11u||screen34==7u||screen34==6u||screen34==4u;
     }
     ~NativeResultsHallTransfer50LA(){if(request.reference00||enrolled)std::terminate();}
 };
@@ -280,12 +282,9 @@ bool Application::commitRaceAcknowledgementRecords1AC440_50PD(rr::game::Original
         const auto scope=race.endHud_.lock();
         if(!scope||scope->thread_!=std::this_thread::get_id()||!scope->active_||!scope->published_||
            !scope->hud_||!scope->manager_||!scope->bank_||!scope->camera_||scope->race_.lock().get()!=&race||
-           scope->application_!=this||race.entity_.sessionGeneration!=scope->generation_||!race.anyWorld()){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
-        std::shared_ptr<const original_camera_session50KX::Session> borrowed;
-        const original_camera_session50KX::Session* camera=nullptr;
-        if(race.world74_){ra_cold_aggregate50LA::Diagnostic wd;
-            borrowed=race.world74_->borrowRuntimeSourceCamera(race.world74_,wd);camera=borrowed.get();}
-        else camera=race.cameraNativeAdapter34_;
+           scope->application_!=this||race.entity_.sessionGeneration!=scope->generation_||!race.world74_){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
+        // Every race: the counted race's own camera adapter34 (no RA aggregate borrow).
+        const original_camera_session50KX::Session* camera=race.cameraNativeAdapter34_;
         if(!camera||camera!=scope->camera_||&camera->actual_.bank!=scope->bank_||camera->actual_.raceHud!=scope->hud_||
            camera->generation_!=scope->generation_||camera->actual_.applicationEntities!=race.application_){std::fprintf(stderr,"ack_1ac440_refused line=%d\n",__LINE__);return false;}
         using Observation=original_position_stats_adapter50LA::Owner;

@@ -136,9 +136,10 @@ Application::PauseReturnStart50LA Application::beginNativePauseReturn50LA(
        std::fegetround()!=FE_TONEAREST||observed->displayInputs_->currentApplicationMode22C()!=0)
         return Start::unavailable; //No invented unknown alpha, EE rounding or source mode.
     try {
-        ra_cold_aggregate50LA::Diagnostic wd;
-        auto camera=race->world74_->borrowRuntimeSourceCamera(race->world74_,wd);
-        if(!camera||camera!=observed)return Start::unavailable;
+        // Every race: the Pause owner's own bound camera session (the race's
+        // camera adapter34), not an RA aggregate borrow (common rewrite, R9).
+        auto camera=observed;
+        if(!camera||!race->ownsNativeCameraAdapter34(*camera))return Start::unavailable;
         auto p=std::make_shared<NativePauseInputContinuation50LA>();
         p->race=race;p->pause=pause;p->camera=std::move(camera);p->video=videoOwner_;p->display=display;p->scope=scope;
         p->owner=&owner;p->input=&input;p->backend=backend;p->inputs=p->camera->displayInputs_;

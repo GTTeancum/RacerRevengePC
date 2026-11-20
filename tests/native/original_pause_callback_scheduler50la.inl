@@ -232,9 +232,13 @@ inline bool Owner::countedPressRace1A87A0(rr::game::InputEvent48Z& event,Counted
     const bool admitted=!(flags58&1u)&&(((flags58&2u)!=0u)||((flags58&4u)!=0u));
     const auto humans=static_cast<std::uint32_t>(race.flags1B0KnownValue_&3u);
     if(!pause->active200_){
-        // Finished (bit0): the original refuses too. PORT STAND-IN (flagged):
-        // the Start is left to the loop's host menus (port-only pages there).
-        if(flags58&1u){out.gate=2;return true;}
+        // Finished (bit0): 1A87A0 refuses the Start (common rewrite R9, 2.8);
+        // it is consumed and logged, never handed to a host menu.
+        if(flags58&1u){
+            out.startConsumed=true;out.gate=2;out.sourcePC=0x1A87B8;
+            common_race_log50CR::pauseRefused(0x1A87B8,"race B4+58 bit0 set (finished)");
+            return true;
+        }
         out.startConsumed=true;
         if(!admitted||event.deviceId>=humans||countedPending_){
             out.gate=3;out.sourcePC=0x1A8890;
@@ -316,31 +320,70 @@ inline bool Owner::countedConfirm1BD8CC(rr::game::InputEvent48Z& event,rr::game:
         return out.closed;
     }
     if(row==1u){
-        // 1BD934 1BE830; 1BD958 race1B0 bit4; 1BD990 1AC8E0(race,1); 1BD9A8
-        // 1A4B90(2). PORT STAND-IN (flagged, item 3): the in-place restart
-        // 1AC8E0 is not owned yet; the loop takes the port's rebuild restart
-        // (race1B0 bit4 is part of 1AC8E0's own state and is left to it).
+        // 1BD934 1BE830; 1BD93C..1BD980 race1B0 bit4 (replay) cleared when set;
+        // 1BD990 1AC8E0(race,1) in place (common_race_start50CR, no reload);
+        // 1BD9A8 1A4B90(2). Common rewrite R9 (F01 retired).
         Diagnostic close;
         if(!closeLifecycle1BE830(close)){out.refused=true;out.gate=6;out.sourcePC=close.sourcePC;return false;}
-        feedback();out.closed=true;out.row=CountedInput::Row::restart;out.sourcePC=0x1BD990;
-        std::fprintf(stderr,"pause_row row=1 site=1BD990 restart=port_rebuild\n");
+        out.closed=true;out.row=CountedInput::Row::restart;
+        auto& race=*application_->sourceRace28COwner_;
+        if((race.flags1B0KnownMask_&0x10u)&&(race.flags1B0KnownValue_&0x10u))
+            race.flags1B0KnownValue_=std::uint8_t(race.flags1B0KnownValue_&~0x10u);
+        const auto* hooks=native_common_results50PD::state().raceStartHooks;
+        const common_race_start50CR::Request request{common_race_start50CR::Reason::restart,1u,
+            common_race_start50CR::callerPauseRestart1BD934,camera->actual_.launchKind11258};
+        common_race_start50CR::Receipt receipt;
+        if(hooks)out.restarted=application_->restartConsumedRace1AC8E0(race,request,*hooks,receipt);
+        else{
+            common_race_log50CR::RaceStart line;line.restart=true;line.a1=1;line.caller=request.caller;
+            line.ok=false;line.refusedPc=0x1AC8E0u;line.reason="race start hooks not bound (I3 publication)";
+            common_race_log50CR::raceStart(line);
+        }
+        feedback();out.sourcePC=0x1BD9A8;
+        std::fprintf(stderr,"pause_row row=1 site=1BD990 restart=in_place ok=%d\n",int(out.restarted));
+        if(!out.restarted){out.refused=true;out.gate=10;}
         return true;
     }
     if(row==9u||row==10u){
         // 1BD9B8 / 1BDA74: App2E0 == 0 skips the row body (1BE804).
         if(!application_->sourceUseProfile2E0_||!*application_->sourceUseProfile2E0_){
             out.sourcePC=0x1BE804;std::fprintf(stderr,"pause_row row=%u site=1BE804 app2E0=0\n",unsigned(row));return true;}
-        // 26D070 / 1A4AB0(.5) / 1A4B90(2) / 267BE0 and the 500 ms 2AED60 fade
-        // before 1BE830: PORT STAND-IN (flagged) - the race teardown stops the
-        // audio and the frontend fades in; the RA ALL8 spectator keeps the
-        // native blocking 2AED60 continuation (original_pause_input50la.inl).
-        feedback();
-        Diagnostic close;
-        if(!closeLifecycle1BE830(close)){out.refused=true;out.gate=7;out.sourcePC=close.sourcePC;return false;}
-        out.closed=true;
+        // Common rewrite R9 (F03, F05): the rows run in the original order.
+        // Row 10 in a Time Trial (11258==3, P+34==0) first asks 1BDAB4
+        // 1ABFC0(race,1): a record opens Results page 3 over the race; no
+        // record takes 1BDB5C. Otherwise row 9 (1BD9B8) / row 10 (1BDB5C) run
+        // step 18 (26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60, 1BE830,
+        // 17DE10(6,4|6,1)) through Application::departRace50CR. The loop only
+        // carries the queued 17DE10 request to the frontend receiver.
+        auto& race=*application_->sourceRace28COwner_;
+        const auto finishClose=[&](){countedOwnsOpen_=false;countedWorldPaused_=false;lifecycleRejected_=false;};
+        rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;
+        const bool timeTrial=row==10u&&camera->actual_.launchKind11258==3u&&application_->riderProfile&&
+            application_->riderProfile->courseRaceSnapshot(course)&&course.mode34==0u;
+        if(timeTrial){
+            bool qualifies=false;std::uint32_t pc=0;
+            const bool ok=application_->quitTimeTrialFromPause1BDAB4(race,qualifies,pc);
+            out.sourcePC=pc;out.closed=true;
+            if(ok){
+                finishClose();
+                out.row=qualifies?CountedInput::Row::record:CountedInput::Row::course;out.departed=!qualifies;
+                std::fprintf(stderr,"pause_quit row=10 site=1BDAB4 qualify_1ABFC0=%d pc=%X\n",int(qualifies),unsigned(pc));
+                return true;
+            }
+            out.refused=true;out.gate=11;out.row=CountedInput::Row::course;
+            std::fprintf(stderr,"pause_quit row=10 site=1BDAB4 refused pc=%X\n",unsigned(pc));
+            return false;
+        }
+        common_race_end50CR::Departure departure;
+        const bool departed=application_->departRace50CR(race,
+            row==9u?common_race_end50CR::Destination::mainMenu:common_race_end50CR::Destination::course,departure);
+        if(departed)finishClose();
+        out.closed=departed;out.departed=departed;
         out.row=row==9u?CountedInput::Row::main:CountedInput::Row::course;
-        out.sourcePC=row==9u?0x1BDA64u:0x1BDA74u;
-        std::fprintf(stderr,"pause_row row=%u site=%s\n",unsigned(row),row==9u?"1BD9B8":"1BDA74");
+        out.sourcePC=departure.reachedPc?departure.reachedPc:(row==9u?0x1BD9B8u:0x1BDB5Cu);
+        std::fprintf(stderr,"pause_row row=%u site=%s departed=%d pc=%X\n",unsigned(row),row==9u?"1BD9B8":"1BDB5C",
+            int(departed),unsigned(out.sourcePC));
+        if(!departed){out.refused=true;out.gate=7;return false;}
         return true;
     }
     out.sourcePC=0x1BE804;return true; //Rows 2..8: Cross has no body.
