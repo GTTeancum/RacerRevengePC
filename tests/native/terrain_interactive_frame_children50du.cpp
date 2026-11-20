@@ -21,7 +21,8 @@
 #include "../../src/game/original_vehicle_damage50la.h"
 #include <cstring>
 #include "native_gc_water_session50kg_fixture.h"
-#include "mc_particle_vehicle50mc.h"
+#include "native_gc_water_racer50kg_fixture.h"           // per-racer water runtime (A9)
+#include "native_gc_other_particle_children50kg_fixture.h" // the water racer's particle children
 #include "lap_drive50gj_fixture.h"
 #include "live_audio50hf_fixture.h"
 #include "race_mode1_host50id_fixture.h"
@@ -57,58 +58,34 @@ using detail::addCounter50DU;
 bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFactor,
     bool sourceAiAudio,NativeCalls& runNative) {
  require50DU(!originalUiActive,"Main-only frontend cannot advance race physics");
- require50DU(!nativeSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
-     "GC light update requires the actual native racer slot");
+ require50DU(!nativeSelectedLights||actualRacerSlot<graphicsSequence.size(),
+     "selected-light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
  // A destroyed racer (original state3/4) runs only its destroyed frame.
  if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u)
   return advanceDestroyedChildren(actualRacerSlot,preparedOuterFactor);
  // One original-AI 2255B0 owner set, shared by both original callers (16EAA0
- // at PostPlayer and 228BBC at the packed-byte cut). The six alternatives are
- // the existing exact-type navigation views (port stand-in: per-course view
- // types, to retire into one view type); no course-specific behaviour here.
+ // at PostPlayer and 228BBC at the packed-byte cut), on every course: the one
+ // AI navigation view (aiView), the track's one lighting owner and, where the
+ // track's SCB names water (A9: 216B78 water334), this racer's water runtime.
  // heightDomain/target/queries are caller-owned: Owners keep references.
- using AiRecoveryOwners50UT=std::variant<native_original_ai_recovery::Owners,native_original_ai_recovery::Owners50MB,
-     native_original_ai_recovery::Owners50TC,native_original_ai_recovery::Owners50TB,
-     native_original_ai_recovery::Owners50GB,native_original_ai_recovery::Owners50MC>;
- const auto aiRecoveryOwners50UT=[&](std::uint8_t& flags22C,std::uint32_t& field24C,auto& actualHeightDomain,
-     const VisualVector49R& target,const auto& queries)->AiRecoveryOwners50UT{
+ require50DU(bool(track.roles.lights),"common track lighting owner (roles.lights, 05.13) absent");
+ auto& lightOwner=*track.roles.lights;
+ // 216B78: the actual terrain330/water334 owners of this racer's world.
+ const auto bindResetHeightDomain=[&](auto& actualHeightDomain){
   actualHeightDomain=selectedRuntimeHeightDomain;
-  // 216B78: the actual terrain330/water334 owners of this racer's world.
-  if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
-      terrainOwner.lift1F0,actualHeightDomain),"MC AI reset requires actual same-runtime water334 and live348 lift");
-  if(nativeGcWater)require50DU(nativeWaterRacers[actualRacerSlot]&&
+  if(track.hasWater())require50DU(actualRacerSlot<nativeWaterRacers.size()&&nativeWaterRacers[actualRacerSlot]&&
       nativeWaterRacers[actualRacerSlot]->bindResetDomain(selectedRuntimeHeightDomain,
           terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
-  if(isMcTrack)require50DU(mcParticleVehicles->racer(actualRacerSlot)&&
-      mcParticleVehicles->racer(actualRacerSlot)->bindResetDomain(selectedRuntimeHeightDomain,
-          terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
+ };
+ const auto aiRecoveryOwners50UT=[&](std::uint8_t& flags22C,std::uint32_t& field24C,auto& actualHeightDomain,
+     const VisualVector49R& target,const auto& queries){
+  bindResetHeightDomain(actualHeightDomain);
   auto& cables=racerCables[actualRacerSlot]->visibility50();
-  return isMcTrack?
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50MC{gcLightOwner,cables,
-          flags22C,field24C,mcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50GB{gcLightOwner,cables,
-          flags22C,field24C,gbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50TB{gcLightOwner,cables,
-          flags22C,field24C,tbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTcTrack?
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50TC{gcLightOwner,cables,
-          flags22C,field24C,tcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isMbTrack?
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners50MB{gcLightOwner,cables,
-          flags22C,field24C,mbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-      AiRecoveryOwners50UT{native_original_ai_recovery::Owners{gcLightOwner,cables,
-          flags22C,field24C,*navigationAI,actualHeightDomain,resetGlobals,resetLifecycle,
-          target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
-          originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
+  return native_original_ai_recovery::Owners{lightOwner,cables,
+      flags22C,field24C,aiView,actualHeightDomain,resetGlobals,resetLifecycle,
+      target,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+      originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount};
  };
  if(actualRacerSlot<rr::game::nativeTestDestroyPending50PD.size()&&
     rr::game::nativeTestDestroyPending50PD[actualRacerSlot]){
@@ -143,64 +120,36 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   // frame. Never read/replay its navigation/packing/repair/scalar prefix.
   if(!originalAi.physicalReset2255B0Pending)
    runNative([&]{return readAiVehicleFrame50IV(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"original AI frame entry");
-  const auto driveSelectedOriginalAi50MB=[&]<class Input>()
-      requires (std::is_same_v<Input,AiRuntimeInput50IV>||std::is_same_v<Input,AiRuntimeInput50MB>||std::is_same_v<Input,AiRuntimeInput50TC>||std::is_same_v<Input,AiRuntimeInput50TB>||std::is_same_v<Input,AiRuntimeInput50GB>||std::is_same_v<Input,AiRuntimeInput50MC>){
-  Input aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;
-  if constexpr(std::is_same_v<Input,AiRuntimeInput50MC>){
-   requireMbRuntimeNavigation50MB();
-   aiInput.mapFF0=mcMapView;aiInput.aiFF4=mcAiView;
-   aiInput.orientationTrackBC=mcAiView;aiInput.aiMetadata=mcAiMetadata;aiInput.actualWorld=&liveWorld;
-  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50GB>){
-   requireMbRuntimeNavigation50MB();
-   aiInput.mapFF0=gbMapView;aiInput.aiFF4=gbAiView;
-   aiInput.orientationTrackBC=gbAiView;aiInput.aiMetadata=gbAiMetadata;aiInput.actualWorld=&liveWorld;
-  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>){
-   requireMbRuntimeNavigation50MB();
-   aiInput.mapFF0=tbMapView;aiInput.aiFF4=tbAiView;
-   aiInput.orientationTrackBC=tbAiView;aiInput.aiMetadata=tbAiMetadata;aiInput.actualWorld=&liveWorld;
-  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50TC>){
-   requireMbRuntimeNavigation50MB();
-   aiInput.mapFF0=tcMapView;aiInput.aiFF4=tcAiView;
-   aiInput.orientationTrackBC=tcAiView;aiInput.aiMetadata=tcAiMetadata;aiInput.actualWorld=&liveWorld;
-  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50MB>){
-   aiInput.mapFF0=mbMapView;aiInput.aiFF4=mbAiView;
-   aiInput.orientationTrackBC=mbAiView;aiInput.aiMetadata=mbAiMetadata;
-  }else{
-   aiInput.mapFF0=navigationMap;aiInput.aiFF4=navigationAI;
-   aiInput.orientationTrackBC=navigationAI;aiInput.aiMetadata=&selectedOriginalAiMetadata;
-  }
-  aiInput.tuning=&originalAiTuning;
-  aiInput.racers=originalAiSession.observed;aiInput.racerCount=raceRacerCount;
-  aiInput.combatDiagnostic=[](const char* message,void*) noexcept {std::fputs(message,stderr);};
-  aiInput.body340Context=&dynamicRegistry;
-  aiInput.resolveBody340=[](const void* context,std::uint32_t slot) noexcept {
-   return static_cast<const native_dynamic_contact50IW::Registry*>(context)->bodyIdentityForManagerIndex(slot);
-  };
-  aiInput.raceFields=&originalAiSession.fields[originalAi.managerIndexFE0];aiInput.timing=&lapContinuity.timing;
-  // Stage S: this racer's own 690 row through the one storage accessor (legacy: same member).
-  const auto aiMainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::main690);
-  const CollectionRef50BX aiMainZone=aiMainRow&&aiMainRow.state->storage.links&&aiMainRow.state->storage.capacity?
-      aiMainRow.state->storage.links[0].zone:0u;
-  aiInput.actualZoneOrdinal48=aiMainZone?aiMainZone-1u:0u;
-  aiInput.managerHumanCount34=originalAiHumanCount;
-  aiInput.raceCountdown94=humanCourseEnabled?&humanResultsCountdown:nullptr;
-  // Consumers here read1125C low byte; the native roster owns the complete
-  // packed count word, with the actual admitted low5 lap selection retained.
-  aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
-  if constexpr(std::is_same_v<Input,AiRuntimeInput50MC>)aiInput.aiTrackLength3C=mcAiMetadata.trackLength3C();
-  else if constexpr(std::is_same_v<Input,AiRuntimeInput50GB>)aiInput.aiTrackLength3C=gbAiMetadata.trackLength3C();
-  else if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>)aiInput.aiTrackLength3C=tbAiMetadata.trackLength3C();
-  else if constexpr(std::is_same_v<Input,AiRuntimeInput50TC>)aiInput.aiTrackLength3C=tcAiMetadata.trackLength3C();
-  else if constexpr(std::is_same_v<Input,AiRuntimeInput50MB>)aiInput.aiTrackLength3C=mbAiMetadata.trackLength3C();
-  else aiInput.aiTrackLength3C=selectedOriginalAiMetadata.trackLength3C;
-  aiInput.raceOwnersBound=originalAiSession.rankBound&&aiMainZone!=0;
-  return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
-      lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
-  };
-  bool aiReturned=isMcTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50MC>():isGbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50GB>():isTbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50TB>():
-      isTcTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50TC>():
-      isMbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50MB>():
-      driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50IV>();
+  // Common rewrite (I4): one AI input on every course (AiRuntimeInput50IV over
+  // the one map/AI navigation views and the one live zone world, B-C12).
+  // Metadata comes from aiFF4.metadata(), the 3C track length from the view.
+  bool aiReturned=[&]{
+   requireRuntimeNavigation();
+   AiRuntimeInput50IV aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;
+   aiInput.mapFF0=mapView;aiInput.aiFF4=aiView;aiInput.orientationTrackBC=aiView;aiInput.actualWorld=&liveWorld;
+   aiInput.tuning=&originalAiTuning;
+   aiInput.racers=originalAiSession.observed;aiInput.racerCount=raceRacerCount;
+   aiInput.combatDiagnostic=[](const char* message,void*) noexcept {std::fputs(message,stderr);};
+   aiInput.body340Context=&dynamicRegistry;
+   aiInput.resolveBody340=[](const void* context,std::uint32_t slot) noexcept {
+    return static_cast<const native_dynamic_contact50IW::Registry*>(context)->bodyIdentityForManagerIndex(slot);
+   };
+   aiInput.raceFields=&originalAiSession.fields[originalAi.managerIndexFE0];aiInput.timing=&lapContinuity.timing;
+   // Stage S: this racer's own 690 row through the one storage accessor.
+   const auto aiMainRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::main690);
+   const CollectionRef50BX aiMainZone=aiMainRow&&aiMainRow.state->storage.links&&aiMainRow.state->storage.capacity?
+       aiMainRow.state->storage.links[0].zone:0u;
+   aiInput.actualZoneOrdinal48=aiMainZone?aiMainZone-1u:0u;
+   aiInput.managerHumanCount34=originalAiHumanCount;
+   aiInput.raceCountdown94=humanCourseEnabled?&humanResultsCountdown:nullptr;
+   // Consumers here read1125C low byte; the native roster owns the complete
+   // packed count word, with the actual admitted low5 lap selection retained.
+   aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
+   aiInput.aiTrackLength3C=aiView.trackLength3C();
+   aiInput.raceOwnersBound=originalAiSession.rankBound&&aiMainZone!=0;
+   return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
+       lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
+  }();
   if(!aiReturned&&originalAi.physicalReset2255B0Pending&&originalRecoveryEnabled){
    std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
    if(originalResetGround&&racerCables[actualRacerSlot]&&sourceAiAudio&&
@@ -215,8 +164,8 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      const auto& relative=x.secondaryInputs.targetRelative2F0;
      const VisualVector49R recoveryTargetRelative{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
      auto owners=aiRecoveryOwners50UT(*flags22C,*field24C,actualHeightDomain,recoveryTargetRelative,queries);
-     aiReturned=std::visit([&](auto& actual){return native_original_ai_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
-         originalAi,originalAiReceipt,originalRecovery,actual,*originalRecoveryWorkspace,originalRecoveryDiagnostic);},owners);
+     aiReturned=native_original_ai_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
+         originalAi,originalAiReceipt,originalRecovery,owners,*originalRecoveryWorkspace,originalRecoveryDiagnostic);
      // PC enhancement (native_zero_gravity50zg.h): 16EAA0 -> 2255B0 is a track
      // reset; N64 ResetToSpline clears ZOFF, keeps ZON, zeroes pitch rates.
      if(aiReturned)rr::game::zeroGravity50ZG.onTrackReset(actualRacerSlot);
@@ -266,16 +215,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   navigationInput.mainBody104=m.components.probe348.field104;
   TrackNavigationReceipt50EU receipt{};
   const TrackNavigationMapEffects50GH lapEffects{&lapOwner,&lap_drive50GJ::Owner::accepted};
-  const bool advanced=isMcTrack?
-      advancePlayerTrackNavigationEffects50GH(mcMapView,mcAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):isGbTrack?
-      advancePlayerTrackNavigationEffects50GH(gbMapView,gbAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):isTbTrack?
-      advancePlayerTrackNavigationEffects50GH(tbMapView,tbAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):
-      isTcTrack?
-      advancePlayerTrackNavigationEffects50GH(tcMapView,tcAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):
-      isMbTrack?
-      advancePlayerTrackNavigationEffects50GH(mbMapView,mbAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):
-      advancePlayerTrackNavigationEffects50GH(*navigationMap,*navigationAI,
-          navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic);
+  // Common rewrite (I4): one 1A0DA0 navigation over the one map/AI views;
+  // crossings go to the one lap owner (lap_drive50GJ::Owner over the one lap
+  // tracker, common_lap50cr.h), every course.
+  const bool advanced=advancePlayerTrackNavigationEffects50GH(mapView,aiView,
+      navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic);
   addCounter50DU(nativeCalls);
   require50DU(reportNavigation(advanced,"live1A0DA0"),"source player navigation rejected");
   addCounter50DU(navigationUpdates);
@@ -293,7 +237,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   require50DU((s.fields.applicationByte58&3u)!=2u&&(s.fields.impactFlagsCD8&1u),
       "native finish driver requires ended human gate and source CD8");
   const auto current=navigationProgress.reset.vehicleC88;
-  require50DU(current<selectedMapCount50MB(),"finished player map target unavailable");
+  require50DU(current<selectedMapCount(),"finished player map target unavailable");
   const auto& scene=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)];
   PlayerFinishInput50IA finishInput{};
   finishInput.resultsCountdown94=humanResultsCountdown;
@@ -303,7 +247,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   finishInput.engineDifference5C=authored.engineDifference5C;
   for(unsigned axis=0;axis<3;++axis){
    finishInput.bodySceneWorldPosition[axis]=scene.world100.v[12+axis];
-   finishInput.mapCurrentNodePosition[axis]=selectedMapNode50MB(current).position[axis];
+   finishInput.mapCurrentNodePosition[axis]=selectedMapNode(current).position[axis];
    finishInput.mainSceneLocalForward[axis]=scene.localC0.v[8+axis];
   }
   finishInput.mainSceneLocalUpY=scene.localC0.v[5];
@@ -336,21 +280,10 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  wrongWayInput.warningOwner=sourceRaceHud.loaded()&&sourceRaceHud.viewCount()>0?&sourceRaceHud:nullptr;
  WrongWayProgressState50GO wrongWayState{lapContinuity.state.vehicleFF8,
      lapContinuity.prefix.flags10CC};
- require50DU(isMcTrack?
-     beginWrongWayProgress50GO(mcMapView,lapOwner.mcTrack(),wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):isGbTrack?
-     beginWrongWayProgress50GO(gbMapView,lapOwner.gbTrack(),wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):isTbTrack?
-     beginWrongWayProgress50GO(tbMapView,lapOwner.tbTrack(),wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):
-     isTcTrack?
-     beginWrongWayProgress50GO(tcMapView,lapOwner.tcTrack(),wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):
-     isMbTrack?
-     beginWrongWayProgress50GO(mbMapView,lapOwner.mbTrack(),wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):
-     beginWrongWayProgress50GO(navigationMap->track,lapOwner.track,wrongWayInput,
-         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic),
+ // Common rewrite (I4): the one wrong-way rule (1A1620) over the one map view
+ // and the lap tracker's ProgressNode markers (common_lap50cr.h), every course.
+ require50DU(beginWrongWayProgress50GO(mapView,laps.markers(),wrongWayInput,
+     wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic),
      "native wrong-way progression rejected");
  // Execute each requested TextOverlay effect on 17C in source order, then
  // resume: SetColor 29DA10 -> SetPosition 29DB50 -> SetText 29D940 ->
@@ -454,18 +387,18 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  if(rr::game::afterChariotLifecycle50RM(actualRacerSlot,s,x.bindings,x.parameters.activation,
      x.secondaryInputs.targetRelative2F0)==rr::game::ChariotRigidMountResult50RM::held)f::project(s,x.bindings);
  if(nativeSelectedLights){
-  auto& sequence=gcGraphicsSequence[actualRacerSlot];
-  require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"GC graphics publication overflow");
+  auto& sequence=graphicsSequence[actualRacerSlot];
+  require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"selected-light graphics publication overflow");
   ++sequence;
   //228844..228884 consumes EXISTING694 immediately after graphics. Neither
   // later physics nor the current draw model substitutes for that cache.
-  require50DU(gcLightOwner.updateAfterGraphics(static_cast<std::uint32_t>(actualRacerSlot),
-      s,x.bindings,x.parameters,sequence,gcLightDiagnostic),
-      "actual GC visibility update failed; requested selected-light frame cannot publish");
+  require50DU(lightOwner.updateAfterGraphics(static_cast<std::uint32_t>(actualRacerSlot),
+      s,x.bindings,x.parameters,sequence,lightDiagnostic),
+      "actual light visibility update failed; requested selected-light frame cannot publish");
   if(originalRecoveryEnabled){
-   require50DU(racerCables[actualRacerSlot]&&gcLightOwner.writeCablesVisibilityAfterGraphics(
+   require50DU(racerCables[actualRacerSlot]&&lightOwner.writeCablesVisibilityAfterGraphics(
        static_cast<std::uint32_t>(actualRacerSlot),s,x.bindings,x.parameters,sequence,
-       racerCables[actualRacerSlot]->visibility50(),gcLightDiagnostic),
+       racerCables[actualRacerSlot]->visibility50(),lightDiagnostic),
        "actual PodCables254 cached visibility write rejected");
   }
  }
@@ -720,25 +653,12 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    require50DU(limpContinued,"limp entry impact block did not complete at state1/2");
   }else{
   if(originalAiEnabled)return commitOriginalDestroyed(actualRacerSlot,decision,preparedOuterFactor);
+  // Common rewrite (I4): the legacy HOST damage checkpoint read the fixed
+  // TrackNavigation50EU no course has any more; retired on every course (it
+  // already refused on the native-navigation courses). The frame stops here.
   recoveryPaused=true;
-  if(opponentFrame)return false; // A failed AI never restarts the human session.
-  recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
-  BodyMatrix48G groundedCheckpoint{};
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint prepareDamageRecovery");
-  const bool prepared=recovery50FI::prepareDamageRecovery(*navigationMap,navigationProgress,s,
-      x.bindings,decision,x.diagnostic,0x3f800000u,x.parameters.visual.verticalLimit7EC,liveWorld,
-      nextCheckpoint,recoveryDiagnostic);
-  const bool grounded=prepared&&recovery50FI::resolveGround(ground,nextCheckpoint,16,0,
-      groundStack.data(),groundStack.size(),groundedCheckpoint,recoveryDiagnostic);
-  if(grounded){
-   checkpointOutput=nextCheckpoint;checkpointRequested=true;
-   std::cerr<<"Damage checkpoint recovery after "<<completedFrames<<" completed ticks: source=0x"
-            <<std::hex<<decision.sourcePC<<std::dec<<" anchor="<<nextCheckpoint.selection.anchorNode
-            <<" zone="<<nextCheckpoint.primaryZone<<". Fresh vehicle; progress retained.\n";
-  }else{
-   std::cerr<<"Damage recovery unavailable: error="<<static_cast<unsigned>(recoveryDiagnostic.error)
-            <<". Last committed image retained; F5/restart returns to grid.\n";
-  }
+  std::cerr<<"Damage recovery unavailable: host checkpoint retired (no original owner); source=0x"<<std::hex
+      <<decision.sourcePC<<std::dec<<" slot="<<actualRacerSlot<<". Last committed image retained.\n";
   return false;
   }
  }
@@ -775,9 +695,9 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  }
  }
  require50DU(s.phase==VehicleFramePhase49W::AfterImpactBlock,"source impact outer skip continuation unavailable");
- if(isMcTrack){
-  require50DU(mcParticleVehicles&&mcParticleVehicles->racer(actualRacerSlot)&&mcParticleVehicles->racer(actualRacerSlot)->attachedTail(s,x.bindings).okay(),"MC actual22A620 water tail rejected");
- }else if(nativeGcWater){
+ // A9 (22C21C/210804): a racer on a track whose SCB names water runs the
+ // water racer's 22A620 tail; otherwise the plain 228390 effect tail.
+ if(track.hasWater()){
   require50DU(nativeWaterRacers[actualRacerSlot]&&
       nativeWaterRacers[actualRacerSlot]->attachedTail(s,x.bindings).okay(),
       "actual22A620 native water tail rejected");
@@ -824,9 +744,9 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
     const auto& relative=x.secondaryInputs.targetRelative2F0;
     const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
     auto owners=aiRecoveryOwners50UT(*flags22C,*field24C,actualHeightDomain,target,queries);
-    physicalReturned=std::visit([&](auto& actual){return native_original_ai_recovery::resumeUndertrack(s,x.bindings,
-        x.parameters,navigationProgress,originalAi,humanBaseUndertrack,originalRecovery,actual,
-        *originalRecoveryWorkspace,originalRecoveryDiagnostic);},owners);
+    physicalReturned=native_original_ai_recovery::resumeUndertrack(s,x.bindings,
+        x.parameters,navigationProgress,originalAi,humanBaseUndertrack,originalRecovery,owners,
+        *originalRecoveryWorkspace,originalRecoveryDiagnostic);
    }else{originalRecoveryDiagnostic.sourcePC=0x124cb0u;
     originalRecoveryDiagnostic.message="actual AI reset world registration queue is pending";}
   }else{originalRecoveryDiagnostic.sourcePC=0x216a80u;
@@ -866,39 +786,14 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    if(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining){
     const auto queries=recoveryQueries();const auto& relative=x.secondaryInputs.targetRelative2F0;
     const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-    auto mcActualHeightDomain=selectedRuntimeHeightDomain;
-    if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
-        terrainOwner.lift1F0,mcActualHeightDomain),"MC human reset requires actual same-runtime water334 and live348 lift");
-    using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB,native_original_human_recovery::Owners50GB,native_original_human_recovery::Owners50MC>;
-    RecoveryOwners50MB owners=isMcTrack?
-        RecoveryOwners50MB{native_original_human_recovery::Owners50MC{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,mcMapView,mcActualHeightDomain,
+    auto actualHeightDomain=selectedRuntimeHeightDomain;
+    bindResetHeightDomain(actualHeightDomain);
+    native_original_human_recovery::Owners owners{lightOwner,racerCables[0]->visibility50(),
+        controllerD40,lapContinuity.prefix,*field24C,mapView,actualHeightDomain,
         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
-        RecoveryOwners50MB{native_original_human_recovery::Owners50GB{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,gbMapView,selectedRuntimeHeightDomain,
-        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
-        RecoveryOwners50MB{native_original_human_recovery::Owners50TB{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,tbMapView,selectedRuntimeHeightDomain,
-        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-        isTcTrack?
-        RecoveryOwners50MB{native_original_human_recovery::Owners50TC{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,tcMapView,selectedRuntimeHeightDomain,
-        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-        isMbTrack?
-        RecoveryOwners50MB{native_original_human_recovery::Owners50MB{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,mbMapView,selectedRuntimeHeightDomain,
-        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-        RecoveryOwners50MB{native_original_human_recovery::Owners{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,*navigationMap,selectedRuntimeHeightDomain,
-        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
-    physicalReturned=std::visit([&](auto& actual){return native_original_human_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
-        humanBaseUndertrack,originalHumanRecovery,actual,*originalRecoveryWorkspace,originalHumanRecoveryDiagnostic);},owners);
+        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount};
+    physicalReturned=native_original_human_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
+        humanBaseUndertrack,originalHumanRecovery,owners,*originalRecoveryWorkspace,originalHumanRecoveryDiagnostic);
    }else{originalHumanRecoveryDiagnostic.sourcePC=0x124cb0u;
     originalHumanRecoveryDiagnostic.message="actual human reset world registration queue is pending";}
   }else{originalHumanRecoveryDiagnostic.sourcePC=0x1a259cu;
@@ -937,25 +832,10 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
        <<"; no checkpoint prepared or session rebuilt.\n";
    require50DU(false,"original AI single session reached native undertrack boundary");
   }
-  if(opponentFrame)return false; // A failed AI never restarts the human session.
-  recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
-  BodyMatrix48G groundedCheckpoint{};
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint prepare");
-  const bool prepared=recovery50FI::prepare(*navigationMap,navigationProgress,s,x.bindings,
-      x.diagnostic,x.parameters.visual.verticalLimit7EC,liveWorld,nextCheckpoint,recoveryDiagnostic);
-  const bool grounded=prepared&&recovery50FI::resolveGround(ground,nextCheckpoint,16,0,
-      groundStack.data(),groundStack.size(),groundedCheckpoint,recoveryDiagnostic);
-  if(grounded){
-   checkpointOutput=nextCheckpoint;checkpointRequested=true;
-   std::cerr<<"Automatic checkpoint recovery after "<<completedFrames<<" completed ticks: anchor="
-            <<nextCheckpoint.selection.anchorNode<<" zone="<<nextCheckpoint.primaryZone
-            <<". Rebuilding native vehicle session; damaged values and progress retained.\n";
-  }else{
-   std::cerr<<"Checkpoint recovery unavailable: error="<<static_cast<unsigned>(recoveryDiagnostic.error)
-            <<" source="<<static_cast<unsigned>(recoveryDiagnostic.source.error)
-            <<" ground="<<static_cast<unsigned>(recoveryDiagnostic.groundPhase)
-            <<". Last committed image retained. F5/restart returns to grid; quit exits.\n";
-  }
+  // Common rewrite (I4): the legacy HOST undertrack checkpoint read the fixed
+  // TrackNavigation50EU no course has any more; retired on every course.
+  std::cerr<<"Checkpoint recovery unavailable: host checkpoint retired (no original owner); slot="<<actualRacerSlot
+      <<". Last committed image retained.\n";
   return false;
  }
  runNative([&]{return baseAdvanced;},"persistent base engine");
@@ -963,12 +843,8 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  runNative([&]{return refreshSecondaryVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::OtherChildrenBetween340And35C),x.workspace,x.diagnostic);},"secondary cache");
  require50DU(s.phase==VehicleFramePhase49W::AfterBodyChildren,
      "racer child prefix did not reach the source camera cut");
- if(isMcTrack){
-  auto& sequence=nativeParticleChildSequence[actualRacerSlot];require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"MC child sequence exhausted");
-  require50DU(mcParticleVehicles&&mcParticleVehicles->advanceChildren(actualRacerSlot,nativeEffects,nativeEffectCount,++sequence,preparedOuterFactor,false,
-    s.noiseOwner().sharedRandomState,sessionRandom,applicationClock,nativeFireSerial,nativeWaterApplication.sparksGlobals),"MC actual prior dust/spark/fire then spray children rejected");
- }
- if(nativeGcWater){
+ // A9: the water racer's prior dust/spark/fire children, then its spray.
+ if(track.hasWater()){
   auto& sequence=nativeParticleChildSequence[actualRacerSlot];
   require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"native particle child sequence exhausted");
   ++sequence;
@@ -976,7 +852,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
       nativeEffects,nativeEffectCount,sequence,preparedOuterFactor,false,s.noiseOwner().sharedRandomState,
       sessionRandom,applicationClock,nativeFireSerial,nativeWaterApplication.sparksGlobals);
   if(!common.okay()){
-   std::cerr<<"GC native particle boundary: owner="<<common.ownerIndex<<" pc="<<std::hex
+   std::cerr<<"water racer particle boundary: owner="<<common.ownerIndex<<" pc="<<std::hex
        <<common.sourcePC<<std::dec<<'\n';
    require50DU(false,"actual canonical particle child update rejected");
   }

@@ -5,15 +5,7 @@
 #include "native_dynamic_contact_peers50iw_fixture.h"
 #include "native_racer_cables50hw_fixture.h"
 #include "original_ai_audio_owner.h"
-#include "ra_cold_aggregate50la.h"
-#include "mc_query50mc.h"
-#include "gb_query50gb.h"
-#include "mb_source_trigger50mb.h"
-#include "ga_trigger_actions_fixture.h"
-#include "gc_trigger_actions50kg_fixture.h"
-#include "ma_trigger_actions_fixture.h"
-#include "sa_trigger_actions_fixture.h"
-#include "sc_trigger_actions_fixture.h"
+#include "track_collision_world50cr.h"   // R3: the one collision world and its per-racer query bracket
 #include "lap_drive50gj_fixture.h"
 #include "live_audio50hf_fixture.h"
 #include "terrain_probe_authoring50fq_fixture.h"
@@ -40,7 +32,6 @@
 #include <cstring>
 #include <exception>
 #include <iostream>
-#include "ra_cold_roster_operation50la.h"
 
 namespace interactive_frame50DU {
 namespace f=runtime_startup50fl;
@@ -163,121 +154,33 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
      *terrainRowNow.state,terrainContext.membershipWork,terrainRowNow.ref,terrainContext.targets,
      terrainContext.targetCount,terrainContext.selected,terrainContext.selectedCapacity,terrainContext.queryWork,
      terrainContext.effects,terrainContext.effectCapacity};
- // The C80 lease spans the actual synchronous query only. It is released
- // on both normal and exceptional exits before any Bank switch or observation.
- auto withRaTriggerLease=[&](auto&& queryOperation){
-  if(!isRaTrack)return queryOperation();
-  require50DU(raWorld->beginRuntimeTriggerQuery(racerBank,actualRacerSlot,raDiagnostic),
-      "RA actual racer C80 query lease rejected");
-  bool active=true;
-  try {
-   auto result=queryOperation();
-   const bool ended=raWorld->endRuntimeTriggerQuery(racerBank,raDiagnostic);active=false;
-   require50DU(ended,"RA original trigger action failed after query commit");return result;
-  }catch(...){
-   if(active&&!raWorld->endRuntimeTriggerQuery(racerBank,raDiagnostic))std::terminate();
-   throw;
-  }
- };
- auto withRcTriggerLease=[&](auto&& queryOperation){
-  if(!isRcTrack)return queryOperation();
-  requireMbRuntimeNavigation50MB();
-  require50DU(rcTriggerActions&&rcTriggerActions->ready()&&rcWorldBorrow&&
-      rcWorldBorrow->world()==&liveWorld&&rcWorldBorrow->actions()==rcTriggerActions&&
-      rcTriggerActions->sourceOwner()==rcTriggerAuthoring.get()&&
-      racerBank.count()==raceRacerCount&&actualRacerSlot<racerBank.count(),
-      "RC query requires its actual same-source world and current Bank arena");
-  const rc_trigger_actions::ActionLease lease{qfilter.identity,&navigationProgress.reset.vehicleC80};
-  require50DU(rcTriggerActions->beginQuery(lease),"RC genuine main690/C80 query lease rejected");
-  bool active=true;
-  try{
-   auto result=queryOperation();const bool ended=rcTriggerActions->endQuery();active=false;
-   require50DU(ended,"RC source trigger action failed after committed query");return result;
-  }catch(...){
-   // endQuery always clears the named borrow, even after action rejection.
-   // Preserve the actual exception and every already-committed source prefix.
-   if(active){const bool ended=rcTriggerActions->endQuery();active=false;
-    if(!ended)std::fputs("RC exceptional query ended with retained action failure\n",stderr);}
-   throw;
-  }
- };
- auto withScTriggerLease=[&](auto&& queryOperation){
-  if(!scTriggerActions)return queryOperation();
-  require50DU(racerBank.count()==raceRacerCount&&actualRacerSlot<racerBank.count(),"SC query requires actual current racer slot");
-  const sc_trigger_actions::ActionLease lease{qfilter.identity,&navigationProgress.reset.vehicleC80};
-  require50DU(scTriggerActions->beginQuery(lease),"SC genuine main690/C80 query lease rejected");
-  bool active=true;
-  try{
-   auto result=queryOperation();const bool ended=scTriggerActions->endQuery();active=false;
-   require50DU(ended,"SC source trigger action failed after committed query");return result;
-  }catch(...){
-   // endQuery clears the actual borrow even when a source-action rejection
-   // makes its result false. Preserve the exception and committed prefixes.
-   if(active){const bool ended=scTriggerActions->endQuery();active=false;
-    if(!ended)std::fputs("SC exceptional query ended with retained action failure\n",stderr);}
-   throw;
-  }
- };
- // The named C80 lease outlives QueryBorrow; both expire before Bank restore.
- // Failed numerical/prefix work is terminal, even when no action was reached.
- auto withTbTriggerLease=[&](std::uint32_t actualCollider,auto&& queryOperation){
-  if(!tbTriggerActions)return queryOperation();
-  require50DU(tbWorldBorrow&&tbWorldBorrow->world()==&liveWorld&&racerBank.count()==raceRacerCount&&
-      actualRacerSlot<racerBank.count(),"TB query requires its actual world/Bank arena");
-  Vector3_48C listener{{audioListener.x,0.f,audioListener.z}};
-  const tb_trigger_actions50TB::ActionLease lease{qfilter.identity,actualCollider,&navigationProgress.reset.vehicleC80,
-      audioListenerReady?&listener:nullptr,audioListenerReady?1u:0u};
-  tb_trigger_actions50TB::Owner::QueryBorrow borrow(*tbTriggerActions,lease);
-  require50DU(bool(borrow),"TB genuine collider/C80 query borrow rejected");
-  auto result=queryOperation();
-  const bool complete=result.status==VehicleLiveQueryStatus50EQ::Complete;
-  const bool ended=borrow.finish(complete);
-  require50DU(!complete||ended,"TB successful query did not release its actual action cursor");
-  return result;
- };
- auto withMcTriggerLease=[&](bool secondary,auto&& queryOperation){
-  if(!isMcTrack)return queryOperation();
-  require50DU(mcQueryBinding&&mcQueryBinding->enrolled(),"MC current typed Bank query binding absent");
+ // Common rewrite (I4, B-C11/B-C13): ONE query bracket for every course, over
+ // the track's one collision world (track.roles.collision) and its one trigger
+ // group (274E90, 2A00A0/2A0E20/2A0B30). The trigger lease names this racer's
+ // main690 identity, this query's collider, the racer's C80 node and the
+ // accepted camera listener; it spans the actual synchronous indexed query
+ // only and ends on every exit before any Bank switch or observation. A
+ // committed prefix is published to the trigger actions (observePrepared).
+ // Retires the RA C80 lease, the RC/SC/TB/TC/GA/GC/MA/common-route leases and
+ // the MC/GB typed Bank bindings.
+ require50DU(bool(track.roles.collision),"track collision world (roles.collision, 05.04) absent");
+ auto& collisionWorld=*track.roles.collision;
+ const Vector3_48C queryListener{{audioListener.x,0.f,audioListener.z}};
+ auto withTrackQuery=[&](bool secondary,std::uint32_t actualCollider,auto&& queryOperation){
+  const track_collision_world50CR::QueryLease lease{actualRacerSlot,qfilter.identity,actualCollider,
+      &navigationProgress.reset.vehicleC80,audioListenerReady?&queryListener:nullptr,audioListenerReady?1u:0u};
   VehicleLiveQueryResult50EQ result{};bool entered=false;
-  const bool accepted=mcQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
+  const bool accepted=collisionWorld.queryRacer(lease,[&](track_runtime_storage50IG::Storage& actual){
    if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
    if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
     const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryRowMember:mainRowMember;
-    if(!mcQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
+    if(!collisionWorld.observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
    }
    return result.status==VehicleLiveQueryStatus50EQ::Complete;
   });
-  require50DU(entered,"MC genuine query admission rejected before indexed work");
-  require50DU(result.status!=VehicleLiveQueryStatus50EQ::Complete||accepted,"MC completed indexed query failed actual owner publication");
-  return result;
- };
- auto withGbTriggerLease=[&](bool secondary,auto&& queryOperation){
-  if(!isGbTrack)return queryOperation();
-  require50DU(gbQueryBinding&&gbQueryBinding->enrolled(),"GB current typed Bank query binding absent");
-  VehicleLiveQueryResult50EQ result{};bool entered=false;
-  const bool accepted=gbQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
-   if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
-   if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
-    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryRowMember:mainRowMember;
-    if(!gbQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
-   }
-   return result.status==VehicleLiveQueryStatus50EQ::Complete;
-  });
-  require50DU(entered,"GB genuine query admission rejected before indexed work");
-  require50DU(result.status!=VehicleLiveQueryStatus50EQ::Complete||accepted,"GB completed indexed query failed actual owner publication");
-  return result;
- };
- auto withTcTriggerLease=[&](std::uint32_t actualCollider,auto&& queryOperation){
-  if(!tcTriggerActions)return queryOperation();
-  require50DU(tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&racerBank.count()==raceRacerCount&&
-      actualRacerSlot<racerBank.count(),"TC query requires its actual world/Bank arena");
-  const tc_trigger_actions50TC::ActionLease lease{qfilter.identity,actualCollider,&navigationProgress.reset.vehicleC80};
-  tc_trigger_actions50TC::Owner::QueryBorrow borrow(*tcTriggerActions,lease);
-  require50DU(bool(borrow),"TC genuine collider/C80 query borrow rejected");
-  auto result=queryOperation();
-  const bool complete=result.status==VehicleLiveQueryStatus50EQ::Complete;
-  const bool ended=borrow.finish(complete);
-  require50DU(!complete||ended,"TC successful query did not release its actual action cursor");
+  require50DU(entered,"track query admission rejected before indexed work");
+  require50DU(result.status!=VehicleLiveQueryStatus50EQ::Complete||accepted,
+      "track completed indexed query failed its trigger owner publication");
   return result;
  };
  MainStaticDetectorAdmission50H admission{};
@@ -298,29 +201,11 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   require50DU(!selected.pods&&!selected.otherRows,
       "pod contact: roster row in the 690 list before step R5 (294BB0 in-order dispatch not wired)");
   if(actualRacerSlot==0&&completedFrames%3600u==0u)roster_pod_contact50PC::reportSummary(std::cerr,completedFrames);}
- if(isMbTrack){
-#include "mb_main_terrain_query50mb.inc"
- }else{
- Vector3_48C mainTriggerListener{{audioListener.x,0.f,audioListener.z}};
- ga_trigger_actions::ActionLease mainTriggerLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
-     audioListenerReady?&mainTriggerListener:nullptr,audioListenerReady?1u:0u};
- gc_trigger_actions50KG::ActionLease mainGcLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
-     audioListenerReady?&mainTriggerListener:nullptr,audioListenerReady?1u:0u};
- if(gcTriggerActions)require50DU(gcTriggerActions->beginQuery(mainGcLease),"GC main trigger arena lease unavailable");
- if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(mainTriggerLease),"GA main trigger arena lease unavailable");
- ma_trigger_actions::ActionLease mainMaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- sa_trigger_actions::ActionLease mainCommonRouteLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- if(maTriggerActions)require50DU(maTriggerActions->beginQuery(mainMaLease),"MA main trigger arena lease unavailable");
- if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->beginQuery(mainCommonRouteLease),"common-route main trigger arena lease unavailable");
- const auto mainQueryAttempt=withMcTriggerLease(false,[&](){return withGbTriggerLease(false,[&](){return withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});});});
- if(isRaTrack&&mainQueryAttempt.prefixCommitted)
-  require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
-      "RA committed query pose observation rejected");
- if(gcTriggerActions)require50DU(gcTriggerActions->endQuery(),"GC main source trigger action failed after contact commit");
- if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA main source trigger action failed after contact commit");
- if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA main trigger action failed after contact commit");
- if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->endQuery(),"common-route main trigger action failed after contact commit");
- if(!isTcTrack&&!isGbTrack&&!isMcTrack&&mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
+ {
+ const auto mainQueryAttempt=withTrackQuery(false,qfilter.identity,[&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});
+ // PORT STAND-IN (flagged, I2's host boundary): a PrefixRejected portal
+ // boundary abandons the frame through recoverPortalBoundary, every course.
+ if(mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainRowMember,mainCrossedPortals,"main");},
      "registered main terrain query");
@@ -336,29 +221,9 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  runNative([&]{return prepareSecondaryLiveQueryScene50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,x.workspace)==SecondaryQuerySceneStatus50J::Ready;},"registered original secondary scene getter");
  // Secondary uses the same first-substep merged list, without recollection.
 
- if(isMbTrack){
-#include "mb_secondary_terrain_query50mb.inc"
- }else{
- Vector3_48C secondaryTriggerListener{{audioListener.x,0.f,audioListener.z}};
- ga_trigger_actions::ActionLease secondaryTriggerLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
-     audioListenerReady?&secondaryTriggerListener:nullptr,audioListenerReady?1u:0u};
- gc_trigger_actions50KG::ActionLease secondaryGcLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
-     audioListenerReady?&secondaryTriggerListener:nullptr,audioListenerReady?1u:0u};
- if(gcTriggerActions)require50DU(gcTriggerActions->beginQuery(secondaryGcLease),"GC secondary trigger arena lease unavailable");
- if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(secondaryTriggerLease),"GA secondary trigger arena lease unavailable");
- ma_trigger_actions::ActionLease secondaryMaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- sa_trigger_actions::ActionLease secondaryCommonRouteLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- if(maTriggerActions)require50DU(maTriggerActions->beginQuery(secondaryMaLease),"MA secondary trigger arena lease unavailable");
- if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->beginQuery(secondaryCommonRouteLease),"common-route secondary trigger arena lease unavailable");
- const auto secondaryQueryAttempt=withMcTriggerLease(true,[&](){return withGbTriggerLease(true,[&](){return withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});});});
- if(isRaTrack&&secondaryQueryAttempt.prefixCommitted)
-  require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
-      "RA committed query pose observation rejected");
- if(gcTriggerActions)require50DU(gcTriggerActions->endQuery(),"GC secondary source trigger action failed after contact commit");
- if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA secondary source trigger action failed after contact commit");
- if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA secondary trigger action failed after contact commit");
- if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->endQuery(),"common-route secondary trigger action failed after contact commit");
- if(!isTcTrack&&!isGbTrack&&!isMcTrack&&secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
+ {
+ const auto secondaryQueryAttempt=withTrackQuery(true,secondaryFilter.identity,[&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});
+ if(secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryRowMember,secondaryCrossedPortals,"secondary");},
      "registered secondary terrain query");
