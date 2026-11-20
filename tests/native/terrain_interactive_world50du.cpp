@@ -389,6 +389,20 @@ SessionExit50DU Context::run() {
      liveAudioPrepared?std::string_view{}:std::string_view{"live audio not prepared"});
  auto* audioMixer=liveAudio->mixerForMaterialOwner();auto* audioGroups=liveAudio->groupsForProviders();
  require50DU(audioMixer&&audioGroups&&audioGroups->uses(*audioMixer),"shared mixer/groups unavailable");
+ // 1101C: the Application's one sound-mode owner (application lifetime, set from the profile
+ // at start) is on the mixer before 05.12, because the AUB material and positional voices bind
+ // to it. The original has it from application start; the port binds it here if no earlier
+ // audio join did, and keeps it as the session's mode so the later audio join reuses it.
+ if(!audioMixer->originalSoundMode50KG()){
+  if(!soundMode)soundMode=originalMainApplication.soundMode;
+  if(!soundMode){
+   auto mode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
+   require50DU(mode->initializeFromProfile1101C(1),"race stereo-mode construction (1101C) rejected");
+   soundMode=std::move(mode);
+  }
+  require50DU(audioMixer->bindOriginalSoundMode50KG(soundMode),
+      "sound-mode binding before the AUB reader rejected");
+ }
 
  // ---- Steps 04-05: the one track load (1A6D80 -> 1A9EE0) into the race's World:
  // archive, SCB, TOB, physics index, collision ground, fog, particles, instances,

@@ -649,6 +649,8 @@ SessionExit50DU Context::run() {
     require50DU(gameplaySoundMode->initializeFromProfile1101C(1),
         "direct native race stereo-mode construction rejected");
    }
+   // The cold load binds the Application's one mode before 05.12 (world); reuse it.
+   if(!(materialMixer&&materialMixer->originalSoundMode50KG()==gameplaySoundMode.get()))
    require50DU(materialMixer&&materialMixer->bindOriginalSoundMode50KG(gameplaySoundMode),
        "actual gameplay source-mode binding rejected");
    }
