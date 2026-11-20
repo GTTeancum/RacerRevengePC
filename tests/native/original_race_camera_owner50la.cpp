@@ -1,79 +1,36 @@
 #include "original_camera_session50kx.h"
-#include "original_race_world_join50la.h"
+#include "original_ui_main_entry50kg.h"
+#include "original_race_constructor50la.h"
 #include "original_race_display_lifetime50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "common_race_world50cr.h"
 #include <thread>
 #include <utility>
 #include <cfenv>
 #include <cstdio>
 
 namespace rr::game {
+// Common rewrite (R2): one rule for every course. The race's Camera34 adapter is
+// the unique Application-issued course Session of THIS race, issued for this
+// race's one World at race+74 (no RA world-owned Session, no per-course world).
 bool OriginalRaceConstructor50LA::nativeCameraAdapter34LifetimeCurrent(
     const original_camera_session50KX::Session& session)const noexcept {
-    if(resultsFeedbackThread_!=std::this_thread::get_id()||!counted_||rolledBack_)return false;
-    if(!world74_&&anyWorld()){
-        // TA/GA/SA/MA/GC: the unique Application-issued course Session of
-        // THIS race, issued for the course whose counted world it holds.
-        const auto& issued=session.nativeTaIssuance_;
-        if(!issued||issued->course==OriginalCameraStartCourse::ra||!raceCameraCourse34(issued->course)||!issued->issuer||
-           issued->issuer->race28C()!=this||issued->generation!=entity_.sessionGeneration)return false;
-        return issued->issuer->issuedCourseCameraSession50LA().get()==&session;
-    }
-    if(!world74_||!world74_->runtimeQueries_)return false;
-    const auto& runtime=*world74_->runtimeQueries_;
+    if(resultsFeedbackThread_!=std::this_thread::get_id()||!counted_||rolledBack_||!world74_)return false;
     // Teardown compares actual unique ownership even after prepare has become
     // terminal. It must not require the live admission it is trying to revoke.
-    return runtime.camera_&&runtime.camera_->session.get()==&session&&
-        runtime.camera_->generation==entity_.sessionGeneration;
+    const auto& issued=session.nativeTaIssuance_;
+    if(!issued||!issued->issuer||issued->race!=this||issued->world!=world74_.get()||
+       issued->issuer->race28C()!=this||issued->generation!=entity_.sessionGeneration)return false;
+    return issued->issuer->issuedCourseCameraSession50LA().get()==&session;
 }
 bool OriginalRaceConstructor50LA::ownsNativeCameraAdapter34(
     const original_camera_session50KX::Session& session)const noexcept {
     if(!nativeCameraAdapter34LifetimeCurrent(session))return false;
-    if(!world74_){
-        // The counted prefix of the course world this race holds.
-        const bool counted=taWorld74_?taWorldCounted_&&taWorldPrefixComplete_:
-            gaWorld74_?gaWorldCounted_&&gaWorldPrefixComplete_:
-            commonRouteWorld74_?commonRouteWorldCounted_&&commonRouteWorldPrefixComplete_:
-            maWorld74_?maWorldCounted_&&maWorldPrefixComplete_:
-            mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_:
-            scWorld74_?scWorldCounted_&&scWorldPrefixComplete_:
-            gbWorld74_?gbWorldCounted_&&gbWorldPrefixComplete_:
-            mcWorld74_?mcWorldCounted_&&mcWorldPrefixComplete_:
-            tbWorld74_?tbWorldCounted_&&tbWorldPrefixComplete_:
-            rcWorld74_?rcWorldCounted_&&rcWorldPrefixComplete_:
-            tcWorld74_?tcWorldCounted_&&tcWorldPrefixComplete_:
-            gcWorld74_?gcWorldCounted_&&gcWorldPrefixComplete_:false;
-        return counted&&!session.closed_&&!session.abandoned_;
-    }
-    const auto& runtime=*world74_->runtimeQueries_;
-    // The actual RA world owns this unique Session; an equal generation or an
-    // Application-issued TA Session is not interchangeable with that owner.
-    return !world74_->terminal_&&!world74_->closed_&&!runtime.terminal_&&!runtime.closed_&&
-        !runtime.cameraPrepareTerminal_&&runtime.cameraBankCurrent()&&runtime.camera_->display;
-}
-bool OriginalRaceConstructor50LA::raceCameraCourse34(OriginalCameraStartCourse course)const noexcept {
-    if(world74_)return course==OriginalCameraStartCourse::ra;
-    if(taWorld74_)return course==OriginalCameraStartCourse::ta;
-    if(gaWorld74_)return course==OriginalCameraStartCourse::ga;
-    if(commonRouteWorld74_)return course==OriginalCameraStartCourse::sa;
-    if(maWorld74_)return course==OriginalCameraStartCourse::ma;
-    if(mbWorld74_)return course==OriginalCameraStartCourse::mb;
-    if(scWorld74_)return course==OriginalCameraStartCourse::sc;
-    if(gbWorld74_)return course==OriginalCameraStartCourse::gb;
-    if(mcWorld74_)return course==OriginalCameraStartCourse::mc;
-    if(tbWorld74_)return course==OriginalCameraStartCourse::tb;
-    if(rcWorld74_)return course==OriginalCameraStartCourse::rc;
-    if(tcWorld74_)return course==OriginalCameraStartCourse::tc;
-    if(gcWorld74_)return course==OriginalCameraStartCourse::gc;
-    return false;
+    // The counted prefix of this race's one World.
+    return world74_->counted&&world74_->prefixComplete&&!session.closed_&&!session.abandoned_;
 }
 std::shared_ptr<original_camera_session50KX::Session> OriginalRaceConstructor50LA::borrowRaceCamera34()const noexcept {
     if(resultsFeedbackThread_!=std::this_thread::get_id()||!counted_||rolledBack_)return {};
-    if(world74_){
-        const auto world=world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        return world->borrowRuntimeSourceCamera(world,wd);
-    }
-    if(!anyWorld()||!cameraNativeAdapter34_)return {};
+    if(!world74_||!cameraNativeAdapter34_)return {};
     const auto& issued=cameraNativeAdapter34_->nativeTaIssuance_;
     if(!issued||!issued->issuer)return {};
     auto held=issued->issuer->issuedCourseCameraSession50LA();
@@ -92,7 +49,7 @@ bool Application::continueConsumedRaCamera1A9240(
        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(sourceRace28COwner_.get()!=&race||raceConstructorColdOwner50LA_.lock().get()!=&race||
        race.application_!=entitiesOwner_||race.profile_!=riderProfile||!riderProfile||
-       !race.counted_||race.rolledBack_||!race.nativeIntroWorldEntity()||!race.anyWorld()||
+       !race.counted_||race.rolledBack_||!race.world74_||!common_race_world50CR::introWorldEntity(race)||
        race.worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
        (race.flags1B0KnownMask_&3u)!=3u)return false;
@@ -146,21 +103,23 @@ bool Application::continueConsumedRaCamera1A9240(
 bool Application::consumedRaAll8CameraCustodyNative34Current(
     const original_camera_session50KX::Session& session)const noexcept {
     using Step=rr::game::OriginalRaceConstructor50LA::CameraInitStep;
-    // The ordinary ALL8 factory supplies no Career/TA issuance. Derive custody
-    // from its actual world-owned unique Session, never from a matching key or
-    // a synthetic completion token. This function performs no source writes.
+    // The ALL8 spectator race (humans34 0) is issued the same Application
+    // course Session as every race. Derive custody from that actual unique
+    // Session of this race's one World, never from a matching key or a
+    // synthetic completion token. This function performs no source writes.
     // Music10C is a separate owner: its presence or lexical provider revocation
     // must not revoke camera custody or strand an active Pause during cleanup.
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||!session.onOwnerThread())return false;
     try {
         const auto& race=sourceRace28COwner_;
         if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
-           !riderProfile||race->profile_!=riderProfile||!race->nativeIntroWorldEntity()||
+           !riderProfile||race->profile_!=riderProfile||!common_race_world50CR::introWorldEntity(*race)||
            !race->ownsNativeCameraAdapter34(session)||
            race->worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
            race->cameraInitStep_!=Step::nativePending||race->cameraNativeAdapter34_||
            (race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||race->field8C_||
-           session.nativeTaIssuance_||session.generation_!=race->entity_.sessionGeneration||
+           !session.nativeTaIssuance_||session.nativeTaIssuance_->issuer!=this||
+           session.generation_!=race->entity_.sessionGeneration||
            session.actual_.applicationEntities!=entitiesOwner_||
            !session.actual_.applicationAnimation.sameOwner(animationClock())||
            session.actual_.humanCount34||session.actual_.bank.count()!=8u||
@@ -196,15 +155,15 @@ bool Application::consumedTaCamera34Engaged(const original_camera_session50KX::S
     bool requireBound)const noexcept {
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||!session.onOwnerThread())return false;
     const auto& race=sourceRace28COwner_;const auto& issued=session.nativeTaIssuance_;
-    // Every consumed non-RA course race (one race class in the original).
-    if(!race||race->world74_||!race->anyWorld()||!race->camera34_||
-       !issued||issued->issuer!=this||issued->course==rr::game::OriginalCameraStartCourse::ra||
-       !race->raceCameraCourse34(issued->course)||
+    // Every consumed course race: one race class in the original, every course.
+    const bool sameWorld=race&&issued&&issued->race==race.get()&&issued->world==race->world74_.get();
+    if(!race||!race->world74_||!race->camera34_||
+       !issued||issued->issuer!=this||!sameWorld||
        &session.actual_.race94!=&race->field94_||session.actual_.humanCount34!=1u){
         if(!requireBound){static int reported=0;if(reported++<2)
-            std::fprintf(stderr,"common_race_camera34 engaged=0 race=%d world74=%d any_world=%d camera34=%d issued=%d course=%d course_ok=%d race94=%d humans=%u\n",
-                int(bool(race)),race?int(bool(race->world74_)):-1,race?int(race->anyWorld()):-1,race?int(bool(race->camera34_)):-1,
-                int(bool(issued)),issued?int(issued->course):-1,race&&issued?int(race->raceCameraCourse34(issued->course)):-1,
+            std::fprintf(stderr,"common_race_camera34 engaged=0 race=%d world74=%d camera34=%d issued=%d same_world=%d race94=%d humans=%u\n",
+                int(bool(race)),race?int(bool(race->world74_)):-1,race?int(bool(race->camera34_)):-1,
+                int(bool(issued)),int(sameWorld),
                 race?int(&session.actual_.race94==&race->field94_):-1,session.actual_.humanCount34);}
         return false;
     }
@@ -225,7 +184,7 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
         if(gate!=last){last=gate;std::fprintf(stderr,"camera34_bind_refused gate=%d\n",gate);}return false;};
     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_)return refused(1);
     if(race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session))return refused(2);
-    if(!issued||issued->issuer!=this||!race->raceCameraCourse34(issued->course)||
+    if(!issued||issued->issuer!=this||issued->race!=race.get()||issued->world!=race->world74_.get()||
        issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation)return refused(3);
     if(session.closed_||session.abandoned_||!session.displayInputs_)return refused(4);
     if(!session.readsBound_||!session.identitiesCurrent())return refused(5);
@@ -234,7 +193,7 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
     if(race->cameraInitStep_!=Step::nativePending&&race->cameraInitStep_!=Step::nativeReady)return refused(8);
     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
        race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session)||
-       !issued||issued->issuer!=this||!race->raceCameraCourse34(issued->course)||
+       !issued||issued->issuer!=this||issued->race!=race.get()||issued->world!=race->world74_.get()||
        issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation||
        session.actual_.applicationEntities!=entitiesOwner_||
        !session.actual_.applicationAnimation.sameOwner(animationClock())||
@@ -320,7 +279,7 @@ bool Application::retireConsumedRaCameraNative34(
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||
        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(raceConstructorColdOwner50LA_.lock().get()!=&race||race.application_!=entitiesOwner_||
-       race.world74_||race.cameraNativeAdapter34_)return false;
+       race.cameraNativeAdapter34_)return false;
     if(race.loadingCamera34_.entered)return abortConsumedRaLoadingCameraNative34(race,pc);
     if(!race.camera34_)return true;
     // Actual world/session cleanup must already have invalidated the native
@@ -342,40 +301,31 @@ bool Application::retireConsumedRaCameraNative34(
 }
 
 namespace original_camera_session50KX {
+// Every issued course session binds its race's Camera34 once engaged (one rule).
 bool Session::bindCountedRaceCameraNative34()noexcept {
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
     if(!nativeTaIssuance_)return true;
-    // Every consumed non-RA course (TA/GA/SA/MA/GC) binds its race's
-    // Camera34 once engaged; RA through its world join.
-    if(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra){
-        if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,false))return true;
-    }
+    if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,false))return true;
     std::uint32_t pause=0;
-    return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+    return actual_.applicationAnimation.readPause11C(pause)&&
         nativeTaIssuance_->issuer->bindConsumedRaCameraNative34(*this);
 }
 bool Session::completeCountedRaceCameraNative34()noexcept {
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
     if(!nativeTaIssuance_)return true;
-    // Every consumed non-RA course (TA/GA/SA/MA/GC) binds its race's
-    // Camera34 once engaged; RA through its world join.
-    if(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra){
-        if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,false))return true;
-    }
+    if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,false))return true;
     std::uint32_t pause=0;
-    return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+    return actual_.applicationAnimation.readPause11C(pause)&&
         nativeTaIssuance_->issuer->completeConsumedRaCameraNative34(*this);
 }
 bool Session::revokeCountedRaceCameraNative34()noexcept {
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
     if(!nativeTaIssuance_)return true;
-    // TA: only a consumed (tournament) race can hold this Session as its
-    // Camera34 adapter. Single Event/practice TA has no Race28C: nothing bound.
-    if(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra){
-        if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->race28C())return true;
-    }
+    // Only a consumed race can hold this Session as its Camera34 adapter.
+    // A launch without Race28C has nothing bound.
+    if(!nativeTaIssuance_->issuer||!nativeTaIssuance_->issuer->race28C())return true;
     std::uint32_t pause=0;
-    return nativeTaIssuance_->issuer&&actual_.applicationAnimation.readPause11C(pause)&&
+    return actual_.applicationAnimation.readPause11C(pause)&&
         nativeTaIssuance_->issuer->revokeConsumedRaCameraNative34(*this);
 }
 }

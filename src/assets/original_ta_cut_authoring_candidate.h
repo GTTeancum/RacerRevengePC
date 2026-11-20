@@ -128,11 +128,6 @@ public:
     OriginalTaCutAuthoringCandidate& operator=(OriginalTaCutAuthoringCandidate&&) = delete;
     ~OriginalTaCutAuthoringCandidate() = default;
 
-    // Compatibility entry: the historical four-member overload remains TA.
-    static std::unique_ptr<const OriginalTaCutAuthoringCandidate> create(
-        const std::array<Input,4>& input, Status& status) noexcept {
-        return create("TA",input.data(),input.size(),status);
-    }
     // Atomically return immutable owned original authoring only. The order is
     // the selected track's TOB followed by its exact numbered VUB members.
     // This checks owned bytes independently; it does not certify a live mount.
@@ -140,12 +135,11 @@ public:
         std::string_view trackId,const Input* input,std::size_t memberCount,Status& status) noexcept {
         using namespace ta_cut_authoring_candidate_detail;
         status = Status::input;
-        // Every track id with a cut row: the 13 stock rows, or the registry
-        // course whose row was derived from its own archive (one rule).
+        // Every course: the cut row derived from its own archive (one rule).
         if(!input||!originalRaceTrackIdAdmitted50LA(trackId))return nullptr;
         const auto* identity=originalTrackCutIdentity50LA(trackId);
-        // Cut count from the course row (stock table or derived from its own TOB),
-        // bounded by the native 7-cut storage; no per-course literal.
+        // Cut count from the course's own TOB (its derived row), bounded by
+        // the native 7-cut storage; no per-course literal.
         if(!identity||!identity->cutCount||identity->cutCount>7u||
            memberCount!=static_cast<std::size_t>(identity->cutCount)+1u)return nullptr;
         for (std::size_t i=0; i<memberCount; ++i) {

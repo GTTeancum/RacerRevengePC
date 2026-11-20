@@ -9,7 +9,6 @@ namespace rr::game { class OriginalRaceConstructor50LA; }
 #include "native_racer_bank50hn_fixture.h"
 #include "native_dynamic_contact_peers50iw_fixture.h"
 #include "ra_source_camera_inputs50la.h"
-#include "ra_track_fog50la.h"
 #include "ra_static_fog_observation50la.h"
 #include "original_follow_query_bridge50kx.h"
 #include "terrain_probe_authoring50fq_fixture.h"
@@ -1477,11 +1476,11 @@ class OwnershipBridge final {
     bool readStaticFogPublication(StaticFogPublication& id,
         ra_static_fog50LA::CameraObservation& out)const noexcept {
         StaticLightPublication base;
-        if(!readStaticLightPublication(base)||!camera_->fog.current()||!camera_->display||
-           camera_->display->trackFog3EC!=&camera_->fog.fields_||
+        if(!readStaticLightPublication(base)||!camera_->fog||!camera_->display||
+           camera_->display->trackFog3EC!=camera_->fog||
            camera_->session->displayInputs_!=camera_->display)return false;
         original_camera_session50KX::Session::FogPreparation current;
-        if(!camera_->session->readFogPreparation(current)||current.owner!=&camera_->fog.fields_)return false;
+        if(!camera_->session->readFogPreparation(current)||current.owner!=camera_->fog)return false;
         ra_static_fog50LA::CameraObservation next;
         next.generation=current.generation;next.publication=current.publication;
         next.frame=current.frame;next.fogRevision=current.revision;next.source=current.source;
@@ -1512,23 +1511,23 @@ class OwnershipBridge final {
         if(terminal_||closed_||cameraPrepareTerminal_||nativeFifoPins_||triggerQueryActive_||
            sharedOwnerLease_||sharedRoleViews_||sharedEffectsStopped_||
            (endCandidateProducer_&&endCandidateProducer_->inCall)||!cameraBankCurrent()||
-           !camera_||!camera_->session||!camera_->display||!camera_->fog.current()||
-           camera_->fog.source_.get()!=&source||camera_->generation!=generation||
-           camera_->fogAddress!=&camera_->fog.fields_||
-           camera_->display->trackFog3EC!=&camera_->fog.fields_||nativeStaticDrawPrepared_)return false;
+           !camera_||!camera_->session||!camera_->display||!camera_->fog||
+           camera_->generation!=generation||
+           camera_->display->trackFog3EC!=camera_->fog||nativeStaticDrawPrepared_)return false;
+        (void)source;
         const auto& s=*camera_->session;
         if(!generation||s.generation_!=generation||s.closed_||s.abandoned_||s.coldBound_||
            s.coldPhase_!=1u||!s.coldViewport_.complete()||!s.coldCameraSelected26F940_||
            s.frameStage_!=original_camera_session50KX::Session::FrameStage::idle||
            s.publicationCount_||s.fogPreparationRevision_||s.fogPreparation_.owner||
-           s.displayInputs_!=camera_->display||s.display_.actualTrackFog3EC!=&camera_->fog.fields_||
+           s.displayInputs_!=camera_->display||s.display_.actualTrackFog3EC!=camera_->fog||
            s.display_.rendererCurrentScene0!=&s.viewport_||
            s.actual_.applicationEntities.get()!=&application||application.attachmentLock423F58())return false;
-        const auto& f=camera_->fog.fields_;std::uint32_t nearBits=0;
+        const auto& f=*camera_->fog;std::uint32_t nearBits=0;
         std::memcpy(&nearBits,&f.near54,sizeof(nearBits));
         if(f.far50!=4000.f||nearBits!=0x44a6a99au||f.minimum58!=64.f||f.dirty60!=1u||
            s.display_.rendererFogColor28!=f.color30)return false;
-        out=&camera_->fog.fields_;return true;
+        out=camera_->fog;return true;
     }
     std::shared_ptr<original_main_entry50KG::RaceDisplayLifetime50LA>
     nativeColdModelDisplay274160(const g::OriginalApplicationEntities50LA& application,
@@ -1662,8 +1661,8 @@ class OwnershipBridge final {
     bool drawZonePrefix114E00(const ZoneDrawEntry114E00&,Diagnostic&)noexcept;
     bool prepareFog(Diagnostic& d)noexcept {
         d={};StaticLightPublication base;
-        if(!readStaticLightPublication(base)||!camera_->fog.current()||!camera_->display||
-           camera_->display->trackFog3EC!=&camera_->fog.fields_||
+        if(!readStaticLightPublication(base)||!camera_->fog||!camera_->display||
+           camera_->display->trackFog3EC!=camera_->fog||
            camera_->session->displayInputs_!=camera_->display){
             d.message="actual published RA SourceCamera and retained fog required";return false;
         }
@@ -1690,48 +1689,54 @@ class OwnershipBridge final {
     std::shared_ptr<g::CoupledNoiseContext49M> sharedSecondaryNoiseOwner_;
     std::weak_ptr<g::OriginalApplicationEntities50LA> sharedSecondaryNoiseEntities_;
     std::unique_ptr<original_follow_query_bridge::QueryBridge> follow_;
+    // Common rewrite (R2): RA's own world-built Session is retired. This is a
+    // BORROW of the one Application-issued course Session of the race (every
+    // course, createNativeCourseCameraSession50LA), bound by bindIssuedCamera.
+    // The Session's root owner prepares and closes it; this bridge never does.
     struct CameraBinding final {
         // Factory-owned lifetime pins for the existing persistent collection.
         // No second Cables object or source material bank is created.
         std::array<std::unique_ptr<native_racer50HW::Cables::SourceCameraPin>,8> cablePins;
         std::array<native_racer50HW::Cables*,8> cables{};
-        std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> lighting;
-        std::shared_ptr<g::OriginalTrackParticleCold50LA> particles;
-        std::vector<std::uint8_t> cam,tob,phySnapshot;
-        const native_racer50HW::Rig* selectedRig=nullptr;
-        original_camera_session50KX::AuthoredInputs authored{};
+        std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> lighting; // the track's lights role
+        std::shared_ptr<g::OriginalTrackParticleCold50LA> particles;                // the track's particles role
         original_camera_session50KX::DisplayInputs* display=nullptr;
         std::uint64_t generation=0;
-        ra_track_fog50LA::Owner fog;
-        rr::game::OriginalRaceFogFields* fogAddress=nullptr;
-        // Last: real Session dies before every owned authoring/manager borrow.
-        std::unique_ptr<original_camera_session50KX::Session> session;
-        ~CameraBinding(){
-            if(session&&!session->closed_)std::terminate();
-            session.reset(); // Destroy the closed Session before retiring its fog borrow.
-            if(display&&fogAddress&&display->trackFog3EC==fogAddress)display->trackFog3EC=nullptr;
-        }
+        // The track's fog fields the Session restores (DisplayInputs::trackFog3EC), borrowed.
+        rr::game::OriginalRaceFogFields* fog=nullptr;
+        // Last: the issued Session (strong borrow, released before the bridge).
+        std::shared_ptr<original_camera_session50KX::Session> session;
     };
     std::unique_ptr<CameraBinding> camera_;
-    // UNACTIVATED: the actual issuer selects its OWN retained Session and
-    // generation. No caller Session/key/generation or public grant is accepted.
-    bool constructCurrentColdController174A30()noexcept {
-        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
-           !camera_->generation||!camera_->display||!cameraBankCurrent()||
-           !freshLighting_||camera_->lighting!=freshLighting_||!camera_->fog.current()||
-           camera_->display->trackFog3EC!=&camera_->fog.fields_)return false;
-        return camera_->session->constructColdController174A30(camera_->generation);
-    }
-    bool constructCurrentRaIntro174FA4(const original_main_entry50KG::Application&)noexcept;
-    rr::game::OriginalWreckComponent50LA* currentIntroController174A30()noexcept {
-        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||!cameraBankCurrent()||
-           camera_->session->closed_||!camera_->session->nativeTaIssuance_||
-           camera_->session->nativeTaIssuance_->course!=g::OriginalCameraStartCourse::ra)return nullptr;
-        return camera_->session->taControllerEntity174A30();
-    }
-    bool constructCurrentIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC> bank,
-        std::size_t firstVoice,std::size_t voiceCount)noexcept {
-        return currentIntroController174A30()&&camera_->session->constructTaIntro177750(std::move(bank),firstVoice,voiceCount);
+    // Bind the race's issued Session (once). Cables pins follow the session's
+    // actual rigs, as the former RA factory took them. No Session is created.
+    bool bindIssuedCamera(std::shared_ptr<original_camera_session50KX::Session> issued,
+        original_camera_session50KX::DisplayInputs& display,
+        std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> lighting,
+        std::shared_ptr<g::OriginalTrackParticleCold50LA> particles,
+        const std::array<native_racer50HW::Cables*,8>* cables,
+        const std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs,std::size_t racers,
+        std::uint64_t generation,Diagnostic& d)noexcept {
+        d={};
+        if(terminal_||closed_||camera_||cameraAttempted_||!issued||!issued->nativeTaIssuance_||
+           issued->closed_||!lighting||!particles||!generation||!cameraBankCurrent()||
+           racers>8u||(issued->displayInputs_&&issued->displayInputs_!=&display)){
+            d.message="issued course camera binding refused (owner, generation or display differs)";return false;}
+        cameraAttempted_=true;
+        try {
+            auto next=std::make_unique<CameraBinding>();
+            if(cables)for(std::size_t i=0;i<racers;++i){
+                auto* const c=(*cables)[i];
+                if(!c||!rigs[i])continue;
+                next->cablePins[i]=c->retainSourceCamera(*rigs[i]);
+                if(!next->cablePins[i]){d.message="actual persistent Cables camera lifetime unavailable";return false;}
+                next->cables[i]=c;
+            }
+            next->lighting=std::move(lighting);next->particles=std::move(particles);
+            next->display=&display;next->generation=generation;next->fog=display.trackFog3EC;
+            next->session=std::move(issued);
+            camera_=std::move(next);return true;
+        }catch(...){d.message="issued course camera binding allocation failed";return false;}
     }
     bool cameraAttempted_=false,cameraPrepareTerminal_=false;
     bool storageAttempted_=false,capacitySealed_=false,storageConstructed_=false;
@@ -2859,77 +2864,17 @@ class OwnershipBridge final {
             return complete;
         }catch(...){d.message="RA grid cleanup exception; actual slot effects and retirement obligation retained";return false;}
     }
-    // The race load's camera start before the population (1A93B0 -> 1A9EE0):
-    // the same Session, generation, authored inputs and display as prepareCamera.
-    original_camera_session50KX::Result prepareCameraTrackCold(std::uint64_t generation,Diagnostic& d)noexcept {
+    // Release the borrow of the issued Session once its root owner closed it.
+    // The bridge never prepares, closes or abandons the Session itself.
+    original_camera_session50KX::Result closeCamera(bool,Diagnostic& d)noexcept {
         namespace c=original_camera_session50KX;
         d={};
-        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
-           !cameraBankCurrent()||!generation||generation!=camera_->generation||!camera_->display){
-            d.message="RA camera track load requires the same live Bank and actual manager/session generation";
-            d.camera.status=c::Status::owner;return d.camera;
-        }
-        if(!camera_->fog.current()||camera_->display->trackFog3EC!=&camera_->fog.fields_){
-            d.message="actual retained RA fog owner was replaced";
-            cameraPrepareTerminal_=true;d.camera.status=c::Status::owner;return d.camera;}
-        try {
-            d.camera=camera_->session->prepareTrackCold(generation,camera_->authored,*camera_->display);
-            if(d.camera.status!=c::Status::complete)d.message="actual SourceCamera track load remains incomplete";
-            return d.camera;
-        }catch(...){cameraPrepareTerminal_=true;d.message="actual SourceCamera track load exception; partial state retained";
-            d.camera.status=c::Status::terminal;return d.camera;}
-    }
-    original_camera_session50KX::Result prepareCamera(std::uint64_t generation,Diagnostic& d)noexcept {
-        namespace c=original_camera_session50KX;
-        d={};
-        if(terminal_||closed_||cameraPrepareTerminal_||!camera_||!camera_->session||
-           !cameraBankCurrent()||!generation||generation!=camera_->generation){
-            d.message="RA camera requires the same live Bank and actual manager/session generation";
-            d.camera.status=c::Status::owner;return d.camera;
-        }
-        if(!freshLighting_||camera_->lighting!=freshLighting_||
-           std::find(freshComplete_.begin(),freshComplete_.end(),false)!=freshComplete_.end()){
-            d.message="RA camera requires every actual fresh attachment from its same lighting owner";
-            d.camera.status=c::Status::owner;return d.camera;
-        }
-        if(!camera_->fog.current()||!camera_->display||
-           camera_->display->trackFog3EC!=&camera_->fog.fields_){
-            d.message="actual retained RA fog owner was replaced";
-            cameraPrepareTerminal_=true;d.camera.status=c::Status::owner;return d.camera;}
-        const auto& rig=*camera_->selectedRig;
-        if(rig.phy!=camera_->phySnapshot||
-           reinterpret_cast<const char*>(rig.phy.data())!=camera_->authored.phy||
-           rig.phy.size()!=camera_->authored.phyBytes){
-            d.message="selected original camera PHY owner changed";
-            cameraPrepareTerminal_=true;d.camera.status=c::Status::authoring;return d.camera;
-        }
-        try {
-            d.camera=camera_->session->prepare(generation,camera_->authored,*camera_->display);
-            if(d.camera.status!=c::Status::complete)d.message="actual SourceCamera preparation remains incomplete";
-            return d.camera;
-        }catch(...){cameraPrepareTerminal_=true;d.message="actual SourceCamera prepare exception; partial state retained";
-            d.camera.status=c::Status::terminal;return d.camera;}
-    }
-    original_camera_session50KX::Result closeCamera(bool abandon,Diagnostic& d)noexcept {
-        namespace c=original_camera_session50KX;
-        d={};
-        if(nativeFifoPins_){d.message="actual collector FIFO still retains SourceCamera";
+        if(nativeFifoPins_){d.message="actual collector FIFO still retains the issued Session";
             d.camera.status=c::Status::owner;return d.camera;}
-        if(!camera_){d.camera.status=c::Status::complete;return d.camera;}
-        if(!camera_->session){camera_.reset();d.camera.status=c::Status::complete;return d.camera;}
-        if(!cameraBankCurrent()){
-            d.message="actual SourceCamera retirement requires its still-live idle Bank";
-            d.camera.status=c::Status::owner;return d.camera;
-        }
-        try {
-            d.camera=abandon?camera_->session->abandonAndCloseSpatial():camera_->session->close();
-            // Inspect the actual algorithm's closed field, never infer it from
-            // a success-shaped return or caller claim. Failed cleanup retries.
-            if(camera_->session->closed_)camera_.reset();
-            else d.message="actual SourceCamera cleanup incomplete; camera/light/pool retained";
-            return d.camera;
-        }catch(...){d.message="actual SourceCamera cleanup exception; owners retained";
-            d.camera.status=c::Status::terminal;return d.camera;}
+        if(!camera_||!camera_->session||camera_->session->closed_){
+            camera_.reset();d.camera.status=c::Status::complete;return d.camera;}
+        d.message="issued course Session still open; its root owner closes it first";
+        d.camera.status=c::Status::owner;return d.camera;
     }
     bool canClose()const noexcept {
         if(sourceIncomingZonesAttempted_&&!sourceIncomingZonesWithdrawn_)return false;

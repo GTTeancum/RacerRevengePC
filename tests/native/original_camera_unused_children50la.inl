@@ -34,9 +34,12 @@ bool nativeCinematographer70Published_=false;
 bool nativeTvBody20Attempted_=false,nativeTvBody20Revoked_=false;
 
 // Cold constructor/lifetime complement of the EXISTING start_ payload, never
-// a second camera identity. Only the bounded RA preparation may create this
-// prefix; other courses and their existing live numeric preparation are not
-// changed. Embedded native storage replaces allocation175060 explicitly.
+// a second camera identity. Only the bounded native-owned preparation (the
+// 174DF0 load operands published on this controller) may create this prefix,
+// on any course; the existing live numeric preparation is not changed.
+// Embedded native storage replaces allocation175060 explicitly.
+// PORT STAND-IN (flagged): no route publishes those 174DF0 operands today, so
+// Start7C (and TvBody below) stay unreached on every course alike.
 struct NativeStart7CPrefix final {
     bool constructed=false,retired=false;
     std::uint32_t vtable00=0;
@@ -53,7 +56,7 @@ bool constructNativeRaStart7C()noexcept {
        coldController_.children64[5]!=nativeTv78_.get()||
        !coldController_.nativeLoadOperandsPublished||coldController_.nativeLoadOperandsRevoked||
        !coldController_.nativeScene3COwner||!coldController_.race88||
-       !nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra||
+       !nativeTaIssuance_||
        nativeTaIssuance_->generation!=generation_||coldController_.issuerGeneration!=generation_||
        !actual_.applicationEntities||!actual_.applicationEntities->application10()||
        actual_.applicationEntities->attachmentLock423F58()||closed_||abandoned_||coldBound_||
@@ -96,7 +99,8 @@ bool retireNativeRaStart7C()noexcept {
 }
 
 bool constructNativeRaCinematographer70()noexcept {
-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
+    // Every Application-issued course session (one rule, no course gate).
+    if(!nativeTaIssuance_)return true;
     if(nativeCinematographer70Attempted_||nativeCinematographer70Retired_||nativeCinematographer70_||
        !coldControllerIdentity174A30())return taReject(0x174f6c);
     nativeCinematographer70Attempted_=true;
@@ -119,7 +123,8 @@ bool constructNativeRaCinematographer70()noexcept {
     return true;
 }
 bool constructNativeRaTv78()noexcept {
-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)return true;
+    // Every Application-issued course session (one rule, no course gate).
+    if(!nativeTaIssuance_)return true;
     const auto& app=actual_.applicationEntities;
     if(nativeTv78Retired_||!app||app->nativeOwnerThread_!=std::this_thread::get_id()||
        !app->application10()||app->attachmentLock423F58()||closed_||abandoned_||
@@ -163,7 +168,7 @@ bool bindNativeRaTvBody1752A0()noexcept {
        !coldController_.nativeLoadOperandsPublished||coldController_.nativeLoadOperandsRevoked||
        !coldController_.nativeScene3COwner||!coldController_.race88||
        coldController_.scene3C!=&scene_||coldController_.mode84!=0||
-       !nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra||
+       !nativeTaIssuance_||
        nativeTaIssuance_->generation!=generation_||!nativeTaIssuance_->issuer||
        coldController_.issuerGeneration!=generation_||!coldController_.started||coldController_.released||
        !actual_.applicationEntities||!actual_.applicationEntities->application10()||
