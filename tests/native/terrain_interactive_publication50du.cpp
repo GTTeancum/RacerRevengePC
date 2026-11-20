@@ -947,7 +947,8 @@ void Context::run() {
    // Tournament (P+34 == 2, 174E90) or with App+350 set (174E9C); otherwise
    // the count is zeroed and no cut child is built. A Free Play counted race
    // therefore has no authored intro: no cut/controller authoring here.
-   const bool introCutsAuthored=dynamicProfile.game34==2u||cameraStartup350!=0;
+   // 174EA8: subtype 2/3 always zero the cut count (Time Trial is counted, 148r).
+   const bool introCutsAuthored=nativeOrdinaryLaunch11258==1u&&(dynamicProfile.game34==2u||cameraStartup350!=0);
    if(!taIntroAuthoring&&introCutsAuthored&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedCommonRouteStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
     taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
     require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");

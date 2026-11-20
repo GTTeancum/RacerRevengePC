@@ -33,6 +33,11 @@ using interactive_frame50DU::BorrowedCall;
 using interactive_loop50DU::GameplayDisplayWallTotals50DU;
 using J=nlohmann::json;
 namespace {
+// The one counted-race rule (1A65C0 is built for every race; 1AD520 forces AI 0
+// for Time Trial): Single Race (11258 1) and Time Trial (11258 3), every course.
+// Practice (11258 2) stays out until its 1ABC1C replay tail exists (PORT
+// STAND-IN, flagged: it would otherwise stop at 1ABBC0 with no fallback).
+bool countedRaceLaunch148(std::uint32_t launch11258) noexcept {return launch11258==1u||launch11258==3u;}
 void require50DU(bool ok, const char* message) {
     if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
 }
@@ -817,7 +822,7 @@ SessionExit50DU Context::run() {
   rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection taSelected{};
   const bool taAuthoredIntro=originalMainApplication.riderProfile&&
       originalMainApplication.riderProfile->courseRaceSnapshot(taSelected)&&
-      (taSelected.mode34==2||taSelected.mode34==0)&&taSelected.subtype==1;
+      (taSelected.mode34==2||taSelected.mode34==0)&&countedRaceLaunch148(taSelected.subtype);
   // Actual174E48 gates: startup350 is zero; subtype2/3 never use authored cuts.
   // The counted race (1A65C0, one race class) is built for Single Race in
   // Free Play (mode0) as in Tournament (mode2). Only its authored cuts
@@ -852,7 +857,7 @@ SessionExit50DU Context::run() {
   const bool loaded=gcOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"GC original all-pass world rejected":diagnostic.message.c_str());
   require50DU(gcOriginalWorld->mesh(),"GC original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -874,7 +879,7 @@ SessionExit50DU Context::run() {
   const bool loaded=maOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"MA original static world rejected":diagnostic.message.c_str());
   require50DU(maOriginalWorld->mesh(),"MA original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -892,7 +897,7 @@ SessionExit50DU Context::run() {
  // MB: the same one race class (1A65C0) and counted course world (1A6BC0)
  // on the MB static owner loaded above, as on MA.
  if(mbOriginalWorld&&mbOriginalWorld->loaded()&&consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&
-    (dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+    (dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
   require50DU(mbOriginalWorld->mesh(),"MB original mesh publication missing");
   openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
@@ -916,7 +921,7 @@ SessionExit50DU Context::run() {
   const bool loaded=scOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"SC original static world rejected":diagnostic.message.c_str());
   require50DU(scOriginalWorld->mesh(),"SC original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -934,7 +939,7 @@ SessionExit50DU Context::run() {
  // GB: the same one race class (1A65C0) and counted course world (1A6BC0) on
  // the GB static owner its cold sources already built above.
  if(isGbTrack&&gbOriginalWorld&&gbOriginalWorld->loaded()&&consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&
-    (dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+    (dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
   require50DU(gbOriginalWorld->mesh(),"GB original mesh publication missing");
   openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
@@ -964,7 +969,7 @@ SessionExit50DU Context::run() {
   const bool loaded=rcOriginalWorld->load(rcColdSources,rcWorldRawReservation,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"RC original world rejected":diagnostic.message.c_str());
   require50DU(rcOriginalWorld->mesh(),"RC original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -986,7 +991,7 @@ SessionExit50DU Context::run() {
   const bool loaded=tcOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"TC original static world rejected":diagnostic.message.c_str());
   require50DU(tcOriginalWorld->mesh(),"TC original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -1005,7 +1010,7 @@ SessionExit50DU Context::run() {
  // the MC static owner its cold sources already built above.
  if(isMcTrack&&mcOriginalWorld&&mcOriginalWorld->loaded()){
   require50DU(mcOriginalWorld->mesh(),"MC original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -1028,7 +1033,7 @@ SessionExit50DU Context::run() {
   const bool loaded=tbOriginalWorld->load(tbColdSources,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"TB original world rejected":diagnostic.message.c_str());
   require50DU(tbOriginalWorld->mesh(),"TB original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -1130,7 +1135,7 @@ SessionExit50DU Context::run() {
       <<" stage="<<diagnostic.stage<<" member="<<diagnostic.member<<'\n';
   require50DU(loaded,diagnostic.message.empty()?"common-route static world rejected":diagnostic.message.c_str());
   require50DU(commonRouteWorld->mesh(),"common-route static mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
@@ -1153,7 +1158,7 @@ SessionExit50DU Context::run() {
   const bool loaded=gaOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"GA original static world rejected":diagnostic.message.c_str());
   require50DU(gaOriginalWorld->mesh(),"GA original mesh publication missing");
-  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
+  if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&countedRaceLaunch148(nativeOrdinaryLaunch11258)){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);

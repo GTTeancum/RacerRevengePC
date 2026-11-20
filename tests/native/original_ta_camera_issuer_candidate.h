@@ -15,6 +15,10 @@
 #include <thread>
 
 namespace original_main_entry50KG::ta_camera_issuer_detail {
+// The race's own field size (148r, same rule as 147c's Binder b4f426c): 1AD520
+// loads 1..8 racers (a Time Trial is a solo field, AI 0); the session already
+// requires every loaded racer bound (racerBank.count() == raceRacerCount).
+inline bool fieldSized(std::size_t racers) noexcept {return racers>=1u&&racers<=8u;}
 template<class A,class B> bool sameOwner(const std::shared_ptr<A>& a,
     const std::shared_ptr<B>& b)noexcept {
     return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
@@ -76,7 +80,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::ta||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -137,7 +141,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::gc||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -201,7 +205,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::ga||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -268,7 +272,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::sa||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -335,7 +339,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::ma||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -400,7 +404,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::mb||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -464,7 +468,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::sc||authored.inputs.mcSourceIdentity||
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
        authored.inputs.camBytes!=authored.cam.size()||authored.inputs.tob!=authored.tob.data()||
@@ -529,7 +533,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::gb||authored.inputs.mcSourceIdentity||
        // GB's TOB stays borrowed from the retained GB cold source (loadGb leaves tob empty).
        authored.cam.empty()||!authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
@@ -596,7 +600,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::tb||authored.inputs.mcSourceIdentity||
        // TB's TOB stays borrowed from the retained TB cold source (loadTb leaves tob empty).
        authored.cam.empty()||!authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
@@ -664,7 +668,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        // MC's CAM is owned by its assets owner; its TOB is borrowed from the retained MC cold source.
        in->course!=rr::game::OriginalCameraStartCourse::mc||!in->cam||!in->camBytes||
        !in->tob||in->tobBytes!=186642u)return {};
@@ -728,7 +732,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::rc||authored.inputs.mcSourceIdentity||
        // RC's TOB stays borrowed from the retained RC cold source (loadRc leaves tob empty).
        authored.cam.empty()||!authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||
@@ -793,7 +797,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !actual.applicationAnimation.sameOwner(animationClock())||
        &actual.applicationClock!=animationClockBackend_.get()||
        !actual.actualRigs||!(*actual.actualRigs)[0]||!actual.actualTrackParticles4A0||
-       actual.bank.count()!=8||!actual.hostRace.runtimeValid()||
+       !ta_camera_issuer_detail::fieldSized(actual.bank.count())||!actual.hostRace.runtimeValid()||
        authored.inputs.course!=rr::game::OriginalCameraStartCourse::tc||authored.inputs.mcSourceIdentity||
        // TC's TOB is the authored storage's own authenticated copy (as SC).
        authored.cam.empty()||authored.tob.empty()||authored.inputs.cam!=authored.cam.data()||

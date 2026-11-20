@@ -1,0 +1,38 @@
+Time Trial step A: counted race for Time Trial (11258 3) on every course, zero intro cuts (174EA8), finish 1A7DEC skip + 1ABBE8 F8 199770; in-place restart 1AC8E0 not yet owned, falls back to the panel (build wt-148r-2, linked, not run)
+
+Original (dis_all.txt; work/scratch/148r/results-tt-ra-design.txt):
+- 1A65C0 is built for every race; 1AD520 forces AI 0 for Time Trial.
+- 174EA8: subtype 2/3 zero the intro cut count in every mode.
+- 1A7DEC: 11258 != 1 skips the F8 199770 and Results 1A7E18; 1A7E24
+  1AD230; 1AB560 -> 1ABBC0 -> 1ABBE8 (11258 3): 199770(F8,0,1,1,1,1) at
+  1ABC00, then 1AC8E0(race,0) at 1ABC0C (in-place restart), return.
+
+Changes (one rule, every course):
+- terrain_interactive_world50du.cpp: countedRaceLaunch148 = 11258 1 or 3
+  on all 11 course gates and the TA gate (was 1 only). Practice (2) stays
+  out (PORT STAND-IN, flagged: its 1ABC1C replay tail does not exist and
+  the end entry would stop at 1ABBC0 with no fallback).
+- terrain_interactive_publication50du.cpp: intro cuts authored only for
+  11258 1 (174EA8), so a Time Trial takes the zero-cut controller path
+  (8f39ce6; the zero-cut 174A30 already admits launch 3).
+- original_race_end_entry50la.cpp: the 1ABBE8 branch: same F8 owner
+  checks as 1A7DF4, 199770(0,1,1,1,1), then a source stop at 1ABC0C
+  ("in-place restart 1AC8E0 has no native owner yet; F8 shown"). The loop
+  treats a source stop as before (common_race_end_entry fallback=host_panel),
+  so a Time Trial still ends on the text panel after the F8 standings.
+
+Still to do (next steps): in-place 1AC8E0 restart (racer 1AEA70/1AED30,
+grid 2A2880, lap clocks, start sequence, record backup 288630); the Pause
+Quit row on the common race (1BDA74: 1ABFC0(1) -> Results page 3 -> 1CA6A4
+1AC440 -> Hall 1CA6F0; otherwise Course 17DE10(6,6,1)) - the every-course
+original Pause row 10 today maps to the port's program Quit; RA Free Play
+on the common path.
+
+Log lines: consumed_ta_gate ... subtype=3 admitted=1; counted_controller
+course=.. cuts=0 slot48=1 intro_lines=0; common_race_end_entry ... pc=1abc0c
+operation=Time Trial 1ABC0C in-place restart ...; common_race_end_entry
+fallback=host_panel.
+
+3 TUs, no headers. Relink wt-148r-2 on wt-148r-1, linked. Not run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

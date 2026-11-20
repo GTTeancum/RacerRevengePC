@@ -192,6 +192,26 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
     }
     //Actual Race vtable+78 is1AB520. Its supported pre-ack prefix is private and
     //uncalled from the live loop; this is not genuine end admission.
+    //1AB55C/1AB560 -> 1ABBC0 -> 1ABBE8 (Time Trial): 199770(F8,0,1,1,1,1) at
+    //1ABC00, then 1AC8E0(race,0) at 1ABC0C restarts the race in place.
+    //No 1ABFC0/1ABE70/20C read: the Time Trial records are taken only from the
+    //Pause Quit row (1BDA74). The F8 store runs here; the in-place restart has
+    //no native owner yet, so the caller falls back (source status, logged).
+    if(results104_&&current.subtype==3u){
+        if(!f8Attached_||!f8Owner_||f8Source_!=f8Owner_.get()||
+           !f8Source_->belongsTo(application_,entity_.sessionGeneration)){
+            stop(S::owner,0x1abbf0,"Time Trial 1ABBF0 actual published/attached Race+F8 absent");return;
+        }
+        const auto* f8=f8Source_->entity();
+        if(!f8||f8->parent1C!=&entity_||f8->mask20!=0xffffffffu){
+            stop(S::owner,0x1abbf0,"Time Trial F8 is not this Race's actual source child");return;
+        }
+        if(!f8Source_->visibility199770(0,1,1,1,1)){
+            stop(S::source,0x1abc00,"Time Trial F8 visibility leaf rejected before its stores");return;
+        }
+        reached();
+        stop(S::source,0x1abc0c,"Time Trial 1ABC0C in-place restart 1AC8E0 has no native owner yet; F8 shown");return;
+    }
     if(!results104_||current.subtype!=1u){
         stop(S::incomplete,0x1abbc0,"Actual1AB520 null104/non-subtype1 branch; separate tail unimplemented");return;
     }
