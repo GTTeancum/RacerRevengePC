@@ -310,6 +310,13 @@ public:
             const ChariotIkChainBinding49T absent{Index::none,Index::none,Index::none,Index::none};
             animation.hands={absent,absent};animation.handRecords=nullptr;
         }else{
+            // PORT STAND-IN (B-P01 leftover, kept and logged): the original builds
+            // each hand record on its own (28EB90); the port pairs both chains, so
+            // a pod with exactly one wrist is refused here for every pod alike (no
+            // pod key). Logged so the run names the pod and the rule.
+            if(!(leftWrist&&rightWrist))
+                std::cerr<<"pod_rig_refused pod="<<podId<<" rule=single_wrist_28EB90 left="<<leftWrist
+                         <<" right="<<rightWrist<<'\n';
             need(leftWrist&&rightWrist,"Roster single-wrist chariot requires per-record 28EB90 construction");
             animation.hands={chain("handlt","l_hand_dummy"),chain("handrt","r_hand_dummy")};animation.handRecords=&hands;
         }

@@ -238,6 +238,8 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         std::array<bool,120> included{};
         std::array<std::uint16_t,32> pods{},characters{};
         std::size_t pairCount=0;
+        // PORT STAND-IN (flagged, B-P05): riders 3/7/19/20 are mandatory pairs by
+        // id below; the rule belongs to the cold population (unlock data).
         for(const auto rider:originalUiRiderRoster50KG){
             const auto pod=owner.podWidget(rider),character=owner.characterWidget(rider);
             const auto p=owner.podAssets(pod);const auto c=owner.characterAssets(character);

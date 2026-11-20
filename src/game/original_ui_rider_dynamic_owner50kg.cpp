@@ -70,20 +70,22 @@ bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::Origina
             // actual manager cold construction, before selection publication.
             if(e.state.selected||e.state.shown)return fail(E::input);
         }
-        // Original Group1 order and PodIndex identities from authenticated rider.dat.
-        // Bind metadata for all23 controls, including hidden traversal intermediates.
-        // These maps confer no descriptor ownership or preview readiness.
-        constexpr std::uint16_t controls[]{16,17,10,8,2,4,9,12,3,5,7,19,20,13,6,14,21,15,1,11,22,18,23};
-        constexpr std::uint16_t riders[]{19,20,12,10,2,4,11,15,3,7,9,22,23,16,8,17,24,18,1,14,25,21,26};
-        constexpr std::size_t count=sizeof(controls)/sizeof(controls[0]);
-        const auto* selection=widgets.selectionData();const auto* page=selection->page();
-        if(!page||page->groups.size()<=1||page->groups[1].controls.size()!=count)return fail(E::input);
+        // B-P05: the Group1 order and each control's PodIndex come from the
+        // authenticated rider.dat itself (every control, including hidden
+        // traversal intermediates), never from a fixed 23-rider table. A rider
+        // id outside the pod/character maps or named twice is refused before
+        // any store. These maps confer no descriptor ownership or preview readiness.
+        const auto* selection=widgets.selectionData();const auto* page=selection?selection->page():nullptr;
+        if(!page||page->groups.size()<=1||page->groups[1].controls.empty())return fail(E::input);
+        const std::size_t count=page->groups[1].controls.size();
+        if(count>next->pods.size())return fail(E::input);
         std::array<bool,120> usedWidgets{};
         for(std::size_t slot=0;slot<count;++slot){
             const auto control=page->groups[1].controls[slot];
-            if(control!=controls[slot]||static_cast<std::size_t>(control)>=page->controls.size())return fail(E::input);
+            if(control<0||static_cast<std::size_t>(control)>=page->controls.size())return fail(E::input);
             const auto rider=selection->controlRider(static_cast<std::uint16_t>(control));
-            if(rider!=riders[slot]||next->pods[rider]||next->characters[rider])return fail(E::input);
+            if(!rider||static_cast<std::size_t>(rider)>=next->pods.size()||
+               next->pods[rider]||next->characters[rider])return fail(E::input);
             const auto& ids=page->controls[control].widgets;
             if(ids.size()!=4)return fail(E::input);
             constexpr K kinds[]{K::pod,K::text,K::text,K::character};

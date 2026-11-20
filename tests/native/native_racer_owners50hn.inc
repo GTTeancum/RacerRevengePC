@@ -160,14 +160,17 @@ racerBank.owner(terrainOwner.prepared);
 racerBank.owner(terrainLiveOwner);
 // Shared world: the static candidates' F8/copied lanes are the one world's
 // (1226E8 marks and copies seen by every racer, as in the original); never banked.
-if(!isRaTrack&&!isMbTrack&&!trackStorage.sharedLayout())for(auto& candidate:candidates){
+// The branch is the storage's own layout (data), the same for every course
+// (B-C18: the former RA/MB exclusions are gone; the one track storage decides).
+if(!trackStorage.sharedLayout())for(auto& candidate:candidates){
  racerBank.owner(candidate.candidate.collision.filter.flagsF8);
  racerBank.owner(candidate.candidate.collision.copied40);
  racerBank.owner(candidate.candidate.collision.copied50);
 }
 // Registers actual backing elements and mutable lanes, never a FixedBuffer,
 // vector descriptor or the Storage owner. No duplicate old array spans remain.
-if(!isRaTrack)trackStorage.registerMutableOwners(racerBank);
+// Every course has the one track storage (common_track50CR::Roles::storage).
+trackStorage.registerMutableOwners(racerBank);
 // A native source cut belongs only to its racer; never restart the human's
 // session because an opponent reaches an unsupported source boundary.
 racerBank.owner(recoveryPaused);

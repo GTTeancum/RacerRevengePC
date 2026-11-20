@@ -2,6 +2,8 @@
 #include "native_last_failure50pd.h"
 #include "native_wreck_debris50pd.h"
 #include "terrain_interactive_roster_cold50du.h"
+#include "common_roster50cr.h"
+#include "common_track50cr.h"
 #include "original_race_constructor50la.h"
 #include "original_results_roster_read50la.h"
 #include "original_results_live_owner_read50la.h"
@@ -56,170 +58,120 @@ std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> makeRuntimeOwners() {
  return std::make_shared<ra_cold_roster50LA::RuntimeOwners>();
 }
 void Context::run() const {
- auto& mainQueryResource=this->mainQueryResource;
- auto& directOriginalInputs=this->directOriginalInputs;
- auto& playerRacer60=this->playerRacer60;
- auto& courseRaceCold=this->courseRaceCold;
- auto& playerPodId=this->playerPodId;
- auto& raceRacerCount=this->raceRacerCount;
- auto& playerUsesRosterRig=this->playerUsesRosterRig;
- auto& racerRigs=this->racerRigs;
- auto& racerCollisions=this->racerCollisions;
- auto& endpointPolicy=this->endpointPolicy;
- auto& racerNames=this->racerNames;
- auto& mainPairCapacity=this->mainPairCapacity;
- auto& secondaryPairCapacity=this->secondaryPairCapacity;
- const auto& matchesEndpointPolicy=this->matchesEndpointPolicy;
-{
-  require50DU(matchesEndpointPolicy(mainQueryResource),"retained main endpoint-W host policy differs");
-  const auto rosterRoot=runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/raw-imports");
-  using Profile=rr::platform::OriginalUiRiderProfileOwner50KG;
-  Profile::CourseRaceSelection mode2Selection{};
-  Profile::TournamentCareerSnapshot mode2Career{};
-  rr::game::OriginalUiCourseRememberedProfile50KG mode2Course{};
-  rr::platform::OriginalUiRiderProfileStamp50KG mode2Stamp{};
-  bool canonicalMode2=false;
-  if(sourceUiHumanCourse){
-   require50DU(courseProfile&&courseProfile->courseRaceSnapshot(mode2Selection),
-       "UI roster requires its actual retained Course profile");
-   if(mode2Selection.mode34==2&&directOriginalInputs){
-    mode2Stamp=courseProfile->stamp();
-    require50DU(directOriginalInputs&&courseRaceCold&&
-        courseProfile->selectedTournamentCourseSnapshot(mode2Career,mode2Course)&&
-        mode2Stamp.mode34==2&&mode2Career.stamp.mode34==2&&mode2Course.mode34==2&&
-        mode2Career.stamp.generation==mode2Stamp.generation&&
-        courseProfile->stamp().generation==mode2Stamp.generation&&
-        mode2Career.career100C0==playerRacer60&&mode2Selection.rider==playerRacer60&&
-        mode2Selection.subtype==1&&mode2Selection.entrants==raceRacerCount&&
-        raceRacerCount==raceRacerCapacity&&((mode2Selection.packed1125C>>5)&3u)==1u&&
-        ((mode2Selection.packed1125C>>7)&15u)==7u&&
-        (mode2Career.progress219C&31u)<mode2Course.courseOrder100C4.size()&&
-        mode2Selection.course==mode2Course.courseOrder100C4[mode2Career.progress219C&31u],
-        "canonical mode2 field lost selected career/Course identity");
-    canonicalMode2=true;
-   }
-  }
-  auto roster=[&](){
-   if(!canonicalMode2)return directOriginalInputs?
-       original_course_roster50KG::directDiscRoster(playerRacer60):
-       native_racer50HW::rig_detail::json(rosterRoot/"roster.json");
-   namespace selection=rr::game::original_racer_selection50IJ;
-   namespace identity=original_player_identity50IK;
-   namespace original=rr::game::original_opponent_selection50KG;
-   const auto order=original::courseIndex187B10(mode2Course.courseOrder100C4,
-       static_cast<std::uint8_t>(mode2Selection.course))+1u;
-   const auto klass=order<5u?1u:(order<9u?2u:3u);
-   std::array<original::RacerId,7> opponents{};
-   require50DU(original::deterministic188470(klass,static_cast<original::RacerId>(playerRacer60),opponents),
-       "original188470 deterministic field rejected");
-   native_racer50HW::J result={{"schema","RR_ORIGINAL_DISC_ROSTER_V1"},{"player_index",0},
-       {"racers",native_racer50HW::J::array()}};
-   // Identity planning is pure: no RNG, profile mutation or racer allocation.
-   // Existing per-slot pipeline below authenticates every selected archive/PHY.
-   for(std::size_t slot=0;slot<raceRacerCapacity;++slot){
-    const auto id=slot?static_cast<std::uint32_t>(opponents[slot-1]):playerRacer60;
-    const auto* entry=selection::findByRacer60(id);const auto* source=identity::find(id);
-    require50DU(entry&&source,"canonical opponent has no authenticated resource identity");
-    result["racers"].push_back(native_racer50HW::J{{"pod_id",std::string(entry->podId)},
-        {"resource_sha256",source->archiveSha256},{"phy_sha256",source->phySha256}});
-   }
-   return result;
-  }();
-  require50DU(roster.at("player_index")==0&&roster.at("racers").size()==raceRacerCapacity,
-      "original roster candidate must contain eight distinct source identities");
-  if(courseRaceCold&&!directOriginalInputs){
-   std::string rosterError;
-   const bool selected=original_course_roster50KG::selectPreparedRider(".",rosterRoot,roster,playerRacer60,rosterError);
-   require50DU(selected,rosterError.empty()?"Course selected original racer cold owner is unavailable":rosterError.c_str());
-  }
-  std::size_t selectedSlot=raceRacerCapacity;
-  for(std::size_t racer=0;racer<raceRacerCapacity;++racer)
-   if(roster.at("racers").at(racer).at("pod_id")==playerPodId){
-    require50DU(selectedSlot==raceRacerCapacity,"duplicate selected original racer");selectedSlot=racer;
-   }
-  require50DU(selectedSlot<raceRacerCapacity,"selected original racer absent from retained roster");
-  // Swap complete authenticated entries, preserving all eight distinct racers.
-  // The selected pod's former opponent slot receives Anakin's original resources.
-  if(selectedSlot)std::swap(roster.at("racers").at(0),roster.at("racers").at(selectedSlot));
-  // Only the authored active prefix is instantiated, registered or drawn.
-  // Inactive capacity does not allocate pods, participate in AI, or become an
-  // invisible opponent. Preserve Player0 before trimming the real roster.
-  auto& activeRoster=roster.at("racers");
-  activeRoster.erase(activeRoster.begin()+raceRacerCount,activeRoster.end());
-  for(std::size_t racer=0;racer<raceRacerCount;++racer){
-   const auto& entry=roster.at("racers").at(racer);
-   const auto id=entry.at("pod_id").get<std::string>();
-   coldRacerStage50DU(id,"roster identity",[&](){
-    // Stock Pod%02d spelling or an admitted add-on row (player only: an
-    // add-on pod never joins a stock AI field).
-    require50DU(original_player_identity50IK::admittedPodId(id)&&
-        (rr::game::original_racer_selection50IJ::stockPodId(id)||racer==0)&&
-        (racer!=0||id==playerPodId),"original roster identity rejected");
-    for(std::size_t previous=0;previous<racer;++previous)
-     require50DU(roster.at("racers").at(previous).at("pod_id")!=id,"duplicate original racer");
-   });
-   if(racer||playerUsesRosterRig)coldRacerStage50DU(id,"rig construction",[&](){
-    if(directOriginalInputs){
-     const auto archive=original_player_identity50IK::podArchive(
-         runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
-     racerRigs[racer]=std::make_unique<native_racer50HW::Rig>(".",archive);
-    }else{
-     const auto relative=std::filesystem::path(entry.at("path").get<std::string>());
-     require50DU(!relative.is_absolute()&&relative.lexically_normal()==relative&&
-         relative.string().find("..") == std::string::npos,"original roster path rejected");
-     racerRigs[racer]=std::make_unique<native_racer50HW::Rig>(".",rosterRoot/relative);
-    }
-    require50DU(racerRigs[racer]->podId==id,"original rig and roster identity differ");
-   });
-   coldRacerStage50DU(id,"collision owner construction",[&](){
-    racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
-   });
-   const auto archive=original_player_identity50IK::podArchive(
-       runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
-   std::vector<std::uint8_t> retainedRes;
-   coldRacerStage50DU(id,"resource archive verification",[&](){
-    retainedRes=f::readBytes(archive);
-    require50DU(pod_materials50ed_fixture::detail::sha256(retainedRes)==
-        entry.at("resource_sha256").get<std::string>(),"original racer resource archive identity differs");
-   });
-   if(!racer)coldRacerStage50DU(id,"original display name",[&](){
-    racerNames[racer]=directOriginalInputs?racerRigs[racer]->displayName:native_racer50HW::loadVerifiedDisplayName(
-        runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/original-eight-visuals"),id,
-        entry.at("resource_sha256").get<std::string>());
-   });
-   coldRacerStage50DU(id,"collision resource preparation",[&](){
-    std::string error;
-    const bool collisionReady=racerCollisions[racer]->prepare(
-        {archive.string(),original_player_identity50IK::podFolderMember(id)},endpointPolicy,error);
-    require50DU(collisionReady,error.empty()?"original racer collision load failed":error.c_str());
-   });
-   // Wreckage pieces for the destroy handlers (2261B0/226750). Debris is
-   // optional presentation: a rejected piece is logged, never a load failure.
-   if(racerRigs[racer]){
-    std::string log;bool loaded=false;
-    try{loaded=native_wreck_debris50PD::loadRacer(racer,*racerRigs[racer],retainedRes,log);}
-    catch(const std::exception& e){log=e.what();}catch(...){log="unknown failure";}
-    std::cerr<<"wreck_debris_cold slot="<<racer<<" pod="<<id<<" inventoried="<<loaded<<' '<<log<<'\n';
-   }
-   mainPairCapacity=std::max(mainPairCapacity,racerCollisions[racer]->main().rayCount);
-   secondaryPairCapacity=std::max(secondaryPairCapacity,racerCollisions[racer]->secondary().rayCount);
-  }
-  if(canonicalMode2){
-   Profile::CourseRaceSelection current{};
-   Profile::TournamentCareerSnapshot career{};
-   rr::game::OriginalUiCourseRememberedProfile50KG course{};
-   require50DU(courseProfile->courseRaceSnapshot(current)&&
-       courseProfile->selectedTournamentCourseSnapshot(career,course)&&
+ namespace selection=rr::game::original_racer_selection50IJ;
+ namespace identity=original_player_identity50IK;
+ namespace original=rr::game::original_opponent_selection50KG;
+ require50DU(matchesEndpointPolicy(mainQueryResource),"retained main endpoint-W host policy differs");
+ const auto rosterRoot=runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/raw-imports");
+ using Profile=rr::platform::OriginalUiRiderProfileOwner50KG;
+ Profile::CourseRaceSelection mode2Selection{};
+ Profile::TournamentCareerSnapshot mode2Career{};
+ rr::game::OriginalUiCourseRememberedProfile50KG mode2Course{};
+ rr::platform::OriginalUiRiderProfileStamp50KG mode2Stamp{};
+ bool canonicalMode2=false,practice=false;
+ if(sourceUiHumanCourse){
+  require50DU(courseProfile&&courseProfile->courseRaceSnapshot(mode2Selection),
+      "UI roster requires its actual retained Course profile");
+  practice=mode2Selection.subtype==2u; // launch subtype 11258 (A10), data only
+  if(mode2Selection.mode34==2&&directOriginalInputs){
+   mode2Stamp=courseProfile->stamp();
+   require50DU(directOriginalInputs&&rootedCourseRace&&
+       courseProfile->selectedTournamentCourseSnapshot(mode2Career,mode2Course)&&
+       mode2Stamp.mode34==2&&mode2Career.stamp.mode34==2&&mode2Course.mode34==2&&
+       mode2Career.stamp.generation==mode2Stamp.generation&&
        courseProfile->stamp().generation==mode2Stamp.generation&&
-       courseProfile->stamp().mode34==mode2Stamp.mode34&&
-       career.stamp.generation==mode2Stamp.generation&&career.career100C0==playerRacer60&&
-       current.mode34==2&&current.course==mode2Selection.course&&current.rider==mode2Selection.rider&&
-       current.planet==mode2Selection.planet&&current.subtype==mode2Selection.subtype&&
-       current.laps==mode2Selection.laps&&current.entrants==mode2Selection.entrants&&
-       current.packed1125C==mode2Selection.packed1125C&&
-       course.courseOrder100C4==mode2Course.courseOrder100C4,
-       "canonical mode2 profile changed during authenticated roster construction");
+       mode2Career.career100C0==playerRacer60&&mode2Selection.rider==playerRacer60&&
+       mode2Selection.subtype==1&&mode2Selection.entrants==raceRacerCount&&
+       raceRacerCount==raceRacerCapacity&&((mode2Selection.packed1125C>>5)&3u)==1u&&
+       ((mode2Selection.packed1125C>>7)&15u)==7u&&
+       (mode2Career.progress219C&31u)<mode2Course.courseOrder100C4.size()&&
+       mode2Selection.course==mode2Course.courseOrder100C4[mode2Career.progress219C&31u],
+       "canonical mode2 field lost selected career/Course identity");
+   canonicalMode2=true;
   }
+ }
+ // ---- the one field, from launch data only (PLAN 2.9). Pure planning: no
+ // RNG, no profile mutation, no racer allocation.
+ require50DU(raceRacerCount>=1u&&raceRacerCount<=raceRacerCapacity,"race field size outside 1..8 (1AD520)");
+ common_roster50CR::Field field;common_roster50CR::Diagnostic fieldDiagnostic;
+ const bool addonCourse=track.source()==common_race_log50CR::Source::registry;
+ bool fieldOk=false;
+ if(canonicalMode2){
+  // Tournament: 188470 over the class tables, by the course's place in the
+  // remembered course order (187B10).
+  const auto order=original::courseIndex187B10(mode2Course.courseOrder100C4,
+      static_cast<std::uint8_t>(mode2Selection.course))+1u;
+  const auto klass=order<5u?1u:(order<9u?2u:3u);
+  fieldOk=common_roster50CR::buildTournamentField188470(klass,playerRacer60,field,fieldDiagnostic);
+ }else if(raceRacerCount==1u){
+  fieldOk=common_roster50CR::buildTimeTrialField(playerRacer60,field,fieldDiagnostic); // 1AD520 solo
+ }else{
+  std::array<std::uint32_t,selection::entries.size()> entries{};
+  require50DU(original_course_roster50KG::courseFieldEntries(playerRacer60,entries),
+      "selected racer has no pod row (A5 table or registry)");
+  fieldOk=common_roster50CR::buildCourseField(entries.data(),raceRacerCount,1u,addonCourse,
+      practice?common_roster50CR::FieldKind::practice:common_roster50CR::FieldKind::freePlay,field,fieldDiagnostic);
+ }
+ if(!fieldOk)require50DU(false,fieldDiagnostic.reason.empty()?"race field refused":fieldDiagnostic.reason.c_str());
+ if(!directOriginalInputs){
+  // PORT STAND-IN (flagged): the prepared-import development input (no
+  // RR_ORIGINAL_ASSET_ROOT) builds each Rig from its retained pod.json; the
+  // RES the row was admitted with is still read and compared by loadAll.
+  // Stock rows only: an add-on row has no prepared import.
+  for(std::size_t slot=0;slot<field.count;++slot){
+   auto& row=field.rows[slot];
+   const auto* entry=selection::findByRacer60(row.racer60);
+   require50DU(entry&&!entry->retainedPodJson.empty(),"prepared-import roster has no retained pod for this racer");
+   const auto relative=std::filesystem::path(std::string(entry->retainedPodJson));
+   require50DU(!relative.is_absolute()&&relative.lexically_normal()==relative&&
+       relative.string().find("..")==std::string::npos,"original roster path rejected");
+   row.archive=(rosterRoot/relative).string();
+  }
+ }
+ common_roster50CR::Diagnostic rosterDiagnostic;
+ if(!roster.build(field,rosterDiagnostic))
+  require50DU(false,rosterDiagnostic.reason.empty()?"roster field refused":rosterDiagnostic.reason.c_str());
+ // Step 10: 1AA510 -> 1AD520 -> 1AE280, every slot's own pod (humans first).
+ if(!roster.loadAll(track,racerRigs,rosterDiagnostic))
+  require50DU(false,rosterDiagnostic.reason.empty()?"roster load refused":rosterDiagnostic.reason.c_str());
+ // Per slot: its own collision owner from its own pod archive; the human's
+ // display name (row 0 is the first human; humans precede AI).
+ for(std::size_t racer=0;racer<roster.count();++racer){
+  const auto* row=roster.row(racer);
+  require50DU(row&&racerRigs[racer],"roster slot has no loaded rig");
+  const auto& id=row->podId;
+  coldRacerStage50DU(id,"collision owner construction",[&](){
+   racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
+  });
+  const auto archive=identity::podArchive(runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
+  if(!racer)coldRacerStage50DU(id,"original display name",[&](){
+   racerNames[racer]=directOriginalInputs?racerRigs[racer]->displayName:native_racer50HW::loadVerifiedDisplayName(
+       runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/original-eight-visuals"),id,row->archiveSha256);
+  });
+  coldRacerStage50DU(id,"collision resource preparation",[&](){
+   std::string error;
+   const bool collisionReady=racerCollisions[racer]->prepare(
+       {archive.string(),identity::podFolderMember(id)},endpointPolicy,error);
+   require50DU(collisionReady,error.empty()?"original racer collision load failed":error.c_str());
+  });
+  mainPairCapacity=std::max(mainPairCapacity,racerCollisions[racer]->main().rayCount);
+  secondaryPairCapacity=std::max(secondaryPairCapacity,racerCollisions[racer]->secondary().rayCount);
+ }
+ if(canonicalMode2){
+  Profile::CourseRaceSelection current{};
+  Profile::TournamentCareerSnapshot career{};
+  rr::game::OriginalUiCourseRememberedProfile50KG course{};
+  require50DU(courseProfile->courseRaceSnapshot(current)&&
+      courseProfile->selectedTournamentCourseSnapshot(career,course)&&
+      courseProfile->stamp().generation==mode2Stamp.generation&&
+      courseProfile->stamp().mode34==mode2Stamp.mode34&&
+      career.stamp.generation==mode2Stamp.generation&&career.career100C0==playerRacer60&&
+      current.mode34==2&&current.course==mode2Selection.course&&current.rider==mode2Selection.rider&&
+      current.planet==mode2Selection.planet&&current.subtype==mode2Selection.subtype&&
+      current.laps==mode2Selection.laps&&current.entrants==mode2Selection.entrants&&
+      current.packed1125C==mode2Selection.packed1125C&&
+      course.courseOrder100C4==mode2Course.courseOrder100C4,
+      "canonical mode2 profile changed during authenticated roster construction");
  }
 }
 }

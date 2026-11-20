@@ -317,66 +317,50 @@ Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
     return projectSceneSurface(scene,lod,surface,palette,context,radialFog,false,false,output,work);
 }
-Status projectOriginalUiKnireColoredSurface50KM(
+// B-P05: ONE coloured-surface rule for every rider/unlock character. A
+// character surface that carries its own source vertex colours (component word
+// 0x10F with original colours, DiffuseCompressed, first pass) is projected with
+// those colours: its PSG groups' colour rows end at B+64, before the generated
+// packets at B+68, and the resident 366430 clipper consumes the generated packet
+// colours (also on the bit4 branch). The facts come from the loaded scene, never
+// from a widget id, a byte count or a digest; any other surface is refused.
+namespace {
+Status projectColoredCharacterSurface(
     const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
     std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
     const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
     const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
-    if(!owner.loaded()||owner.widgetId()!=56||!identity||!identity->sha256||
-        identity->bytes!=84424||std::strcmp(identity->sha256,
-        "1e240e3c96bab3cf54b20ba8b482ab58a3e38685c62484c9ad6542d2314a4868")||
-        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
-        scene->nodes.size()!=18||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
-        scene->materials.size()!=3||scene->materials[1]!="22c_2")return Status::unsupportedScene;
-    const auto& original=scene->lods[0].surfaces[1];
+    if(!owner.loaded()||!identity||!identity->sha256||!scene||passIndex!=0||
+        microprogram!="DiffuseCompressed"||lod>=scene->lods.size()||
+        surface>=scene->lods[lod].surfaces.size())return Status::unsupportedScene;
+    const auto& original=scene->lods[lod].surfaces[surface];
     if(original.component_word!=0x10f||!original.has_original_colors||
-        original.material_index!=1||original.vertices.size()!=923)return Status::unsupportedScene;
-    // PSG hash authenticates all 71 source groups (3..16 vertices). Their color
-    // rows end at B+64, before generated packets at B+68. The resident366430
-    // clipper consumes generated packet colors, including on the bit4 branch.
+        original.material_index>=scene->materials.size())return Status::unsupportedScene;
     return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
+}
+}
+Status projectOriginalUiKnireColoredSurface50KM(
+    const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    return projectColoredCharacterSurface(owner,lod,surface,passIndex,microprogram,palette,context,radialFog,output,work);
 }
 Status projectOriginalUiKraidColoredSurface50KM(
     const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
     std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
     const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
-    const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
-    if(!owner.loaded()||owner.widgetId()!=57||!identity||!identity->sha256||
-        identity->bytes!=99072||std::strcmp(identity->sha256,
-        "7ac6249f6219fcd2d8e779fc322f2b3de7cd8cccd5625b9bf30dbe66f2c2b2ba")||
-        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
-        scene->nodes.size()!=26||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
-        scene->materials.size()!=3||scene->materials[1]!="23c_2")return Status::unsupportedScene;
-    const auto& original=scene->lods[0].surfaces[1];
-    if(original.component_word!=0x10f||!original.has_original_colors||
-        original.material_index!=1||original.vertices.size()!=1850)return Status::unsupportedScene;
-    // PSG hash authenticates all 145 source groups (3..16 vertices). Their color
-    // rows end at B+64, before generated packets at B+68. The resident366430
-    // clipper consumes generated packet colors, including on the bit4 branch.
-    return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
+    return projectColoredCharacterSurface(owner,lod,surface,passIndex,microprogram,palette,context,radialFog,output,work);
 }
-// UIUnlock Soultree_Character34 (22c) / 35 (23c): the SAME authenticated PSG
-// bytes (identical size and SHA-256 in UIUNLOCK and UIRIDER), same kernel bounds.
+// UIUnlock Soultree characters: the same rule (same PSG bytes as UIRIDER).
 Status projectOriginalUiUnlockColoredSurface50PD(
     const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
     std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
     const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
-    const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
-    const bool knire=owner.widgetId()==34,kraid=owner.widgetId()==35;
-    if(!owner.loaded()||(!knire&&!kraid)||!identity||!identity->sha256||
-        identity->bytes!=(knire?84424u:99072u)||std::strcmp(identity->sha256,knire?
-        "1e240e3c96bab3cf54b20ba8b482ab58a3e38685c62484c9ad6542d2314a4868":
-        "7ac6249f6219fcd2d8e779fc322f2b3de7cd8cccd5625b9bf30dbe66f2c2b2ba")||
-        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
-        scene->nodes.size()!=(knire?18u:26u)||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
-        scene->materials.size()!=3||scene->materials[1]!=(knire?"22c_2":"23c_2"))return Status::unsupportedScene;
-    const auto& original=scene->lods[0].surfaces[1];
-    if(original.component_word!=0x10f||!original.has_original_colors||
-        original.material_index!=1||original.vertices.size()!=(knire?923u:1850u))return Status::unsupportedScene;
-    return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
+    return projectColoredCharacterSurface(owner,lod,surface,passIndex,microprogram,palette,context,radialFog,output,work);
 }
 Status projectOriginalUiSpecularMapCompressedSurface50KM(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,

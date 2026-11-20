@@ -34,6 +34,9 @@ inline bool originalUiRiderPreviewRequest50KG(OriginalUiRiderPreviewSet50KG lega
     }
     combined=requested;return true;
 }
+// PORT STAND-IN (flagged, B-P05): the cold population names riders (19/20,
+// 3, 7 and the default-unlocked set) instead of reading the profile's unlock
+// bits; the session (original_ui_rider_session50kg.cpp) must pass the mask.
 inline bool originalUiRiderColdMember50KG(OriginalUiRiderColdPopulation50KG population,
     std::uint32_t requested,std::uint32_t rider) noexcept {
     if(originalUiRiderRequested50KG(requested,rider))return true;

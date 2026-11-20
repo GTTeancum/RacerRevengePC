@@ -1,11 +1,17 @@
 #pragma once
-// Cold Course handoff only. Existing-field selections preserve all eight
-// original entries; the caller moves the complete selected entry to slot0.
-// Supplemental originals replace only POD01, retaining seven genuine opponents.
-// This is a bounded native field policy, not retail opponent construction.
+// Cold Course handoff only. The free-play field is a list of racer ids
+// (courseFieldEntries); every row then loads its own pod's files through the
+// one roster (common_roster50cr.h), stock or add-on alike.
+// PORT STAND-IN (flagged, B-P04 field rule): the original's free-play opponents
+// come from 1AE620's non-tournament branch (RNG, not ported). Until it is, the
+// field is the eight retained host entries with the selected racer in slot 0:
+// a racer already among them swaps with slot 0, any other racer (a supplemental
+// stock pod or an add-on row, the same rule) takes the place of entry 0.
 #include "native_racer_rig50hw_fixture.h"
 #include "original_player_identity50ik_fixture.h"
+#include <array>
 #include <filesystem>
+#include <utility>
 #include <string>
 
 namespace original_course_roster50KG {
@@ -13,28 +19,37 @@ inline bool supportsPreparedRider(std::uint32_t racer60) noexcept { // find() re
     const auto* entry=rr::game::original_racer_selection50IJ::findByRacer60(racer60);
     return entry&&entry->humanJoinImplemented&&original_player_identity50IK::find(racer60);
 }
-// Field selection describes the admitted original identities only. Each Rig
-// subsequently authenticates and decodes its own actual RES, PHY and model
-// resources. No generated pod/import/roster JSON files are read or written.
-inline native_racer50HW::J directDiscRoster(std::uint32_t racer60) {
+// The free-play field entries (stand-in rule above): racer60 per slot, the
+// selected racer first. Refuses a racer with no pod row (A5 table or registry).
+inline bool courseFieldEntries(std::uint32_t racer60,
+    std::array<std::uint32_t,rr::game::original_racer_selection50IJ::entries.size()>& out) noexcept {
     namespace selection=rr::game::original_racer_selection50IJ;
+    const auto* selected=selection::findAnyByRacer60(racer60);
+    if(!selected||!selected->humanJoinImplemented)return false;
+    std::array<std::uint32_t,selection::entries.size()> next{};
+    std::size_t at=next.size();
+    for(std::size_t i=0;i<next.size();++i){next[i]=selection::entries[i].racer60;if(next[i]==racer60)at=i;}
+    if(at<next.size())std::swap(next[0],next[at]);else next[0]=racer60;
+    out=next;return true;
+}
+// Field selection describes the admitted identities only, in the order of
+// courseFieldEntries. Each Rig subsequently authenticates and decodes its own
+// actual RES, PHY and model resources. No generated JSON is read or written.
+inline native_racer50HW::J directDiscRoster(std::uint32_t racer60) {
     namespace identities=original_player_identity50IK;
     using native_racer50HW::rig_detail::need;
-    // findAny: a stock row or a free-play add-on row (DLC registry, PORT
-    // EXTENSION). An add-on player takes slot0 the way a supplemental stock
-    // pod does; the seven opponents stay the stock field.
-    const auto* selected=selection::findAnyByRacer60(racer60);
-    need(selected&&selected->humanJoinImplemented&&identities::find(racer60),
+    std::array<std::uint32_t,rr::game::original_racer_selection50IJ::entries.size()> ids{};
+    need(courseFieldEntries(racer60,ids)&&identities::find(racer60),
         "Original disc selected racer has no native cold owner");
     native_racer50HW::J roster={{"schema","RR_ORIGINAL_DISC_ROSTER_V1"},{"player_index",0},
         {"racers",native_racer50HW::J::array()}};
-    auto row=[](const selection::Entry& entry){const auto* identity=identities::find(entry.racer60);
-        need(identity,"Original disc roster resource identity absent");
-        return native_racer50HW::J{{"pod_id",std::string(entry.podId)},
-            {"resource_sha256",identity->archiveSha256},{"phy_sha256",identity->phySha256}};};
-    bool present=false;
-    for(const auto& entry:selection::entries){roster["racers"].push_back(row(entry));present|=entry.racer60==racer60;}
-    if(!present)roster["racers"][0]=row(*selected);
+    for(const auto id:ids){
+        const auto* entry=rr::game::original_racer_selection50IJ::findAnyByRacer60(id);
+        const auto* identity=identities::find(id);
+        need(entry&&identity,"Original disc roster resource identity absent");
+        roster["racers"].push_back(native_racer50HW::J{{"pod_id",std::string(entry->podId)},
+            {"resource_sha256",identity->archiveSha256},{"phy_sha256",identity->phySha256}});
+    }
     return roster;
 }
 // Authenticate the selected original's own cold inputs. Mutable rig, collision,
@@ -109,12 +124,5 @@ inline bool selectPreparedRider(const std::filesystem::path& repository,
         error.clear();return true;
     }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
     catch(...){try{error="Course selected original cold roster preparation failed";}catch(...){}return false;}
-}
-// Preserve the original narrow entry point without requiring that POD19 be the
-// only supplemental resource installed in an otherwise authentic preparation.
-inline bool selectPod19(const std::filesystem::path& repository,
-    const std::filesystem::path& rosterRoot,native_racer50HW::J& roster,
-    std::string& error) noexcept {
-    return selectPreparedRider(repository,rosterRoot,roster,19,error);
 }
 } // namespace original_course_roster50KG

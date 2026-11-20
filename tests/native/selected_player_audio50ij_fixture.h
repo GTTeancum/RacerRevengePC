@@ -25,6 +25,8 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
     try {
         const auto* identity=id::find(racer60);
         d::need(identity,"50IK selected original player identity unsupported");
+        // PORT STAND-IN (flagged, course audio in a pod reader): TrackIntro and
+        // PodEngine key 3 come from the shared retained baseline below.
         // Preserve authenticated TA intro and literal boost from the existing
         // shared course/global reader. No pod-owned row is borrowed from its
         // POD01 input. This eight-racer package still requires POD01 data.
@@ -65,24 +67,15 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
         };
         const auto events=[&](AudioBank50HE bank,const std::string& name,const char* digest,unsigned count){
             const auto bytes=member(name,digest);
-            if(racer60==26&&bank==AudioBank50HE::PodCurses){
-                // Authenticated POD26 declares14, omits Event2, and retains
-                // Event3..14. Preserve exact source keys: never compact the
-                // hole or synthesize another racer's line for it. Speech-count
-                // selection stays independently authored (sum13).
-                const auto ini=native_racer50HW::rig_detail::ini(bytes);
-                d::need(count==13&&native_racer50HW::rig_detail::value(ini,"responseemitter","numevents")=="14"&&
-                    !ini.count("event2")&&ini.size()==14,"POD26 original sparse curses structure differs");
-                for(unsigned key=1;key<=14;++key){if(key==2)continue;
-                    const auto section="event"+std::to_string(key);
-                    const auto& row=ini.at(section);
-                    d::need(row.size()==2&&row.at("isstream")=="1","POD26 sparse event flags differ");
-                    put(bank,key,{row.at("filename"),false,false,true});
-                }
-                return;
-            }
-            const auto rows=source_announcer_authoring50IE::detail::events(bytes,count);
-            for(unsigned key=1;key<=count;++key)put(bank,key,rows[key-1]);
+            // B-P02, one rule for every pod (2C1170 / 292650): the file's own
+            // NumEvents; an absent EventN is a hole (its key keeps no cue, never
+            // compacted, never filled from another line). The present events are
+            // the ones `count` describes (sounds.ini [Indices] sum for a speech
+            // bank, the shared file's own count otherwise).
+            const auto rows=source_announcer_authoring50IE::detail::eventRows(bytes,
+                static_cast<unsigned>(next.catalog.size()));
+            d::need(rows.presentCount==count,std::string("50IK original event count differs: ")+identity->podId+"/"+name);
+            for(unsigned key=1;key<=rows.declared;++key)if(rows.present[key-1])put(bank,key,rows.rows[key-1]);
         };
         const auto speechPrefix="audio\\speech\\"+native_racer50HW::rig_detail::lower(identity->podId)+"\\";
         const auto expected=id::speechCounts(*identity);

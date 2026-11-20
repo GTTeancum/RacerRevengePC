@@ -218,9 +218,10 @@ public:
         const a::OriginalStandardMaterialDomain50LA& domain);
     bool canonicalChariotBound()const noexcept{return canonicalChariotBound_;}
 private:
-    // The existing left-engine base-map projection is also exact for POD02's
-    // actual lower PSMs (02_1 plus flame02l/r). Only the authenticated model,
-    // component and PSG identity change; lower lighting and map1 stay as-is.
+    // The left-engine base-map projection is the one rule for every engine
+    // model, upper or lower (a pod's lower PSMs when its [Pod Setup] names
+    // BottomLeftEngine, 211470). Only the authenticated model, component and
+    // PSG identity change; lower lighting and map1 stay as-is.
     void bindCanonicalEngineBaseMap(const g::OriginalRacerModelSceneOwner50LA& model,
         const a::OriginalStandardModelGeometry50LA& geometry,
         const a::OriginalStandardMaterialReferences50LA& references,
@@ -232,7 +233,7 @@ public:
     // Cold engine consumers. All joins authenticate the SAME actual model,
     // geometry1B4, references1C4, shared382B38/383400 resources and source rows.
     // Primary left optionally consumes its own source-color/MODULATE base
-    // projection. POD02 lower models keep their existing pass1/map1 host route.
+    // projection. Lower (bottom-engine) models of any pod keep the pass1/map1 route.
     // No additional second-map bank or specular output is introduced.
     void bindCanonicalLeft(const g::OriginalRacerModelSceneOwner50LA& model,
         const a::OriginalStandardModelGeometry50LA& geometry,
