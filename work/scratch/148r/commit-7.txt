@@ -1,0 +1,13 @@
+Pause QUIT test: the held test throttle (W) reads as menu Up on the drawn original Pause, so the row-10 confirm landed on row 9 (QUIT TO MAIN); clear held directions on the injected confirm (test only) (build wt-148r-7, linked, not run)
+
+Evidence c148-ta-pausequit6 (wt-148r-6): test_pause_quit row=10 confirm=1, then no
+pause_quit_admission line and two "Starting a fresh authored-grid session".
+Cause: HostSessionMenu50IF::pollOriginalPause maps key 26 (W) to Up
+(host_session_menu50if.h:131); --hold-throttle holds W, so the same poll moved the
+selection to row 9 after the test set row 10, and row 9 (QUIT TO MAIN) took the
+port's ReturnOriginalMain. The injected confirm now clears up/down/left/right (a
+player releases the throttle to press Cross). Test path only; no game behaviour change.
+
+1 TU. Relink wt-148r-7 on wt-148r-6, linked. Not run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

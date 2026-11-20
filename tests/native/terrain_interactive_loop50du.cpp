@@ -1284,6 +1284,8 @@ void Context::run() {
       // Test only (148r): Down until row 10 QUIT, then Confirm, as a player would.
       for(unsigned guard=0;guard<16u&&sourcePauseObservation.hostSelection()!=10u;++guard)
        sourcePauseObservation.moveHostSelection(true);
+      // The held test throttle (W) also reads as menu Up here; a player releases it.
+      in.up=in.down=in.left=in.right=false;
       in.confirm=sourcePauseObservation.hostSelection()==10u;in.back=false;testPauseQuitStage148=2u;
       std::cerr<<"test_pause_quit row="<<sourcePauseObservation.hostSelection()<<" confirm="<<in.confirm<<'\n';
      }     if(in.up!=in.down)sourcePauseObservation.moveHostSelection(in.down);
