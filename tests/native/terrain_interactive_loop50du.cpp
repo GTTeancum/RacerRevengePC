@@ -1813,8 +1813,19 @@ void Context::run() {
       }
       // PORT STAND-IN (flagged): the HostRaceResults50IL panel. Single Race
       // (subtype1, mode0 and mode2) now takes the counted race's Results104 /
-      // 1AB5BC flow; this panel remains only where no Results root exists
-      // (subtypes 2/3 and a rejected root), to be retired with them.
+      // 1AB5BC flow; this panel remains only where no Results root exists,
+      // to be retired with them (work\scratch\148r\results-tt-ra-design.txt):
+      // - Time Trial (11258==3): the original shows NO Results at the finish
+      //   (1A7DEC skips 1A7E18; 1ABBE8: 199770 F8 + 1AC8E0 race restart). Its
+      //   records open only from the original Pause Quit row (1BDA74 ->
+      //   1ABFC0(1) -> Results page 3 -> 1CA6A4 1AC440 -> Hall 1CA6F0). The
+      //   port has no counted race for subtype 3, no in-place 1AC8E0 restart
+      //   and no original Pause on the common race.
+      // - Practice (11258==2): 1ABC1C replay without Results.
+      // - RA Free Play: the original takes the same zero-cut counted race as
+      //   every course (174E90); the port's RA prefix/camera factory still
+      //   require P+34==2 and the RA cuts (ra_source_camera_factory50la.h).
+      // - A rejected Results root.
       // Explicit native presentation substitution at1A7DD0, before the
       // source launch1 UI199770/race104 virtual+20, HUD-stop1AD230 and
       // race virtual+78 dispatch.1AD230 is not a Results implementation.

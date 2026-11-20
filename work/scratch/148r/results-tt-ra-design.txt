@@ -1,0 +1,118 @@
+148r task 1: Time Trial and RA Free Play race end - original flow and port gaps
+==============================================================================
+Base: results-records-148 at 8d3667a (main 2b40b66 + add-on course route).
+Source: SLUS_202.68, work\scratch\dis_all.txt (helper work\scratch\148r\dis.py).
+
+1. Time Trial (Application/Profile 11258 == 3), the original
+--------------------------------------------------------------
+Race load: the same race class 1A65C0 and the same 1A95B0 -> 174A30 controller
+as every race; 174EA8 zeroes the cut count for subtype 2/3 (no intro cuts);
+1AD520 builds the racer manager with no AI (one human + the record actor /
+ghost, manager+40, 1AE810).
+
+Finish (end dispatch 1A7DD0):
+  1A7DE8  lw 11258 ; bne 1 -> 1A7E24   Time Trial SKIPS 199770 (F8 visibility)
+                                       and Results104 vtable+20 (1A7E18): no
+                                       Results activation at the finish.
+  1A7E24  1AD230 (HUD stop), then race vtable+78 = 1AB520.
+  1AB55C  lw 11258 ; bne 1 -> 1ABBC0   (no 1ABFC0 / 1ABE70 / 20C read)
+  1ABBC0  11258 == 1 -> return; 11258 == 3 (1ABBE8):
+  1ABC00    199770(F8, 0,1,1,1,1)      standings shown
+  1ABC0C    1AC8E0(race, 0)            race restart (World3D0 trigger reset,
+                                       App11C clear, Aural 103210, music,
+                                       1AEA70/1AED30 racers back on the grid,
+                                       2A2880 placement, cameras)
+  1ABC14    return                     the Time Trial simply runs again.
+  (11258 == 2, practice: 1ABC1C.. bit5, 199770, VCR channels, 1AC8E0, replay
+  as the waiting-results branch.)
+
+So the original Time Trial never shows Results at the finish. Its record
+screen is reached ONLY from the original Pause menu "Quit" row:
+  1BDA74  App2E0 == 0 -> skip; P+34 != 0 -> 1BDB5C; 11258 != 3 -> 1BDB5C
+  1BDAB4  1ABFC0(race, 1)             first human qualifies (lap records only:
+                                      race/knockout categories need subtype 1,
+                                      3 laps, 8 racers - 1AC440/1863B0 rule)
+          v0 != 0 (1BDAC4): Pause+200 = 0, Pause vtable+1C (close), 1A4B90(2),
+                  199770(F8,..), Results104 vtable+20 (activate),
+                  1CA8E0(Results, 3, 0)   Results opens on page 3 (record /
+                                          name entry)
+          v0 == 0 (1BDB5C): 26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60
+                  fade 500 ms, 1BE830, 17DE10(App, 6, 6, 1) -> Course.
+Results confirm on that page (1CA574..1CA6F8):
+  1CA578  mode200 == 3: 1ABFC0(race, 2) (second human) -> page 4 if v0
+  1CA5D0  P+34 == 0 and 11258 == 3: 26D070, 1A4B90(2), 1A4AB0(0.5), 267BE0,
+          2AED60, Results vtable+18 (deactivate), App11C = 0,
+  1CA6A4  1AC440(race)                 Hall rows (lap only for subtype 3)
+  1CA6B4..1CA6E4  P+100BC bit0 = 1     save pending
+  1CA6F0  17DE10(App, 6, 11, 1)        Hall of Fame
+          (no 20C store: the Time Trial never reaches 1AB5BC)
+  else    1CA794 20C = 1               ordinary races -> 1AB5BC.
+
+2. Time Trial in the port today
+--------------------------------
+- No counted race for subtype 3 on any course: every course gate in
+  terrain_interactive_world50du.cpp requires nativeOrdinaryLaunch11258 == 1
+  (TA: subtype == 1). So common.rootPublished is false and the finish takes
+  the HostRaceResults50IL text panel (terrain_interactive_loop50du.cpp).
+- Ready already: the zero-cut controller admits launch 3
+  (original_ta_camera_lifecycle.inl constructCountedControllerWithoutCuts174A30);
+  the VCR subtype-3 shape (0x28 channels / 0x20000) and its backup; the record
+  rules (race_record_rule50kg: lap only for subtype 3); the record actor
+  original_subtype3_record (no-record actor only, no ghost playback).
+- Missing, each its own round:
+  a) counted race + racer manager for subtype 3 (AI 0, record actor at
+     manager+40) on the common course stages;
+  b) 1ABBC0 subtype-3 branch in continuePreAck1AB520
+     (src\game\original_race_end_dispatch50la.cpp stops at 0x1abbc0 today):
+     199770 + 1AC8E0 as an in-place race restart. The port's 1AC8E0 tail
+     today only starts the Results replay (native_common_results50PD
+     beginReplay); a real restart (grid placement 2A2880, lap clocks, record
+     actor/ghost backup 288630) is not implemented on any course;
+  c) the original Pause on the common race: the port's original Pause
+     (original_pause_input50la.inl, 1BD9B8/1BDA74) is the RA ALL8 spectator
+     Pause only (race->world74_, consumedRaAll8ListenerCustody); every other
+     race uses the port's own session menu. The Time Trial's only way to its
+     records (1BDA74 Quit -> 1ABFC0(1) -> Results page 3 -> 1CA6A4 1AC440 ->
+     Hall) runs through that Pause.
+  None of a)-c) can be proven without game runs; this helper may not run
+  the game. The text panel therefore stays for Time Trial (flagged).
+
+3. RA in Free Play, the original
+---------------------------------
+Nothing in the race or end flow reads the course: RA Free Play (P+34 0,
+subtype 1) is the same counted race with zero cuts (174E90: P+34 != 2 and
+App+350 == 0), Results104 at the finish (1A7DD0, 11258 == 1), 1AB5BC
+non-tournament rows 1AB828 (Hall 1AB884 / Unlock 1AB8E8 / Course 1AB908),
+exactly as TA Free Play (b0f776a .. 2b40b66). No RA branch exists here.
+
+4. RA Free Play in the port today
+----------------------------------
+- RA builds its consumed race only through its own stand-in route:
+  terrain_interactive_session50du.cpp sourceConsumedIntroActivation =
+  RA && human && camera && P+34 == 2 && 11258 == 1 (or the ALL8 spectator),
+  and ra_application_cold50la.cpp beginConsumedRaPrefix needs it.
+- The RA camera factory (ra_source_camera_factory50la.h) builds the RA
+  Session itself and adds the controller only through
+  constructCurrentRaIntro174FA4, which requires configuration34 == 2, launch
+  1 and the 7 RA cuts. The zero-cut controller 174A30 that the common race
+  gets from Application::constructCountedControllerWithoutCuts174A30
+  (8f39ce6) is issued only to Application-issued sessions
+  (nativeTaIssuance_); the RA session is not one.
+- To take the common path RA needs: its consumed prefix admitted for P+34 0
+  (one rule with the other courses: counted race for subtype 1 in mode 0 or
+  2), the RA factory's controller built by the same zero-cut 174A30 rule
+  when the cut count is zero, the race slot48 publish and the empty
+  Announcer120 transport (8f39ce6) on the RA race, and the RA-only
+  (world74_) end leaves already used by the RA tournament. This is the RA
+  stand-in route being retired, not a new RA branch; it touches
+  ra_native_session50la / ra_source_camera_* (expensive headers) and needs
+  runs to prove. Not done in this helper: RA Free Play keeps the text panel
+  (flagged).
+
+5. What this commit changes
+----------------------------
+No behaviour. The HostRaceResults50IL stand-in comment and the 1ABBC0 stop
+message now name the exact original flow and the missing port pieces above,
+so the next round can pick them up. The text panel remains only for:
+Time Trial (every course), practice subtype 2, RA Free Play, and a rejected
+Results root.

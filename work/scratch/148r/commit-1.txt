@@ -1,0 +1,36 @@
+Time Trial and RA Free Play race end: original flow read (1A7DD0/1AB520/1ABBC0, Pause Quit 1BDA74, Results 1CA574..1CA6F0); text panel kept for both, flagged with the exact gaps (no behaviour change; compile-checked, not run)
+
+Original (SLUS_202.68, dis_all.txt; full read in work/scratch/148r/results-tt-ra-design.txt):
+- Time Trial (11258 == 3) shows NO Results at the finish. 1A7DEC skips the
+  F8 visibility 199770 and Results104 vtable+20 (1A7E18); 1AD230; 1AB520
+  1AB560 branches to 1ABBC0; 1ABBE8: 199770(F8,0,1,1,1,1) and
+  1AC8E0(race,0) restart the race in place (1AEA70/1AED30, 2A2880 grid).
+- Its records open only from the original Pause Quit row: 1BDA74 (App2E0,
+  P+34 == 0, 11258 == 3) 1ABFC0(race,1) -> Pause close, 199770, Results
+  vtable+20, 1CA8E0(Results,3) (record page); else Course 17DE10(6,6,1).
+  Results confirm 1CA5D0 (P+34 0, 11258 3): 26D070 .. 1AC440 at 1CA6A4
+  (lap records only: race/knockouts need subtype 1, 3 laps, 8 racers),
+  100BC bit0, 17DE10(App,6,11,1) Hall at 1CA6F0; no 20C store.
+- Practice (11258 == 2): 1ABC1C replay without Results.
+- RA Free Play: no course branch anywhere in this flow; it is the same
+  zero-cut counted race (174E90) with Results104 and 1AB5BC 1AB828 rows as
+  every other course.
+
+Why both keep the HostRaceResults50IL panel (PORT STAND-IN, flagged):
+- Time Trial: no counted race for subtype 3 (every course gate in
+  terrain_interactive_world50du.cpp requires 11258 == 1), no in-place
+  1AC8E0 restart owner (the port's 1AC8E0 tail only starts the Results
+  replay), and no original Pause on the common race (the port's original
+  Pause, 1BD9B8/1BDA74, is the RA ALL8 spectator Pause only).
+- RA Free Play: the RA consumed prefix and its camera factory still require
+  P+34 == 2 and the 7 RA cuts (sourceConsumedIntroActivation,
+  ra_source_camera_factory50la.h constructCurrentRaIntro174FA4); the
+  zero-cut 174A30 controller (8f39ce6) is issued only to Application
+  sessions. Retiring that RA stand-in route touches the RA session/camera
+  headers and needs runs; not done here.
+
+Changes: comments only (terrain_interactive_loop50du.cpp stand-in list) and
+the 1ABBC0 stop message in original_race_end_dispatch50la.cpp now names the
+subtype-3 and subtype-2 tails. 2 TUs, no headers.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

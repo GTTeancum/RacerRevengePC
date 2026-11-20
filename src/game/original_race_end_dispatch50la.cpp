@@ -90,7 +90,13 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
     if(!profile_->courseRaceSnapshot(selection)){
         stop(S::profile,0x1ab55c,"Actual Profile11258 read unavailable");return;
     }
-    if(selection.subtype!=1u){stop(S::incomplete,0x1abbc0,"Source non-subtype1 branch reached; separate tail remains unimplemented");return;}
+    //1AB55C..1AB560: 11258 != 1 -> 1ABBC0. Subtype 3 (1ABBE8): 199770 F8 and
+    //1AC8E0(race,0) in-place restart, no Results (the Time Trial records open
+    //from Pause Quit 1BDA74). Subtype 2 (1ABC1C): bit5, F8, VCR, 1AC8E0
+    //replay. Neither tail is implemented (no in-place restart owner).
+    if(selection.subtype!=1u){stop(S::incomplete,0x1abbc0,selection.subtype==3u?
+        "Source Time Trial 1ABBE8 F8 + 1AC8E0 in-place restart unimplemented":
+        "Source practice 1ABC1C replay tail unimplemented");return;}
     const auto profileCurrent=[&]()noexcept {
         const auto now=profile_->stamp();
         return endEntryProfile_&&now.generation==endEntryProfile_->generation&&now.mode34==endEntryProfile_->mode34;
