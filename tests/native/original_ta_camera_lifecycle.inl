@@ -1,4 +1,6 @@
-// Included inside Session. Concrete same-Application TA/RA custody and dispatch.
+// Included inside Session. The one same-Application course camera custody and
+// dispatch (174A30/174FA4/175510/1756D0/177750), for every course: no branch on
+// the course; the cut count and rows are the course's own data.
 // All post-mutation failures latch through Session::fail; no transition replay.
 std::uint32_t taFailurePC_=0;
 bool taReject(std::uint32_t pc)noexcept{taFailurePC_=pc;return false;}
@@ -18,16 +20,14 @@ bool constructTaOwners174FA4()noexcept {
     }
     rr::assets::OriginalTaCutAuthoringCandidate::Status status;
     auto copy=rr::assets::OriginalTaCutAuthoringCandidate::create(source.trackId(),inputs.data(),source.cutCount()+1,status);
-    if(!copy||source.trackId()!=introTrackId(nativeTaIssuance_->course,nativeTaIssuance_->courseCode)||
+    if(!copy||source.trackId()!=introTrackId(nativeTaIssuance_->code)||
        actual_.taIntroAuthoring->trackId()!=source.trackId()||!source.cutCount()||source.cutCount()>7)return false;
     OriginalTaCutChildDiagnosticCandidate diagnostic;
     taCuts_=OriginalTaCutChildrenCandidate::construct174FA4(std::move(copy),
         actual_.applicationEntities->cutOrigin443200_,diagnostic);
     if(!taCuts_)return taReject(diagnostic.sourcePC);
-    //RA backing remains unpublished until the actual signed A8 load branch.
-    //Other courses retain their existing standalone construction API.
-    if(nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)
-        coldController_.children64[4]=taCuts_.get();
+    //+74 stays unpublished here: source70 (174F84) precedes74 (174FB4), so the
+    //prepare cut publishes children64[3] then children64[4] for every course.
     coldController_.halfA8Value=static_cast<std::uint16_t>((coldController_.halfA8Value&~0x1f0u)|(taCuts_->cutCount()<<4));
     return true;
 }
@@ -37,8 +37,8 @@ bool constructTaOwners174FA4()noexcept {
 // (+74) and the intro audio entity 177750 (+80); the controller itself and
 // the race slot48 store (1A95DC) exist exactly as in the Tournament. The
 // +64/+68/+6C/+70/+78/+7C children stay as this port builds them for the
-// zero-cut case today (the live 7C start owner; native 70/78/7C prefixes are
-// RA-only). Only the Application-issued same Session reaches this.
+// zero-cut case (the live 7C start owner). Only the Application-issued same
+// Session reaches this, on every course (RA Free Play / Time Trial included).
 bool constructCountedControllerWithoutCuts174A30()noexcept {
     const auto launch=actual_.launchKind11258;
     const bool cutsZeroed=launch==2u||launch==3u||
@@ -119,51 +119,23 @@ bool transitionTaMode4_177AB0(unsigned ordinal)noexcept {
     if(!taReparent(zone,{{(*position)[0],(*position)[1],(*position)[2],1.f}}))return false;
     controller_.mode44=4;return true;
 }
+// 2A2880 grid centre on the race's one map view (the map spline's own nodes
+// and gates), the same for every course.
+static bool prepareStartLane2A2880(const common_track50CR::NavigationView& view,std::uint32_t rank,
+    GridCenterResult50AC& out)noexcept {
+    if(!view.gatesPrepared()||view.role()!=common_track50CR::NavigationRole::map||
+       !view.count()||view.count()>view.capacity()||!view.nodes()||!view.gates())return false;
+    struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
+    struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
+    const Navigation map{{view.nodes(),view.count()},view.gates(),true};
+    return source_grid50IG::detail::prepare(map,view.capacity(),rank,out);
+}
 bool taRestoreStartLane()noexcept {
     GridCenterResult50AC grid;
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gc&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->gcMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ga&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->gaMap)return taReject(0x2a2880);
-    // The common route (stock SA or the add-on course): its own retained B8 map.
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sa&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->commonRouteMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ma&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sc&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->scMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::rc&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->rcMap)return taReject(0x2a2880);
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tb){
-        //2A2880 on TB's own retained map view (its 270-node Map role).
-        if(actual_.actualRadarMapB8||!nativeTaIssuance_->tbMap.sameOwner(actual_.actualRadarMapTb)||
-           !source_grid50IG::prepare(actual_.actualRadarMapTb,0,grid))return taReject(0x2a2880);
-    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mc){
-        //2A2880 on MC's own retained map view (173-node Map role, the same MC source).
-        if(actual_.actualRadarMapB8||!nativeTaIssuance_->mcMap.sameOwner(actual_.actualRadarMapMc)||
-           actual_.actualRadarMapMc.sourceIdentity()!=nativeTaIssuance_->mcSource||
-           !source_grid50IG::prepare(actual_.actualRadarMapMc,0,grid))return taReject(0x2a2880);
-    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::tc){
-        //2A2880 on TC's own retained map view (its 268-node Map role).
-        if(actual_.actualRadarMapB8||!nativeTaIssuance_->tcMap.sameOwner(actual_.actualRadarMapTc)||
-           !source_grid50IG::prepare(actual_.actualRadarMapTc,0,grid))return taReject(0x2a2880);
-    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::gb){
-        //2A2880 on GB's own retained map view (its 213-node Map role).
-        if(actual_.actualRadarMapB8||!nativeTaIssuance_->gbMap.sameOwner(actual_.actualRadarMapGb)||
-           !source_grid50IG::prepare(actual_.actualRadarMapGb,0,grid))return taReject(0x2a2880);
-    }else if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::mb){
-        //2A2880 on MB's own retained map view (same grid helper as the B8 map).
-        if(actual_.actualRadarMapB8||!nativeTaIssuance_->mbMap.sameOwner(actual_.actualRadarMapMb)||
-           !source_grid50IG::prepare(actual_.actualRadarMapMb,0,grid))return taReject(0x2a2880);
-    }else if(!nativeTaIssuance_||(nativeTaIssuance_->course!=OriginalCameraStartCourse::ta&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::ra&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::gc&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::sa&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::ma&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::ga&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::sc&&
-       nativeTaIssuance_->course!=OriginalCameraStartCourse::rc)||
-       !actual_.actualRadarMapB8||!source_grid50IG::prepare(*actual_.actualRadarMapB8,0,grid))return taReject(0x2a2880);
+    // The map view issued with this session (same owner as ActualOwners'),
+    // every course; no per-course map type or node count.
+    if(!nativeTaIssuance_||!nativeTaIssuance_->map.sameOwner(actual_.actualRadarMap)||
+       !prepareStartLane2A2880(actual_.actualRadarMap,0,grid))return taReject(0x2a2880);
     OriginalTaCutVector4Candidate point,look;
     for(unsigned i=0;i<4;++i){std::memcpy(&point[i],&grid.position[i],4);std::memcpy(&look[i],&grid.heading[i],4);}
     return taReparent(1,point,&look);
@@ -418,13 +390,6 @@ bool constructTaIntroAudio177750(std::shared_ptr<const rr::assets::AudioBank50HC
     taAudioConstructionAttempted_=true;
     if(!actual_.taIntroAudio->beginTaIntro177750(actual_.taIntroAuthoring,coldController_.entity,
         std::move(bank),firstVoice,voiceCount))return false;
-    if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra){
-        //Prewarm the SAME real attachment once, but withhold80/5C and rows.
-        //This is not source177750 completion. Dispatch/service is reserved
-        //until the later ordered native source adoption, with no reattachment.
-        if(!actual_.taIntroAudio->finishTaIntro177750(coldController_.entity))return false;
-        return actual_.taIntroAudio->reserveNativeTaIntro177750(coldController_.entity);
-    }
     //177750: events292650 precede real5C initialized source rows. Bytes2..7
     // are unrepresented; do not invent content or assert source heap padding.
     taLineCount_=taCuts_->cutCount();

@@ -9,20 +9,15 @@
 #include <optional>
 #include "original_replay_tv_camera50pd.h"
 #include "source_grid50ig_fixture.h"
-#include "source_grid50gb_fixture.h"
-#include "source_grid50tc_fixture.h"
-#include "source_grid50tb_fixture.h"
-#include "source_grid50mc_fixture.h"
 #include <string_view>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../src/assets/original_ta_intro_authoring_candidate.h"
 #include "../../src/game/pod_speech50hg.h"
 #include "../../src/game/original_racer_diffuse_camera50la.h"
 #include "../../src/game/track_zone_visibility50zv.h"
-#include "track_navigation_view50tc.h"
-#include "track_navigation_view50tb.h"
-#include "track_navigation_view50gb.h"
-#include "track_navigation_view50mc.h"
+// Common rewrite (R2): the one track, its one navigation view and the one race World.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
 namespace original_subtype3_record { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace original_race_hud_scope50LA { class Registration; }
@@ -74,18 +69,6 @@ namespace rr::platform { struct VehicleWindowFrame50DS; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace ra_cold_roster50LA { class FreshExecutionArena; }
 namespace ra_cold_aggregate50LA { class Owner; }
-namespace gc_original_world50LM { class Owner; }
-namespace ga_original_world50LH { class Owner; }
-namespace common_route_world50LM { class Owner; }
-namespace ma_original_world50LM { class Owner; }
-namespace mb_original_world50LM { class Owner; }
-namespace sc_original_world50LM { class Owner; }
-namespace gb_original_world50LM { class Owner; }
-namespace mc_cold_sources50LA { class Owner; }
-namespace tb_original_world50LM { class Owner; }
-namespace mc_original_world50LM { class Owner; }
-namespace rc_original_world50LM { class Owner; }
-namespace tc_original_world50LM { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalFrontendCameraCold50LA; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
@@ -94,22 +77,10 @@ namespace original_pause_observation50LA { class Owner; }
 namespace interactive_loop50DU { struct Context; }
 namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; class NativeF8BarPrefix50LA; }
 namespace original_camera_session50KX {
-// Explicit source course identity, never a TA default for an unknown route.
-inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)noexcept {
- using C=rr::game::OriginalCameraStartCourse;
- switch(course){
- case C::ta:return "TA";case C::ra:return "RA";case C::gc:return "GC";case C::ga:return "GA";case C::sa:return "SA";case C::ma:return "MA";case C::mb:return "MB";case C::sc:return "SC";case C::gb:return "GB";case C::rc:return "RC";case C::tc:return "TC";case C::mc:return "MC";case C::tb:return "TB";default:return {};
-
- }
-}
-// The common route (C::sa, the former SA chain) is one route for stock SA and
-// for the add-on course whose code is not stock (146r): its track id is the
-// row's own code carried with it ("SA" or e.g. "NV"); empty = stock "SA".
-inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course,
-    const std::array<char,3>& code)noexcept {
- if(course==rr::game::OriginalCameraStartCourse::sa&&code[0]&&code[1]&&!code[2])return {code.data(),2};
- return introTrackId(course);
-}
+// The course identity of a camera session is its course code as data (stock
+// "TA".."RA" or a registry code such as "NV"); the cut and intro rows are the
+// rows derived from that course's own archive. No course enum exists.
+inline std::string_view introTrackId(const common_track50CR::Code& code)noexcept {return code.view();}
 
 using namespace rr::game;
 using Bank=native_racer50HN::Bank;
@@ -124,12 +95,8 @@ struct AuthoredInputs {
     const std::uint8_t* cam=nullptr;std::size_t camBytes=0;
     const char* phy=nullptr;std::size_t phyBytes=0;std::uint64_t phyIdentity=0;
     const std::uint8_t* tob=nullptr;std::size_t tobBytes=0;
-    OriginalCameraStartCourse course=OriginalCameraStartCourse::unspecified;
-    // Borrow of the very same MC source retained by actualRadarMapMc. The
-    // source-specific AuthoredStorage issues it; never a generic course flag.
-    const mc_cold_sources50LA::Owner* mcSourceIdentity=nullptr;
-    // Common route only: the row's upper-case code (stock "SA" or the add-on code).
-    std::array<char,3> courseCode{};
+    // The course's upper-case code (data): names its cut/intro rows and TOB.
+    common_track50CR::Code code{};
 };
 // These are genuine external application/display inputs. Keep one instance
 // for the application's display lifetime, and borrow it here. The explicitly
@@ -228,12 +195,9 @@ struct ActualOwners {
     // Legacy RA factory pins every concrete owner. The private earlier
     // constructor-only route requires absence, not an array of NULL owners.
     const std::array<native_racer50HW::Cables*,8>* actualCables=nullptr;
-    const TrackNavigation50EU* actualRadarMapB8=nullptr; // Borrow of the same retained authored map; RA factory only.
-    TrackNavigationView50EU actualRadarMapMb{};
-    TrackNavigationView50TC actualRadarMapTc{};
-    TrackNavigationView50TB actualRadarMapTb{};
-    TrackNavigationView50GB actualRadarMapGb{};
-    TrackNavigationView50MC actualRadarMapMc{};
+    // The race's one map navigation view (race B8 radar/start map, 2A1160 map
+    // spline), the same for every course; sized from the spline file.
+    common_track50CR::NavigationView actualRadarMap{};
     void* startMusicContext=nullptr;
     bool (*startMusicRequest)(void*,std::int32_t,std::int32_t)=nullptr;
     const original_subtype3_record::Owner* recordManager40=nullptr;
@@ -472,52 +436,13 @@ class Session final {
         const native_racer50HW::Rig* selectedRig=nullptr;
         OriginalTrackParticleCold50LA* particles=nullptr;
         std::uint32_t selectedPod=0;
-        OriginalCameraStartCourse course=OriginalCameraStartCourse::unspecified;
-        // Common route only: the row's code issued with the session (AuthoredInputs::courseCode).
-        std::array<char,3> courseCode{};
-        // GC issuance records the actual consumed race/world and root-owned map.
-        // Comparison-only: the root closes Session before releasing these owners.
-        const OriginalRaceConstructor50LA* gcRace=nullptr;
-        const gc_original_world50LM::Owner* gcWorld=nullptr;
-        const TrackNavigation50EU* gcMap=nullptr;
-        const OriginalRaceConstructor50LA* commonRouteRace=nullptr;
-        const common_route_world50LM::Owner* commonRouteWorldPin=nullptr;
-        const TrackNavigation50EU* commonRouteMap=nullptr;
-        const OriginalRaceConstructor50LA* maRace=nullptr;
-        const ma_original_world50LM::Owner* maWorld=nullptr;
-        const TrackNavigation50EU* maMap=nullptr;
-        // MB keeps its retained radar/start map as a view (no B8 pointer).
-        const OriginalRaceConstructor50LA* mbRace=nullptr;
-        const mb_original_world50LM::Owner* mbWorld=nullptr;
-        TrackNavigationView50EU mbMap{};
-        // SC's start-lane/radar map is its own retained authored B8 map.
-        const OriginalRaceConstructor50LA* scRace=nullptr;
-        const sc_original_world50LM::Owner* scWorld=nullptr;
-        const TrackNavigation50EU* scMap=nullptr;
-        // GB keeps its retained radar/start map as its own view (no B8 pointer).
-        const OriginalRaceConstructor50LA* gbRace=nullptr;
-        const gb_original_world50LM::Owner* gbWorld=nullptr;
-        TrackNavigationView50GB gbMap{};
-        // RC uses its retained B8 navigation map, as SC/GC do.
-        const OriginalRaceConstructor50LA* rcRace=nullptr;
-        const rc_original_world50LM::Owner* rcWorld=nullptr;
-        const TrackNavigation50EU* rcMap=nullptr;
-        // TC keeps its retained 268-node map as its own view (no B8 pointer).
-        const OriginalRaceConstructor50LA* tcRace=nullptr;
-        const tc_original_world50LM::Owner* tcWorld=nullptr;
-        TrackNavigationView50TC tcMap{};
-        // TB keeps its retained 270-node map as its own view (no B8 pointer).
-        const OriginalRaceConstructor50LA* tbRace=nullptr;
-        const tb_original_world50LM::Owner* tbWorld=nullptr;
-        TrackNavigationView50TB tbMap{};
-        // MC: its own 173-node map view, bound to the same MC cold source as its camera assets.
-        const OriginalRaceConstructor50LA* mcRace=nullptr;
-        const mc_original_world50LM::Owner* mcWorld=nullptr;
-        TrackNavigationView50MC mcMap{};
-        const mc_cold_sources50LA::Owner* mcSource=nullptr;
-        const OriginalRaceConstructor50LA* gaRace=nullptr;
-        const ga_original_world50LH::Owner* gaWorld=nullptr;
-        const TrackNavigation50EU* gaMap=nullptr;
+        // The course code (data) issued with this session.
+        common_track50CR::Code code{};
+        // The race, its one World at race+74 and its one map view, recorded at
+        // issuance. Comparison-only: the root closes Session before releasing them.
+        const OriginalRaceConstructor50LA* race=nullptr;
+        const common_race_world50CR::World* world=nullptr;
+        common_track50CR::NavigationView map{};
         std::vector<std::uint8_t> cam,tob,phy;
     };
     std::unique_ptr<const NativeTaIssuance> nativeTaIssuance_;
@@ -748,7 +673,6 @@ class Session final {
     bool canonicalCourseEndRoute()const noexcept;
     bool completeCountedRaceCameraNative34()noexcept;
     bool completeCountedRaceMusicNative10C(std::uint32_t&)noexcept;
-    bool completeCountedRaceWorldNativePrefix1A9EE0(std::uint32_t&)noexcept;
     bool revokeCountedRaceCameraNative34()noexcept;
     TVCameraUpdateOutput49F pose_{};
     // race48+78 (175040/175650): the course TV camera; absent when the course
@@ -839,9 +763,10 @@ class Session final {
             result_.entityCold.sourcePC=0x1a9240u;return false;}
         // Source1A6C80/88 passes the actual one-view1B0 low bits to1A9240;
         //1A9284 writes numeric race8C=0. Zero is not an absent scene pointer.
-        if(!nativeTaIssuance_||nativeTaIssuance_->course!=OriginalCameraStartCourse::ra)raceMode8C_=0;
-        // Issued RA binds its actual canonical8C before entering this native
-        // racer-prefix adapter; never invent its mode from one-view appearance.
+        if(!nativeTaIssuance_)raceMode8C_=0;
+        // Every issued session binds its race's actual canonical8C (the counted
+        // Camera34 bind) before this native racer-prefix adapter; never invent
+        // its mode from one-view appearance.
         aiDamageRace_={generation_,key(*this),&raceMode8C_};
         if(!aiDamageMaterial_.prepared()){
             rr::assets::OriginalStandardMaterialDiagnostic50LA diagnostic;
@@ -1802,7 +1727,7 @@ public:
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         if(coldPhase_>=2)return set(Status::complete,0x1a6d98);
-        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||authored.course!=nativeTaIssuance_->course))return set(Status::owner);
+        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||!(authored.code==nativeTaIssuance_->code)))return set(Status::owner);
         if(!generation||!actual_.hostRace.runtimeValid())return set(Status::owner);
         if(displayInputs_&&displayInputs_!=&app)return set(Status::owner);
         if(generation_&&generation_!=generation)return set(Status::owner);
@@ -1870,10 +1795,8 @@ private:
                     std::uint32_t musicPC=0;
                     if(!completeCountedRaceMusicNative10C(musicPC))return set(Status::owner,musicPC);
                 }
-                {
-                    std::uint32_t worldPC=0;
-                    if(!completeCountedRaceWorldNativePrefix1A9EE0(worldPC))return set(Status::owner,worldPC);
-                }
+                // The 1A9EE0 track load ran before this camera session (1A6D80
+                // precedes 1A6DC0): common_track50CR::Load, every course.
                 ++coldPhase_;break;
             }
         }
@@ -1897,16 +1820,13 @@ public:
         // Unpublished constructor staging is a different private lifetime,
         // not evidence for the existing reduced native prepare chronology.
         if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty)return set(Status::sourcePath,0x282860u);
-        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||authored.course!=nativeTaIssuance_->course))return set(Status::owner);
+        if(nativeTaIssuance_&&(generation!=nativeTaIssuance_->generation||!(authored.code==nativeTaIssuance_->code)))return set(Status::owner);
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
-        const bool mc=authored.course==OriginalCameraStartCourse::mc;
-        if(mc?(!authored.mcSourceIdentity||!actual_.actualRadarMapMc.runtimeValid()||
-                actual_.actualRadarMapMc.role()!=NavigationRole50MC::Map||actual_.actualRadarMapMc.count()!=173u||
-                actual_.actualRadarMapMc.sourceIdentity()!=authored.mcSourceIdentity||
-                actual_.actualRadarMapB8||actual_.actualRadarMapMb.gatesPrepared()||actual_.actualRadarMapTc.gatesPrepared()||
-                actual_.actualRadarMapTb.gatesPrepared()||actual_.actualRadarMapGb.gatesPrepared()):
-              (authored.mcSourceIdentity||actual_.actualRadarMapMc.gatesPrepared()))return set(Status::owner);
+        // The one map view issued with this session, every course (its node
+        // count is the map spline's own; no per-course count).
+        if(nativeTaIssuance_&&(!nativeTaIssuance_->map.sameOwner(actual_.actualRadarMap)||
+           actual_.actualRadarMap.role()!=common_track50CR::NavigationRole::map))return set(Status::owner);
         if(!actual_.hostRace.runtimeValid())return set(Status::owner);
         if(!generation||(!actual_.bank.count()||actual_.bank.count()>8)||actual_.all8Manager.flags58&2u||
            (actual_.launchKind11258<1u||actual_.launchKind11258>3u)||
@@ -1957,9 +1877,9 @@ public:
                     coldController_.children64[4]=taCuts_.get();
                 }
                 if(authoredPhase_==0){
-                    if(!startActions_.prepare(authored.course,authored.tob,authored.tobBytes))return set(Status::authoring,0x1ad330);
+                    if(!startActions_.prepare(authored.code.view(),authored.tob,authored.tobBytes))return set(Status::authoring,0x1ad330);
                     authoredPhase_=1;
-                }else if(startActions_.course()!=authored.course)return set(Status::authoring,0x1ad330);
+                }else if(startActions_.code()!=authored.code.view())return set(Status::authoring,0x1ad330);
                 if(nativeRaOwnedPreparationAttempted_){
                     //The real World3E4 producer already wrote the SAME counted
                     //controllerA8. Authoring remains corroboration, not authority.
@@ -1976,11 +1896,10 @@ public:
                 if(startPrelude_.controllerCutCountA8()!=0){
                     if(!nativeCamera74ConsumersCurrent())return fail(Status::owner,nativeAttached6C_.pc);
                     if(!taCuts_||startPrelude_.controllerCutCountA8()!=taCuts_->cutCount()||!coldController_.started||
-                       !nativeTaIssuance_||nativeTaIssuance_->course!=authored.course||
-                       nativeTaIssuance_->courseCode!=authored.courseCode||
-                       taCuts_->trackId()!=introTrackId(authored.course,authored.courseCode)||
+                       !nativeTaIssuance_||!(nativeTaIssuance_->code==authored.code)||
+                       taCuts_->trackId()!=introTrackId(authored.code)||
                        !actual_.taIntroAudio||!actual_.taIntroAuthoring||
-                       actual_.taIntroAuthoring->trackId()!=introTrackId(authored.course,authored.courseCode)||
+                       actual_.taIntroAuthoring->trackId()!=introTrackId(authored.code)||
                        !actual_.startMusicRequest||!actual_.introMusicFadeRequest)
                         return fail(Status::sourcePath,0x174fa4);
                     taPositive_=true;
@@ -2692,7 +2611,8 @@ public:
         if(abandoned_)return set(Status::abandoned);
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
         if(blockingRequestPending50LA())return set(Status::sourcePath,0x2aed60);
-        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+        // Every issued course race once its counted Camera34 and end HUD are bound.
+        if(canonicalCourseEndRoute())
             return advanceCanonicalRaceFadeInPrefix();
         auto& app=*displayInputs_;auto& video=app.video;
         if(endingFadeRequest_.pending()||(retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))
@@ -2728,20 +2648,20 @@ public:
         if(!actual_.humanCount34||!actual_.followQueries.get()||!coldBound_||abandoned_||pendingDisplayWork()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))
             return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7da0u,0};
-        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+        if(canonicalCourseEndRoute())
             return advanceCanonicalHumanEndRoot(); //Actual Root/audio, never these supplied observations.
         return endingClockCursor_.begin(endingClock_,actual_.race94,raceFlags1B0_,actual_.all8Manager.flags58,
             delta,musicActive,musicFading,announcerActive,true);
     }
     OriginalHumanEndClockResult50KG resumeHumanEndMusic(bool musicActive,bool announcerActive) noexcept {
         if(f8Intro_.ownerThread_!=std::this_thread::get_id()||
-           (nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra))
+           canonicalCourseEndRoute())
             return {OriginalHumanEndClockStatus50KG::callerBoundary,0x1a7e84u,0};
         return endingClockCursor_.afterMusicFade(musicActive,announcerActive,true);
     }
     Result requestHumanEndFade(std::int32_t milliseconds) noexcept {
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7f24};
-        if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ra)
+        if(canonicalCourseEndRoute())
             return set(Status::sourcePath,0x1a7f24); //Canonical request is consumed by its exact owner.
         if(!actual_.humanCount34||!displayInputs_||!endingClockCursor_.pending())return set(Status::owner);
         auto& app=*displayInputs_;

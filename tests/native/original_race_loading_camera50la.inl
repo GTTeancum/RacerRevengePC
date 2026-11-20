@@ -9,7 +9,7 @@ bool Application::initializeConsumedRaLoadingCamera2361C0(
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||race.resultsFeedbackThread_!=std::this_thread::get_id()||
        sourceRace28COwner_.get()!=&race||raceConstructorColdOwner50LA_.lock().get()!=&race||
        race.application_!=entitiesOwner_||race.profile_!=riderProfile||!race.counted_||race.rolledBack_||
-       !race.world74_||!race.nativeIntroWorldEntity()||
+       !race.world74_||!common_race_world50CR::introWorldEntity(race)||
        race.worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
        race.cameraInitStep_!=Step::nativePending||race.cameraNativeAdapter34_||!race.camera34_||
        n.entered||n.terminal||std::fegetround()!=FE_TONEAREST)return false;
@@ -110,7 +110,7 @@ bool Application::abortConsumedRaLoadingCameraNative34(
     auto& n=race.loadingCamera34_;pc=0;
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||race.resultsFeedbackThread_!=std::this_thread::get_id()||
        raceConstructorColdOwner50LA_.lock().get()!=&race||race.application_!=entitiesOwner_||
-       race.world74_||race.cameraNativeAdapter34_||!n.entered)return false;
+       race.cameraNativeAdapter34_||!n.entered)return false;
     const auto display=race.loadDisplay_;
     if(!display||display->application_!=this||display->video_!=videoOwner_||!display->ownerThread())return false;
     if(n.pinned&&!display->localizationServiceIdentityCurrent50KG())return false;
@@ -171,12 +171,14 @@ bool Application::abortConsumedRaLoadingCameraNative34(
 
 namespace rr::game {
 bool OriginalRaceConstructor50LA::loadingCameraSourceNullSuffixCurrent()const noexcept {
-    // The same counted World actually executed2705BC. Absence in native
-    // storage alone would not prove the original1A97B8 branch.
-    return resultsFeedbackThread_==std::this_thread::get_id()&&nativeIntroWorldEntity()&&
-        worldInitStep_==WorldInitStep::camera&&world74_&&!world74_->terminal_&&!world74_->closed_&&
-        world74_->worldColdConstructed_&&world74_->worldReset270550Complete_&&
-        !world74_->nativeFog3EC_&&!nativeTaController48_&&
+    // The same counted World actually executed its 1A6BC0 prefix (1B2870 ..
+    // 1B2918). Absence in native storage alone would not prove the original
+    // 1A97B8 branch: the World's fog (+3EC) is the loaded track's fog role,
+    // absent until the 1A9EE0 track load publishes it (every course).
+    // PORT STAND-IN (flagged): port mapping of the World+3EC field; path uncalled today.
+    return resultsFeedbackThread_==std::this_thread::get_id()&&common_race_world50CR::introWorldEntity(*this)&&
+        worldInitStep_==WorldInitStep::camera&&world74_&&world74_->counted&&world74_->prefixComplete&&
+        !(world74_->track&&world74_->track->roles.fog)&&!nativeTaController48_&&
         fields48_==std::array<std::uint32_t,4>{};
 }
 }

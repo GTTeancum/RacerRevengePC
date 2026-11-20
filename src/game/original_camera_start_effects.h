@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 namespace original_main_entry50KG { struct Application; }
 namespace original_camera_session50KX { class AsyncRetainedFade; }
@@ -235,19 +236,22 @@ OriginalCameraStartResult advanceOriginalVideoFade25B5D0(
 struct OriginalRaceStartCountdown {
     float countdown34=0; //1AF87C constructor; caller must bind the actual field.
 };
-enum class OriginalCameraStartCourse : std::uint8_t { unspecified,gc,ga,ta,ma,sa,ra,rc,mb,sc,tc,tb,gb,mc };
+// Common rewrite (R2): no course enum. The course's own TOB is the authority for
+// every course: 174DF0 reads World+3E4 = TOB [CSCameras].NumberOfCameras (1B28EC).
 class OriginalCourseStartActions final {
-    bool authenticated_=false;OriginalCameraStartCourse course_=OriginalCameraStartCourse::unspecified;
+    bool authenticated_=false;
+    std::array<char,3> code_{}; // course code as data (diagnostics / same-course check only)
     // Immutable track authoring. Controller174DF0 applies its own real
-    // launch/configuration policy; authored TA3/MA4/SA5/RA7/RC5/MB5 remain intact.
+    // launch/configuration policy (174EA8); the authored count stays intact.
     std::int32_t sourceSceneCutCount3E4_=-1;
 public:
     bool authenticated() const noexcept {return authenticated_;}
-    OriginalCameraStartCourse course() const noexcept {return course_;}
+    std::string_view code() const noexcept {return {code_.data(),code_[0]?(code_[1]?2u:1u):0u};}
     std::int32_t sourceSceneCutCount3E4() const noexcept {return sourceSceneCutCount3E4_;}
-    // Exact GC/GA/TA/MA/SA/RA/RC/MB TOB members. All lack[321_Anims];1B28EC's0 survives.
-    // No arbitrary parsed count/success receipt can claim this source path.
-    bool prepare(OriginalCameraStartCourse,const std::uint8_t*,std::size_t) noexcept;
+    // One rule for every course: decode the course TOB and read its unique
+    // [CSCameras].NumberOfCameras (0..7, the native cut storage). The stock
+    // values are receipts only (stock_course_receipts50cr.h role "cuts").
+    bool prepare(std::string_view code,const std::uint8_t*,std::size_t) noexcept;
 };
 OriginalCameraStartResult beginOriginalRaceCountdown1AFD80(
     OriginalRaceStartCountdown&,LapTimingManager50ID& actualManager,

@@ -1,10 +1,17 @@
 #pragma once
-// Bounded TA/RA/GC/SA/MA/GA/MB/SC/GB/RC/TC/MC/TB identity/layout catalog from the supplied original RES members.
-// Other track families remain outside this integration boundary.
+// Cut-camera identity rows (174DF0/175510): the TOB, its [CSCameras] count and
+// zones, the numbered VUB per cut and the intro INIs of the course archive.
+// Common rewrite (R2, B-C10): the row a race uses is ALWAYS the one derived
+// from the loaded course archive's own data (tests/native/course_cut_identity50ci.h)
+// and held in the runtime slots below, for every course (stock or registry).
+// The 13-row stock table is kept as integrity rows only (PLAN A4): receipts
+// that the derivation compares against and the stand-in intro event offsets
+// it carries over; nothing reads a stock row as the race's row.
 // Digests identify bytes; no curves, PCM, or runtime assets are embedded.
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <string_view>
 namespace rr::assets {
@@ -90,21 +97,21 @@ inline constexpr std::array<OriginalTrackCutIdentity50LA,13> originalTrackCutIde
   5,{{{"audio\\introAud.ini",556,1463,"bd83e5412da7cbf14f979c17c0002c798f477848ed0af38883197dfdc2320423"},{"audio\\scrptLns.ini",175,1462,"5197d42995287097b6d1f5981db602c5e7e148891392566427ff4b14f1bd22fc"}}},
   {{{57,39,56,1,109,123,135},{161,39,85,1,213,227,239},{265,39,114,1,317,331,343},{369,39,143,1,421,435,447},{473,39,172,1,525,539,551}}}},
 }};
-// Stock table row (receipt source; the shipped archives).
+// Stock integrity row (receipt; the shipped archives). Never the race's row.
 inline const OriginalTrackCutIdentity50LA* originalTrackCutStockIdentity50LA(std::string_view id)noexcept {
  for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return &row;
  return nullptr;
 }
-// Common course rule: a non-stock course archive gets its row derived from
-// its own data (tests/native/course_cut_identity50ci.h) and held here, the
-// one place for it. Host memory only; one slot per course id.
+// One derived row per course code, built from that course's own archive
+// (course_cut_identity50ci.h) and held here, the one place for it. Host
+// memory only; nothing is written into game memory.
 struct OriginalTrackCutRuntimeRow50LA {
  std::string archiveSha;
  std::array<std::string,8> names,shas;
  std::array<std::string,2> introNames,introShas;
- // Registry slot only (146r, the common-route course whose code is not stock):
- // its own code ("NV") and archive name ("TRACKS/NV.RES"); a stock slot keeps
- // the stock row's trackId/archiveName literals.
+ // The row's own code ("TA", "NV") and, for a code with no stock integrity
+ // row, the archive name its session row mounts ("TRACKS/NV.RES"). A code
+ // with a stock integrity row keeps that row's trackId/archiveName literals.
  std::array<char,3> code{};
  std::string archiveName;
  OriginalTrackCutIdentity50LA identity{};
@@ -118,34 +125,56 @@ struct OriginalTrackCutRuntimeRow50LA {
   for(std::size_t i=0;i<introNames.size();++i)if(!introNames[i].empty()){identity.introMembers[i].name=introNames[i].c_str();identity.introMembers[i].sha256=introShas[i].c_str();}
  }
 };
-// One slot per stock course id plus ONE registry slot (index = stock count)
-// for the common-route course whose code is not stock (PORT EXTENSION, NOT
-// ORIGINAL: the registry). The one storage for every derived row.
-inline constexpr std::size_t originalTrackCutRegistrySlot50LA=originalTrackCutIdentities50LA.size();
-inline std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()+1>& originalTrackCutRuntimeRows50LA()noexcept{
- static std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()+1> rows;return rows;
-}
-// A registry code: exactly two [A-Z0-9] characters that name no stock row.
-inline bool originalTrackCutRegistryCode50LA(std::string_view id)noexcept {
+// A course code as data: exactly two [A-Z0-9] characters.
+inline bool originalTrackCutCode50LA(std::string_view id)noexcept {
  if(id.size()!=2)return false;
  for(char c:id)if(!((c>='A'&&c<='Z')||(c>='0'&&c<='9')))return false;
- for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return false;
  return true;
 }
-// Read access: a stock id's slot, or the registry slot while it holds that code.
+// A code with no stock integrity row (a registry course, PORT EXTENSION A12).
+inline bool originalTrackCutRegistryCode50LA(std::string_view id)noexcept {
+ return originalTrackCutCode50LA(id)&&!originalTrackCutStockIdentity50LA(id);
+}
+// The runtime rows, keyed by code. The key lives beside the row, so the
+// derivation's whole-row assignment never loses it. std::deque: a published
+// row never moves, so an authoring that borrows a row's identity keeps a
+// valid address.
+struct OriginalTrackCutRuntimeEntry50LA {
+ std::array<char,3> key{};
+ OriginalTrackCutRuntimeRow50LA row;
+};
+inline std::deque<OriginalTrackCutRuntimeEntry50LA>& originalTrackCutRuntimeRows50LA()noexcept{
+ static std::deque<OriginalTrackCutRuntimeEntry50LA> rows;return rows;
+}
+// PORT STAND-IN (flagged): allocation guard on the number of distinct course
+// codes held (13 stock + add-ons); not a size or an admission rule. A code past
+// it gets no row (the derivation logs its refusal).
+inline constexpr std::size_t originalTrackCutRuntimeRowCeiling50LA=64;
 inline OriginalTrackCutRuntimeRow50LA* originalTrackCutRuntimeSlot50LA(std::string_view id)noexcept {
- for(std::size_t i=0;i<originalTrackCutIdentities50LA.size();++i)
-  if(id==originalTrackCutIdentities50LA[i].trackId)return &originalTrackCutRuntimeRows50LA()[i];
- auto& registry=originalTrackCutRuntimeRows50LA()[originalTrackCutRegistrySlot50LA];
- if(registry.present&&registry.code[0]&&id==std::string_view(registry.code.data(),2))return &registry;
+ for(auto& entry:originalTrackCutRuntimeRows50LA())
+  if(entry.key[0]&&id==std::string_view(entry.key.data(),2))return &entry.row;
  return nullptr;
 }
-// Write access for derivation: a stock id's slot, or the registry slot for a
-// registry code (replacing the course it held; one registry course at a time).
+// Write access for derivation: the code's row, appended once per code.
 inline OriginalTrackCutRuntimeRow50LA* originalTrackCutWritableSlot50LA(std::string_view id)noexcept {
- for(std::size_t i=0;i<originalTrackCutIdentities50LA.size();++i)
-  if(id==originalTrackCutIdentities50LA[i].trackId)return &originalTrackCutRuntimeRows50LA()[i];
- return originalTrackCutRegistryCode50LA(id)?&originalTrackCutRuntimeRows50LA()[originalTrackCutRegistrySlot50LA]:nullptr;
+ if(!originalTrackCutCode50LA(id))return nullptr;
+ if(auto* row=originalTrackCutRuntimeSlot50LA(id))return row;
+ auto& rows=originalTrackCutRuntimeRows50LA();
+ if(rows.size()>=originalTrackCutRuntimeRowCeiling50LA)return nullptr;
+ try{rows.emplace_back();}catch(...){return nullptr;}
+ auto& entry=rows.back();entry.key={id[0],id[1],'\0'};
+ return &entry.row;
+}
+// The derived row whose archive is `container` ("TRACKS/XX.RES", the mount's archive name).
+inline const OriginalTrackCutRuntimeRow50LA* originalTrackCutRowForArchive50LA(std::string_view container)noexcept {
+ for(const auto& entry:originalTrackCutRuntimeRows50LA())
+  if(entry.row.present&&entry.row.identity.archiveName&&container==entry.row.identity.archiveName)return &entry.row;
+ return nullptr;
+}
+// The code of a derived row (the key it was derived under).
+inline std::string_view originalTrackCutRowCode50LA(const OriginalTrackCutRuntimeRow50LA& row)noexcept {
+ for(const auto& entry:originalTrackCutRuntimeRows50LA())if(&entry.row==&row)return {entry.key.data(),2};
+ return {};
 }
 // The label every course mount carries (one rule): the admitted archive's
 // digest/size when course select derived its row, else the stock identity.
@@ -163,14 +192,15 @@ inline const char* originalTrackMountDigest50LA(std::string_view container,const
 inline std::size_t originalTrackMountBytes50LA(std::string_view container,std::size_t stockBytes)noexcept {
  const auto* slot=originalTrackMountSlot50LA(container);return slot?slot->identity.archiveBytes:stockBytes;
 }
+// The race's cut row: ONLY the row derived from the course's own archive. A
+// course whose row was not derived (absent data) has none; the camera step
+// then refuses it with its own message. The stock table is never returned.
 inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::string_view id)noexcept {
  const auto* slot=originalTrackCutRuntimeSlot50LA(id);
- if(slot&&slot->present)return &slot->identity;
- return originalTrackCutStockIdentity50LA(id);
+ return slot&&slot->present?&slot->identity:nullptr;
 }
-// The race track ids the cut cameras and the race intro admit: every id with
-// a cut row (the 13 stock rows, or the registry course whose row was derived
-// from its own data). Replaces the 13-code whitelists; stock admission is unchanged.
+// The race track ids the cut cameras and the race intro admit: every code
+// whose row was derived from its own archive data (one rule, every course).
 inline bool originalRaceTrackIdAdmitted50LA(std::string_view id)noexcept {
  return originalTrackCutIdentity50LA(id)!=nullptr;
 }

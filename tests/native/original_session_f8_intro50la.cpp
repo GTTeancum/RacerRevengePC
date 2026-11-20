@@ -1,7 +1,7 @@
 #include "original_ui_main_entry50kg.h"
 #include "original_camera_session50kx.h"
 #include "original_race_constructor50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "common_race_world50cr.h"
 #include "../../src/game/original_race_f8_storage50la.h"
 #include "../../src/game/original_session_f8_intro50la.h"
 #include <thread>
@@ -16,12 +16,13 @@ bool OriginalSessionF8Intro50LA::reveal(std::uint8_t& projection,bool direct)con
        session.frameStage_!=original_camera_session50KX::Session::FrameStage::exit||
        session.directStartPending_!=direct||(!direct&&session.taExitReason_>3))return false;
     const auto& issuance=session.nativeTaIssuance_;
-    if(!issuance||issuance->course!=OriginalCameraStartCourse::ra){
-        // Preserve existing standalone/non-RA/unissued numeric behavior.
-        // This route gains no canonical F8 authority from a course projection.
+    if(!issuance){
+        // Preserve existing standalone/unissued numeric behavior. An unissued
+        // session gains no canonical F8 authority from a projection.
         revealOriginalRaceUi199770(projection);return true;
     }
-    // Actual RA issuance retains the Application lifetime observation. Check
+    // Every Application-issued course session (one rule, B-C06): the race's
+    // real F8 199770. Its issuance retains the Application lifetime observation. Check
     // it before dereferencing the issuer; a failed actual-owner join NEVER
     // falls back to writing only the native projection and reporting success.
     std::uint32_t ignoredPause=0;
@@ -41,19 +42,18 @@ bool Application::revealConsumedSessionF8Intro50LA(original_camera_session50KX::
        race->application_!=entitiesOwner_||!race->counted_||race->rolledBack_||!race->world74_||
        !race->f8Attached_||!race->f8Owner_||race->f8Source_!=race->f8Owner_.get())return false;
     const auto& issued=session.nativeTaIssuance_;
-    if(!issued||issued->issuer!=this||issued->course!=rr::game::OriginalCameraStartCourse::ra||
+    if(!issued||issued->issuer!=this||issued->race!=race.get()||issued->world!=race->world74_.get()||
        issued->generation!=session.generation_||session.generation_!=race->entity_.sessionGeneration||
        !session.coldBound_||session.closed_||session.abandoned_||session.actual_.humanCount34!=1||
        session.actual_.applicationEntities!=entitiesOwner_||
        !session.actual_.applicationAnimation.sameOwner(animationClock())||
        session.frameStage_!=original_camera_session50KX::Session::FrameStage::exit||
        session.directStartPending_!=direct||(!direct&&session.taExitReason_>3))return false;
-    // Counted exact-world borrow retains every Camera dependency and prevents
-    // world retirement during the leaf. A separately constructed RA-looking
-    // Session, copied generation or legacy scene key is not this producer.
-    const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-    const auto actual=world->borrowRuntimeSourceCamera(world,wd);
-    if(!actual||actual.get()!=&session)return false;
+    // The race's own issued Session (strong borrow for the leaf) on its counted
+    // World. A separately constructed Session, copied generation or legacy
+    // scene key is not this producer.
+    const auto actual=issuedCourseCameraSession50LA();
+    if(!actual||actual.get()!=&session||!race->ownsNativeCameraAdapter34(session))return false;
     auto& source=*race->f8Owner_;
     if(!source.loadedCold()||!source.belongsTo(entitiesOwner_,session.generation_))return false;
     const auto* entity=source.entity();
