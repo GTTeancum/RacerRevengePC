@@ -19,8 +19,6 @@
 #include "native_dynamic_contact_peers50iw_fixture.h"
 #include "original_disc_query_bootstrap50le.h"
 #include "live_audio50hf_fixture.h"
-#include "tb_pod_sound50tb.h"
-#include "gb_pod_sound50gb.h"
 #include "lap_drive50gj_fixture.h"
 #include "phase_timing50gk_fixture.h"
 #include "render_diagnostics50gq_fixture.h"
@@ -133,11 +131,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       rr::platform::hostTrackCode50IM(effectiveTrack));
  }();
  const auto loadedTrack=effectiveTrack;
- // A real Course consumption may reach only this next cold session. Direct
- // startup has no such owner; this check does not activate a counted race.
- if(consumedLaunch)require50DU(originalMainApplication.enabled&&originalMainApplication.riderProfile&&
-     consumedLaunch->matches(*originalMainApplication.riderProfile,sessionIndex+1,loadedTrack,playerRacer60),
-     "consumed Course launch lost its same-profile next-session identity");
  require50DU(rr::platform::validHostTrack50IM(loadedTrack),"unsupported loaded track identity");
  ColdLoadDiagnostics50DU coldLoadDiagnostics(originalUiStarted&&!enterOriginalUi,
      rr::platform::hostTrackCode50IM(loadedTrack),playerRacer60,sessionIndex+1);
@@ -148,89 +141,63 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(selectedTrackAssets,trackSelectionError?trackSelectionError:"original track admission failed");
  track_session_assets50IG::ResolvedSessionAssets resolvedTrackAssets(*selectedTrackAssets);
  const auto* trackSession=&resolvedTrackAssets.assets;
- const bool isGcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
- const bool isGaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
- const bool isTaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TA");
- const bool isMaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MA");
- // ONE common race route (146r): stock SA (its stock profile = receipts) and every
- // registry (add-on) course. The registry flag is data of the session row
- // (track_session_assets50IG::registrySession); no add-on code is named here.
- // PORT STAND-IN (flagged): the other twelve stock codes still select their own
- // loaders below (isXxTrack); they are to be retired onto this route.
+ // Common rewrite (I1, B-C01/B-C02): ONE entry for every course. The course code
+ // is data (file names, receipts, the A1 PHY-class compare); the source says only
+ // where the files come from (stock disc or DLC registry row, A12). No flag here
+ // names a course: the twelve per-course track flags, the "common route" pair,
+ // the thirteen per-course original-disc flags and the direct-human OR are deleted.
+ const std::string_view courseCode(trackSession->world->code);
  const bool registryCourse=trackSession->registry;
  require50DU(!registryCourse||loadedTrack==rr::platform::HostTrack50IM::Course,
-     "registry course row reached the session without the common-route launch identity");
- const bool commonRouteTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SA")||registryCourse;
- if(registryCourse)std::cerr<<"course_route_session code="<<trackSession->world->code<<" archive="<<trackSession->archive
-     <<" listed_bytes="<<trackSession->archiveBytes<<" tuning="<<(trackSession->tuningArchive?"inherited":"own")
-     <<" route=common session="<<sessionIndex+1<<'\n';
- const bool isRaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"RA");
- const bool isMbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MB");
- const bool isScTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SC");
- const bool isTcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TC");
- const bool isRcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"RC");
- const bool isGbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GB");
- const bool isMcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MC");
- const bool isTbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TB");
- const bool maOrCommonRouteTrack=isMaTrack||commonRouteTrack;
- // Direct human worlds use only authenticated original archives. Clearing
- // legacy path descriptors prevents accidental generated visual/sky fallback.
- // GC direct-human capability is entered by the rooted frontend. The
- // retained standalone ALL8 diagnostic remains a distinct legacy route.
- const bool gcOriginalDisc=isGcTrack&&originalUiStarted&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool gaOriginalDisc=isGaTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool taOriginalDisc=isTaTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool maOriginalDisc=isMaTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool commonRouteOriginalDisc=commonRouteTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool mbOriginalDisc=isMbTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool scOriginalDisc=isScTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool tcOriginalDisc=isTcTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool rcOriginalDisc=isRcTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool gbOriginalDisc=isGbTrack&&!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool mcOriginalDisc=isMcTrack&&!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool tbOriginalDisc=isTbTrack&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const char* raAllAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
- const bool raOriginalDisc=isRaTrack&&originalUiStarted&&
-     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty()&&
-     !(raAllAiSetting&&std::string(raAllAiSetting)=="1");
- const bool directOriginalHuman=raOriginalDisc||gcOriginalDisc||gaOriginalDisc||taOriginalDisc||maOriginalDisc||commonRouteOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
- const bool directOriginalInputs=isRaTrack||directOriginalHuman;
- // Collision ownership is separate from the legacy all-pass/render-policy flag.
- const bool sourceStaticCandidates=trackSession->originalStaticCandidates||taOriginalDisc;
- if(taOriginalDisc){
-  resolvedTrackAssets.assets.tuningInArchive=true;
-  resolvedTrackAssets.assets.impactTuning="tracks\\ta.tun";
+     "registry course row reached the session without its registry launch identity");
+ // The race's one Track identity (187330 name): where this course's files are.
+ // R3 fills it from the course row, the same fields for a stock or registry row.
+ common_track50CR::Identity raceIdentity;
+ {
+  std::string identityError;
+  require50DU(common_track50CR::identityForCourse(courseCode,registryCourse,raceIdentity,identityError),
+      identityError.empty()?"course code has no track identity (stock or registry row)":identityError.c_str());
  }
- if(directOriginalHuman){
+ // A real Course consumption may reach only this next cold session, matched by
+ // its course code as data (stock or registry row). Direct startup has no such
+ // owner; this check does not activate a counted race.
+ if(consumedLaunch)require50DU(originalMainApplication.enabled&&originalMainApplication.riderProfile&&
+     consumedLaunch->registryCourse()==registryCourse&&
+     consumedLaunch->matchesCourse(*originalMainApplication.riderProfile,sessionIndex+1,courseCode,playerRacer60),
+     "consumed Course launch lost its same-profile next-session identity");
+ const bool originalDisc=!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ // One rule for every course (B-C02; original 17C16C / 17D678 -> 1A65C0): the
+ // race is launched through the rooted original Course entry, reading the
+ // original disc. A human Player0 field and the retained ALL8 spectator field
+ // (humans34 == 0) take the same entry; only the field differs.
+ const bool rootedCourseRace=originalUiStarted&&consumedLaunch!=nullptr&&originalDisc;
+ const bool directOriginalInputs=rootedCourseRace;
+ // Collision ownership is separate from the legacy all-pass/render-policy flag.
+ // An original-disc race takes its static candidates from the track's own files,
+ // every course; the legacy corpus candidates are retired (W0 deleted them).
+ const bool sourceStaticCandidates=trackSession->originalStaticCandidates||directOriginalInputs;
+ // A direct original race reads the course archive only. A row that names a
+ // development tuning file outside the archive reads the archive's own
+ // tracks\<code>.tun instead, as the original does for every course (keyed on the
+ // row's tuningInArchive data, never on the course).
+ const std::string archiveTuningMember="tracks\\"+raceIdentity.code.lower()+".tun";
+ if(directOriginalInputs&&!resolvedTrackAssets.assets.tuningInArchive&&!resolvedTrackAssets.assets.tuningArchive){
+  resolvedTrackAssets.assets.tuningInArchive=true;
+  resolvedTrackAssets.assets.impactTuning=archiveTuningMember.c_str();
+ }
+ // Clearing legacy path descriptors prevents accidental generated visual/sky fallback.
+ if(directOriginalInputs){
   resolvedTrackAssets.assets.visualRoot="";resolvedTrackAssets.assets.visualMesh="";
   resolvedTrackAssets.assets.visualReport="";resolvedTrackAssets.assets.skyTextureRoot="";
  }
- const bool courseRaceCold=(isGcTrack||isGaTrack||isTaTrack||maOrCommonRouteTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)&&originalUiStarted;
- require50DU(!(maOrCommonRouteTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)||(!checkpointInput&&!startAtMenu),
-     "MA/SA/RA require a fresh ordinary cold race; host startup menu/checkpoint unsupported");
- require50DU(!courseRaceCold||!startAtMenu,"original Course race entry requires RR_START_MENU=0");
- // GA follows the common direct-disc Course rule (its former GA-only host
- // admission and WatchtowerRun gate were port stand-ins, retired).
- require50DU(!(gaOriginalDisc||gcOriginalDisc||taOriginalDisc||maOriginalDisc||commonRouteOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc)||
-     (courseRaceCold&&!checkpointInput&&!startAtMenu),
-     "direct-disc human route requires actual Main/Course ownership");
- // Retained HOST trigger source is dormant; native Gate has independent ownership.
- const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
- require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0",
-     "RR_GC_HOST_TRIGGERS is dormant and cannot replace original-AI/native Gate ownership");
- const char* gateSetting=std::getenv("RR_GC_NATIVE_GATE");
- require50DU(!gateSetting||std::string(gateSetting)=="0"||std::string(gateSetting)=="1",
-     "RR_GC_NATIVE_GATE must be 0 or 1");
+ std::cerr<<"course_entry code="<<courseCode<<" source="<<common_race_log50CR::sourceName(raceIdentity.source)
+     <<" archive="<<trackSession->archive<<" listed_bytes="<<trackSession->archiveBytes
+     <<" rooted="<<(rootedCourseRace?1:0)<<" session="<<sessionIndex+1<<'\n';
+ require50DU(!rootedCourseRace||(!checkpointInput&&!startAtMenu),
+     "original Course race requires a fresh ordinary cold race (RR_START_MENU=0, no checkpoint)");
+ // B-C03: the GC- and RA-named environment switches (host triggers, native
+ // gate, native water, incomplete world, RA native world) are deleted; no
+ // course-independent replacement is needed (water and triggers follow data).
 
  // Original Course enters a fresh race after the frontend has committed
  // Options and retired its local owners. Read the sole application profile
@@ -253,37 +220,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
+ // B-C02: every race launches from the rooted Course entry. The former direct
+ // host races (host start menu, legacy corpus TA) had no consumed launch; the
+ // one stage (original_consumed_stage50DU::Owner::begin) needs that launch.
+ require50DU(!raceEnabled||rootedCourseRace,
+     "a race launches only from the rooted original Course entry (original disc, Main/Course, consumed launch)");
  // One authored level-illumination rule for every course: on for a fresh race,
  // RR_NATIVE_SELECTED_LIGHTS=0 is the single diagnostic opt-out (the former
- // per-course RR_NATIVE_xx_SELECTED_LIGHTS switches were retired).
+ // per-course RR_NATIVE_xx_SELECTED_LIGHTS switches and the 13 nativeXxSelection
+ // aliases are retired; the lighting owner keeps one storage layout, R6).
  const char* selectedLightingSetting=std::getenv("RR_NATIVE_SELECTED_LIGHTS");
  require50DU(!selectedLightingSetting||std::string(selectedLightingSetting)=="0"||
      std::string(selectedLightingSetting)=="1","RR_NATIVE_SELECTED_LIGHTS must be 0 or 1");
- const bool freshLevelLighting=raceEnabled&&!checkpointInput&&(!originalUiActive||courseRaceCold);
+ const bool freshLevelLighting=raceEnabled&&!checkpointInput&&(!originalUiActive||rootedCourseRace);
  const bool nativeSelectedLights=selectedLightingSetting?std::string(selectedLightingSetting)=="1":freshLevelLighting;
  require50DU(!nativeSelectedLights||freshLevelLighting,
      "native selected lights require a fresh authenticated race; checkpoint/Main unsupported");
- // PORT STAND-IN (flagged): the lighting owner still keeps one storage layout
- // per course scene (topology capacities), so the scene is named by the loaded
- // course here. These are aliases of the one rule above, not separate switches.
- const bool nativeGcSelection=nativeSelectedLights&&isGcTrack;
- const bool nativeTaSelection=nativeSelectedLights&&isTaTrack;
- const bool nativeGaSelection=nativeSelectedLights&&isGaTrack;
- const bool nativeMaSelection=nativeSelectedLights&&isMaTrack;
- const bool nativeCommonRouteSelection=nativeSelectedLights&&commonRouteTrack;
- const bool nativeMbSelection=nativeSelectedLights&&isMbTrack;
- const bool nativeScSelection=nativeSelectedLights&&isScTrack;
- const bool nativeTcSelection=nativeSelectedLights&&isTcTrack;
- const bool nativeRcSelection=nativeSelectedLights&&isRcTrack;
- const bool nativeGbSelection=nativeSelectedLights&&isGbTrack;
- const bool nativeMcSelection=nativeSelectedLights&&isMcTrack;
- const bool nativeTbSelection=nativeSelectedLights&&isTbTrack;
- const bool nativeRaSelection=nativeSelectedLights&&isRaTrack;
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
- require50DU(!originalUiStarted||allAiEnabled||directOriginalHuman,
-     "recovered original profile entry requires its owned direct human or retained all-AI route");
- require50DU(!directOriginalHuman||!allAiEnabled,"direct human Course must not replace Player0 with AI");
  // Native device selection never changes original player/AI classes. ALL8
  // bypasses both human packet paths even if a physical device is attached.
  const char* inputDeviceSetting=std::getenv("RR_HUMAN_INPUT_DEVICE");
@@ -306,14 +260,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::cerr<<"zero_g_lean bound="<<(!allAiEnabled&&humanControlInput.zeroGLean?1:0)
      <<" preset="<<humanControlInput.preset<<'\n';
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
- // Product Course owns one real Player and seven original AI. This is a
- // separate native roster, never the legacy one-AI diagnostic slice.
- // Every accepted human Course request cold-reloads, even the same selection.
- const bool humanCourseEnabled=courseRaceCold&&(isTaTrack||directOriginalHuman)&&!allAiEnabled;
+ // Product Course owns one real Player and seven original AI (or the ALL8
+ // field). Every accepted human Course request cold-reloads, even the same selection.
+ const bool humanCourseEnabled=rootedCourseRace&&!allAiEnabled;
  require50DU(!captureRun.enabled()||(!headlessLive&&raceEnabled&&(allAiEnabled||humanCourseEnabled)),
      "Window track capture requires a real window and an admitted original human or all-AI race");
- require50DU(!directOriginalHuman||!originalAiSetting||std::string(originalAiSetting)!="1",
-     "direct human Course forbids the legacy first-slice AI override");
+ require50DU(!rootedCourseRace||!originalAiSetting||std::string(originalAiSetting)!="1",
+     "rooted Course race forbids the legacy first-slice AI override");
  const bool nativeOriginalFleet=allAiEnabled||humanCourseEnabled;
  const bool originalAiEnabled=nativeOriginalFleet||(originalAiSetting&&std::string(originalAiSetting)=="1");
  const char* dynamicContactSetting=std::getenv("RR_ORIGINAL_AI_DYNAMIC_CONTACT");
@@ -324,32 +277,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto originalAiOwnsSlot=[&](std::size_t slot) noexcept {
   return originalAiEnabled&&(allAiEnabled||(humanCourseEnabled?slot!=0:slot==originalAiSlot));
  };
- require50DU(!maOrCommonRouteTrack||(raceEnabled&&!checkpointInput&&!startAtMenu&&
-     ((directOriginalHuman&&humanCourseEnabled&&!allAiEnabled)||(!directOriginalHuman&&allAiEnabled))),
-     "MA/common-route courses require either actual Main/Course Player0 plus seven AI or their retained ALL8 route");
- // The registry course has no retained ALL8 route: only the consumed free-play Course launch reaches it.
- require50DU(!registryCourse||(consumedLaunch&&directOriginalHuman&&humanCourseEnabled&&!allAiEnabled&&trackAdmission.gcMode2),
-     "registry course requires the consumed free-play Course launch (Player0 plus seven AI, mode2, original disc)");
- require50DU(!isMbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.mbNativeWorldRequested),
-     "MB requires the exact original Main/Course Player0 plus seven AI request");
- require50DU(!isScTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.scNativeWorldRequested),
-     "SC requires the exact original Main/Course Player0 plus seven AI request");
- require50DU(!isTcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.tcNativeWorldRequested),
-     "TC requires the exact original Main/Course Player0 plus seven AI request");
- require50DU(!isRcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
-     trackAdmission.rcNativeWorldRequested&&trackAdmission.gcMode2),
-     "RC requires the shared Main/Course Player0 plus seven AI request and mode2");
- require50DU(!isTbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
-     trackAdmission.tbNativeWorldRequested&&trackAdmission.gcMode2),
-     "TB requires the shared Main/Course Player0 plus seven AI request and mode2");
- require50DU(!isGbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
-     trackAdmission.gbNativeWorldRequested&&trackAdmission.gcMode2),
-     "GB requires shared Main/Course Player0 plus seven AI request and mode2");
- require50DU(!isMcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
-     trackAdmission.mcNativeWorldRequested&&trackAdmission.gcMode2),
-     "MC requires genuine rooted human Course mode2 and actual runtime owners");
- require50DU(!isRaTrack||(raceEnabled&&(allAiEnabled||humanCourseEnabled)&&!checkpointInput&&!startAtMenu),
-     "RA requires a fresh original Course human roster or explicit legacy ALL8 roster");
+ // One admission for every course (B-C02), replacing the per-course require50DU
+ // admissions: a fresh rooted race in mode2 with the one native cold request.
+ require50DU(!rootedCourseRace||(raceEnabled&&!checkpointInput&&!startAtMenu&&
+     trackAdmission.gcMode2&&trackAdmission.nativeWorldRequested&&(humanCourseEnabled||allAiEnabled)),
+     "the rooted Course race requires a fresh cold race in mode2 (Player0 plus seven AI, or the ALL8 field)");
  const auto originalAiCreateSelection=[&](){
   AiFreshCreateSelection50IU selected{};
   require50DU(!originalAiEnabled||(raceEnabled&&bindFreshAiCreateSelection50IU(
@@ -367,33 +299,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // canonical7F0 visibility and selected original rig owners. Player recovery
  // and reset=false authored LostAI actions retain their separate behavior.
  const bool originalRecoveryEnabled=originalCameraEnabled;
- // The concrete nine-trigger owner is part of the genuine GC world. Zero is
- // an explicit diagnostic omission; the admitted native fleet needs no opt-in.
- const bool gcNativeGate=isGcTrack&&(gateSetting?std::string(gateSetting)=="1":originalCameraEnabled);
- const char* nativeWaterSetting=std::getenv("RR_GC_NATIVE_WATER");
- require50DU(!nativeWaterSetting||std::string(nativeWaterSetting)=="0"||std::string(nativeWaterSetting)=="1",
-     "RR_GC_NATIVE_WATER must be 0 or 1");
- // Original water and local fog are on for the genuinely admitted GC
- // single-view source-camera world. Explicit0 remains diagnostic only.
- const bool nativeWaterEnabled=nativeWaterSetting?std::string(nativeWaterSetting)=="1":
-     isGcTrack&&originalCameraEnabled;
- require50DU(!nativeWaterEnabled||(isGcTrack&&originalCameraEnabled&&(!originalUiActive||courseRaceCold)),
-     "GC water/particles require the genuine selected fleet/source-camera world");
- require50DU(!(maOrCommonRouteTrack||isRaTrack||directOriginalHuman)||originalCameraEnabled,"MA/common-route/RA require the actual recovered camera/visibility owner");
- require50DU(!gcNativeGate||(originalCameraEnabled&&!checkpointInput&&!startAtMenu),
-     "GC native world triggers require the genuine fresh fleet/source-camera world");
- const bool gcNativeWorldSelected=isGcTrack&&gcNativeGate&&nativeWaterEnabled&&
-     originalCameraEnabled&&!checkpointInput&&!startAtMenu;
- if(isGcTrack){
-  require50DU(gcNativeWorldSelected||trackAdmission.gcIncompleteWorld,
-      "GC diagnostic omissions or legacy control/camera paths require RR_GC_INCOMPLETE_WORLD=1; ordinary GC owns the selected fleet, source camera, triggers and effects");
-  std::cerr<<(gcNativeWorldSelected?"GC NATIVE WORLD: ":"GC INCOMPLETE DIAGNOSTIC WORLD: ")
-      <<"real track, navigation, opening/windmill and static-model properties; "
-      <<(gcNativeGate?"nine native-geometry triggers with source LostAI/entry/exit and Gate audio owners. ":
-          "authored branch triggers and Gate are diagnostically disabled. ")
-      <<(nativeWaterEnabled?"Original water/particles/fog owners selected. ":"Water/particle/fog owners are diagnostically disabled. ")
-      <<"Native geometry/render/listener policies remain explicit; separate mode1 record and positive-effective cut-camera paths remain guarded.\n";
- }
+ // A9: water is the track's own data. The original branches on whether the
+ // SCB names water (274570 none / 2745D4 water factory, R7 prepareWater274570);
+ // the counted race admits the water owner on every course and the data decides.
+ // (B-C03/B-C16: the GC-named water and gate switches, the GC-only gate/water
+ // selection and the GC incomplete-world block are deleted.)
+ const bool nativeWaterEnabled=originalCameraEnabled;
+ require50DU(!nativeWaterEnabled||(originalCameraEnabled&&rootedCourseRace),
+     "track water/particles require the rooted fleet/source-camera world");
+ require50DU(!rootedCourseRace||!raceEnabled||originalCameraEnabled,
+     "the rooted Course race requires the actual recovered camera/visibility owner");
  require50DU(raceEnabled||!playerUsesRosterRig,"alternate original selection requires the native race");
  const std::string playerPodId(selectedOriginal->podId);
  const auto playerArchive=original_player_identity50IK::podArchive(
@@ -404,8 +319,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool mode1Requested=raceEnabled&&(!raceModeSetting||std::string(raceModeSetting)=="1");
  require50DU(!mode1Requested||trackSession->nativeMode1,
      "Selected original track record-row/selection configuration is unjoined; choose RR_RACE_MODE=2 explicitly");
- require50DU(rr::platform::hostTrackAdmitted50IM(loadedTrack,trackAdmission),
-     "Track requires its genuine native-world request or explicit diagnostic admission and RR_RACE_MODE=2");
+ require50DU(!raceEnabled||rr::platform::hostTrackAdmitted50IM(loadedTrack,trackAdmission),
+     "a race requires a supported course selection and RR_RACE_MODE=2");
  // Default mode1 is committed only after ALL required providers cold-prepare.
  // Failure is explicit; RR_RACE_MODE=2 is the selectable existing fallback.
  bool mode1Enabled=false;
@@ -417,8 +332,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!originalAiEnabled||racerContactsEnabled,
      "original AI first slice requires actual racer contacts and their source boundary");
  // Course's immutable consumption was checked at entry, before1AD520
- // mutates the actual profile. A Restart has no receipt and reexecutes the
- // source clear against the already-singleton retained subtype3 snapshot.
+ // mutates the actual profile. (A restart is in place, 1AC8E0, and never
+ // re-enters this cold entry.)
  if(humanCourseEnabled&&!originalUiActive){
   rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection before;
   require50DU(originalMainApplication.riderProfile&&
@@ -465,7 +380,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const std::uint32_t originalAiHumanCount=allAiEnabled?0u:1u;
  const std::uint32_t originalAiOpponentCount=raceRacerCount-originalAiHumanCount;
  const std::uint16_t originalAiSettings1125C=[&]() -> std::uint16_t {
-  // Actual mode0/mode2 human Course launch and Restart consume the retained
+  // Actual mode0/mode2 human Course launch consumes the retained
   // source lap choice. Tournament mode2 has committed fixed three laps;
   // direct/ALL8 diagnostic clients retain their separate default3.
   if(humanCourseEnabled&&!originalUiActive){
@@ -498,9 +413,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* captureWrongSetting=std::getenv("RR_CAPTURE_WRONG_WAY");
  const bool captureFirstWrongWay=headlessLive&&captureWrongSetting&&std::string(captureWrongSetting)=="1";
  bool capturedFirstWrongWay=false,lastCommittedWrongWay=false;
- // RA constructs its bootstrap from authenticated original resources in memory.
- // Legacy diagnostic tracks retain their explicit corpus; no replacement JSON
- // case, captured output or generated-file fallback is created for RA.
+ // A rooted race constructs its bootstrap from authenticated original resources
+ // in memory, every course. A non-race diagnostic session keeps its explicit
+ // corpus query; no replacement JSON case or generated-file fallback is created.
  f::Fixture x(0,".",directOriginalInputs?f::AssetInput::OriginalDisc:f::AssetInput::RetainedDevelopment);
  auto&s=x.state;auto&m=s.bodies.main;
  const auto endpointPolicy=original_disc_query_bootstrap50LE::endpointPolicy();
@@ -509,18 +424,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  CollisionFilter48J qfilter{};Type2StaticQuery49X query{};
  std::vector<cold::Mesh> meshes;
  if(directOriginalInputs){
+  // C2 (B-P04): the query bootstrap collision is slot 0's own pod, read from that
+  // pod's own archive and member folder (Pods\PodNN\ for a stock pod, A5 Pod%02d;
+  // the registry row's package and stem for an add-on pod). No pod is named here.
   std::string error;
+  const auto bootstrapPodBytes=runtime_startup50fl::readBytes(playerArchive);
   const bool prepared=originalBootstrapCollision.prepare(
-      {x.assets.originalArchivePath.string(),"Pods\\Pod01\\"},x.assets.originalArchive,endpointPolicy,error);
-  require50DU(prepared,error.empty()?"original POD01 collision bootstrap rejected":error.c_str());
+      {playerArchive.string(),original_player_identity50IK::podFolderMember(playerPodId)},
+      bootstrapPodBytes,endpointPolicy,error);
+  require50DU(prepared,error.empty()?"original slot-0 pod collision bootstrap rejected":error.c_str());
   original_disc_query_bootstrap50LE::initialize(originalBootstrapCollision.main(),qfilter,query,false);
  }else{
   std::ifstream file(corpusPath);require50DU(bool(file),"cannot open collision corpus");file>>corpus;
   for(const auto& item:corpus["cases"])if(item["name"]==trackSession->mainCollisionCase)chosen=&item;
   require50DU(chosen,"authored placement case present");const auto& row=*chosen;const auto& qj=row["query"];
   shape=cold::shape(corpus["shapes"][qj["shape"].get<std::size_t>()]);
-  if(!sourceStaticCandidates){meshes.reserve(corpus["meshes"].size());
-   for(const auto& j:corpus["meshes"])meshes.push_back(cold::mesh(j));}
   qfilter=cold::filter(qj["filter"]);query.resource=&shape.view;query.filter=&qfilter;query.queryScene.value=77;
   query.normalMode54=0u;query.normalMode54Bound=true;
   query.collisionTypeTag=qj["collision_tag"];query.groupTypeTag=qj["group_tag"];query.callbackEnabled=qj["callback"];
@@ -529,18 +447,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  const auto& mainQueryResource=*query.resource;
  std::vector<std::string> names;
- std::vector<Type2StaticCandidate49X> legacyCandidates;std::size_t stackCount=1;
- if(!sourceStaticCandidates){
- const auto& row=*chosen;
- names.resize(row["candidates"].size());for(std::size_t i=0;i<names.size();++i)names[i]=cold::unhex(row["candidates"][i]["name_hex"]);
- legacyCandidates.reserve(row["order"].size());
- for(auto index:row["order"].get<std::vector<std::size_t>>()){
-  const auto&j=row["candidates"][index];auto&m=meshes[j["mesh"].get<std::size_t>()];legacyCandidates.emplace_back();auto&out=legacyCandidates.back();
-  out.nodeRadii=m.radii.data();out.nodeRadiusCount=m.radii.size();out.maxDepth=m.maxDepth;out.candidate.hasMaterialScene=j["has_scene"];out.candidate.sceneName=names[index].data();out.candidate.sceneNameBytes=names[index].size();
-  auto&v=out.candidate.collision;v.geometry={&m.mesh,cold::matrix(j["world"]),j["id"].get<std::uint32_t>()};v.filter=cold::filter(j["filter"]);v.sphere=cold::sphere(j["sphere"]);v.typeTag=j["type_tag"];
-  cold::words(v.copied40.data(),j["copied40"]);cold::words(v.copied50.data(),j["copied50"]);stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+m.maxDepth);
- }
- } // TA retained diagnostic candidate inputs only.
+ std::size_t stackCount=1;
+ // The legacy corpus static candidates are retired (W0 removed them from the
+ // world context): a race takes its candidates from the track's own files.
+ require50DU(!raceEnabled||sourceStaticCandidates,
+     "legacy corpus static candidates are retired; a race reads its track's own candidates");
  if(originalUiStarted){
   require50DU(originalMainApplication.state&&originalMainApplication.state->known,
       "native Course entry requires the actual application RNG owner");
@@ -551,7 +462,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  AiRuntimeState50IV originalAi{};AiRuntimeReceipt50IV originalAiReceipt{};
  native_ai50IV::Session originalAiSession{};
  // The exact genuine mode-2 race owns its arm until commit or session teardown.
- // Restart, Main return and exceptions cannot leave a dangling manager pointer.
+ // Main return and exceptions cannot leave a dangling manager pointer.
  struct TournamentResultLifetime50KG {
   rr::platform::OriginalUiRiderProfileOwner50KG* profile=nullptr;
   const LapTimingManager50ID* manager=nullptr;
@@ -581,7 +492,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  DynamicContactProfile50IW dynamicMusicProfile{1u,dynamicContactEnabled};
  if(originalUiStarted&&!originalUiActive){
   rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
-  require50DU(courseRaceCold&&originalMainApplication.riderProfile&&
+  require50DU(rootedCourseRace&&originalMainApplication.riderProfile&&
       originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
       original_course_targets50KX::target(selected)&&
       original_course_targets50KX::target(selected)->track==loadedTrack&&
@@ -629,73 +540,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto nativeVideo=originalMainApplication.videoForSession();
  auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
  auto liveAudio=std::make_unique<live_audio50HF::Owner>();
- // TB's real Trigger16 action group must retain voice126 before actual
- // collision Storage registrations. The construction layer calls this once
- // after decoding its shared tbTriggerAuthoring, before publishing actions.
- std::shared_ptr<tb_pod_sound50TB::Owner> tbPodSound;
- std::shared_ptr<rr::platform::OriginalSoundMode50KG> tbSoundMode;
- std::filesystem::path tbPreparedAudioRoot;
- bool tbLiveAudioPrepared=false;
- const auto prepareTbPodSound=[&](std::shared_ptr<const tb_trigger_authoring50TB::Owner> authored){
-  require50DU(isTbTrack&&nativeOriginalFleet&&authored&&authored->ready()&&
-      authored->coldSource()&&!tbLiveAudioPrepared&&!tbPodSound,
-      "TB early PodSound requires its actual fresh trigger source and human fleet");
-  const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
-  tbPreparedAudioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
-      runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
-  std::string error;
-  const bool audioPrepared=liveAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
-      tbPreparedAudioRoot,error,playerRacer60,loadedAudioSettings);
-  require50DU(audioPrepared,error.empty()?"TB actual shared audio preparation rejected":error.c_str());
-  tbLiveAudioPrepared=true;
-  auto* mixer=liveAudio->mixerForMaterialOwner();auto* groups=liveAudio->groupsForProviders();
-  require50DU(mixer&&groups&&groups->uses(*mixer),"TB actual shared mixer/groups unavailable");
-  // Binding is cold and one-shot. Later material/engine setup reuses this
-  // exact actual mode rather than attempting to bind a second one.
-  tbSoundMode=originalMainApplication.soundMode;
-  if(!tbSoundMode){
-   tbSoundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
-   require50DU(tbSoundMode->initializeFromProfile1101C(1),"TB direct native stereo mode rejected");
-  }
-  require50DU(mixer->bindOriginalSoundMode50KG(tbSoundMode),"TB early source-mode binding rejected");
-  tbPodSound=std::make_shared<tb_pod_sound50TB::Owner>();
-  const bool soundReady=tbPodSound->prepare(std::move(authored),*mixer,*groups,tbPreparedAudioRoot,error);
-  require50DU(soundReady,error.empty()?"TB actual HUGEDOOR source/voice126 rejected":error.c_str());
- };
- std::shared_ptr<gb_pod_sound50GB::Owner> gbPodSound;
- std::shared_ptr<rr::platform::OriginalSoundMode50KG> gbSoundMode;
- std::filesystem::path gbPreparedAudioRoot;
- bool gbLiveAudioPrepared=false;
- const auto prepareGbPodSound=[&](std::shared_ptr<const gb_trigger_authoring50GB::Owner> authored){
-  require50DU(isGbTrack&&nativeOriginalFleet&&authored&&authored->ready()&&
-      authored->coldSource()&&!gbLiveAudioPrepared&&!gbPodSound,
-      "GB early PodSound requires its actual fresh trigger source and human fleet");
-  const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
-  gbPreparedAudioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
-      runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
-  std::string error;
-  const bool audioPrepared=liveAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
-      gbPreparedAudioRoot,error,playerRacer60,loadedAudioSettings);
-  require50DU(audioPrepared,error.empty()?"GB actual shared audio preparation rejected":error.c_str());
-  gbLiveAudioPrepared=true;
-  auto* mixer=liveAudio->mixerForMaterialOwner();auto* groups=liveAudio->groupsForProviders();
-  require50DU(mixer&&groups&&groups->uses(*mixer),"GB actual shared mixer/groups unavailable");
-  // Binding is cold and one-shot. Later material/engine setup reuses this
-  // exact actual mode rather than attempting to bind a second one.
-  gbSoundMode=originalMainApplication.soundMode;
-  if(!gbSoundMode){
-   gbSoundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
-   require50DU(gbSoundMode->initializeFromProfile1101C(1),"GB direct native stereo mode rejected");
-  }
-  require50DU(mixer->bindOriginalSoundMode50KG(gbSoundMode),"GB early source-mode binding rejected");
-  // The PodSound owner exists exactly when a trigger authors a PodSound
-  // action (stock GB: the door, trigger 16); absent = none.
-  std::cerr<<"gb_course_owner owner=podsound present="<<(authored->authorsPodSound()?1:0)<<'\n';
-  if(!authored->authorsPodSound())return;
-  gbPodSound=std::make_shared<gb_pod_sound50GB::Owner>();
-  const bool soundReady=gbPodSound->prepare(std::move(authored),*mixer,*groups,gbPreparedAudioRoot,error);
-  require50DU(soundReady,error.empty()?"GB actual BIGDOOR source/voice126 rejected":error.c_str());
- };
+ // One shared-audio preparation state for every course (B-C17). The former
+ // TB/GB early PodSound owners are retired: the track's trigger-driven sounds
+ // are the one positional-sound owner over the track's sound rows (R7,
+ // positional_sound_rows50SR, prepared in the 05.12 AUB step). The world stage
+ // records here whether it already prepared the shared audio, its AUDIO root
+ // and the bound sound mode, so later material/engine setup reuses them.
+ bool liveAudioPrepared=false;
+ std::filesystem::path preparedAudioRoot;
+ std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode;
  // Retain the actual accepted source event type; never relabel it as a normal race.
  std::uint32_t nativeOrdinaryLaunch11258=dynamicMusicProfile.mode11258;
  std::unique_ptr<OriginalRacerModelRenderGlobals50LA> sourceModelRenderGlobals;
@@ -740,19 +593,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
   }
  };
- // First usable scope is the explicit muted consumed ALL8 RA spectator route.
- // Source command25 audible-feedback semantics remain unsupported; preserve
- // every counted group state rather than invent an Auxiliary pause exemption.
- const char* spectatorAudioPolicy=std::getenv("RR_AUDIO");
- const bool sourceConsumedPauseActivation=consumedLaunch&&isRaTrack&&allAiEnabled&&
-     originalCameraEnabled&&spectatorAudioPolicy&&std::string(spectatorAudioPolicy)=="0";
- // Human Career intro needs the genuine RA race/world prefix, but does not
- // opt into the separate source spectator Pause implementation.
- const bool sourceConsumedIntroActivation=consumedLaunch&&isRaTrack&&humanCourseEnabled&&
-     originalCameraEnabled&&dynamicProfile.game34==2&&nativeOrdinaryLaunch11258==1;
+ // B-C06: activation from launch data only, every course. The original builds
+ // Pause100, Results104 and F8 for every race at race vtable+74 (1A8A40), so
+ // the original Pause owner activates for every counted race (human or ALL8).
+ const bool sourceConsumedPauseActivation=rootedCourseRace&&originalCameraEnabled;
+ // Intro cuts are decided by 174EA8 from launch data: subtype 2 and 3 have no
+ // cuts, subtype 1 has them only when P+34 == 2 (tournament) and App+350 == 0.
+ // The cut count itself is the TOB's (World+3E4, 174E58), read by the camera
+ // session (R2); a course whose TOB authors no cameras takes the zero-cut path.
+ const bool sourceConsumedIntroActivation=rootedCourseRace&&originalCameraEnabled&&
+     nativeOrdinaryLaunch11258==1u&&dynamicProfile.game34==2u&&cameraStartup350==0;
+ // The race's one Track (common_track50cr.h) and one roster (common_roster50cr.h).
+ // The Track carries only the identity here; the world stage (I2) begins the
+ // stage with it (01-02), loads it through 1A9EE0 (04-05), builds and loads the
+ // roster (10). Declared after the audio/video owners so it retires before them.
+ auto raceTrack=std::make_shared<common_track50CR::Track>();
+ raceTrack->identity=std::move(raceIdentity);
+ common_roster50CR::Owner raceRoster;
  // Actual world/collision ownership remains in the next lexical stage.
  // It retires before this original early fixture/rig/audio prefix, on all exits.
  interactive_world50DU::Context world50DU{
+  .track=*raceTrack,
+  .roster=raceRoster,
   .allAiControllerSamples=allAiControllerSamples,
   .allAiEnabled=allAiEnabled,
   .allAiHostDriverCalls=allAiHostDriverCalls,
@@ -772,10 +634,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .controlPresets=controlPresets,
   .corpus=corpus,
   .courseColdLoad=courseColdLoad,
-  .courseRaceCold=courseRaceCold,
+  .rootedCourseRace=rootedCourseRace,
   .courseRaceLaunched=courseRaceLaunched,
   .deviceIndex=deviceIndex,
-  .directOriginalHuman=directOriginalHuman,
   .directOriginalInputs=directOriginalInputs,
   .displayWallTotals=displayWallTotals,
   .dynamicActorResolver=dynamicActorResolver,
@@ -798,68 +659,32 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .dynamicSelfSlot=dynamicSelfSlot,
   .dynamicTuning=dynamicTuning,
   .endpointPolicy=endpointPolicy,
-  .gaOriginalDisc=gaOriginalDisc,
-  .gbLiveAudioPrepared=gbLiveAudioPrepared,
-  .gbOriginalDisc=gbOriginalDisc,
-  .gbPodSound=gbPodSound,
-  .gbPreparedAudioRoot=gbPreparedAudioRoot,
-  .gbSoundMode=gbSoundMode,
-  .gcNativeGate=gcNativeGate,
-  .gcNativeWorldSelected=gcNativeWorldSelected,
-  .gcOriginalDisc=gcOriginalDisc,
+  .liveAudioPrepared=liveAudioPrepared,
+  .preparedAudioRoot=preparedAudioRoot,
+  .soundMode=soundMode,
   .headlessLive=headlessLive,
   .host=host,
   .hostDiagnostic=hostDiagnostic,
   .humanControlInput=humanControlInput,
   .humanCourseEnabled=humanCourseEnabled,
-  .isGaTrack=isGaTrack,
-  .isGbTrack=isGbTrack,
-  .isGcTrack=isGcTrack,
-  .maOrCommonRouteTrack=maOrCommonRouteTrack,
-  .isMaTrack=isMaTrack,
-  .isMbTrack=isMbTrack,
-  .isMcTrack=isMcTrack,
-  .isRaTrack=isRaTrack,
-  .isRcTrack=isRcTrack,
-  .commonRouteTrack=commonRouteTrack,
-  .isScTrack=isScTrack,
-  .isTaTrack=isTaTrack,
-  .isTbTrack=isTbTrack,
-  .isTcTrack=isTcTrack,
   .lapContinuity=lapContinuity,
   .lastCommittedWrongWay=lastCommittedWrongWay,
-  .legacyCandidates=legacyCandidates,
   .liveAudio=liveAudio,
   .loadedAudioSettings=loadedAudioSettings,
   .loadedTrack=loadedTrack,
   .m=m,
-  .maOriginalDisc=maOriginalDisc,
   .mainQueryResource=mainQueryResource,
   .managerRuntimeSelection=managerRuntimeSelection,
-  .mbOriginalDisc=mbOriginalDisc,
-  .mcOriginalDisc=mcOriginalDisc,
   .meshes=meshes,
   .mode1Enabled=mode1Enabled,
   .mode1Requested=mode1Requested,
   .monotonicNow50DU=monotonicNow50DU,
   .names=names,
-  .nativeGaSelection=nativeGaSelection,
-  .nativeGbSelection=nativeGbSelection,
-  .nativeMaSelection=nativeMaSelection,
-  .nativeMbSelection=nativeMbSelection,
-  .nativeMcSelection=nativeMcSelection,
   .nativeOrdinaryLaunch11258=nativeOrdinaryLaunch11258,
   .nativeOriginalFleet=nativeOriginalFleet,
-  .nativeRaSelection=nativeRaSelection,
   .nativeRacerManager=nativeRacerManager,
-  .nativeRcSelection=nativeRcSelection,
   .nativeRecordActor=nativeRecordActor,
-  .nativeCommonRouteSelection=nativeCommonRouteSelection,
-  .nativeScSelection=nativeScSelection,
   .nativeSelectedLights=nativeSelectedLights,
-  .nativeTaSelection=nativeTaSelection,
-  .nativeTbSelection=nativeTbSelection,
-  .nativeTcSelection=nativeTcSelection,
   .nativeVideo=nativeVideo,
   .nativeWaterApplication=nativeWaterApplication,
   .nativeWaterEnabled=nativeWaterEnabled,
@@ -891,22 +716,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .playerRacer60=playerRacer60,
   .playerSource5C=playerSource5C,
   .playerUsesRosterRig=playerUsesRosterRig,
-  .prepareGbPodSoundCall=interactive_frame50DU::BorrowedCall<void(std::shared_ptr<const gb_trigger_authoring50GB::Owner>)>{prepareGbPodSound},
-  .prepareTbPodSoundCall=interactive_frame50DU::BorrowedCall<void(std::shared_ptr<const tb_trigger_authoring50TB::Owner>)>{prepareTbPodSound},
   .qfilter=qfilter,
   .query=query,
   .raceEnabled=raceEnabled,
   .raceOpponentCount=raceOpponentCount,
   .raceRacerCount=raceRacerCount,
   .racerContactsEnabled=racerContactsEnabled,
-  .rcOriginalDisc=rcOriginalDisc,
   .renderDiagnostics=renderDiagnostics,
   .reportHost50DU=reportHost50DU,
   .reportRenderer50DU=reportRenderer50DU,
   .requestedWindowSamples=requestedWindowSamples,
   .s=s,
-  .commonRouteOriginalDisc=commonRouteOriginalDisc,
-  .scOriginalDisc=scOriginalDisc,
   .selectedAudioSettings=selectedAudioSettings,
   .selectedOriginal=selectedOriginal,
   .selectedRacer60=selectedRacer60,
@@ -920,13 +740,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .sourceStaticCandidates=sourceStaticCandidates,
   .stackCount=stackCount,
   .startAtMenu=startAtMenu,
-  .taOriginalDisc=taOriginalDisc,
-  .tbLiveAudioPrepared=tbLiveAudioPrepared,
-  .tbOriginalDisc=tbOriginalDisc,
-  .tbPodSound=tbPodSound,
-  .tbPreparedAudioRoot=tbPreparedAudioRoot,
-  .tbSoundMode=tbSoundMode,
-  .tcOriginalDisc=tcOriginalDisc,
   .tournamentLaunchSelection=tournamentLaunchSelection,
   .tournamentLaunchStamp=tournamentLaunchStamp,
   .tournamentResultArmed=tournamentResultArmed,
