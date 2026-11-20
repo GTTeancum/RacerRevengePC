@@ -24,14 +24,17 @@
 // 0x271600 (the same [Sounds] block's NumMaterials / DefaultMaterial /
 // CollisionObjectsMaterial%d) is the material audio reader, not this one.
 //
-// Capacity, not a stock count: the stores hold the largest stock lists (SC 199
-// soul-tree sounds; GB 4 ambient sounds) with the live count; a larger list is
-// refused (bounds-checked before any write). This is the ONE place these
-// capacities are defined. Each native owner bounds or refuses what it does
-// not implement itself.
+// Storage: each list is sized ONCE from its own authored count
+// (NumSoultreeSounds / NumAmbientSounds) and every write is bounds-checked
+// against that size. The one ceiling below is an allocation guard against a
+// corrupt or hostile AUB (PORT STAND-IN, flagged), equal to the common
+// positional_sounds block row (tests/native/common_track50cr.h BlockId::
+// positionalSounds); it is not a stock count (stock maxima: SC 199 soul-tree,
+// GB 4 ambient, receipts only).
 #include "import_world48f.h"
 #include "track_start50ad.h"
 #include <array>
+#include <vector>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -39,7 +42,7 @@
 #include <string>
 
 namespace rr::assets {
-inline constexpr std::size_t soulTreeSoundCapacity50SR=199,ambientSoundCapacity50SR=4;
+inline constexpr std::size_t positionalSoundCeiling50SR=4096;
 struct OriginalSound50SR {
  std::uint32_t ordinal=0;               // authored 1-based index i
  const ParameterBlock48F* block=nullptr;// block actually read (selection)
@@ -52,19 +55,18 @@ struct OriginalSound50SR {
  std::string attachToObject;std::int32_t startDisabled=0; // soul-tree (0x278B80)
  float cycleTime=0.f;                                      // ambient (0x278D70)
 };
-template<std::size_t Capacity> struct OriginalSoundList50SR {
+struct OriginalSoundList50SR {
  std::uint32_t authored=0;   // NumSoultreeSounds / NumAmbientSounds
  std::size_t live=0;         // loaded descriptors in rows[0,live)
  std::size_t dropped=0,repeated=0;
- std::array<OriginalSound50SR,Capacity> rows{};
- static constexpr std::size_t capacity()noexcept{return Capacity;}
- void clear()noexcept{authored=0;live=0;dropped=repeated=0;}
+ std::vector<OriginalSound50SR> rows; // sized once from `authored`
+ std::size_t capacity()const noexcept{return rows.size();}
+ void clear()noexcept{authored=0;live=0;dropped=repeated=0;rows.clear();}
 };
 struct OriginalPositionalSounds50SR {
  bool soundsBlock=false;
- OriginalSoundList50SR<soulTreeSoundCapacity50SR> soulTree;
- OriginalSoundList50SR<ambientSoundCapacity50SR> ambient;
- // Large (capacity rows): hold it on the heap, not the stack.
+ OriginalSoundList50SR soulTree;
+ OriginalSoundList50SR ambient;
 };
 namespace positional_sounds50SR_detail {
 inline const ParameterBlock48F* find(const ParameterDocument48F& d,const std::string& name)noexcept{
@@ -123,12 +125,15 @@ inline bool load(const ParameterBlock48F* b,bool soulTree,OriginalSound50SR& s,c
  else if(!number(b,"cycletime",0.f,s.cycleTime)){bad="CycleTime";return true;}
  return true;
 }
-template<std::size_t C> bool list(const ParameterDocument48F& d,const ParameterBlock48F* sounds,const char* countKey,
-    const char* prefix,bool soulTree,OriginalSoundList50SR<C>& out,std::string& error){
+inline bool list(const ParameterDocument48F& d,const ParameterBlock48F* sounds,const char* countKey,
+    const char* prefix,bool soulTree,OriginalSoundList50SR& out,std::string& error){
  out.clear();
  const auto n=integer(sounds,countKey,0);
  if(n<=0)return true;
+ if(static_cast<std::size_t>(n)>positionalSoundCeiling50SR){
+  error=std::string(countKey)+" above the positional sound allocation ceiling";return false;}
  out.authored=static_cast<std::uint32_t>(n);
+ try{out.rows.resize(out.authored);}catch(...){error="positional sound store allocation failed";return false;}
  const ParameterBlock48F* selected=sounds; // [Sounds] stays selected until a hit
  for(std::uint32_t i=1;i<=out.authored;++i){
   const auto* hit=find(d,prefix+std::to_string(i));

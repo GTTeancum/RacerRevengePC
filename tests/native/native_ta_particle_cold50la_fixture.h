@@ -1,50 +1,73 @@
 #pragma once
+// ONE track particle manager load for every course (PLAN B-C16, step 05.06).
+// Original 1B4DC0 builds the track's particle manager; 1617A0 forms the atlas
+// member from 36B530 ("particle\\") + the SCB Environment
+// ParticleTextureMapName with its last extension replaced (.prt/.psm/.pst), and
+// 299BE0 acquires the canonical particle material. Nothing here names a course
+// or a member: the SCB names the atlas (stock: demoprt.tga), and the stock
+// PRT/PSM/PST bytes are receipts (stock_course_receipts50cr.h particles.*).
+// The per-course RC/TB/GB compact-source paths and the MC path are retired.
 #include "original_ui_main_entry50kg.h"
-#include "track_session_assets50ig_fixture.h"
+#include "common_track50cr.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
-#include "course_archive_receipt50ci.h"
-#include "course_cut_identity50ci.h"
 #include "../../src/game/original_track_particle_cold50la.h"
 #include "../../src/game/dlc_course_entries50dl.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_standard_material_source50la.h"
 #include <cstring>
-#include "rc_cold_sources50la.h"
-#include "tb_cold_sources50la.h"
-#include "gb_cold_sources50la.h"
+#include <iostream>
+#include <stdexcept>
 
 namespace native_ta_particle_cold50LA {
-// Shared native cold load for an authenticated selected-track capability. It consumes the
-// already authenticated SCB and exact selected-track archive in the SAME
-// Application material domain, before its caller performs material population.
-// No recovery-time decoder execution, alternate domain or source fallback.
+// Largest PRT/PSM/PST member the reader copies (the shared course-archive
+// member cap; a larger member is refused by capacity, never by identity).
+inline constexpr std::size_t maximumMemberBytes=8u*1024u*1024u;
+
+// The SCB Environment ParticleTextureMapName (the one field 1617A0 reads).
+// Returns nullptr when the SCB names none; refuses a duplicate.
+inline const std::string* particleTextureMapName(const rr::assets::World48F& world){
+    const auto sameName=[](const std::string& a,const char* b){
+        std::size_t i=0;
+        for(;i<a.size()&&b[i];++i){const auto lower=[](char c){return c>='A'&&c<='Z'?char(c+('a'-'A')):c;};
+            if(lower(a[i])!=lower(b[i]))return false;}
+        return i==a.size()&&!b[i];
+    };
+    const std::string* name=nullptr;
+    for(const auto& block:world.parameters.blocks){
+        if(!sameName(block.name,"Environment"))continue;
+        for(const auto& field:block.fields){
+            if(!sameName(field.name,"ParticleTextureMapName"))continue;
+            runtime_startup50fl::require(!name,"duplicate SCB ParticleTextureMapName");name=&field.value;
+        }
+    }
+    return name;
+}
+
+// The PRT/PSM/PST member names 1617A0 forms from the SCB atlas name.
+struct Members {std::string prt,psm,pst;};
+inline Members atlasMembers(const original_main_entry50KG::Application& application,const std::string& particleName){
+    //1617A0 uses36B530+the original SCB name and replaces its last extension.
+    //It does not choose a material from the PRT's separate TextureMap field.
+    std::string stem=application.particleDirectory36B530()+particleName;
+    const auto dot=stem.find_last_of('.');
+    if(dot!=std::string::npos)stem.resize(dot);
+    return {stem+".prt",stem+".psm",stem+".pst"};
+}
+
+// 1B4DC0 for the race's Track. Consumes the Track's decoded SCB and archive in
+// the SAME Application material domain, before the caller's 14D370/29E340
+// material population (05.08). No recovery-time decoder, alternate domain or
+// source fallback. Throws std::runtime_error on a refusal (the 05.06 step
+// turns it into a common_load refusal); returns the owner's own result.
 inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
-    const track_session_assets50IG::SessionAssets& track,
-    const rr::assets::World48F& actualWorld,
+    const common_track50CR::Track& track,
     const original_main_entry50KG::Application& application,
     std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> actual382B38,
     std::uint64_t generation,rr::game::OriginalTrackParticleColdDiagnostic50LA& diagnostic) {
     using runtime_startup50fl::require;
     using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-    // Source selection and availability are separate from this shared cold
-    // capability. Authenticate the descriptor against the retained catalog;
-    // caller-supplied hashes alone must never nominate another archive.
-    // A registry row (the common race route's add-on course) IS its catalog
-    // row: it was built once from the DLC registry for the latched code.
-    // Selecting it again would rebuild the one registry storage under the
-    // caller's borrowed strings, so it is taken as given.
-    const char* selectionError=nullptr;
-    const auto* canonical=track.registry?&track:track_session_assets50IG::select(
-        track.world?track.world->code:nullptr,selectionError);
-    require(canonical&&track.world==canonical->world&&track.archive&&
-        track.archiveSha256&&canonical->archiveSha256&&
-        track.archiveBytes==canonical->archiveBytes&&
-        std::string(track.archiveSha256)==canonical->archiveSha256,
-        "Track particle canonical selected archive descriptor rejected");
-    const char* archiveName=canonical->world->container;
-    const auto archiveBytes=canonical->archiveBytes;
-    const char* archiveSha=canonical->archiveSha256;
+    require(track.archive.opened()&&track.archive.decoded(),"Track particle requires the race's opened course archive");
     const auto domain=application.standardMaterialDomain();
     require(domain&&domain->prepared()&&actual382B38&&domain->materials382B38()==actual382B38&&
         domain->resolver3E1A70()&&!actual382B38->populationTerminal()&&!actual382B38->demandTerminal()&&
@@ -53,493 +76,76 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     const auto provider=domain->archiveProvider3E1A70();
     require(provider&&provider->sealed(),"Track particle requires its complete sealed native archive provider");
     const auto providerRevision=provider->revision();
-    const auto sameName=[](const std::string& a,const char* b){
-        std::size_t i=0;
-        for(;i<a.size()&&b[i];++i){const auto lower=[](char c){return c>='A'&&c<='Z'?char(c+('a'-'A')):c;};
-            if(lower(a[i])!=lower(b[i]))return false;}
-        return i==a.size()&&!b[i];
-    };
-    const auto selectedParticleName=[&](const rr::assets::World48F& world){
-        const std::string* name=nullptr;
-        for(const auto& block:world.parameters.blocks){
-            if(!sameName(block.name,"Environment"))continue;
-            for(const auto& field:block.fields){
-                if(!sameName(field.name,"ParticleTextureMapName"))continue;
-                require(!name,"duplicate SCB ParticleTextureMapName");name=&field.value;
-            }
-        }
-        return name;
-    };
-    const auto* particleName=selectedParticleName(actualWorld);
+    const auto* particleName=particleTextureMapName(track.documents.world);
     require(particleName&&!particleName->empty()&&particleName->size()<128&&
         particleName->find_first_of("/\\")==std::string::npos,
         "Original track particle atlas name is unavailable");
-    //1617A0 uses36B530+the original SCB name and replaces its last extension.
-    //It does not choose a material from the PRT's separate TextureMap field.
-    std::string member=application.particleDirectory36B530()+*particleName;
-    const auto dot=member.find_last_of('.');
-    if(dot!=std::string::npos)member.resize(dot);
-    member+=".prt";
-    // The member is whatever the SCB names (stock: demoprt.tga); its stock
-    // name is a receipt only.
-    if(*particleName!="demoprt.tga")
-        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
-    // Same bounded fresh-cold guard as the real RA particle stage: never
+    const auto members=atlasMembers(application,*particleName);
+    // Same bounded fresh-cold guard as the original particle stage: never
     // adopt another manager's retained/populated canonical particle material.
     std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
+    require(actual382B38->find298C80(members.prt.substr(0,members.prt.size()-4),particleRow,diagnostic.material)&&
         actual382B38->row(particleRow,material)&&material.references08&&
         *material.references08==0&&!material.object04,
-        "Track particle requires fresh canonical demoprt reference ownership");
-    const std::string psmMember=member.substr(0,member.size()-4)+".psm";
-    const std::string pstMember=member.substr(0,member.size()-4)+".pst";
-    const auto bytes=runtime_startup50fl::readBytes(track.archive);
-    // Common course rule: identity is a receipt; shared decode capacity.
-    course_archive_receipt50CI::receipt("track_particle",canonical->world->code,bytes,archiveSha,archiveBytes);
-    rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;
-    const auto limits=course_archive_receipt50CI::limits();
-    require(rr::assets::decodeResource48C(bytes,archive,error,nullptr,limits),
-        "selected original track archive decode rejected");
+        "Track particle requires fresh canonical particle material reference ownership");
     // inherit.particles (add-on row only; PORT EXTENSION, NOT ORIGINAL): an
     // add-on archive without the particle closure names a stock course whose
-    // own TRACKS/<CODE>.RES supplies it. The row says so (AddonCourseLoad);
-    // a stock course always reads its own archive.
+    // own TRACKS/<CODE>.RES supplies it (the registry row says so). The
+    // archive owner (R3, Archive::open) mounts that closure beside the course
+    // archive in the same provider namespace; a stock course reads its own.
     rr::game::dlc50DL::AddonCourseLoad addon;
-    const bool inherited=track.registry&&track.world&&
-        rr::game::dlc50DL::addonCourseLoadByCode(track.world->code,addon)&&addon.particlesInherited;
-    if(track.registry)require(addon.number!=0,"registry course row unavailable for its particle source");
-    std::string particleArchiveName;
-    rr::assets::ResArchive48C inheritedArchive;
+    const bool inherited=track.source()==common_track50CR::Source::registry&&
+        rr::game::dlc50DL::addonCourseLoadByCode(std::string(track.code()).c_str(),addon)&&addon.particlesInherited;
+    std::vector<std::uint8_t> prt,psm,pst;
     if(inherited){
         require(!addon.particleArchive.empty(),"inherited particle archive unnamed");
-        particleArchiveName=addon.particleArchive;
         // readBytes resolves the repository-relative disc path (runtime_asset_paths50LB).
         const auto inheritedBytes=runtime_startup50fl::readBytes("work/native/project/disc/"+addon.particleArchive);
-        require(rr::assets::decodeResource48C(inheritedBytes,inheritedArchive,error,nullptr,limits),
+        rr::assets::ResArchive48C inheritedArchive;rr::assets::DecodeError48C error;
+        require(rr::assets::decodeResource48C(inheritedBytes,inheritedArchive,error),
             "inherited particle archive decode rejected");
+        require(rr::assets::extractResMember48C(inheritedArchive,members.prt,prt,error)&&
+            rr::assets::extractResMember48C(inheritedArchive,members.psm,psm,error)&&
+            rr::assets::extractResMember48C(inheritedArchive,members.pst,pst,error),
+            "inherited particle PRT/PSM/PST closure unavailable");
+    }else{
+        common_track50CR::Diagnostic member;
+        require(track.archive.member(members.prt,prt,maximumMemberBytes,member)&&
+            track.archive.member(members.psm,psm,maximumMemberBytes,member)&&
+            track.archive.member(members.pst,pst,maximumMemberBytes,member),
+            "SCB-selected original track PRT/PSM/PST closure unavailable");
     }
-    const auto& particleArchive=inherited?inheritedArchive:archive;
+    require(!prt.empty()&&!psm.empty()&&!pst.empty(),"Original selected-track particle closure empty");
     {
-        std::string code=canonical->world->code;
+        std::string code(track.code());
         for(auto& c:code)if(c>='A'&&c<='Z')c=static_cast<char>(c+('a'-'A'));
         std::cerr<<"course_route_particles code="<<code<<" source="
-                 <<(inherited?"inherited:"+particleArchiveName:std::string("own"))<<'\n';
+                 <<(inherited?"inherited:"+addon.particleArchive:std::string("own"))<<" prt="<<members.prt<<'\n';
     }
-    std::vector<std::uint8_t> prt,psm,pst;
-    require(rr::assets::extractResMember48C(particleArchive,member,prt,error)&&
-        rr::assets::extractResMember48C(particleArchive,psmMember,psm,error)&&
-        rr::assets::extractResMember48C(particleArchive,pstMember,pst,error),
-        "SCB-selected original track PRT/PSM/PST closure unavailable");
-    // Verify the selected field against decoded authenticated SCB bytes,
-    // never silently substitute a conflicting mutable caller world.
-    std::vector<std::uint8_t> scb;rr::assets::World48F sourceWorld;
-    require(rr::assets::extractResMember48C(archive,canonical->world->worldMember,scb,error)&&
-        rr::assets::decodeWorld48F(scb,sourceWorld,error)&&
-        actualWorld.parameters.original_bytes==scb,
-        "Track particle world differs from the selected original SCB");
-    const auto* originalParticleName=selectedParticleName(sourceWorld);
-    require(originalParticleName&&*originalParticleName==*particleName,
-        "Track particle parsed selection differs from authenticated SCB");
-    // These are the two already-supported original atlas layouts, not
-    // course identities. The numerical constructor retains its own bounds.
-    // Stock PRT/PSM bytes are receipts; the PRT/PSM parsers below keep
-    // their own bounds and refuse what they cannot read.
-    const auto prtSha=pod_materials50ed_fixture::detail::sha256(prt);
-    if(!((prt.size()==9210u&&prtSha=="d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
-         (prt.size()==10310u&&prtSha=="98a7d3c28ed61d1e8c9fb90a9dd433119e5e2574f648308271d4a2f4a0bd7a2a")))
-        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
-    if(!(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1"))
-        std::cerr<<"course_member_identity site=track_particle member="<<psmMember<<" stock=0\n";
-    // PST pixels belong to this exact authenticated whole archive. Preserve
-    // them byte-for-byte in the same mounted provider and canonical domain;
-    // no another-course image, exported pixels or independent lookup exists.
-    require(!pst.empty(),"Original selected-track particle PST missing");
+    // The provider must serve exactly these bytes under these names (the same
+    // mounted course archive, or the inherited closure mounted beside it).
     const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
-        Provider::MemberView selected;Provider::MountView mounted;
-        // Inherited closure: present ONLY in the inherited stock-archive mount
-        // (the stock archive's particle members, mounted beside the course
-        // archive in this namespace by terrain_interactive_publication50du.cpp),
-        // with exactly these bytes.
-        if(inherited)return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
-            provider->mount(selected.mount,mounted)&&mounted.archiveName&&*mounted.archiveName==particleArchiveName&&
-            selected.member&&sameName(*selected.member,requested.c_str())&&selected.data&&selected.revision==providerRevision&&
-            selected.size==original.size()&&!std::memcmp(selected.data,original.data(),original.size());
+        Provider::MemberView selected;
         return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
-            provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            *mounted.archiveName==archiveName&&
-            *mounted.archiveSha256==course_cut_identity50CI::mountDigest(canonical->world->code,archiveSha)&&
-            mounted.archiveBytes==course_cut_identity50CI::mountBytes(canonical->world->code,archiveBytes)&&mounted.memberCount==archive.entries.size()&&
-            selected.member&&*selected.member==requested&&selected.data&&
+            selected.member&&Provider::sameName(*selected.member,requested)&&selected.data&&
             selected.revision==providerRevision&&selected.size==original.size()&&
             !std::memcmp(selected.data,original.data(),original.size());
     };
-    const bool prtMatch=matches(member,prt),psmMatch=matches(psmMember,psm),pstMatch=matches(pstMember,pst);
-    if(!(prtMatch&&psmMatch&&pstMatch))std::cerr<<"course_route_particle_closure code="<<canonical->world->code
-        <<" inherited="<<(inherited?1:0)<<" prt="<<prtMatch<<" psm="<<psmMatch<<" pst="<<pstMatch
-        <<" mount="<<(inherited?particleArchiveName:std::string(archiveName))<<'\n';
-    require(prtMatch&&psmMatch&&pstMatch&&
-        provider->sealed()&&provider->revision()==providerRevision,
-        "Track particle closure differs from the same selected mounted archive");
+    const bool prtMatch=matches(members.prt,prt),psmMatch=matches(members.psm,psm),pstMatch=matches(members.pst,pst);
+    if(!(prtMatch&&psmMatch&&pstMatch))std::cerr<<"course_route_particle_closure code="<<track.code()
+        <<" inherited="<<(inherited?1:0)<<" prt="<<prtMatch<<" psm="<<psmMatch<<" pst="<<pstMatch<<'\n';
+    require(prtMatch&&psmMatch&&pstMatch&&provider->sealed()&&provider->revision()==providerRevision,
+        "Track particle closure differs from the same mounted archive");
     auto materialSource=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
-    require(materialSource->prepare(psmMember,psm,diagnostic.material.document),
+    require(materialSource->prepare(members.psm,psm,diagnostic.material.document),
         "Original selected-track particle PSM parsing rejected");
     // Same domain owns the exact PSM/PST beyond these temporary source vectors.
-    // The actual particle owner acquires its canonical reference before the
-    // caller's14D370/29E340 population. Failure retains real partial effects.
-    const bool appended=domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material);
-    if(!appended)std::cerr<<"course_route_particle_append code="<<canonical->world->code<<" inherited="<<(inherited?1:0)
+    // The particle owner acquires its canonical reference before the caller's
+    // 14D370/29E340 population. Failure retains real partial effects.
+    const bool appended=domain->appendOriginalSources({materialSource},{{members.pst,pst}},diagnostic.material);
+    if(!appended)std::cerr<<"course_route_particle_append code="<<track.code()<<" inherited="<<(inherited?1:0)
         <<" status="<<unsigned(diagnostic.material.status)<<" pc="<<std::hex<<diagnostic.material.sourcePC<<std::dec<<'\n';
     require(appended,"Original selected-track particle canonical source append rejected");
-    const bool prepared=application.withParticleMaterialDirectory160F88([&](const std::string& actualDirectory){
-        return owner.prepareNativeTrack(actualDirectory,*particleName,prt,application.entities(),
-            std::move(actual382B38),generation,diagnostic);
-    });
-    if(!prepared)return false;
-    require(provider->sealed()&&provider->revision()==providerRevision&&owner.material150()&&
-        owner.material150()->table382B38()==domain->materials382B38().get(),
-        "Track particle construction changed its canonical source ownership");
-    return true;
-}
-// RC compact-source path; all legacy cold paths above remain unchanged.
-inline bool prepareRc(rr::game::OriginalTrackParticleCold50LA& owner,
-    const track_session_assets50IG::SessionAssets& track,
-    std::shared_ptr<const rc_cold_sources50LA::Owner> source,
-    const original_main_entry50KG::Application& application,
-    std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> actual382B38,
-    std::uint64_t generation,rr::game::OriginalTrackParticleColdDiagnostic50LA& diagnostic) {
-    using runtime_startup50fl::require;
-    using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-    require(source&&source->ready()&&track.world&&
-        track_session_assets50IG::codeEquals(track.world->code,"RC"),
-        "RC particle requires the actual authenticated compact source");
-    const auto& actualWorld=source->world();
-    const char* archiveName="TRACKS/RC.RES";
-    const std::size_t archiveBytes=rc_cold_sources50LA::archiveBytes;
-    const char* archiveSha=rc_cold_sources50LA::archiveSha;
-    const char* pstSha="730d836d0decb8c5460b1318ec90ef82d88f342fbd92fc81580c190b5c09f019";
-    require(track.archive&&track.world->container&&track.archiveSha256&&
-        std::string(track.world->container)==archiveName&&track.archiveBytes==archiveBytes&&
-        std::string(track.archiveSha256)==archiveSha,"RC particle archive profile identity rejected");
-    const auto domain=application.standardMaterialDomain();
-    require(domain&&domain->prepared()&&actual382B38&&domain->materials382B38()==actual382B38&&
-        domain->resolver3E1A70()&&!actual382B38->populationTerminal()&&!actual382B38->demandTerminal()&&
-        !actual382B38->coldCollectorCurrent(domain->coldCollector14D440()),
-        "Track particle requires the actual cold Application domain before collector publication");
-    const auto provider=domain->archiveProvider3E1A70();
-    require(provider&&provider->sealed(),"Track particle requires its complete sealed native archive provider");
-    std::shared_ptr<const rc_cold_sources50LA::Owner> mountedSource;
-    Provider::Diagnostic sourceDiagnostic;
-    require(rc_cold_sources50LA::Owner::reuseCanonicalSource(*provider,mountedSource,sourceDiagnostic)&&
-        mountedSource.get()==source.get(),"RC particle canonical mount must retain this exact source");
-    const auto providerRevision=provider->revision();
-    const auto sameName=[](const std::string& a,const char* b){
-        std::size_t i=0;
-        for(;i<a.size()&&b[i];++i){const auto lower=[](char c){return c>='A'&&c<='Z'?char(c+('a'-'A')):c;};
-            if(lower(a[i])!=lower(b[i]))return false;}
-        return i==a.size()&&!b[i];
-    };
-    const std::string* particleName=nullptr;
-    for(const auto& block:actualWorld.parameters.blocks){
-        if(!sameName(block.name,"Environment"))continue;
-        for(const auto& field:block.fields){
-            if(!sameName(field.name,"ParticleTextureMapName"))continue;
-            require(!particleName,"duplicate SCB ParticleTextureMapName");particleName=&field.value;
-        }
-    }
-    require(particleName&&!particleName->empty()&&particleName->size()<128&&
-        particleName->find_first_of("/\\")==std::string::npos,
-        "Original track particle atlas name is unavailable");
-    //1617A0 uses36B530+the original SCB name and replaces its last extension.
-    //It does not choose a material from the PRT's separate TextureMap field.
-    std::string member=application.particleDirectory36B530()+*particleName;
-    const auto dot=member.find_last_of('.');
-    if(dot!=std::string::npos)member.resize(dot);
-    member+=".prt";
-    // The member is whatever the SCB names (stock: demoprt.tga); its stock
-    // name is a receipt only.
-    if(*particleName!="demoprt.tga")
-        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
-    // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical particle material.
-    std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
-        actual382B38->row(particleRow,material)&&material.references08&&
-        *material.references08==0&&!material.object04,
-        "Track particle requires fresh canonical demoprt reference ownership");
-    const std::string psmMember=member.substr(0,member.size()-4)+".psm";
-    const std::string pstMember=member.substr(0,member.size()-4)+".pst";
-    rr::assets::DecodeError48C error;
-    std::vector<std::uint8_t> prt,psm,pst;
-    require(source->extractMember(member,prt,error,7671u)&&
-        source->extractMember(psmMember,psm,error,5022u)&&
-        source->extractMember(pstMember,pst,error,132124u),
-        "RC selected original particle closure unavailable");
-    require(prt.size()==7671u&&pod_materials50ed_fixture::detail::sha256(prt)==
-        "9ee08f9801aeae21750eb106a2892f1399a6ab13f41f754d1d66b698c1428958",
-        "RC original particle PRT identity rejected");
-    require(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1",
-        "Original selected-track particle PSM identity rejected");
-    require(pst.size()==132124u&&pod_materials50ed_fixture::detail::sha256(pst)==pstSha,
-        "RC original particle PST identity rejected");
-    const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
-        Provider::MemberView selected;Provider::MountView mounted;
-        return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
-            provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            *mounted.archiveName==archiveName&&*mounted.archiveSha256==archiveSha&&
-            mounted.archiveBytes==archiveBytes&&mounted.memberCount==rc_cold_sources50LA::archiveEntries&&
-            selected.member&&*selected.member==requested&&selected.data&&
-            selected.revision==providerRevision&&selected.size==original.size()&&
-            !std::memcmp(selected.data,original.data(),original.size());
-    };
-    require(matches(member,prt)&&matches(psmMember,psm)&&matches(pstMember,pst)&&
-        provider->sealed()&&provider->revision()==providerRevision,
-        "Track particle closure differs from the same selected mounted archive");
-    auto materialSource=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
-    require(materialSource->prepare(psmMember,psm,diagnostic.material.document),
-        "Original selected-track particle PSM parsing rejected");
-    // Same domain owns the exact PSM/PST beyond these temporary source vectors.
-    // The actual particle owner acquires its canonical reference before the
-    // caller's14D370/29E340 population. Failure retains real partial effects.
-    require(domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material),
-        "Original selected-track particle canonical source append rejected");
-    const bool prepared=application.withParticleMaterialDirectory160F88([&](const std::string& actualDirectory){
-        return owner.prepareNativeTrack(actualDirectory,*particleName,prt,application.entities(),
-            std::move(actual382B38),generation,diagnostic);
-    });
-    if(!prepared)return false;
-    require(provider->sealed()&&provider->revision()==providerRevision&&owner.material150()&&
-        owner.material150()->table382B38()==domain->materials382B38().get(),
-        "Track particle construction changed its canonical source ownership");
-    return true;
-}
-// TB compact-source path; all legacy cold paths above remain unchanged.
-inline bool prepareTb(rr::game::OriginalTrackParticleCold50LA& owner,
-    const track_session_assets50IG::SessionAssets& track,
-    std::shared_ptr<const tb_cold_sources50LA::Owner> source,
-    const original_main_entry50KG::Application& application,
-    std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> actual382B38,
-    std::uint64_t generation,rr::game::OriginalTrackParticleColdDiagnostic50LA& diagnostic) {
-    using runtime_startup50fl::require;
-    using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-    require(source&&source->ready()&&track.world&&
-        track_session_assets50IG::codeEquals(track.world->code,"TB"),
-        "TB particle requires the actual authenticated compact source");
-    const auto& actualWorld=source->world();
-    const char* archiveName="TRACKS/TB.RES";
-    const std::size_t archiveBytes=tb_cold_sources50LA::archiveBytes;
-    const char* archiveSha=tb_cold_sources50LA::archiveSha;
-    const char* pstSha="9266d01d81b65f5be72e15380eaf251d34af713dfa7875cadffaa5eb81c1183a";
-    require(track.archive&&track.world->container&&track.archiveSha256&&
-        std::string(track.world->container)==archiveName&&track.archiveBytes==archiveBytes&&
-        std::string(track.archiveSha256)==archiveSha,"TB particle archive profile identity rejected");
-    const auto domain=application.standardMaterialDomain();
-    require(domain&&domain->prepared()&&actual382B38&&domain->materials382B38()==actual382B38&&
-        domain->resolver3E1A70()&&!actual382B38->populationTerminal()&&!actual382B38->demandTerminal()&&
-        !actual382B38->coldCollectorCurrent(domain->coldCollector14D440()),
-        "Track particle requires the actual cold Application domain before collector publication");
-    const auto provider=domain->archiveProvider3E1A70();
-    require(provider&&provider->sealed(),"Track particle requires its complete sealed native archive provider");
-    std::shared_ptr<const tb_cold_sources50LA::Owner> mountedSource;
-    Provider::Diagnostic sourceDiagnostic;
-    require(tb_cold_sources50LA::Owner::reuseCanonicalSource(*provider,mountedSource,sourceDiagnostic)&&
-        mountedSource.get()==source.get(),"TB particle canonical mount must retain this exact source");
-    const auto providerRevision=provider->revision();
-    const auto sameName=[](const std::string& a,const char* b){
-        std::size_t i=0;
-        for(;i<a.size()&&b[i];++i){const auto lower=[](char c){return c>='A'&&c<='Z'?char(c+('a'-'A')):c;};
-            if(lower(a[i])!=lower(b[i]))return false;}
-        return i==a.size()&&!b[i];
-    };
-    const std::string* particleName=nullptr;
-    for(const auto& block:actualWorld.parameters.blocks){
-        if(!sameName(block.name,"Environment"))continue;
-        for(const auto& field:block.fields){
-            if(!sameName(field.name,"ParticleTextureMapName"))continue;
-            require(!particleName,"duplicate SCB ParticleTextureMapName");particleName=&field.value;
-        }
-    }
-    require(particleName&&!particleName->empty()&&particleName->size()<128&&
-        particleName->find_first_of("/\\")==std::string::npos,
-        "Original track particle atlas name is unavailable");
-    //1617A0 uses36B530+the original SCB name and replaces its last extension.
-    //It does not choose a material from the PRT's separate TextureMap field.
-    std::string member=application.particleDirectory36B530()+*particleName;
-    const auto dot=member.find_last_of('.');
-    if(dot!=std::string::npos)member.resize(dot);
-    member+=".prt";
-    // The member is whatever the SCB names (stock: demoprt.tga); its stock
-    // name is a receipt only.
-    if(*particleName!="demoprt.tga")
-        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
-    // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical particle material.
-    std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
-        actual382B38->row(particleRow,material)&&material.references08&&
-        *material.references08==0&&!material.object04,
-        "Track particle requires fresh canonical demoprt reference ownership");
-    const std::string psmMember=member.substr(0,member.size()-4)+".psm";
-    const std::string pstMember=member.substr(0,member.size()-4)+".pst";
-    rr::assets::DecodeError48C error;
-    std::vector<std::uint8_t> prt,psm,pst;
-    require(source->extractMember(member,prt,error,9210u)&&
-        source->extractMember(psmMember,psm,error,5022u)&&
-        source->extractMember(pstMember,pst,error,132124u),
-        "TB selected original particle closure unavailable");
-    require(prt.size()==9210u&&pod_materials50ed_fixture::detail::sha256(prt)==
-        "d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f",
-        "TB original particle PRT identity rejected");
-    require(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1",
-        "Original selected-track particle PSM identity rejected");
-    require(pst.size()==132124u&&pod_materials50ed_fixture::detail::sha256(pst)==pstSha,
-        "TB original particle PST identity rejected");
-    const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
-        Provider::MemberView selected;Provider::MountView mounted;
-        return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
-            provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            *mounted.archiveName==archiveName&&*mounted.archiveSha256==archiveSha&&
-            mounted.archiveBytes==archiveBytes&&mounted.memberCount==tb_cold_sources50LA::archiveEntries&&
-            selected.member&&*selected.member==requested&&selected.data&&
-            selected.revision==providerRevision&&selected.size==original.size()&&
-            !std::memcmp(selected.data,original.data(),original.size());
-    };
-    require(matches(member,prt)&&matches(psmMember,psm)&&matches(pstMember,pst)&&
-        provider->sealed()&&provider->revision()==providerRevision,
-        "Track particle closure differs from the same selected mounted archive");
-    auto materialSource=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
-    require(materialSource->prepare(psmMember,psm,diagnostic.material.document),
-        "Original selected-track particle PSM parsing rejected");
-    // Same domain owns the exact PSM/PST beyond these temporary source vectors.
-    // The actual particle owner acquires its canonical reference before the
-    // caller's14D370/29E340 population. Failure retains real partial effects.
-    require(domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material),
-        "Original selected-track particle canonical source append rejected");
-    const bool prepared=application.withParticleMaterialDirectory160F88([&](const std::string& actualDirectory){
-        return owner.prepareNativeTrack(actualDirectory,*particleName,prt,application.entities(),
-            std::move(actual382B38),generation,diagnostic);
-    });
-    if(!prepared)return false;
-    require(provider->sealed()&&provider->revision()==providerRevision&&owner.material150()&&
-        owner.material150()->table382B38()==domain->materials382B38().get(),
-        "Track particle construction changed its canonical source ownership");
-    return true;
-}
-// GB compact-source path; all legacy cold paths above remain unchanged.
-inline bool prepareGb(rr::game::OriginalTrackParticleCold50LA& owner,
-    const track_session_assets50IG::SessionAssets& track,
-    std::shared_ptr<const gb_cold_sources50LA::Owner> source,
-    const original_main_entry50KG::Application& application,
-    std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> actual382B38,
-    std::uint64_t generation,rr::game::OriginalTrackParticleColdDiagnostic50LA& diagnostic) {
-    using runtime_startup50fl::require;
-    using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-    require(source&&source->ready()&&track.world&&
-        track_session_assets50IG::codeEquals(track.world->code,"GB"),
-        "GB particle requires the actual authenticated compact source");
-    const auto& actualWorld=source->world();
-    const char* archiveName="TRACKS/GB.RES";
-    const std::size_t archiveBytes=gb_cold_sources50LA::archiveBytes;
-    const char* archiveSha=gb_cold_sources50LA::archiveSha;
-    const char* pstSha="e00d1321525795ed19676514f733ea3b4027925f2b1367afd45b189c4bee2642";
-    require(track.archive&&track.world->container&&track.archiveSha256&&
-        std::string(track.world->container)==archiveName&&track.archiveBytes==archiveBytes&&
-        std::string(track.archiveSha256)==archiveSha,"GB particle archive profile identity rejected");
-    const auto domain=application.standardMaterialDomain();
-    require(domain&&domain->prepared()&&actual382B38&&domain->materials382B38()==actual382B38&&
-        domain->resolver3E1A70()&&!actual382B38->populationTerminal()&&!actual382B38->demandTerminal()&&
-        !actual382B38->coldCollectorCurrent(domain->coldCollector14D440()),
-        "Track particle requires the actual cold Application domain before collector publication");
-    const auto provider=domain->archiveProvider3E1A70();
-    require(provider&&provider->sealed(),"Track particle requires its complete sealed native archive provider");
-    std::shared_ptr<const gb_cold_sources50LA::Owner> mountedSource;
-    Provider::Diagnostic sourceDiagnostic;
-    require(gb_cold_sources50LA::Owner::reuseCanonicalSource(*provider,mountedSource,sourceDiagnostic)&&
-        mountedSource.get()==source.get(),"GB particle canonical mount must retain this exact source");
-    const auto providerRevision=provider->revision();
-    const auto sameName=[](const std::string& a,const char* b){
-        std::size_t i=0;
-        for(;i<a.size()&&b[i];++i){const auto lower=[](char c){return c>='A'&&c<='Z'?char(c+('a'-'A')):c;};
-            if(lower(a[i])!=lower(b[i]))return false;}
-        return i==a.size()&&!b[i];
-    };
-    const std::string* particleName=nullptr;
-    for(const auto& block:actualWorld.parameters.blocks){
-        if(!sameName(block.name,"Environment"))continue;
-        for(const auto& field:block.fields){
-            if(!sameName(field.name,"ParticleTextureMapName"))continue;
-            require(!particleName,"duplicate SCB ParticleTextureMapName");particleName=&field.value;
-        }
-    }
-    require(particleName&&!particleName->empty()&&particleName->size()<128&&
-        particleName->find_first_of("/\\")==std::string::npos,
-        "Original track particle atlas name is unavailable");
-    //1617A0 uses36B530+the original SCB name and replaces its last extension.
-    //It does not choose a material from the PRT's separate TextureMap field.
-    std::string member=application.particleDirectory36B530()+*particleName;
-    const auto dot=member.find_last_of('.');
-    if(dot!=std::string::npos)member.resize(dot);
-    member+=".prt";
-    // The member is whatever the SCB names (stock: demoprt.tga); its stock
-    // name is a receipt only.
-    if(*particleName!="demoprt.tga")
-        std::cerr<<"course_member_identity site=track_particle member="<<member<<" stock=0\n";
-    // Same bounded fresh-cold guard as the real RA particle stage: never
-    // adopt another manager's retained/populated canonical particle material.
-    std::int32_t particleRow=-1;rr::assets::OriginalStandardMaterialRowView50LA material;
-    require(actual382B38->find298C80(member.substr(0,member.size()-4),particleRow,diagnostic.material)&&
-        actual382B38->row(particleRow,material)&&material.references08&&
-        *material.references08==0&&!material.object04,
-        "Track particle requires fresh canonical demoprt reference ownership");
-    const std::string psmMember=member.substr(0,member.size()-4)+".psm";
-    const std::string pstMember=member.substr(0,member.size()-4)+".pst";
-    rr::assets::DecodeError48C error;
-    std::vector<std::uint8_t> prt,psm,pst;
-    // Common course rule: the SCB-named PRT/PSM/PST are read by name at their
-    // own sizes (bounded by the shared 8 MiB member cap); the stock GB
-    // demoprt bytes are receipts, as on the common pool path above.
-    const auto memberBytes=[&](const std::string& name)->std::size_t{
-        for(const auto& e:source->archive().entries())
-            if(rr::assets::OriginalStandardArchiveProvider50LA::sameName(e.name,name))return e.bytes;
-        return 0;};
-    const auto prtBytes=memberBytes(member),psmBytes=memberBytes(psmMember),pstBytes=memberBytes(pstMember);
-    require(prtBytes&&psmBytes&&pstBytes&&prtBytes<=8u*1024u*1024u&&psmBytes<=8u*1024u*1024u&&pstBytes<=8u*1024u*1024u&&
-        source->extractMember(member,prt,error,prtBytes)&&
-        source->extractMember(psmMember,psm,error,psmBytes)&&
-        source->extractMember(pstMember,pst,error,pstBytes)&&!pst.empty(),
-        "GB selected original particle closure unavailable");
-    course_archive_receipt50CI::memberReceipt("gb_track_particle",member,prt,0,0,9385u,
-        "fc95eee7487a6ae0c00e50228cf3667f9978f74770fe913fe95310a35c59f15c");
-    course_archive_receipt50CI::memberReceipt("gb_track_particle",psmMember,psm,0,0,5022u,
-        "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1");
-    course_archive_receipt50CI::memberReceipt("gb_track_particle",pstMember,pst,0,0,132124u,pstSha);
-    const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
-        Provider::MemberView selected;Provider::MountView mounted;
-        return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
-            provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
-            // The mount the GB cold source made (original_track_cut_identity50la.h:
-            // the admitted archive's digest/size; stock disc = stock identity).
-            *mounted.archiveName==archiveName&&
-            *mounted.archiveSha256==rr::assets::originalTrackMountDigest50LA(archiveName,archiveSha)&&
-            mounted.archiveBytes==rr::assets::originalTrackMountBytes50LA(archiveName,archiveBytes)&&
-            mounted.memberCount==source->archive().entries().size()&&
-            selected.member&&*selected.member==requested&&selected.data&&
-            selected.revision==providerRevision&&selected.size==original.size()&&
-            !std::memcmp(selected.data,original.data(),original.size());
-    };
-    require(matches(member,prt)&&matches(psmMember,psm)&&matches(pstMember,pst)&&
-        provider->sealed()&&provider->revision()==providerRevision,
-        "Track particle closure differs from the same selected mounted archive");
-    auto materialSource=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
-    require(materialSource->prepare(psmMember,psm,diagnostic.material.document),
-        "Original selected-track particle PSM parsing rejected");
-    // Same domain owns the exact PSM/PST beyond these temporary source vectors.
-    // The actual particle owner acquires its canonical reference before the
-    // caller's14D370/29E340 population. Failure retains real partial effects.
-    require(domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material),
-        "Original selected-track particle canonical source append rejected");
     const bool prepared=application.withParticleMaterialDirectory160F88([&](const std::string& actualDirectory){
         return owner.prepareNativeTrack(actualDirectory,*particleName,prt,application.entities(),
             std::move(actual382B38),generation,diagnostic);

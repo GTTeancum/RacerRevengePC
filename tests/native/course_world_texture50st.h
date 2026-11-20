@@ -1,7 +1,7 @@
 #pragma once
-// ONE static-world texture rule for the course world loaders that include it
-// (TA, GC, TB, TC, MC, RC; MA/SA/GA keep their own copy of the same unpinned
-// branch from 2ec225a). Repo CLAUDE.md: courses differ only in the data they load.
+// ONE static-world texture rule for every course (the one world loader,
+// single_pass_world50LM, and the 05.08 material step). Repo CLAUDE.md:
+// courses differ only in the data they load.
 //
 // The original course load reads each texture member a material names and
 // takes its kind, frame count, mip chain and extent from the member's own
@@ -28,6 +28,7 @@
 #include "../../src/assets/original_standard_ipum_framing50la.h"
 #include "../../src/assets/original_tga_conversion50la.h"
 #include "../../src/assets/original_ui_atm50kg.h"
+#include "../../src/assets/material_texture_assets50ea.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -208,6 +209,25 @@ struct Tally {
 inline void frameReceipt(const char* site,const std::string& name,std::uint32_t authored,std::uint32_t pinned){
     if(authored!=pinned)std::fprintf(stderr,"course_static_texture_receipt site=%s member=%s check=atm_initial_frame "
         "authored=%u pin=%u stock=0\n",site?site:"?",name.c_str(),authored,pinned);
+}
+
+// ONE texture budget for every course (PLAN B-C15). The original sizes its
+// material table (382B38) and texture table from the course's own data: the
+// shared string table grows 16 rows at a time on the heap (298900, reached from
+// the name request at 2993A8) and 29E340 loads every requested texture row;
+// neither has a count limit. The only fixed count on that chain is the
+// 4096-slot shader-pass registry (29C490, assert at 29C4E8), owned by the
+// material table. So the bank is sized from what the course loads, and the one
+// ceiling below is an allocation guard, logged on every load (common_storage
+// block=texture_bank / cold_texture_sources ... limit=).
+// PORT STAND-IN (flagged): the ceilings are the 50EA hard capacities (a corrupt
+// or hostile file guard), not admission gates, sizes or stock values; 1024 is
+// the per-texture dimension the PS2 GS can sample. The per-course 32/64 MiB
+// cold-source budgets they replace are gone.
+inline constexpr std::size_t coldSourceByteCeiling50ST=64u*1024u*1024u;
+inline a::MaterialTextureBudgets50EA textureBudgets50ST()noexcept{
+    return {a::maxMaterialTextureAssets50EA,a::maxMaterialTextureSlots50EA,
+        a::maxMaterialTextureSourceBytes50EA,a::maxMaterialTextureRGBABytes50EA,1024};
 }
 
 // One pass rule: native AA1 coverage when the pass authors
