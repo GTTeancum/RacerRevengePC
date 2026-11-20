@@ -27,6 +27,8 @@ class Owner final {
     mutable bool lifecycleRejected_=false;
     // Every-track human race route: no consumed RA race; see bindHost.
     bool host_=false;std::size_t hostTrackText_=0;
+    // Registry (add-on) course: the row's track name; empty = the LOC title above.
+    std::string hostTrackName_;
     const original_main_entry50KG::Application* application_=nullptr;
     std::weak_ptr<rr::game::OriginalPauseStorage50LA> pause_;
     std::weak_ptr<rr::game::ControlPresets49D> controls_;
@@ -284,6 +286,16 @@ public:
         if(host_||cameraGeneration_||!camera||!camera->generation_||!bind(application,pause))return false;
         camera_=camera;cameraGeneration_=camera->generation_;hostTrackText_=trackTextId;host_=true;return true;
     }
+    // Registry (add-on) course, 146r (PORT EXTENSION, NOT ORIGINAL): the title
+    // is the row's name (rr::game::dlc50DL::AddonCourseLoad::name), never a
+    // stock course's LOC title. Empty name = refused (no owner).
+    bool bindHostNamed(const original_main_entry50KG::Application& application,
+        const std::shared_ptr<rr::game::OriginalPauseStorage50LA>& pause,
+        const std::shared_ptr<Camera>& camera,const std::string& trackName)noexcept {
+        if(trackName.empty()||!bindHost(application,pause,camera,0))return false;
+        try{hostTrackName_=trackName;}catch(...){unbind();return false;}
+        return true;
+    }
     bool hostBound()const noexcept{return host_;}
     bool hostOpen()const noexcept{
         const auto pause=pause_.lock();return host_&&pause&&pause->active200_;
@@ -345,7 +357,9 @@ public:
             rr::game::OriginalPauseLayout50LA::Commands derived,outer;
             if(complete&&count){
                 if(rr::game::OriginalPauseLayout50LA::visible(*pause))
-                    complete=pause->refreshTitle1BB010(camera->raceFlags1B0_,hostTrackText_,observation)&&
+                    complete=(hostTrackName_.empty()?
+                        pause->refreshTitle1BB010(camera->raceFlags1B0_,hostTrackText_,observation):
+                        pause->refreshTitleText1BB010(camera->raceFlags1B0_,hostTrackName_,observation))&&
                         pause->refreshSettings1BB590(*controls,*settings,observation);
                 complete=complete&&rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,derived,layout);
             }
@@ -371,7 +385,7 @@ public:
         rr::game::OriginalPauseNativeResources50LA::Diagnostic&)const noexcept;
     bool resetNativePresentationClock()const noexcept;
     void unbind()noexcept {
-        host_=false;hostTrackText_=0;
+        host_=false;hostTrackText_=0;hostTrackName_.clear();
         race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }

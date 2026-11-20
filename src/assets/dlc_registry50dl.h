@@ -46,6 +46,9 @@ struct RegistryLimits {
     // defaults: 64 MiB file, 128 MiB decoded, 10000 entries).
     static constexpr std::size_t cameraBytes=64u<<10;    // <STEM>.CAM (stock PODnn.CAM is ~5.8 KiB)
     static constexpr std::size_t loosePstBytes=4u<<20;   // loading screen / preview PST
+    // Loading presenter layout rule (tests\native\authored_loading_presenter50du.h,
+    // 24EB20): one 640x448 indexed-8 level after the 1024-byte palette.
+    static constexpr std::size_t loadingScreenBytes=12+1024+16+640*448; // 287772
 };
 
 // Package-relative file addressed by the overlay: "dlc:/<package-id>/<path>".
@@ -113,9 +116,26 @@ struct AddonCourse {
     unsigned rivalRacer=0;               // resolved at freeze: 0 = none
     bool loadingStock=false;std::string loadingFile,loadingStockCode; // file: dlc:/ path
     std::string courseScreenTemplate="ta",coursePreview; // stock code; preview dlc:/ path or empty
+    // course_background: the motion-blurred full-screen Course-screen background.
+    // File (dlc:/ path, the 640x448 one-level layout the background decoder reads)
+    // or a stock course's background (stock code); absent = stock:<courseScreenTemplate>.
+    std::string backgroundFile,backgroundStockCode;bool backgroundBorrowed=false;
     std::string inheritTuning,inheritParticles;          // stock codes or empty
     bool ownTuning=false,ownParticles=false;             // members present in the archive
-    bool single=true,timeTrial=true,vs=true; // modes; "vs" has no effect until two-player races are built
+    // Course facts read at startup (146c; names and small text members only):
+    //   loadingSha256    listed SHA-256 of the package loading screen (a receipt
+    //                    for the loading presenter, never a refusal)
+    //   preview*         PST shape of the preview, equal to the stock template's
+    //                    ui\textures\holo_<template>.pst (checked; refused otherwise)
+    //   introEvents      audio\introAud.ini [ResponseEmitter] NumEvents (absent = 0)
+    //   scriptLines      audio\scrptLns.ini [General] NumberOfLines (absent = 0)
+    //   cutCameras       tracks\<code>NN.vub members; tvCamera tracks\<code>TVCam.pos
+    //   cube             tracks\<code>.cub present (absent = no course sky cube)
+    std::string loadingSha256;
+    unsigned previewKind=0,previewLevels=0,previewWidth=0,previewHeight=0;
+    unsigned introEvents=0,scriptLines=0,cutCameras=0;
+    bool ownIntro=false,ownScript=false,tvCamera=false,cube=false;
+    bool single=true,timeTrial=true,vs=true; // modes (free play and two-player VS; never the tournament); "vs" has no effect until two-player races are built
     std::string recordsKey;
     bool hallDefaults=false;AddonHallRow lap[3],race[3],knockouts[3];
     std::vector<std::string> enhancements;
@@ -142,9 +162,9 @@ inline constexpr bool addonNumberRange(unsigned n) noexcept {
     return n>=RegistryLimits::firstNumber&&n<=RegistryLimits::lastRacer;
 }
 
-// Course rows. API for the add-on course phase (another helper wires these into
-// the Course screen and race load): courses are parsed, validated, numbered and
-// listed here; nothing in the game reads them yet.
+// Course rows: parsed, validated, numbered and listed here. The Course-screen
+// rows and the race-load data decisions built from them live in
+// src\game\dlc_course_entries50dl.h (146c).
 //   addonCourseCount()/addonCourseAt(i)  the "DLC" planet's list, in number order
 //   addonCourse(number)                  32..95, nullptr for any other number
 //   addonCourseByCode(code)              "nv" -> row (codes are unique)

@@ -513,7 +513,7 @@ public:
         Diagnostic&) noexcept;
     // Exact SA SCB,25 zones/25 portals,263 numerically reached lights. Its166
     // non-emitting ObjectPoints do not contribute or acquire a flare renderer.
-    bool prepareSaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+    bool prepareCommonRouteNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
     // Inactive RA source preparation: exact SCB,10 zones/10 portals,185
     // numeric reader slots. Failed Light90/107 selection retains89/106;

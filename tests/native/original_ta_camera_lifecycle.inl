@@ -18,7 +18,7 @@ bool constructTaOwners174FA4()noexcept {
     }
     rr::assets::OriginalTaCutAuthoringCandidate::Status status;
     auto copy=rr::assets::OriginalTaCutAuthoringCandidate::create(source.trackId(),inputs.data(),source.cutCount()+1,status);
-    if(!copy||source.trackId()!=introTrackId(nativeTaIssuance_->course)||
+    if(!copy||source.trackId()!=introTrackId(nativeTaIssuance_->course,nativeTaIssuance_->courseCode)||
        actual_.taIntroAuthoring->trackId()!=source.trackId()||!source.cutCount()||source.cutCount()>7)return false;
     OriginalTaCutChildDiagnosticCandidate diagnostic;
     taCuts_=OriginalTaCutChildrenCandidate::construct174FA4(std::move(copy),
@@ -125,8 +125,9 @@ bool taRestoreStartLane()noexcept {
        actual_.actualRadarMapB8!=nativeTaIssuance_->gcMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ga&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->gaMap)return taReject(0x2a2880);
+    // The common route (stock SA or the add-on course): its own retained B8 map.
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sa&&
-       actual_.actualRadarMapB8!=nativeTaIssuance_->saMap)return taReject(0x2a2880);
+       actual_.actualRadarMapB8!=nativeTaIssuance_->commonRouteMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::ma&&
        actual_.actualRadarMapB8!=nativeTaIssuance_->maMap)return taReject(0x2a2880);
     if(nativeTaIssuance_&&nativeTaIssuance_->course==OriginalCameraStartCourse::sc&&

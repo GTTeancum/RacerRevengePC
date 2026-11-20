@@ -1,0 +1,11 @@
+Bring main (a1a480e + 0803c69 + fa52ca4 + 4634754) into common-route-146r by tree diff
+
+Main was rewritten (batch 145 squashed, DLC phase 2 squashed), so it is applied as
+the patch diff(<base tree without 146c> 5e58351, main) -- work/scratch/146r/main-delta.patch,
+three-way. Conflicts resolved keeping both sides: CMake/sources lists (course entries +
+rider add-on models + dlc_progress), UI image bank (146r-U loose package files and
+146p add-on archives, separate ID namespaces 0x554C / 0x41), drive (announceAddonCourses
++ side-file load), rider profile includes, capture navigation, runner (--hold-course +
+stock --hold-rider + --eyecheck-dlc-hall). Single TUs compile.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

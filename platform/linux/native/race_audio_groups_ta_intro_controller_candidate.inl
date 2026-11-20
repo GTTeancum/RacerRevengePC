@@ -21,11 +21,17 @@ inline bool RaceAudioGroups50IC::taIntroExistingBindingsCurrent()const noexcept 
 inline RaceAudioGroups50IC::TaIntroConstructionResult
 RaceAudioGroups50IC::constructTaIntroEvents177750(
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring)noexcept {
-    if(!authoring||!authoring->eventCount()||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"&&authoring->trackId()!="RC"&&authoring->trackId()!="TC"&&authoring->trackId()!="MC"&&authoring->trackId()!="TB"))return TaIntroConstructionResult::rejected;
+    if(!authoring||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||!rr::assets::originalRaceTrackIdAdmitted50LA(authoring->trackId()))return TaIntroConstructionResult::rejected;
     const auto events=authoring->eventCount();
     if(!coldTaIntroEmitter_){
         if(!constructDetachedColdTaIntroEmitter177750(std::move(authoring)))
             return TaIntroConstructionResult::rejected;
+        // NumEvents 0 (the course's own introAud.ini): 177750's 292650 loop
+        // appends nothing; the emitter is complete with its empty list.
+        if(!events){
+            coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)].taIntroConstructed=true;
+            return TaIntroConstructionResult::eventsComplete;
+        }
     }else{
         const auto& group=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
         if(group.taIntroAuthoring!=authoring||!coldTaIntroEmitterIdentity()||

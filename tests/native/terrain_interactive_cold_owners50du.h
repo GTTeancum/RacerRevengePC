@@ -137,8 +137,8 @@ struct OwnersContext final {
     isGaTrackType& isGaTrack;
     using isGbTrackType = const bool;
     isGbTrackType& isGbTrack;
-    using isMaSaTrackType = const bool;
-    isMaSaTrackType& isMaSaTrack;
+    using maOrCommonRouteTrackType = const bool;
+    maOrCommonRouteTrackType& maOrCommonRouteTrack;
     using isMbTrackType = const bool;
     isMbTrackType& isMbTrack;
     using isMcTrackType = const bool;
@@ -374,8 +374,8 @@ struct OwnersContext final {
     responseType& response;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
-    saTriggerMembershipType& saTriggerMembership;
+    using commonRouteTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
+    commonRouteTriggerMembershipType& commonRouteTriggerMembership;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;
     using scGroundType = std::unique_ptr<sc_runtime_ground50LA::Owner>;

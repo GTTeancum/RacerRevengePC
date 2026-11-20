@@ -230,7 +230,7 @@ void Context::run() {
  auto& consumedRcStage=this->consumedRcStage;
  auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
- auto& consumedSaStage=this->consumedSaStage;
+ auto& consumedCommonRouteStage=this->consumedCommonRouteStage;
  auto& consumedTaStage=this->consumedTaStage;
  auto& controlPresets=this->controlPresets;
  auto& controller=this->controller;
@@ -327,13 +327,13 @@ void Context::run() {
  auto& isGaTrack=this->isGaTrack;
  auto& isGbTrack=this->isGbTrack;
  auto& isGcTrack=this->isGcTrack;
- auto& isMaSaTrack=this->isMaSaTrack;
+ auto& maOrCommonRouteTrack=this->maOrCommonRouteTrack;
  auto& isMaTrack=this->isMaTrack;
  auto& isMbTrack=this->isMbTrack;
  auto& isMcTrack=this->isMcTrack;
  auto& isRaTrack=this->isRaTrack;
  auto& isRcTrack=this->isRcTrack;
- auto& isSaTrack=this->isSaTrack;
+ auto& commonRouteTrack=this->commonRouteTrack;
  auto& isScTrack=this->isScTrack;
  auto& isTaTrack=this->isTaTrack;
  auto& isTbTrack=this->isTbTrack;
@@ -349,7 +349,7 @@ void Context::run() {
  auto& m=this->m;
  auto& maOriginalDisc=this->maOriginalDisc;
  auto& maOriginalWorld=this->maOriginalWorld;
- auto& maSaAtm=this->maSaAtm;
+ auto& maCommonRouteAtm=this->maCommonRouteAtm;
  auto& maTriggerActions=this->maTriggerActions;
  auto& mainContactFrames=this->mainContactFrames;
  auto& mainCrossedPortals=this->mainCrossedPortals;
@@ -531,9 +531,9 @@ void Context::run() {
  auto& restartRequested=this->restartRequested;
  auto& returnOriginalMainRequested=this->returnOriginalMainRequested;
  auto& s=this->s;
- auto& saOriginalDisc=this->saOriginalDisc;
- auto& saOriginalWorld=this->saOriginalWorld;
- auto& saTriggerActions=this->saTriggerActions;
+ auto& commonRouteOriginalDisc=this->commonRouteOriginalDisc;
+ auto& commonRouteWorld=this->commonRouteWorld;
+ auto& commonRouteTriggerActions=this->commonRouteTriggerActions;
  const auto& sampleController=this->sampleControllerCall;
  const auto& sampleRaceField=this->sampleRaceFieldCall;
  auto& scAtm=this->scAtm;
@@ -706,7 +706,7 @@ void Context::run() {
   // Direct640x480 retains the existing host route without a canonical context.
   if(originalMainApplication.enabled&&!originalUiActive)
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
-  if((isTaTrack||isSaTrack||isRaTrack||directOriginalHuman)&&originalMainApplication.enabled){
+  if((isTaTrack||commonRouteTrack||isRaTrack||directOriginalHuman)&&originalMainApplication.enabled){
    originalMainApplication.appStart(originalMainApplication.assetRoot);
    trackMaterialRequest.canonicalDomain=originalMainApplication.standardMaterialDomain();
    trackMaterialRequest.canonicalContext=nativeVideo->standardMaterialConstructionContext(
@@ -793,8 +793,8 @@ void Context::run() {
    // a guessed negative namespace. GA already retains this exact decoded owner.
    rr::assets::ResArchive48C retainedTrackArchive;
    const auto* archive=tcOriginalWorld?tcOriginalWorld->archive():scOriginalWorld?scOriginalWorld->archive():mbOriginalWorld?mbOriginalWorld->archive():taOriginalWorld?taOriginalWorld->archive():gcOriginalWorld?gcOriginalWorld->archive():gaOriginalWorld?gaOriginalWorld->archive():
-       maOriginalWorld?maOriginalWorld->archive():saOriginalWorld?saOriginalWorld->archive():&retainedTrackArchive;
-   if(!tcOriginalWorld&&!scOriginalWorld&&!mbOriginalWorld&&!taOriginalWorld&&!gcOriginalWorld&&!gaOriginalWorld&&!maOriginalWorld&&!saOriginalWorld){
+       maOriginalWorld?maOriginalWorld->archive():commonRouteWorld?commonRouteWorld->archive():&retainedTrackArchive;
+   if(!tcOriginalWorld&&!scOriginalWorld&&!mbOriginalWorld&&!taOriginalWorld&&!gcOriginalWorld&&!gaOriginalWorld&&!maOriginalWorld&&!commonRouteWorld){
     const auto bytes=runtime_startup50fl::readBytes(trackSession->archive);
     // Common course rule: identity is a receipt; shared decode capacity.
     rr::assets::DecodeError48C diagnostic;
@@ -805,17 +805,31 @@ void Context::run() {
    }
    const auto provider=trackMaterialRequest.canonicalDomain->archiveProvider3E1A70();
    rr::assets::OriginalStandardArchiveProvider50LA::Diagnostic mounted;
+   // One race lease for every mount of this course's namespace (released at race end).
+   auto* const raceLease=provider?native_course_archive_release50PD::holder().begin(provider,
+       trackMaterialRequest.canonicalDomain->resolver3E1A70()):nullptr;
+   // inherit.particles (146r, PORT EXTENSION, NOT ORIGINAL): the common world
+   // carries the stock archive's particle closure members (Identity::particleArchive);
+   // they join THIS namespace beside the course archive, under the stock
+   // archive's own name/SHA/bytes, before the seal, so the particle owner and the
+   // canonical domain authenticate them like members of a mounted archive.
+   const auto* inheritedParticles=commonRouteWorld?&commonRouteWorld->identity():nullptr;
+   const bool mountInheritedParticles=inheritedParticles&&inheritedParticles->particleArchive;
    require50DU(provider&&archive&&
-       (taOriginalWorld?taOriginalWorld->mountCanonicalArchive(*provider,mounted,native_course_archive_release50PD::holder().begin(provider,
-            trackMaterialRequest.canonicalDomain->resolver3E1A70())):
+       (taOriginalWorld?taOriginalWorld->mountCanonicalArchive(*provider,mounted,raceLease):
            // Label = the archive actually admitted (course_cut_identity50ci.h).
            provider->mountAuthenticatedRes(trackSession->world->container,
                course_cut_identity50CI::mountDigest(trackSession->world->code,trackSession->archiveSha256),
                course_cut_identity50CI::mountBytes(trackSession->world->code,trackSession->archiveBytes),
-               *archive,mounted,native_course_archive_release50PD::holder().begin(provider,
-                   trackMaterialRequest.canonicalDomain->resolver3E1A70())))&&provider->sealNativeMounts(mounted)&&
+               *archive,mounted,raceLease))&&
+       (!mountInheritedParticles||provider->mountAuthenticatedRes(inheritedParticles->particleContainer,
+           ::rr::assets::originalTrackMountDigest50LA(inheritedParticles->particleContainer,inheritedParticles->particleSha.c_str()),
+           ::rr::assets::originalTrackMountBytes50LA(inheritedParticles->particleContainer,inheritedParticles->particleBytes),
+           *inheritedParticles->particleArchive,mounted,raceLease))&&provider->sealNativeMounts(mounted)&&
        trackMaterialRequest.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,trackMaterialDiagnostic.canonical.texture),
        "canonical selected-track archive mount rejected");
+   if(mountInheritedParticles)std::cerr<<"course_route_particle_namespace code="<<trackSession->world->code
+       <<" container="<<inheritedParticles->particleContainer<<" mounted=1 lease="<<(raceLease?1:0)<<'\n';
    require50DU(native_ta_particle_cold50LA::prepare(nativeTaParticles,*trackSession,actualWorld,
        originalMainApplication,trackMaterialRequest.canonicalDomain->materials382B38(),
        sessionIndex+1,nativeTaParticleDiagnostic),"canonical particle source staging rejected");
@@ -885,12 +899,12 @@ void Context::run() {
   // population window (racer sources admitted, before the one combined
   // population/collector). RA does it inside its own world join; TA's race
   // does it here through its world's population hook.
-  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||saOriginalWorld||maOriginalWorld||gcOriginalWorld||(mbOriginalWorld&&consumedMbStage.race())||(scOriginalWorld&&consumedScStage.race())||(gbOriginalWorld&&consumedGbStage.race())||(rcOriginalWorld&&consumedRcStage.race())||(tcOriginalWorld&&consumedTcStage.race())||(mcOriginalWorld&&consumedMcStage.race())||(tbOriginalWorld&&consumedTbStage.race()))){
+  if(commonRacePausePrewarmed&&humanCourseEnabled&&!allAiEnabled&&(taOriginalWorld||gaOriginalWorld||commonRouteWorld||maOriginalWorld||gcOriginalWorld||(mbOriginalWorld&&consumedMbStage.race())||(scOriginalWorld&&consumedScStage.race())||(gbOriginalWorld&&consumedGbStage.race())||(rcOriginalWorld&&consumedRcStage.race())||(tcOriginalWorld&&consumedTcStage.race())||(mcOriginalWorld&&consumedMcStage.race())||(tbOriginalWorld&&consumedTbStage.race()))){
    // TA, GA, SA, MA, GC, MB: each world's population hook runs the same race load.
    const auto commonRace=native_common_race50PD::race(*this);
    auto& populationHook=taOriginalWorld?taOriginalWorld->beforeRacerPopulation:
        gaOriginalWorld?gaOriginalWorld->beforeRacerPopulation:
-       saOriginalWorld?saOriginalWorld->beforeRacerPopulation:
+       commonRouteWorld?commonRouteWorld->beforeRacerPopulation:
        maOriginalWorld?maOriginalWorld->beforeRacerPopulation:
        gcOriginalWorld?gcOriginalWorld->beforeRacerPopulation:
        mbOriginalWorld?mbOriginalWorld->beforeRacerPopulation:
@@ -934,7 +948,7 @@ void Context::run() {
    // the count is zeroed and no cut child is built. A Free Play counted race
    // therefore has no authored intro: no cut/controller authoring here.
    const bool introCutsAuthored=dynamicProfile.game34==2u||cameraStartup350!=0;
-   if(!taIntroAuthoring&&introCutsAuthored&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
+   if(!taIntroAuthoring&&introCutsAuthored&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedCommonRouteStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
     taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
     require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");
     const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
@@ -1015,8 +1029,8 @@ void Context::run() {
       taOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):gcOriginalWorld?
       gcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):gaOriginalWorld?
       gaOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):maOriginalWorld?
-      maOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):saOriginalWorld?
-      saOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):
+      maOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):commonRouteWorld?
+      commonRouteWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):
       trackMaterialOwner->load(trackMaterialRequest,trackMesh,trackMaterialDiagnostic));
   if(!trackMaterialsLoaded){
    const auto& failure=trackMaterialDiagnostic;const auto& canonical=failure.canonical;
@@ -1045,7 +1059,7 @@ void Context::run() {
   }
   if(taOriginalWorld)taOriginalWorld->beforeRacerPopulation=nullptr;
   if(gaOriginalWorld)gaOriginalWorld->beforeRacerPopulation=nullptr;
-  if(saOriginalWorld)saOriginalWorld->beforeRacerPopulation=nullptr;
+  if(commonRouteWorld)commonRouteWorld->beforeRacerPopulation=nullptr;
   if(maOriginalWorld)maOriginalWorld->beforeRacerPopulation=nullptr;
   if(gcOriginalWorld)gcOriginalWorld->beforeRacerPopulation=nullptr;
   if(mbOriginalWorld)mbOriginalWorld->beforeRacerPopulation=nullptr;
@@ -1135,7 +1149,7 @@ void Context::run() {
   }
   if(nativeGcWater){
    const auto* spans=taOriginalWorld?taOriginalWorld->spans():gcOriginalWorld?gcOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():maOriginalWorld?maOriginalWorld->spans():
-       saOriginalWorld?saOriginalWorld->spans():trackMaterialOwner->spans();require50DU(spans,"GC source track spans missing");
+       commonRouteWorld?commonRouteWorld->spans():trackMaterialOwner->spans();require50DU(spans,"GC source track spans missing");
    std::array<bool,6> matched{};
    for(std::size_t index=0;index<spans->size();++index)for(unsigned fire=0;fire<6;++fire)
     if((*spans)[index].worldInstanceIndex==nativeGcWater->attachmentWorldInstances()[fire]){
@@ -1285,14 +1299,23 @@ void Context::run() {
        <<" source_detail="<<atmDiagnostic.source.detail<<'\n';
    require50DU(loaded,atmDiagnostic.message.empty()?"original GA ATM source bank rejected":atmDiagnostic.message.c_str());
   }
-  // ATM owner exactly when the course world's materials name an ATM texture.
-  if(isMaSaTrack&&(maOriginalWorld?worldAuthorsAnimatedTextures50DU(maOriginalWorld.get()):
-      worldAuthorsAnimatedTextures50DU(saOriginalWorld.get()))){
+  // ATM owner exactly when the course world's materials name an ATM texture
+  // (absent = no owner). MA and the common route (stock SA or the add-on
+  // course, by the row's code) share the stock-shaped owner; a course whose
+  // own ATM set is not the stock one is refused by it as the flagged stand-in
+  // (ma_sa_atm_animation_fixture.h: no data ATM reader yet), never silently.
+  const bool maOrCommonRouteAuthorsAtm=maOrCommonRouteTrack&&(maOriginalWorld?worldAuthorsAnimatedTextures50DU(maOriginalWorld.get()):
+      worldAuthorsAnimatedTextures50DU(commonRouteWorld.get()));
+  if(commonRouteTrack)std::cerr<<"course_route_atm code="<<trackSession->world->code
+      <<" stock_code="<<(trackSource==track_source_fixture::Track::course?0:1)
+      <<" authored="<<(maOrCommonRouteAuthorsAtm?1:0)<<" owner="<<(maOrCommonRouteAuthorsAtm?"stock_shaped":"none")<<'\n';
+  if(maOrCommonRouteAuthorsAtm){
    ma_sa_atm_animation_fixture::Diagnostic diagnostic;
-   const bool loaded=maOriginalWorld?maSaAtm.loadSource(trackSession->archive,trackSource,*maOriginalWorld,diagnostic):
-       saOriginalWorld?maSaAtm.loadSource(trackSession->archive,trackSource,*saOriginalWorld,diagnostic):
-       maSaAtm.loadSource(trackSession->archive,trackSource,*trackMaterialOwner,diagnostic);
-   require50DU(loaded,diagnostic.message.empty()?"MA/SA actual animated textures rejected":diagnostic.message.c_str());
+   const bool loaded=maOriginalWorld?maCommonRouteAtm.loadSource(trackSession->archive,trackSource,*maOriginalWorld,diagnostic):
+       commonRouteWorld?maCommonRouteAtm.loadSource(trackSession->archive,trackSource,*commonRouteWorld,diagnostic):
+       maCommonRouteAtm.loadSource(trackSession->archive,trackSource,*trackMaterialOwner,diagnostic);
+   if(!loaded)atmRefused(trackSession->world->code,diagnostic.message);
+   require50DU(loaded,diagnostic.message.empty()?"MA/common-route actual animated textures rejected":diagnostic.message.c_str());
   }
   // Original Main owns a separate mixer/device/WAV. The retained cold race
   // bank cannot open output during Main, even if RR_AUDIO is enabled.
@@ -1436,10 +1459,10 @@ void Context::run() {
     // world's materials name an ATM texture.
     // Every course: the common track-animation owner is ready with its window when present.
     if(trackAnimations&&(!trackAnimations->ready()||!trackAnimationWindow.loaded()||!trackAnimationWindow.ownsResources()))return false;
-    if(isSaTrack&&((saTriggerActions&&!saTriggerActions->ready())||
-       (worldAuthorsAnimatedTextures50DU(saOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
+    if(commonRouteTrack&&((commonRouteTriggerActions&&!commonRouteTriggerActions->ready())||
+       (worldAuthorsAnimatedTextures50DU(commonRouteWorld.get())?(!maCommonRouteAtm.loaded()||!maCommonRouteAtm.ownsResources()):maCommonRouteAtm.loaded())))return false;
     if(isMaTrack&&((maTriggerActions&&!maTriggerActions->ready())||
-       (worldAuthorsAnimatedTextures50DU(maOriginalWorld.get())?(!maSaAtm.loaded()||!maSaAtm.ownsResources()):maSaAtm.loaded())))return false;
+       (worldAuthorsAnimatedTextures50DU(maOriginalWorld.get())?(!maCommonRouteAtm.loaded()||!maCommonRouteAtm.ownsResources()):maCommonRouteAtm.loaded())))return false;
     // MB (SC's rule): the ATM owner is required exactly when the world's
     // materials name an ATM texture.
     if(isMbTrack&&(!mbOriginalWorld||!mbOriginalWorld->loaded()||
@@ -1510,7 +1533,7 @@ void Context::run() {
        !(scZeroSky.ready()||(skyOwner&&skyOwner->loaded()))))return false; // sky: zero-sky or authored cube, per the data
     if(maOriginalDisc&&(!humanOriginalHud||!maOriginalWorld||!maOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
-    if(saOriginalDisc&&(!humanOriginalHud||!saOriginalWorld||!saOriginalWorld->loaded()||
+    if(commonRouteOriginalDisc&&(!humanOriginalHud||!commonRouteWorld||!commonRouteWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(taOriginalDisc&&(!humanOriginalHud||!taOriginalWorld||!taOriginalWorld->loaded()||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
@@ -1660,7 +1683,7 @@ void Context::run() {
       trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates&&!isRcTrack){
    const auto* projectionUvs=mcOriginalWorld?mcOriginalWorld->projectionUvs():gbOriginalWorld?gbOriginalWorld->projectionUvs():tbOriginalWorld?tbOriginalWorld->projectionUvs():tcOriginalWorld?tcOriginalWorld->projectionUvs():scOriginalWorld?scOriginalWorld->projectionUvs():mbOriginalWorld?mbOriginalWorld->projectionUvs():gcOriginalWorld?gcOriginalWorld->projectionUvs():gaOriginalWorld?gaOriginalWorld->projectionUvs():maOriginalWorld?maOriginalWorld->projectionUvs():
-       saOriginalWorld?saOriginalWorld->projectionUvs():trackMaterialOwner->projectionUvs();
+       commonRouteWorld?commonRouteWorld->projectionUvs():trackMaterialOwner->projectionUvs();
    require50DU(projectionUvs,"original GC projected UV publication missing");
    renderRequest.track.sourceProjectionUvs=projectionUvs->data();
    renderRequest.track.sourceProjectionCount=projectionUvs->size();
@@ -1675,16 +1698,16 @@ void Context::run() {
       trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
   renderRequest.track.maximumIndexBytes=courseWorldCeiling?courseWorldIndexCeiling:2u*1024u*1024u;
   const auto* trackBank=mcOriginalWorld?mcOriginalWorld->bank():gbOriginalWorld?gbOriginalWorld->bank():tbOriginalWorld?tbOriginalWorld->bank():rcOriginalWorld?rcOriginalWorld->bank():tcOriginalWorld?tcOriginalWorld->bank():scOriginalWorld?scOriginalWorld->bank():mbOriginalWorld?mbOriginalWorld->bank():taOriginalWorld?taOriginalWorld->bank():gcOriginalWorld?gcOriginalWorld->bank():gaOriginalWorld?gaOriginalWorld->bank():maOriginalWorld?maOriginalWorld->bank():
-       saOriginalWorld?saOriginalWorld->bank():trackMaterialOwner->bank();
+       commonRouteWorld?commonRouteWorld->bank():trackMaterialOwner->bank();
   const auto* trackSpans=mcOriginalWorld?mcOriginalWorld->spans():gbOriginalWorld?gbOriginalWorld->spans():tbOriginalWorld?tbOriginalWorld->spans():rcOriginalWorld?rcOriginalWorld->spans():tcOriginalWorld?tcOriginalWorld->spans():scOriginalWorld?scOriginalWorld->spans():mbOriginalWorld?mbOriginalWorld->spans():taOriginalWorld?taOriginalWorld->spans():gcOriginalWorld?gcOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():maOriginalWorld?maOriginalWorld->spans():
-       saOriginalWorld?saOriginalWorld->spans():trackMaterialOwner->spans();
+       commonRouteWorld?commonRouteWorld->spans():trackMaterialOwner->spans();
   require50DU(trackBank&&trackSpans,"selected-track material publication missing");
   std::vector<platform::MaterialTextureSampler50EB> trackSamplers(trackBank->textureCount(),
       {platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureFilter50EB::linear,
        platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat});
   if(trackSession->originalStaticCandidates||taOriginalDisc){
    const auto* selected=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gcOriginalWorld?gcOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
-       saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
+       commonRouteWorld?commonRouteWorld->selections():trackMaterialOwner->selections();
    require50DU(selected,"original GC sampler selections missing");
    for(const auto& entry:*selected){
     require50DU(entry.textureIndex<trackSamplers.size(),"original GC sampler texture unresolved");
@@ -1703,7 +1726,7 @@ void Context::run() {
    // One texture-scroll owner for every course, from the track's own
    // authored pass fields (VertexAnimation=unique + uvs_animate, 29A310).
    const auto* uvSelections=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gcOriginalWorld?gcOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
-       saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
+       commonRouteWorld?commonRouteWorld->selections():trackMaterialOwner->selections();
    require50DU(trackSpans&&uvSelections,"selected-track spans/selections missing for UV animation");
    track_uv_animation50uv_fixture::Diagnostic uvDiagnostic;
    require50DU(trackUvAnimation.load(*trackSpans,*uvSelections,uvDiagnostic),
@@ -1723,7 +1746,7 @@ void Context::run() {
        platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
    const auto* trackSelections=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gcOriginalWorld?gcOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
-       saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
+       commonRouteWorld?commonRouteWorld->selections():trackMaterialOwner->selections();
    require50DU(trackSelections&&span.materialSelection<trackSelections->size(),"selected-track material selection missing");
    material_alpha50gx_fixture::Policy alpha{};
    const auto& sourceSelection=(*trackSelections)[span.materialSelection];
@@ -1737,10 +1760,10 @@ void Context::run() {
        taOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):gcOriginalWorld?
        gcOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):gaOriginalWorld?
        gaOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):maOriginalWorld?
-       maOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):saOriginalWorld?
-       saOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):isGaTrack?
+       maOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):commonRouteWorld?
+       commonRouteWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):isGaTrack?
        material_alpha50gx_fixture::selectGa(sourceSelection,gameplayBinderTemplates,
-           originalMainApplication.materialRuntime,alpha):(isMaTrack||isSaTrack)?
+           originalMainApplication.materialRuntime,alpha):(isMaTrack||commonRouteTrack)?
        material_alpha50gx_fixture::selectMaSa(sourceSelection,gameplayBinderTemplates,
            originalMainApplication.materialRuntime,alpha):
        material_alpha50gx_fixture::select(sourceSelection,alpha);
@@ -1918,7 +1941,17 @@ void Context::run() {
    {std::string effectsLog;
     // Wreck particle effects: pod effect files and the selected track's
     // sprite atlas. Optional: a rejected atlas only disables the effects.
-    const bool effects=racerRigs[0]&&native_wreck_debris50PD::loadEffects(trackSession->archive,*racerRigs[0],effectsLog)&&
+    // inherit.particles (146r): a registry course without particle\demoprt.* reads
+    // them from the named stock course's archive (members in the archive win).
+    const std::string effectsArchive=[&]()->std::string{
+     rr::game::dlc50DL::AddonCourseLoad row;
+     if(trackSession->registry&&rr::game::dlc50DL::addonCourseLoadByCode(trackSession->world->code,row)&&row.particlesInherited)
+      return runtime_asset_paths50LB::resolve("work/native/project/disc/"+row.particleArchive).string();
+     return trackSession->archive;
+    }();
+    if(trackSession->registry)std::cerr<<"course_route_wreck_effects code="<<trackSession->world->code
+        <<" source="<<(effectsArchive==trackSession->archive?"own":"inherited")<<'\n';
+    const bool effects=racerRigs[0]&&native_wreck_debris50PD::loadEffects(effectsArchive.c_str(),*racerRigs[0],effectsLog)&&
         native_wreck_debris50PD::prepareEffectsGpu(textureRequest,textureDiagnostic);
     std::cerr<<"wreck_effects_cold ready="<<effects<<' '<<effectsLog<<'\n';}
    require50DU(native_wreck_debris50PD::prepareGpu(textureRequest,textureDiagnostic,debrisLog),debrisLog.c_str());
@@ -1948,9 +1981,9 @@ void Context::run() {
    require50DU(gcAtm.createGpu(textureRequest,textureDiagnostic),"original GC ATM GPU bank rejected");
    require50DU(gcAtm.bindRequest(renderRequest),"original GC ATM render binding rejected");
   }
-  if(maSaAtm.loaded()){
-   require50DU(maSaAtm.createGpu(textureRequest,textureDiagnostic),"MA/SA actual ATM GPU bank rejected");
-   require50DU(maSaAtm.bindRequest(renderRequest),"MA/SA actual ATM renderer binding rejected");
+  if(maCommonRouteAtm.loaded()){
+   require50DU(maCommonRouteAtm.createGpu(textureRequest,textureDiagnostic),"MA/common-route actual ATM GPU bank rejected");
+   require50DU(maCommonRouteAtm.bindRequest(renderRequest),"MA/common-route actual ATM renderer binding rejected");
   }
   if(mbAtm.loaded()){
    require50DU(mbAtm.createGpu(textureRequest,textureDiagnostic),"MB actual ATM GPU bank rejected");
@@ -2207,7 +2240,7 @@ void Context::run() {
        directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{},
        &startMusicContext,requestStartMusic,nativeRecordActor.get(),
        taIntroAuthoring?liveAudio->groupsForProviders():nullptr,taIntroAuthoring,requestIntroMusicFade};
-   if((isTaTrack||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&trackMaterialRequest.canonicalDomain){
+   if((isTaTrack||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedCommonRouteStage.race()||consumedGaStage.race()||consumedGcStage.race())&&trackMaterialRequest.canonicalDomain){
     sourceCameraSession=isTaTrack?originalMainApplication.createNativeTaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isMaTrack?originalMainApplication.createNativeMaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isMbTrack?originalMainApplication.createNativeMbCameraSession50LA(sourceCameraActual,sourceCameraAssets):
@@ -2217,7 +2250,9 @@ void Context::run() {
         isTcTrack?originalMainApplication.createNativeTcCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isTbTrack?originalMainApplication.createNativeTbCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isMcTrack?originalMainApplication.createNativeMcCameraSession50LA(sourceCameraActual,*mcSourceCameraAssets):
-        isSaTrack?originalMainApplication.createNativeSaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
+        // The common route's ONE camera session (stock SA or the add-on
+        // course): its track id is the row's code carried by sourceCameraAssets.
+        commonRouteTrack?originalMainApplication.createNativeCommonRouteCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         isGaTrack?originalMainApplication.createNativeGaCameraSession50LA(sourceCameraActual,sourceCameraAssets):
         originalMainApplication.createNativeGcCameraSession50LA(sourceCameraActual,sourceCameraAssets);
     require50DU(bool(sourceCameraSession),"same-Application TA native camera custody rejected");
@@ -2332,12 +2367,18 @@ void Context::run() {
     // Constructor17EA08 title IDs in actual track-ID order (as the loader).
     constexpr std::size_t trackTitles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection course;
+    // Registry course (146r): the title is the row's name; the profile's stock
+    // course field is not this race's course and is never used as an index here.
+    rr::game::dlc50DL::AddonCourseLoad titleRow;
+    const bool registryTitle=trackSession->registry&&rr::game::dlc50DL::addonCourseLoadByCode(trackSession->world->code,titleRow);
     bool bound=originalMainApplication.riderProfile&&
-        originalMainApplication.riderProfile->courseRaceSnapshot(course)&&course.course<13&&
+        originalMainApplication.riderProfile->courseRaceSnapshot(course)&&(registryTitle||course.course<13)&&
         originalMainApplication.finishPauseDrawCold50LA(sourcePause)&&
         renderer.bindOriginalPauseDerived(sourcePause.drawing(),rendererDiagnostic);
-    bound=bound&&sourcePauseObservation.bindHost(originalMainApplication,sourcePause.storage(),
-        sourceCameraSession,trackTitles[course.course]);
+    bound=bound&&(registryTitle?
+        sourcePauseObservation.bindHostNamed(originalMainApplication,sourcePause.storage(),sourceCameraSession,titleRow.name):
+        sourcePauseObservation.bindHost(originalMainApplication,sourcePause.storage(),sourceCameraSession,trackTitles[course.course]));
+    if(registryTitle)std::cerr<<"course_route_pause_title code="<<titleRow.code<<" name=\""<<titleRow.name<<"\" stock=0\n";
     std::cerr<<"original_pause_host bound="<<bound<<" course="<<course.course<<" subtype="<<course.subtype<<"\n";
    }
    if(sourceSpeedBoost.owner){
@@ -2617,7 +2658,7 @@ void Context::run() {
        <<",\"loaded_track\":\""<<platform::hostTrackCode50IM(loadedTrack)
        <<"\",\"selected_track\":\""<<platform::hostTrackCode50IM(selectedTrack)<<'"'
        <<",\"track_pending\":"<<(sessionMenu.trackChangesPending()?"true":"false")
-       <<",\"loaded_track_incomplete\":"<<(((isGcTrack&&!gcNativeWorldSelected)||isGaTrack||isMaSaTrack)?"true":"false")
+       <<",\"loaded_track_incomplete\":"<<(((isGcTrack&&!gcNativeWorldSelected)||isGaTrack||maOrCommonRouteTrack)?"true":"false")
        <<",\"gc_incomplete_opt_in\":"<<(trackAdmission.gcIncompleteWorld?"true":"false")
        <<",\"gc_native_world_selected\":"<<(gcNativeWorldSelected?"true":"false")
        <<",\"gc_mode2_admitted\":"<<(trackAdmission.gcMode2?"true":"false")
@@ -3176,7 +3217,7 @@ void Context::run() {
    .trackAnimationWindow=trackAnimationWindow,
    .gcAtm=gcAtm,
    .gaAtm=gaAtm,
-   .maSaAtm=maSaAtm,
+   .maCommonRouteAtm=maCommonRouteAtm,
    .mbAtm=mbAtm,
    .scAtm=scAtm,
    .tbAtm=tbAtm,
@@ -3184,7 +3225,7 @@ void Context::run() {
    .gbAtm=gbAtm,
    .rcAtm=rcAtm,
    .tcAtm=tcAtm,
-   .isMaSaTrack=isMaSaTrack,
+   .maOrCommonRouteTrack=maOrCommonRouteTrack,
    .sourceSkySelection=sourceSkySelection,
    .opponentFlamePrepared=opponentFlamePrepared,
    .opponentDraw=opponentDraw,

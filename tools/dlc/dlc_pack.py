@@ -226,6 +226,7 @@ POD_CAPACITY = dict(file=16 << 20, decoded=16 << 20, entries=512)
 UI_CAPACITY = dict(file=16 << 20, decoded=32 << 20, entries=512)
 COURSE_CAPACITY = dict(file=64 << 20, decoded=128 << 20, entries=10000)
 TEXT_MEMBER, CAMERA_BYTES, LOOSE_PST = 8192, 64 << 10, 4 << 20
+LOADING_SCREEN_BYTES = 12 + 1024 + 16 + 640 * 448   # loading presenter layout (24EB20): 287772
 
 
 def font_text(s, limit):  # printable ASCII: the stock menu fonts draw every glyph of it
@@ -493,21 +494,38 @@ def read_items(p, d):
                 f = path(txt(ls, 'file', w + ' loading_screen'), f'{w}: loading_screen file')
                 need(f.lower() == f'ui/textures/ld_{code}.pst', f'{w}: loading_screen file must be UI/TEXTURES/LD_{code.upper()}.PST')
                 c['loose'].append(f)
+                c['loading'] = f
             else:
                 sc = txt(ls, 'stock', w + ' loading_screen').lower()
                 need(sc in STOCK_CODES and sc != 'sb', f'{w}: loading_screen stock must be a stock course code')
             cs = o.get('course_screen')
+            c['template'], c['preview'] = 'ta', None
             if cs is not None:
                 need(isinstance(cs, dict), f'{w}: course_screen must be an object')
                 need('archive' not in cs and 'hologram' not in cs,
                      f'{w}: own hologram archives need a later version of the port (contract 2: stock_template)')
                 st = txt(cs, 'stock_template', w + ' course_screen').lower()
                 need(st in STOCK_CODES and st != 'sb', f'{w}: course_screen stock_template must be a stock course code')
+                c['template'] = st
                 pv = txt(cs, 'preview', w + ' course_screen', False)
                 if pv:
                     pv = path(pv, f'{w}: course_screen preview')
                     need(ext(pv.lower()) == 'pst', f'{w}: course_screen preview must be a .PST')
                     c['loose'].append(pv)
+                    c['preview'] = pv
+            bg = o.get('course_background')
+            c['background'] = None
+            if bg is not None:
+                if isinstance(bg, str):
+                    need(bg.startswith('stock:') and bg[6:].lower() in STOCK_CODES and bg[6:].lower() != 'sb',
+                         f'{w}: course_background must be {{"file": ...}} or "stock:<code>"' if not bg.startswith('stock:')
+                         else f'{w}: course_background stock must be a stock course code')
+                else:
+                    need(isinstance(bg, dict) and set(bg) == {'file'}, f'{w}: course_background must be {{"file": ...}} or "stock:<code>"')
+                    bf = path(txt(bg, 'file', w + ' course_background'), f'{w}: course_background file')
+                    need(ext(bf.lower()) == 'pst', f'{w}: course_background file must be a .PST')
+                    c['loose'].append(bf)
+                    c['background'] = bf
             inh = o.get('inherit', {})
             need(isinstance(inh, dict), f'{w}: inherit must be an object')
             c['inherit'] = {}
@@ -548,6 +566,44 @@ def read_items(p, d):
             raise Refused(f'items: kind "{kind}" is not course or pod')
     need(p['kind'] != 'pod' or (p['pods'] and not p['courses']), 'kind "pod" must list only pod items (at least one)')
     need(p['kind'] != 'course' or (p['courses'] and not p['pods']), 'kind "course" must list only course items (at least one)')
+
+
+def pst_shape(b):
+    """(kind, levels, width, height) of the smallest level, or None (layout of geo_pst.parse and
+    dlc_registry50dl.cpp pstShape: u16 1, u16 0, u32 kind 0/1/2, u32 levels 1..7, palette, levels, nothing after)."""
+    try:
+        rev, flags, kind, mips = struct.unpack_from('<HHII', b, 0)
+        if rev != 1 or flags != 0 or kind not in (0, 1, 2) or not 1 <= mips <= 7:
+            return None
+        at, w, h = 12 + 4 * {0: 16, 1: 256, 2: 0}[kind], 0, 0
+        for _ in range(mips):
+            h, w, a, z = struct.unpack_from('<4I', b, at)
+            if a or z or not w or not h or w > 4096 or h > 4096:
+                return None
+            if kind == 2:
+                n, = struct.unpack_from('<I', b, at + 16); at += 20
+            else:
+                n = w * h // 2 if kind == 0 else w * h; at += 16
+            if n > len(b) - at:
+                return None
+            at += n
+        return (kind, mips, w, h) if at == len(b) else None
+    except struct.error:
+        return None
+
+
+_STOCK_RES = {}
+
+
+def stock_res(stock, rel, cap):
+    key = (str(stock), rel.lower())
+    if key not in _STOCK_RES:
+        q = Path(stock) / rel
+        try:
+            _STOCK_RES[key] = read_res(q, cap) if q.is_file() else 'is not in the install'
+        except Refused as x:
+            _STOCK_RES[key] = str(x)
+    return _STOCK_RES[key]
 
 
 def check_items(p, stock):
@@ -615,7 +671,7 @@ def check_items(p, stock):
     for c in p['courses']:
         code, w = c['code'], f'course {c["code"]}'
         try:
-            names, _ = read_res(p['folder'] / c['archive'], COURSE_CAPACITY)
+            names, data = read_res(p['folder'] / c['archive'], COURSE_CAPACITY)
         except Refused as x:
             raise Refused(f'{w}: archive {c["archive"]} {x}')
         for want in (f'tracks\\{code}.scb', f'tracks\\{code}.tob', f'tracks\\{code}.aub', f'tracks\\m{code}.spl', f'tracks\\a{code}.spl'):
@@ -632,6 +688,51 @@ def check_items(p, stock):
         for f in c['loose']:
             n = (p['folder'] / f).stat().st_size
             need(0 < n <= LOOSE_PST, f'{w}: {f} is empty or larger than 4 MiB')
+        # Same rules as dlc_registry50dl.cpp checkItems (146c).
+        for member, section, key in (('audio\\introaud.ini', 'responseemitter', 'numevents'),
+                                     ('audio\\scrptlns.ini', 'general', 'numberoflines')):
+            if member in names:   # absent = 0 events / lines (accepted)
+                _, lo, sz = names[member]
+                need(sz <= TEXT_MEMBER, f'{w}: archive member {member} is outside the 8 KiB text capacity')
+                v = ini(data[lo:lo + sz]).get(section, {}).get(key, '')
+                need(re.fullmatch(r'[0-9]{1,4}', v) is not None, f'{w}: {member} [{section}] {key} is not a whole number')
+        if c.get('loading'):
+            b = (p['folder'] / c['loading']).read_bytes()
+            wd = lambda at: int.from_bytes(b[at:at + 4], 'little')   # noqa: E731
+            need(len(b) == LOADING_SCREEN_BYTES and (wd(0), wd(4), wd(8), wd(1036), wd(1040), wd(1044), wd(1048)) == (1, 1, 1, 448, 640, 0, 0),
+                 f'{w}: loading screen {c["loading"]} is not the 640x448 one-level layout the loading presenter reads')
+        if c.get('background'):
+            b = (p['folder'] / c['background']).read_bytes()
+            wd = lambda at: int.from_bytes(b[at:at + 4], 'little')   # noqa: E731
+            need(len(b) == LOADING_SCREEN_BYTES and (wd(0), wd(4), wd(8), wd(1036), wd(1040), wd(1044), wd(1048)) == (1, 1, 1, 448, 640, 0, 0),
+                 f'{w}: course background {c["background"]} is not the 640x448 one-level layout of the stock course-screen backgrounds')
+        shape = lambda s: f'kind {s[0]}, {s[1]} level(s), {s[2]}x{s[3]}'   # noqa: E731
+        if c.get('preview'):
+            got = pst_shape((p['folder'] / c['preview']).read_bytes())
+            need(got is not None, f'{w}: preview {c["preview"]} is not a PST texture')
+            if stock:
+                ui = stock_res(stock, 'UI/UICOURSE/UICOURSE.RES', UI_CAPACITY)
+                holo = f'ui\\textures\\holo_{c["template"]}.pst'
+                need(not isinstance(ui, str), f'{w}: stock UI/UICOURSE/UICOURSE.RES {ui} (needed for the preview check)')
+                need(holo in ui[0], f'{w}: stock {holo} cannot be read (needed for the preview check)')
+                _, lo, sz = ui[0][holo]
+                want = pst_shape(ui[1][lo:lo + sz])
+                need(want is not None, f'{w}: stock {holo} cannot be read (needed for the preview check)')
+                need(got == want, f'{w}: preview is {shape(got)}; the stock texture it stands in for ({holo}) is {shape(want)}')
+            else:
+                print(f'  ({w}: preview format not compared with the stock hologram; pass --stock <install>)')
+        for what, inh_code in (('tuning', '' if own_tun else c['inherit']['tuning']),
+                               ('particles', '' if own_part else c['inherit']['particles'])):
+            if not inh_code:
+                continue
+            if not stock:
+                print(f'  ({w}: inherit.{what} {inh_code} not checked against the install; pass --stock <install>)')
+                continue
+            members = [f'tracks\\{inh_code}.tun'] if what == 'tuning' else [f'particle\\demoprt.{e}' for e in ('prt', 'pst', 'psm')]
+            res = stock_res(stock, f'TRACKS/{inh_code.upper()}.RES', COURSE_CAPACITY)
+            need(not isinstance(res, str), f'{w}: inherit.{what} stock TRACKS/{inh_code.upper()}.RES {res}')
+            for m in members:
+                need(m in res[0], f'{w}: inherit.{what} stock TRACKS/{inh_code.upper()}.RES lacks {m}')
 
 
 def items_collide(a, b):

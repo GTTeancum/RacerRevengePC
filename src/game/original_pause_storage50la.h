@@ -499,12 +499,22 @@ private:
         try {
             const auto* track=data_->english()->at(actualTrackTextId);
             if(!track)return stop(d,0x187390);
+            return refreshTitleText1BB010(actualRaceFlags1B0,track->text,d);
+        }catch(...){return stop(d,0x1BB010);}
+    }
+    // Same 1BB010 format with the track name already resolved: a stock course
+    // passes its LOC title (above); a registry (add-on) course passes its row's
+    // name (PORT EXTENSION, NOT ORIGINAL: the original has 13 LOC titles only).
+    bool refreshTitleText1BB010(std::uint8_t actualRaceFlags1B0,
+        const std::string& trackText,Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::derivedResources||controller884_>=2)return false;
+        try {
             std::string bytes;
-            if((actualRaceFlags1B0&3u)==1u)bytes=track->text; //3ACAD0 '%s'.
+            if((actualRaceFlags1B0&3u)==1u)bytes=trackText; //3ACAD0 '%s'.
             else {
                 const auto* prefix=data_->english()->at(controller884_?173:172);
                 if(!prefix)return stop(d,0x18AC60);
-                bytes=prefix->text+" - "+track->text; //3ACAD8 '%s - %s'.
+                bytes=prefix->text+" - "+trackText; //3ACAD8 '%s - %s'.
             }
             assignText(derivedTexts_[0],bytes.data(),bytes.size());return true;
         }catch(...){return stop(d,0x1BB010);}

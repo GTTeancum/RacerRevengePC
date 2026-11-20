@@ -39,6 +39,9 @@ public:
     bool prepare(const rr::assets::World48F& world,track_source_fixture::Track track,
         std::string& error) {
         if(prepared_){error="source sky selection is cold one-shot";return false;}
+        // The common route's non-stock course has no stock SCB pin: its rows
+        // are read from its own data (the same 276C00 read as prepareFromCourseData).
+        if(track==track_source_fixture::Track::course)return prepareSelection(world,nullptr,error);
         const bool ma=track==track_source_fixture::Track::ma;
         const bool sa=track==track_source_fixture::Track::sa;
         const char* hash=ma?"5766af3e7a0bba0644058ae6f31eab802cadd9be7cc71911c349f603c7ca873b":

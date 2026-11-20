@@ -2,6 +2,7 @@
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../src/assets/dlc_registry50dl.h"
 #include "../../src/game/dlc_rider_entries50dl.h"
+#include "../../src/game/dlc_course_entries50dl.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -19,6 +20,12 @@
 // RR_TEST_RIDER_HOLD=1 (no add-on) stops on the stock rider the route lands on
 // (no Confirm) so the run holds on the Rider screen until its wall budget. GA takes
 // three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one; the explicit Mawhonic9/RA fixture takes four.
+// The free-play add-on course test (RR_TEST_ADDON_COURSE_PICK=<package>/<item> on
+// main-rider-course-ta, PORT EXTENSION, NOT ORIGINAL) presses Course Next at most
+// 13 + add-on count times until that add-on course entry is highlighted (read from
+// dlc50DL::highlightedAddonCourse), then the original Course Confirm launches it;
+// RR_TEST_ADDON_COURSE_HOLD=1 stops there instead (no Confirm, the run holds on the
+// Course screen until its wall budget).
 // It does not write a profile, select a screen, advance a transition, control a racer, or admit a
 // missing destination. The caller owns the explicit native-window unattended opt-in,
 // shared wall-time deadline, actual framebuffer capture, and normal teardown.
@@ -60,6 +67,19 @@ class Route final {
     unsigned addonTarget_=0,priorHighlight_=0;
     std::uint32_t addonMoves_=0;
     std::uint64_t priorAddonSource_=0;
+    // PORT EXTENSION, NOT ORIGINAL (DLC add-on course test, main-rider-course-ta only).
+    bool addonCourse_=false,addonCourseHold_=false,awaitingAddonCourseMove_=false,addonCourseHoldLogged_=false;
+    const char* addonCourseKey_=nullptr;
+    unsigned addonCourseTarget_=0,priorCourseHighlight_=0;
+    std::uint32_t addonCourseMoves_=0,priorCourseSlot_=0;
+    std::uint64_t priorCourseRenders_=0;
+    // Event type for the add-on course test (147c, RR_TEST_ADDON_COURSE_SUBTYPE=1..3;
+    // unset = the Course screen's own subtype, Single Race on a fresh profile).
+    // Before any course move: original Down to the event-type row, Right until that
+    // subtype shows, Up back to the course row. Same original inputs a player uses.
+    std::uint32_t addonCourseSubtype_=0,addonEventMoves_=0,priorEventSubtype_=0;
+    std::int32_t priorEventGroup_=-1;
+    bool awaitingAddonEventMove_=false;
 
     static void require(bool condition,const char* message) {
         if(!condition)throw std::runtime_error(message);
@@ -95,6 +115,57 @@ class Route final {
                     <<" anchor_rider="<<s.rider.rider4C4<<" (no Confirm; the run ends at its wall budget)\n";}
             return -1;
         }
+        return 2;
+    }
+    static unsigned addonCourseNumber(const char* key) noexcept {
+        if(!key)return 0;
+        for(std::size_t i=0;i<rr::game::dlc50DL::addonCourseCount();++i)
+            if(const auto* c=rr::game::dlc50DL::addonCourseAt(i);c&&c->key==key)return c->number;
+        return 0;
+    }
+    // Course stage of the add-on course test: -1 wait, 1 Course Next, 2 go on to Confirm,
+    // or (event type first, 147c) 3 Down / 1 Right / 2 Up on the Course page rows.
+    int pollAddonCourse(const Snapshot& s,bool courseCaptured) {
+        if(!addonCourseTarget_){
+            addonCourseTarget_=addonCourseNumber(addonCourseKey_);
+            require(addonCourseTarget_!=0,"RR_TEST_ADDON_COURSE_PICK is not an admitted add-on course (check RR_DLC_ROOT and the dlc_course lines)");
+            require(s.course.mode34==0,"add-on course route requires free play");
+        }
+        if(addonCourseSubtype_&&!addonCourseMoves_){
+            if(addonEventMoves_&&s.course.renders<=priorCourseRenders_)return -1;
+            const bool typed=s.course.subtypeSlot14F4==addonCourseSubtype_;
+            if(!typed||s.course.controllerGroup!=1){
+                require(!courseCaptured,"add-on course route captured the Course screen before its event type");
+                require(addonEventMoves_<8u,"add-on course event type was not reached within 8 row/type moves");
+                priorEventSubtype_=s.course.subtypeSlot14F4;priorEventGroup_=s.course.controllerGroup;
+                priorCourseRenders_=s.course.renders;awaitingAddonEventMove_=awaitingDispatch_=true;
+                const auto group=s.course.controllerGroup;
+                if(!typed&&group==2)return 1;                        // Right on the event-type row
+                if(!typed)return group<2?3:2;                        // Down / Up to the event-type row
+                return group>1?2:3;                                  // Up (Down) back to the course row
+            }
+        }
+        // A frame rendered after the last move (an add-on step defers nothing).
+        if(addonCourseMoves_&&s.course.renders<=priorCourseRenders_)return -1;
+        const auto highlighted=rr::game::dlc50DL::highlightedAddonCourse();
+        if(highlighted!=addonCourseTarget_){
+            require(!courseCaptured,"add-on course route captured the Course screen before its add-on course");
+            require(addonCourseMoves_<13u+rr::game::dlc50DL::addonCourseCount(),
+                "add-on course was not reached within the stock courses plus the add-on count");
+            priorCourseSlot_=s.course.courseSlot14E4;priorCourseHighlight_=highlighted;priorCourseRenders_=s.course.renders;
+            awaitingAddonCourseMove_=awaitingDispatch_=true;return 1;
+        }
+        if(!courseCaptured)return -1;
+        if(addonCourseHold_){
+            if(!addonCourseHoldLogged_){addonCourseHoldLogged_=true;
+                std::cerr<<"addon_course_route hold key="<<addonCourseKey_<<" number="<<addonCourseTarget_<<" moves="<<addonCourseMoves_
+                    <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
+                    <<" (no Confirm; the run ends at its wall budget)\n";}
+            return -1;
+        }
+        std::cerr<<"addon_course_route confirm key="<<addonCourseKey_<<" number="<<addonCourseTarget_<<" moves="<<addonCourseMoves_
+            <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
+            <<" subtype="<<s.course.subtypeSlot14F4<<'\n';
         return 2;
     }
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,
@@ -177,11 +248,22 @@ public:
         addonKey_=addon_?key:nullptr;
         const char* hold=std::getenv("RR_TEST_ADDON_RIDER_HOLD");
         addonHold_=addon_&&hold&&std::strcmp(hold,"1")==0;
+        const char* course=std::getenv("RR_TEST_ADDON_COURSE_PICK");
+        addonCourse_=enabled_&&!selectedRoute_&&!sa_&&!occo_&&course&&*course;
+        addonCourseKey_=addonCourse_?course:nullptr;
+        const char* courseHold=std::getenv("RR_TEST_ADDON_COURSE_HOLD");
+        addonCourseHold_=addonCourse_&&courseHold&&std::strcmp(courseHold,"1")==0;
+        const char* courseSubtype=std::getenv("RR_TEST_ADDON_COURSE_SUBTYPE");
+        if(addonCourse_&&courseSubtype&&*courseSubtype){
+            if(courseSubtype[0]<'1'||courseSubtype[0]>'3'||courseSubtype[1])
+                throw std::runtime_error("RR_TEST_ADDON_COURSE_SUBTYPE must be 1 (Single Race), 2 or 3 (Time Trial)");
+            addonCourseSubtype_=std::uint32_t(courseSubtype[0]-'0');
+        }
         const char* stockHold=std::getenv("RR_TEST_RIDER_HOLD");
         stockHold_=enabled_&&!addon_&&!selectedRoute_&&!sa_&&!occo_&&stockHold&&std::strcmp(stockHold,"1")==0;
     }
     bool enabled()const noexcept{return enabled_;}
-    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+addonCourseMoves_+addonEventMoves_+
         (selectedRoute_?courseMoves_+riderMoves_:(moved_?1u:0u)+(riderMoved_?1u:0u)));}
     // Dispatch completion is not proof of a loaded race or a captured track.
     bool actionsDispatched()const noexcept{return issued_==3&&!awaitingDispatch_;}
@@ -220,6 +302,10 @@ public:
         if(addon_&&s.route.screen==5)return addonTarget_&&!awaitingDispatch_&&issued_==1&&
             rr::game::dlc50DL::highlightedAddonRider()==addonTarget_&&settled(s)&&
             sourceAccepted&&source>priorAddonSource_&&publication;
+        // Add-on course test: only the settled frame with the requested add-on course highlighted.
+        if(addonCourse_&&s.route.screen==6)return addonCourseTarget_&&!awaitingDispatch_&&issued_==2&&
+            rr::game::dlc50DL::highlightedAddonCourse()==addonCourseTarget_&&settled(s)&&
+            (!addonCourseMoves_||s.course.renders>priorCourseRenders_);
         if(selectedRoute_){
             if(s.route.screen==5){
                 if(gasganoInitial_||mawhonicRa_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
@@ -292,6 +378,8 @@ public:
                 "unattended Course arrived without the completed Main/Rider screenshots");
             if(sa_&&moved_){
                 require(selectedSa(s),"unattended Course requires committed SA/3-lap/8-entrant selection");
+            }else if(addonCourse_&&(addonCourseMoves_||addonEventMoves_)){
+                // The add-on course route has moved the event type or the course row (stock moves, then add-on entries).
             }else{
                 require(s.course.courseSlot14E4==1&&s.course.selectedCourse44==0&&
                     s.course.selectedPlanet40==0&&s.course.subtypeSlot14F4==1&&
@@ -303,6 +391,10 @@ public:
                     awaitingMove_=awaitingDispatch_=true;return 1;
                 }
             }
+            if(addonCourse_){
+                const int action=pollAddonCourse(s,courseCaptured);
+                if(action!=2)return action;
+            }
             if(!courseCaptured)return -1;
             require(courseReady,"unattended Course race prerequisites are unavailable");
         }
@@ -312,6 +404,38 @@ public:
     // Call immediately after originalMain.input(action), BEFORE update/render.
     // No successful dispatch is inferred from the host having issued an event.
     void validateDispatch(const Snapshot& s) {
+        if(awaitingAddonEventMove_){
+            const auto& t=s.transition;
+            require(enabled_&&addonCourse_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
+                s.route.screen==6&&s.route.page==1&&s.switches==2&&t.bound&&same(t.current,s.route)&&
+                same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
+                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
+                "add-on course route event-type move changed the route");
+            require(s.course.controllerGroup!=priorEventGroup_||s.course.subtypeSlot14F4!=priorEventSubtype_,
+                "add-on course route row/event-type move changed neither the row nor the event type");
+            ++addonEventMoves_;awaitingAddonEventMove_=awaitingDispatch_=false;
+            std::cerr<<"addon_course_route event_move="<<addonEventMoves_<<" row="<<s.course.controllerGroup
+                <<" subtype="<<s.course.subtypeSlot14F4<<" target_subtype="<<addonCourseSubtype_<<'\n';
+            return;
+        }
+        if(awaitingAddonCourseMove_){
+            const auto& t=s.transition;
+            require(enabled_&&addonCourse_&&awaitingDispatch_&&issued_==2&&!s.faulted&&!s.quitRequested&&
+                s.route.screen==6&&s.route.page==1&&s.switches==2&&t.bound&&same(t.current,s.route)&&
+                same(t.requested,s.route)&&t.lifecycle==Life::idle&&t.phase==Phase::none&&
+                !t.applicationRequestQueued&&!t.initialRestartPending&&!s.deferredQueue,
+                "add-on course route Course Next changed the route");
+            const auto highlighted=rr::game::dlc50DL::highlightedAddonCourse();
+            // Either the original stock move committed, or the port-owned add-on entry moved.
+            const bool stockMove=highlighted==0&&s.course.courseSlot14E4!=priorCourseSlot_&&
+                s.course.deferred14D0==3&&!s.course.framePublished;
+            const bool addonMove=highlighted!=0&&highlighted!=priorCourseHighlight_&&s.course.courseSlot14E4==priorCourseSlot_;
+            require(stockMove||addonMove,"add-on course route Course Next moved neither a stock course nor an add-on entry");
+            ++addonCourseMoves_;awaitingAddonCourseMove_=awaitingDispatch_=false;
+            std::cerr<<"addon_course_route move="<<addonCourseMoves_<<" slot="<<s.course.courseSlot14E4
+                <<" course="<<s.course.selectedCourse44<<" addon="<<highlighted<<'\n';
+            return;
+        }
         if(awaitingAddonMove_){
             const auto& t=s.transition;
             require(enabled_&&addon_&&awaitingDispatch_&&issued_==1&&!s.faulted&&!s.quitRequested&&

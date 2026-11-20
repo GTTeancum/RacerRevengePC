@@ -9,7 +9,9 @@
 #include "original_race_constructor50la.h"
 #include "../../src/assets/original_ta_cut_authoring_candidate.h"
 #include <cstring>
+#include <iostream>
 #include <memory>
+#include <string_view>
 #include <thread>
 
 namespace original_main_entry50KG::ta_camera_issuer_detail {
@@ -28,9 +30,13 @@ inline bool camIdentity(std::uint32_t pod,const std::vector<std::uint8_t>& bytes
     return camIdentity(pod,bytes.data(),bytes.size());
 }
 using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-inline bool trackMember(const Provider& provider,rr::game::OriginalCameraStartCourse course,
+// The course's TOB member checked against its cut row (stock row, or the row
+// derived from the loaded archive's own data: course_cut_identity50ci.h). A
+// non-stock archive's row carries the digests of the bytes actually admitted,
+// so the stock pins are receipts there (logged at derivation).
+inline bool trackMember(const Provider& provider,std::string_view trackId,
     Provider::MemberView& out)noexcept {
-    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(course));
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(trackId);
     if(!identity)return false;
     const auto& expected=identity->members[0];
     try {
@@ -43,6 +49,10 @@ inline bool trackMember(const Provider& provider,rr::game::OriginalCameraStartCo
             mount.memberCount==identity->memberCount&&
             rr::assets::ta_cut_authoring_candidate_detail::hashMatches(out.data,out.size,expected.sha256);
     }catch(...){return false;}
+}
+inline bool trackMember(const Provider& provider,rr::game::OriginalCameraStartCourse course,
+    Provider::MemberView& out)noexcept {
+    return trackMember(provider,original_camera_session50KX::introTrackId(course),out);
 }
 inline bool taMember(const Provider& provider,Provider::MemberView& out)noexcept {
     return trackMember(provider,rr::game::OriginalCameraStartCourse::ta,out);
@@ -234,18 +244,21 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         return session;
     }catch(...){return {};}
 }
-inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeSaCameraSession50LA(
+inline std::shared_ptr<original_camera_session50KX::Session> Application::createNativeCommonRouteCameraSession50LA(
     original_camera_session50KX::ActualOwners actual,
     const original_camera_session50KX::AuthoredStorage& authored)const noexcept {
     namespace c=original_camera_session50KX;
     namespace d=ta_camera_issuer_detail;
     const auto* race=race28C();
-    if(!race||!race->nativeSaWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
+    if(!race||!race->nativeCommonRouteWorldBacking()||!race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
        !actual.actualRadarMapB8||!actual.actualRadarMapB8->gatesPrepared||!actual.actualRadarMapB8->indicesPrepared||
        actual.actualRadarMapMb.gatesPrepared()||actual.actualRadarMapTc.gatesPrepared()||
        actual.actualRadarMapTb.gatesPrepared()||actual.actualRadarMapGb.gatesPrepared()||actual.actualRadarMapMc.gatesPrepared())return {};
     // No lazy domain creation: only the actual already-retained Application
-    // domain/provider used by this root's selected SA preparation is eligible.
+    // domain/provider used by this root's selected common-route preparation
+    // (stock SA or the add-on course, one route) is eligible. The track id is
+    // the row's own code carried by the authored inputs, never a course name.
+    const auto routeTrackId=original_camera_session50KX::introTrackId(authored.inputs.course,authored.inputs.courseCode);
     if(garageAudioOwnerThread_!=std::this_thread::get_id()||!nativeTaCameraSession50LA_.expired()||
        !enabled||!entitiesOwner_||!entitiesOwner_->application10()||
        !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()||
@@ -272,7 +285,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
        !d::sameOwner(particles.application_,entitiesOwner_)||!d::sameOwner(particles.table_,table)||
        particles.component_.reference00!=1||particles.component_.sessionGeneration!=particles.generation_||
        particles.component_.kind!=rr::game::OriginalWreckComponentKind50LA::particleManager160B10||
-       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,rr::game::OriginalCameraStartCourse::sa,member)||
+       table->populationTerminal()||table->demandTerminal()||!provider||!d::trackMember(*provider,routeTrackId,member)||
        member.size!=authored.tob.size()||std::memcmp(member.data,authored.tob.data(),member.size)||
        !pod||pod->racer60!=actual.racer60[0]||rig.phy.empty()||rig.phy.size()>1024u*1024u||
        authored.inputs.phy!=reinterpret_cast<const char*>(rig.phy.data())||
@@ -288,7 +301,10 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         pin->providerRevision=member.revision;pin->bankGeneration=member.bankGeneration;
         pin->mount=member.mount;pin->ordinal=member.ordinal;
         pin->selectedRig=&rig;pin->particles=actual.actualTrackParticles4A0;pin->selectedPod=pod->racer60;pin->course=rr::game::OriginalCameraStartCourse::sa;
-        pin->saRace=race;pin->saWorld=race->nativeSaWorldBacking();pin->saMap=actual.actualRadarMapB8;
+        pin->courseCode=authored.inputs.courseCode;
+        std::cerr<<"course_route_camera code="<<routeTrackId<<" stock_code="<<(routeTrackId=="SA"?1:0)
+                 <<" session=issued tob_bytes="<<member.size<<'\n';
+        pin->commonRouteRace=race;pin->commonRouteWorldPin=race->nativeCommonRouteWorldBacking();pin->commonRouteMap=actual.actualRadarMapB8;
         pin->cam=authored.cam;pin->tob=authored.tob;pin->phy=rig.phy;
         auto session=std::make_shared<c::Session>(actual);
         session->nativeTaIssuance_=std::move(pin);
@@ -849,9 +865,9 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::freshN
     }
     if(pin.course==rr::game::OriginalCameraStartCourse::sa){
         const auto* race=race28C();
-        if(!race||race!=pin.saRace||!pin.saWorld||race->nativeSaWorldBacking()!=pin.saWorld||
+        if(!race||race!=pin.commonRouteRace||!pin.commonRouteWorldPin||race->nativeCommonRouteWorldBacking()!=pin.commonRouteWorldPin||
            !race->nativeIntroRaceEntity()||!race->nativeIntroWorldEntity()||
-           !pin.saMap||actual.actualRadarMapB8!=pin.saMap)return {};
+           !pin.commonRouteMap||actual.actualRadarMapB8!=pin.commonRouteMap)return {};
     }
     if(pin.course==rr::game::OriginalCameraStartCourse::ma){
         const auto* race=race28C();
@@ -919,7 +935,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::freshN
        !d::sameOwner(particles.application_,entitiesOwner_)||
        !d::sameOwner(particles.table_,standardMaterialDomainOwner_->materials382B38())||
        !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
-       !d::trackMember(*pin.provider,pin.course,member)||member.revision!=pin.providerRevision||
+       !d::trackMember(*pin.provider,original_camera_session50KX::introTrackId(pin.course,pin.courseCode),member)||member.revision!=pin.providerRevision||
        member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
        member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
     return session;
@@ -969,7 +985,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
        !d::sameOwner(particles.application_,entitiesOwner_)||
        !d::sameOwner(particles.table_,standardMaterialDomainOwner_->materials382B38())||
        !pod||pod->racer60!=pin.selectedPod||actual.racer60[0]!=pin.selectedPod||rig.phy!=pin.phy||
-       !d::trackMember(*pin.provider,pin.course,member)||member.revision!=pin.providerRevision||
+       !d::trackMember(*pin.provider,original_camera_session50KX::introTrackId(pin.course,pin.courseCode),member)||member.revision!=pin.providerRevision||
        member.bankGeneration!=pin.bankGeneration||member.mount!=pin.mount||member.ordinal!=pin.ordinal||
        member.size!=pin.tob.size()||std::memcmp(member.data,pin.tob.data(),member.size))return {};
     const auto& custody=*session->nativeTaCutAuthoring_;
@@ -977,7 +993,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::resour
        custody.providerRevision!=pin.providerRevision||custody.bankGeneration!=pin.bankGeneration||
        custody.mount!=pin.mount)return {};
     // Retained exact bytes alone are not a current mount/epoch certificate.
-    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course));
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course,pin.courseCode));
     if(!identity||!identity->cutCount||identity->cutCount>7)return {};
     const auto memberCount=static_cast<std::size_t>(identity->cutCount)+1u;
     try {
@@ -1012,7 +1028,7 @@ inline bool Application::retainNativeTaCutAuthoring50LA()const noexcept {
     if(!session||session->nativeTaCutAuthoring_)return false;
     const auto& pin=*session->nativeTaIssuance_;
     // Exact selected-track directory order, not caller-selected members/handles.
-    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course));
+    const auto* identity=rr::assets::originalTrackCutIdentity50LA(original_camera_session50KX::introTrackId(pin.course,pin.courseCode));
     if(!identity||!identity->cutCount||identity->cutCount>7)return false;
     const auto memberCount=static_cast<std::size_t>(identity->cutCount)+1u;
     try {

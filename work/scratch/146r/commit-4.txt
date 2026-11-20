@@ -1,0 +1,12 @@
+146r fix: inherit.particles closure mounted in the course namespace (NV refused "particle canonical source append rejected")
+
+The canonical material domain authenticates every PSM/PST against the sealed
+native archive namespace; the inherited demoprt.* were read from stock TA.RES but
+were not in any mount, so the append refused. The common world now mounts the
+three particle closure members of the stock archive the row names (members only,
+stock archive name/SHA/bytes as identity) beside the course archive before the seal;
+the particle cold loader requires them present in exactly that mount with the same
+bytes. PORT EXTENSION, NOT ORIGINAL. Log: course_route_particle_mount code=NV
+container=TRACKS/TA.RES members=3. Stock courses unchanged (no inherited row).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

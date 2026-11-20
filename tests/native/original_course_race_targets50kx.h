@@ -4,6 +4,7 @@ namespace original_main_entry50KG { struct Application; }
 #include "original_course_roster50kg_fixture.h"
 #include "../../src/game/original_course_load_selection50kg.h"
 #include "../../src/game/dlc_rider_entries50dl.h"
+#include "../../src/game/dlc_course_entries50dl.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
 #include "course_archive_receipt50ci.h"
@@ -30,7 +31,7 @@ using Track=rr::platform::HostTrack50IM;
 // Actual source profile visibility, rider/roster identity, mode2 and target
 // archive authentication remain independent requirements below.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::RA||track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
+    return track==Track::RA||track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC||track==Track::Course;
 }
 inline constexpr bool directDiscTarget(Track track) noexcept {
     return directHumanTrack(track)||track==Track::RA;
@@ -58,9 +59,24 @@ inline const std::array<Target,13> targets{{
     {Track::TB,&track_session_assets50IG::retainedTB,1,0},
     {Track::GB,&track_session_assets50IG::retainedGB,9,1},
     {Track::MC,&track_session_assets50IG::retainedMC,6,5}}};
+// PORT EXTENSION, NOT ORIGINAL (146r): the ONE common-route target. A free-play
+// launch with an add-on course selected (port-owned, dlc_course_entries50dl.h;
+// the profile's packed course/planet keep the last STOCK selection and are still
+// checked by the original encodings above) races that course on the common
+// route; its session row is built from the registry at consumption
+// (track_session_assets50IG::registrySession), never a stock row.
+inline const Target courseRouteTarget{Track::Course,nullptr,0xffffffffu,0xffffffffu};
+// The targets that run the ONE common route: stock SA (stock profile = receipts)
+// and the registry course target. Every other stock target keeps its own loader
+// (PORT STAND-INS, to retire onto this route).
+inline bool commonRouteTarget(const Target& t) noexcept {return t.track==Track::SA||t.track==Track::Course;}
+// Code of a target for log lines: the stock row's code, or "course" for the
+// common-route target (its row exists only once the launch is consumed).
+inline const char* targetCode(const Target& t) noexcept {return t.assets?t.assets->world->code:"course";}
 inline const Target* target(const Selection& s) noexcept {
     if(!rr::game::originalCourseSelectionEncoding50KG(s)||
        !rr::game::nativeSingleHumanCourseMode50KG(s))return nullptr;
+    if(rr::game::dlc50DL::addonCourseForLaunch(s.mode34,s.subtype))return &courseRouteTarget;
     for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet&&
         (s.laps==3||directHumanTrack(t.track)))return &t;
     return nullptr;
@@ -238,7 +254,15 @@ public:
         if(!rr::game::nativeSingleHumanCourseMode50KG(s))return A::unsupportedNativeMode;
         if(!attempted_)return A::hostNotReady;
         const Target* selected=nullptr;
-        for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet){selected=&t;break;}
+        // Common route (146r): the registry admitted the package file at startup
+        // (listed size/SHA); the route availability is the only other condition.
+        const bool addonCourse=rr::game::dlc50DL::addonCourseForLaunch(s.mode34,s.subtype)!=0;
+        if(addonCourse){
+            if(!rr::game::dlc50DL::addonCourseRoute().available||!directDisc_||
+               runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())return A::courseResourcesUnavailable;
+            selected=&courseRouteTarget;
+        }
+        else for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet){selected=&t;break;}
         if(!selected)return A::courseResourcesUnavailable;
         if((s.laps!=3&&!directHumanTrack(selected->track))||
            (directDisc_&&!directDiscTarget(selected->track)))return A::unsupportedNativeMode;
@@ -251,6 +275,7 @@ public:
         else for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;
         if(!rosterPresent)return A::riderResourcesUnavailable;
+        if(addonCourse)return A::ready;
         for(std::size_t i=0;i<targets.size();++i)
             if(selected==&targets[i]&&!originals_[i].empty())return A::ready;
         return A::courseResourcesUnavailable;
@@ -319,6 +344,16 @@ public:
         Selection current;
         if(!pending()||destroyedGeneration!=outgoingGeneration_||!actual.courseRaceSnapshot(current)||
            !same(selection_,current)||target(current)!=target_)return false;
+        // Common route (146r): latch the add-on code the session row is built from.
+        if(target_==&courseRouteTarget){
+            rr::game::dlc50DL::AddonCourseLoad load;
+            const unsigned number=rr::game::dlc50DL::addonCourseForLaunch(current.mode34,current.subtype);
+            if(!number||!rr::game::dlc50DL::addonCourseLoad(number,load)||
+               !rr::platform::latchCourseRouteCode50IM(load.codeUpper.c_str()))return false;
+            std::cerr<<"course_route_launch key="<<load.key<<" code="<<load.code<<" number="<<number
+                <<" route=common mode34="<<current.mode34<<" subtype="<<current.subtype
+                <<" profile_course="<<current.course<<" profile_planet="<<current.planet<<'\n';
+        }
         nextTrack=target_->track;nextRacer=current.rider;
         target_=nullptr;outgoingGeneration_=0;return true;
     }

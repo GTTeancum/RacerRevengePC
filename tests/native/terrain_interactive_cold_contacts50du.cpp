@@ -221,21 +221,21 @@ void ContactsContext::run() {
         "MA trigger cold actual COL poses unavailable");
    });
   }
-  if(saTriggerActions){
+  if(commonRouteTriggerActions){
    require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&navigationAI->track.count&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==8)||
-        (saOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
-       "SA triggers require actual human/AI manager ownership and their original AI spline");
+        (commonRouteOriginalDisc&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
+       "common-route triggers require actual human/AI manager ownership and their original AI spline");
    std::array<sa_trigger_actions::RacerIdentities,sa_trigger_actions::racers> identities{};
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
     identities[racer]={qfilter.identity,secondaryFilter.identity};
    });
-   require50DU(saTriggerActions->prepare(*saTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count,raceRacerCount),
-       "SA actual trigger/action destinations rejected");
+   require50DU(commonRouteTriggerActions->prepare(*commonRouteTriggerAuthoring,identities,originalAiHumanCount,navigationAI->track.count,raceRacerCount),
+       "common-route actual trigger/action destinations rejected");
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
-    require50DU(saTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
-        saTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
-        "SA trigger cold actual COL poses unavailable");
+    require50DU(commonRouteTriggerActions->observePrepared(qfilter.identity,*query.resource,rowShape(track_runtime_storage50IG::RosterRole::main690))&&
+        commonRouteTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,rowShape(track_runtime_storage50IG::RosterRole::secondary364)),
+        "common-route trigger cold actual COL poses unavailable");
    });
   }
   if(gaTriggerActions){

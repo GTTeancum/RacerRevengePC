@@ -5,6 +5,8 @@
 #include "../../src/assets/import_texture48e.h"
 #include "../../src/assets/original_ui_localization50kg.h"
 #include "../../src/game/original_course_descriptor50kg.h"
+#include "../../src/game/dlc_course_entries50dl.h"
+#include "../../src/assets/dlc_registry50dl.h"
 #include "../../src/game/original_ui_text50kg.h"
 #include "../../src/game/original_ui_hall_records50kg.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
@@ -65,14 +67,53 @@ class PlayerLoadingPresenter50DU final {
         return s.substr(begin,s.find_last_not_of(" \t\r\n\"")-begin+1);
     }
     static bool loadTextRejected(int step)noexcept{std::fprintf(stderr,"original_loading_text_rejected step=%d\n",step);return false;}
+    // Registry (add-on) course row of code_ (146r); false for every stock code.
+    // PORT EXTENSION, NOT ORIGINAL: the original has 13 courses; an add-on
+    // course's loading facts (screen file, name, rival, records) come from its row.
+    bool addonRow(game::dlc50DL::AddonCourseLoad& row) const {
+        return code_.size()==2&&game::dlc50DL::addonCourseLoadByCode(code_.c_str(),row);
+    }
+    // HOOK (DLC save side file, helper 146s, not merged here): replace the body by
+    //   progress.courseHall(game::dlc50DL::addonCourseRecordsTarget(row.number),view); records=view.rows;
+    // Until then: the item's hall_defaults (what courseHall answers when no
+    // record was set), else empty rows. Never the stock Hall of profile 0x102F0+c*0xE4.
+    static void addonRecords(const game::dlc50DL::AddonCourseLoad& row,game::OriginalUiHallCourseRecords50KG& records) {
+        records={};
+        const auto* c=assets::dlc50DL::addonCourse(row.number);
+        if(!c||!c->hallDefaults)return;
+        const auto copyName=[](const std::string& from,std::array<char,21>& to){
+            const std::size_t n=std::min<std::size_t>(from.size(),to.size()-1); // bounded: 20 characters + NUL
+            std::copy(from.begin(),from.begin()+static_cast<std::ptrdiff_t>(n),to.begin());to[n]='\0';};
+        for(unsigned i=0;i<3;++i){
+            records.lap102F0[i]=static_cast<float>(c->lap[i].time);copyName(c->lap[i].name,records.lapNames102FC[i]);
+            records.race1033C[i]=static_cast<float>(c->race[i].time);copyName(c->race[i].name,records.raceNames10348[i]);
+            records.knockouts10388[i]=c->knockouts[i].count;copyName(c->knockouts[i].name,records.knockoutNames10394[i]);
+        }
+    }
     bool loadText() {
         if(code_=="UI")return true;
         OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
         game::OriginalUiHallCourseRecords50KG records;
+        game::dlc50DL::AddonCourseLoad addon;
+        const bool registryCourse=addonRow(addon);
+        std::string title;
+        std::optional<std::string> rivalName; // nullopt + rivalId = LOC racer name
+        std::uint32_t rivalCareer=0;
+        if(registryCourse){
+            // Track name from the row; rival = the row's rival racer (0 = none).
+            if(!profile_)return loadTextRejected(1);
+            addonRecords(addon,records);title=addon.name;rivalCareer=addon.rivalRacer;
+            if(const auto* pod=rivalCareer?assets::dlc50DL::addonPod(rivalCareer):nullptr)rivalName=pod->name;
+            std::fprintf(stderr,"course_route_loading_text code=%s name=\"%s\" rival=%s records=%s stock=0\n",
+                addon.code.c_str(),addon.name.c_str(),rivalCareer?std::to_string(rivalCareer).c_str():"none",
+                (assets::dlc50DL::addonCourse(addon.number)&&assets::dlc50DL::addonCourse(addon.number)->hallDefaults)?"hall_defaults":"empty");
+        }else{
         if(!profile_||!profile_->courseRaceSnapshot(selected)||selected.course>=13||
            !profile_->hallRecordSnapshot(selected.course,records))return loadTextRejected(1);
         const auto seed=game::originalFreshCourseDescriptors50KG[selected.course];
         if(code_!=std::string{seed.first,seed.second})return loadTextRejected(2);
+        rivalCareer=static_cast<unsigned>(seed.rival11280);
+        }
         assets::OriginalUiArchive50KG loc,fontArchive;assets::OriginalUiArchiveDiagnostic50KG archiveDiagnostic;
         if(!loc.load(assets::OriginalUiArchiveId50KG::localization,read(root_/"LOC.RES",35925),archiveDiagnostic)||
            !fontArchive.load(assets::OriginalUiArchiveId50KG::fonts,read(root_/"UI"/"UIFONTS.RES",44870),archiveDiagnostic))return loadTextRejected(3);
@@ -81,11 +122,17 @@ class PlayerLoadingPresenter50DU final {
         const auto localized=[&](unsigned id)->std::string {const auto* entry=english.at(id);if(!entry)throw std::runtime_error("Original loading text ID missing");return entry->text;};
         // Constructor17EA08..17EEDC, actual track-ID order; not course menu order.
         constexpr unsigned titles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
-        OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot rival;
-        if(!profile_->tournamentTextMetadataSnapshot(static_cast<unsigned>(seed.rival11280),rival)||rival.racerName3C<0)return loadTextRejected(5);
+        if(!registryCourse)title=localized(titles[selected.course]);
+        if(rivalCareer&&!rivalName){
+            OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot rival;
+            if(!profile_->tournamentTextMetadataSnapshot(rivalCareer,rival)||rival.racerName3C<0)return loadTextRejected(5);
+            rivalName=localized(static_cast<unsigned>(rival.racerName3C));
+        }
         //1CADE0: title/rival, then best lap, race, KOs and their actual record names.
-        texts_.push_back({localized(titles[selected.course]),0,3,320,142});
-        texts_.push_back({localized(129)+" "+localized(static_cast<unsigned>(rival.racerName3C)),1,3,320,186});
+        texts_.push_back({title,0,3,320,142});
+        // An add-on course with rival "none" draws no rival line (PORT EXTENSION:
+        // every stock course has a rival).
+        if(rivalName)texts_.push_back({localized(129)+" "+*rivalName,1,3,320,186});
         std::array<char,9> lap{},race{};
         if(!game::originalUiHallTime18900050KG(records.lap102F0[0],lap)||
            !game::originalUiHallTime18900050KG(records.race1033C[0],race))return loadTextRejected(6);
@@ -130,11 +177,38 @@ class PlayerLoadingPresenter50DU final {
         static constexpr Identity identities[]={
 #include "original_loading_background_hashes50du.inc"
         };
-        const char* hash=nullptr;for(const auto& identity:identities)if(code_==identity.code)hash=identity.hash;
-        if(!hash)return false;
+        // The background file: the stock UI/TEXTURES/LD_<CODE>.PST for a stock
+        // code; for a registry course the row names it (a listed package file,
+        // dlc:/ path opened through the overlay, or a stock course's LD_<CODE>.PST).
+        // The shipped fingerprints are RECEIPTS only (one line), never a gate;
+        // the layout checks below still bound what is decoded.
         const auto directory=root_/"UI"/"TEXTURES";
-        const auto bytes=read(directory/("LD_"+code_+".PST"),287772);
-        if(bytes.size()!=287772||!assets::OriginalLoadingTextureSource50LA::hashMatches(bytes.data(),bytes.size(),hash))return false;
+        std::filesystem::path backgroundPath=directory/("LD_"+code_+".PST");
+        std::string backgroundName="LD_"+code_+".PST",receiptCode=code_;
+        const char* hash=nullptr;
+        game::dlc50DL::AddonCourseLoad addon;
+        const bool registryCourse=addonRow(addon);
+        if(registryCourse){
+            if(addon.loadingScreen.empty())return false; // registry rows always name one
+            backgroundName=addon.loadingScreen;
+            if(addon.loadingFromPackage)backgroundPath=std::filesystem::path(addon.loadingScreen);
+            else{
+                backgroundPath=root_/std::filesystem::path(addon.loadingScreen); // UI/TEXTURES/LD_<STOCK>.PST
+                const auto at=addon.loadingScreen.rfind("LD_");
+                if(at!=std::string::npos&&addon.loadingScreen.size()>=at+5)receiptCode=addon.loadingScreen.substr(at+3,2);
+            }
+        }
+        if(!registryCourse||!addon.loadingFromPackage)
+            for(const auto& identity:identities)if(receiptCode==identity.code)hash=identity.hash;
+        const auto bytes=read(backgroundPath,287772);
+        if(bytes.size()!=287772)return false; // the one 640x448 indexed8 layout 24EB20 reads
+        const bool stockBytes=hash?assets::OriginalLoadingTextureSource50LA::hashMatches(bytes.data(),bytes.size(),hash):
+            (registryCourse&&addon.loadingSha256.size()==64&&
+             assets::OriginalLoadingTextureSource50LA::hashMatches(bytes.data(),bytes.size(),addon.loadingSha256.c_str()));
+        std::fprintf(stderr,"course_route_loading code=%s source=%s file=%s receipt=%s stock=%d\n",code_.c_str(),
+            !registryCourse?"stock":addon.loadingFromPackage?"package":"stock_screen",backgroundName.c_str(),
+            stockBytes?"match":"differs",registryCourse?0:1);
+        if(!hash)hash=registryCourse&&addon.loadingSha256.size()==64?addon.loadingSha256.c_str():"none";
         //24EB20: height448,width640,zero,zero. Indexed8 payload after1024-byte
         //CSM1 palette. Preserve original linear rows and source RGB bytes.
         const auto word=[&](std::size_t at){U n=0;for(unsigned i=0;i<4;++i)n|=U(bytes[at+i])<<(8*i);return n;};
@@ -196,7 +270,7 @@ class PlayerLoadingPresenter50DU final {
 #undef RR_LOAD
         if(!loadText())return false;
         pixels_.resize(background_.rgba.size());loaded_=true;
-        std::fprintf(stderr,"original_loading_assets background=LD_%s.PST layout=%s background_sha256=%s\n",code_.c_str(),menu?"LD_UI.LSI":"LD_ICON.LSI",hash);
+        std::fprintf(stderr,"original_loading_assets background=%s layout=%s background_sha256=%s\n",backgroundName.c_str(),menu?"LD_UI.LSI":"LD_ICON.LSI",hash);
         return true;
     }
     // Positions are sprite centres. Blend (Cs-Cd)*As/128+Cd, or a plain copy.

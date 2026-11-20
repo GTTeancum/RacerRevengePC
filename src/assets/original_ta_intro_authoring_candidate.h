@@ -73,6 +73,7 @@ public:
             const auto revision=provider->revision();
             std::array<Provider::MemberView,2> views{};
             const Specification* spec=nullptr;
+            std::unique_ptr<OwnedSpecification> owned;
             for(std::size_t i=0;i<views.size();++i){
                 diagnostic.member=i;
                 if(provider->lookup132820(memberNames_[i],views[i])!=Provider::Lookup::present){
@@ -83,7 +84,10 @@ public:
                     diagnostic.status=Status::mountIdentity;return nullptr;
                 }
                 if(!i){for(const auto& candidate:specifications_)if(*mount.archiveName==candidate.archiveName)spec=&candidate;
-                    if(spec)spec=admittedSpecification(*spec);}
+                    if(spec)spec=admittedSpecification(*spec);
+                    // The common-route course whose code is not stock (146r):
+                    // its row from its own archive (the registry cut slot).
+                    else if((owned=registrySpecification(*mount.archiveName)))spec=&owned->spec;}
                 if(!spec||*mount.archiveName!=spec->archiveName||*mount.archiveSha256!=spec->archiveDigest||
                    mount.archiveBytes!=spec->archiveBytes||mount.memberCount!=spec->memberCount){
                     diagnostic.status=Status::mountIdentity;return nullptr;
@@ -101,6 +105,7 @@ public:
             next->provider_=std::move(provider);next->metadata_=std::move(metadata);
             next->capturedMount_=views[0].mount;next->capturedGeneration_=views[0].bankGeneration;
             next->capturedRevision_=revision;next->specification_=spec;
+            next->ownedSpecification_=std::move(owned); // heap row: spec stays valid
             for(std::size_t i=0;i<views.size();++i){
                 diagnostic.member=i;
                 next->bytes_[i].assign(views[i].data,views[i].data+views[i].size);
@@ -130,7 +135,9 @@ public:
             const auto& ini=next->bytes_[0];const auto& script=next->bytes_[1];
             std::uint32_t numEvents=0,numLines=0;
             diagnostic.member=0;
-            if(!iniNumber(ini,"ResponseEmitter","NumEvents",numEvents)||numEvents<1||
+            // NumEvents 0 is the data's own answer (an add-on course with no
+            // announcer lines): no intro events; the cut cameras still play.
+            if(!iniNumber(ini,"ResponseEmitter","NumEvents",numEvents)||
                numEvents>originalRaceIntroEventsMax50LA){
                 diagnostic.status=Status::layout;return nullptr;
             }
@@ -180,7 +187,13 @@ public:
                    e.metadata->sourceIndex!=spec->metadataIndices[i])stockShape=false;
             }
             next->eventCount_=static_cast<unsigned>(numEvents);
-            if(!stockShape){
+            if(next->ownedSpecification_){
+                // Registry course: one line, no stock row to compare against.
+                std::fprintf(stderr,"course_intro_rows track=%.*s events=%u lines=%u stock_row=0 cameras=",
+                    int(spec->track.size()),spec->track.data(),unsigned(numEvents),unsigned(numLines));
+                for(std::size_t i=0;i<numEvents;++i)std::fprintf(stderr,"%s%u",i?",":"",unsigned(next->events_[i].cameraNumber));
+                std::fprintf(stderr,"\n");
+            }else if(!stockShape){
                 std::fprintf(stderr,"course_intro_rows track=%.*s events=%u stock_events=%u cameras=",
                     int(spec->track.size()),spec->track.data(),unsigned(numEvents),spec->eventCount);
                 for(std::size_t i=0;i<numEvents;++i)std::fprintf(stderr,"%s%u",i?",":"",unsigned(next->events_[i].cameraNumber));
@@ -224,7 +237,15 @@ private:
         std::array<std::size_t,originalRaceIntroEventsMax50LA> filenameOffsets,streamOffsets,stereoOffsets,loopOffsets,cameraOffsets,metadataIndices;
         std::array<std::string_view,originalRaceIntroEventsMax50LA> cameraValues;
     };
+    // Registry course row (146r, PORT EXTENSION): owned copies of the slot's
+    // strings so this owner never borrows a slot a later course may replace.
+    struct OwnedSpecification {
+        std::string track,archiveName,archiveDigest;
+        std::array<std::string,2> digests;
+        Specification spec{};
+    };
     const Specification* specification_=nullptr;
+    std::unique_ptr<OwnedSpecification> ownedSpecification_;
     unsigned eventCount_=0;
     // Minimal INI lookup over the copied member bytes: "[Section]" then
     // "Key = value" lines (case-insensitive names, value trimmed, ends at CR/LF
@@ -295,6 +316,27 @@ private:
         for(std::size_t i=0;i<2;++i){row.memberSizes[i]=id.introMembers[i].size;row.memberOrdinals[i]=id.introMembers[i].ordinal;
             row.memberDigests[i]=slot->introShas[i].c_str();}
         return &row;
+    }
+    // The common-route course whose code is not stock: its row is the registry
+    // cut slot derived from its own archive (course_cut_identity50ci.h), matched
+    // by the mounted archive name. No stock event rows: eventCount 0, so every
+    // event the data names is logged (course_intro_rows ... stock_row=0).
+    static std::unique_ptr<OwnedSpecification> registrySpecification(std::string_view archiveName){
+        const auto& slot=originalTrackCutRuntimeRows50LA()[originalTrackCutRegistrySlot50LA];
+        if(!slot.present||!slot.code[0]||slot.archiveName.empty()||slot.archiveName!=archiveName)return {};
+        auto owned=std::make_unique<OwnedSpecification>();
+        owned->track.assign(slot.code.data(),2);owned->archiveName=slot.archiveName;owned->archiveDigest=slot.archiveSha;
+        auto& s=owned->spec;
+        s.track=owned->track;s.archiveName=owned->archiveName;s.archiveDigest=owned->archiveDigest;
+        s.archiveBytes=slot.identity.archiveBytes;s.memberCount=slot.identity.memberCount;s.eventCount=0;s.filenameLength=0;
+        for(std::size_t i=0;i<2;++i){
+            owned->digests[i]=slot.introShas[i];
+            s.memberSizes[i]=slot.identity.introMembers[i].size;s.memberOrdinals[i]=slot.identity.introMembers[i].ordinal;
+            s.memberDigests[i]=owned->digests[i].c_str();
+        }
+        s.filenameOffsets={};s.streamOffsets={};s.stereoOffsets={};s.loopOffsets={};s.cameraOffsets={};s.metadataIndices={};
+        s.cameraValues={};
+        return owned;
     }
     inline static constexpr std::array<Specification,13> specifications_{{
         {"TA","TRACKS/TA.RES","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",

@@ -382,8 +382,8 @@ struct Context final {
     gcTriggerActionsType& gcTriggerActions;
     using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
     maTriggerActionsType& maTriggerActions;
-    using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    saTriggerActionsType& saTriggerActions;
+    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
+    commonRouteTriggerActionsType& commonRouteTriggerActions;
     using mcQueryBindingType = std::unique_ptr<mc_query50MC::Binding>;
     mcQueryBindingType& mcQueryBinding;
     using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;

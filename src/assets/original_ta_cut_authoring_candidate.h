@@ -140,7 +140,9 @@ public:
         std::string_view trackId,const Input* input,std::size_t memberCount,Status& status) noexcept {
         using namespace ta_cut_authoring_candidate_detail;
         status = Status::input;
-        if(!input||(trackId!="TA"&&trackId!="RA"&&trackId!="GC"&&trackId!="SA"&&trackId!="MA"&&trackId!="GA"&&trackId!="MB"&&trackId!="SC"&&trackId!="GB"&&trackId!="RC"&&trackId!="TC"&&trackId!="MC"&&trackId!="TB"))return nullptr;
+        // Every track id with a cut row: the 13 stock rows, or the registry
+        // course whose row was derived from its own archive (one rule).
+        if(!input||!originalRaceTrackIdAdmitted50LA(trackId))return nullptr;
         const auto* identity=originalTrackCutIdentity50LA(trackId);
         // Cut count from the course row (stock table or derived from its own TOB),
         // bounded by the native 7-cut storage; no per-course literal.

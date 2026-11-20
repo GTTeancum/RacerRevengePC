@@ -23,8 +23,13 @@ bool isOriginalUiCourseBackgroundIdentity50KG(const OriginalUiMemberIdentity50KG
     for(auto planet:{0u,1u,2u,4u,5u})if(std::strcmp(source->name,originalUiCourseBackgroundName50KG(planet))==0)return true;
     return false;
 }
+const char originalUiAddonCourseBackgroundTag50DL[]="port-extension:dlc-course-background";
+bool isOriginalUiAddonCourseBackgroundIdentity50DL(const OriginalUiMemberIdentity50KG* source)noexcept{
+    return source&&source->bytes==287772&&source->name&&source->sha256==originalUiAddonCourseBackgroundTag50DL;
+}
 bool isOriginalUiCourseBackground50KG(const OriginalUiMemberView50KG& source)noexcept{
-    return source.data&&source.size==287772&&isOriginalUiCourseBackgroundIdentity50KG(source.identity);
+    return source.data&&source.size==287772&&(isOriginalUiCourseBackgroundIdentity50KG(source.identity)||
+        isOriginalUiAddonCourseBackgroundIdentity50DL(source.identity));
 }
 bool decodeOriginalUiCourseBackground50KG(const OriginalUiMemberView50KG& source,
     Texture48E& output,DecodeError48C& diagnostic)noexcept{

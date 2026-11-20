@@ -1,5 +1,7 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "course_archive_receipt50ci.h"
+#include <iostream>
 #include "../../src/assets/import_texture48e.h"
 #include "../../src/assets/original_ipu_decoder.h"
 #include "../../src/game/authored_texture_animation.h"
@@ -131,8 +133,16 @@ inline constexpr Frame saFrames[]={
 };
 static_assert(sizeof(saSources)/sizeof(saSources[0])==3,"Exact original SA ATM source count");
 #endif
+// The stock-shaped ATM set of a stock code (MA, SA). The common-route course
+// (Track::course) names no stock ATM set: callers create an ATM owner only when
+// that course's own materials name an .ATM texture (absent = no owner), and
+// load() then refuses it as a flagged stand-in (no data ATM reader yet).
+inline constexpr const char* dataAtmReaderStandIn=
+    "PORT STAND-IN (flagged): the ATM owner reads the stock ATM set only; the data ATM reader is not built (REFUSALS round 2)";
 inline Profile profile(track_source_fixture::Track track) {
     switch(track){
+    case track_source_fixture::Track::course:
+        throw std::runtime_error(std::string("course authors ATM textures: ")+dataAtmReaderStandIn);
     case track_source_fixture::Track::ma:
 #if __has_include("ma_atm_source_index.inc") && __has_include("ma_atm_animation_index.inc") && __has_include("ma_atm_frame_index.inc")
         return {maSources,9,maEntries,std::uint32_t(sizeof(maEntries)/sizeof(maEntries[0])),maFrames,std::uint32_t(sizeof(maFrames)/sizeof(maFrames[0]))};
@@ -228,12 +238,15 @@ public:
                 shared::add(rgbaBytes,std::size_t(frame.width)*frame.height*4,maxRgbaBytes,
                     "Original ATM decoded RGBA budget");
             }
+            // Common course rule: the archive identity is a receipt; shared
+            // decode capacity (course_archive_receipt50ci.h). The stock ATM
+            // members below are the stock-shaped owner's own input: a member
+            // that differs is refused as the flagged stand-in, never silently.
             shared::Inputs inputs;inputs.capacity=maxRgbaBytes+8u*1024u*1024u;
-            auto bytes=inputs.read(sourceArchive,archiveProfile.archiveBytes);
-            need(bytes.size()==archiveProfile.archiveBytes&&shared::sha256(bytes)==archiveProfile.archiveSha,"Original ATM archive identity");
-            a::ResArchive48C archive;a::DecodeLimits48C limits;
-            limits.resource_file_bytes=archiveProfile.archiveBytes;limits.resource_decoded_bytes=archiveProfile.archiveDecodedBytes;
-            limits.resource_entries=archiveProfile.archiveEntries;
+            auto bytes=inputs.read(sourceArchive,course_archive_receipt50CI::maximumArchiveBytes());
+            course_archive_receipt50CI::receipt("atm",selectedTrack==track_source_fixture::Track::ma?"MA":"SA",
+                bytes,archiveProfile.archiveSha,archiveProfile.archiveBytes);
+            a::ResArchive48C archive;const auto limits=course_archive_receipt50CI::limits();
             need(a::decodeResource48C(bytes,archive,d.source,nullptr,limits),"Original ATM archive decode");
             auto next=std::make_unique<Storage>();next->sampling.resize(p.frameCount);
             std::vector<std::vector<std::uint8_t>> native(p.frameCount);
@@ -244,8 +257,10 @@ public:
                 need(source.firstTextureIndex==nextFrame&&source.frameCount&&source.frameCount<=64&&
                     source.frameCount<=p.frameCount-nextFrame,"Original ATM contiguous bank extent");
                 std::vector<std::uint8_t> original;
-                need(a::extractResMember48C(archive,archiveMember(archive,source.member),original,d.source,1024u*1024u)&&
-                    original.size()==source.bytes&&shared::sha256(original)==source.sha,"Exact original ATM source identity");
+                need(a::extractResMember48C(archive,archiveMember(archive,source.member),original,d.source,1024u*1024u),
+                    "Original ATM source member unreadable");
+                need(original.size()==source.bytes&&shared::sha256(original)==source.sha,
+                    std::string(source.member)+" is not the stock ATM: "+dataAtmReaderStandIn);
                 need(original.size()>=12&&shared::u32(original.data())==1&&
                     shared::u32(original.data()+4)==source.frameCount&&shared::u32(original.data()+8)==0,"Original ATM header");
                 std::size_t end=12;
@@ -271,8 +286,13 @@ public:
                 need(entry.pass>=1&&entry.pass<=8&&entry.initialFrame<source.frameCount&&entry.fps>0&&entry.fps<=60&&
                     entry.placedSpans<=maxAnimations,"Supported original ATM source binding subset");
                 std::vector<std::uint8_t> psm;
-                need(a::extractResMember48C(archive,archiveMember(archive,entry.materialMember),psm,d.source,16384)&&
-                    psm.size()==entry.materialBytes&&shared::sha256(psm)==entry.materialSha,"Exact original animated PSM identity");
+                need(a::extractResMember48C(archive,archiveMember(archive,entry.materialMember),psm,d.source,16384),
+                    "Original animated PSM member unreadable");
+                // Stock PSM pin = receipt; the declared pass fields below are
+                // checked against the binding from these bytes themselves.
+                const auto psmSha=shared::sha256(psm);
+                if(!(psm.size()==entry.materialBytes&&psmSha==entry.materialSha))
+                    std::cerr<<"course_member_identity site=atm member="<<entry.materialMember<<" bytes="<<psm.size()<<" stock=0\n";
                 a::Material48E material;
                 need(a::decodeMaterial48E(psm,material,d.source)&&entry.pass<=material.passes.size(),
                     "Original animated material declared pass decode");
@@ -302,7 +322,7 @@ public:
                 // retaining an unused layered source never admits its draw semantics.
                 need(!entry.placedSpans||(entry.pass==1&&material.passes.size()==1),
                     "Placed ATM requires the original single-pass live subset");
-                const auto key=shared::sha256(std::string("rr-native-material-48E-v1\n")+entry.materialSha);
+                const auto key=shared::sha256(std::string("rr-native-material-48E-v1\n")+psmSha);
                 for(std::uint32_t mi=0;mi<selections->size();++mi){
                     const auto& selection=selections->at(mi);
                     if(shared::normalized(selection.materialName)!=shared::normalized(entry.materialName)||selection.pass!=entry.pass)continue;

@@ -102,22 +102,50 @@ struct OriginalTrackCutRuntimeRow50LA {
  std::string archiveSha;
  std::array<std::string,8> names,shas;
  std::array<std::string,2> introNames,introShas;
+ // Registry slot only (146r, the common-route course whose code is not stock):
+ // its own code ("NV") and archive name ("TRACKS/NV.RES"); a stock slot keeps
+ // the stock row's trackId/archiveName literals.
+ std::array<char,3> code{};
+ std::string archiveName;
  OriginalTrackCutIdentity50LA identity{};
  bool present=false;
  // Re-point the row's views at this slot's own strings (after any move).
  void bind()noexcept{
   identity.archiveSha256=archiveSha.c_str();
+  if(code[0])identity.trackId=code.data();
+  if(!archiveName.empty())identity.archiveName=archiveName.c_str();
   for(std::size_t i=0;i<names.size();++i)if(!names[i].empty()){identity.members[i].name=names[i].c_str();identity.members[i].sha256=shas[i].c_str();}
   for(std::size_t i=0;i<introNames.size();++i)if(!introNames[i].empty()){identity.introMembers[i].name=introNames[i].c_str();identity.introMembers[i].sha256=introShas[i].c_str();}
  }
 };
-inline std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()>& originalTrackCutRuntimeRows50LA()noexcept{
- static std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()> rows;return rows;
+// One slot per stock course id plus ONE registry slot (index = stock count)
+// for the common-route course whose code is not stock (PORT EXTENSION, NOT
+// ORIGINAL: the registry). The one storage for every derived row.
+inline constexpr std::size_t originalTrackCutRegistrySlot50LA=originalTrackCutIdentities50LA.size();
+inline std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()+1>& originalTrackCutRuntimeRows50LA()noexcept{
+ static std::array<OriginalTrackCutRuntimeRow50LA,originalTrackCutIdentities50LA.size()+1> rows;return rows;
 }
+// A registry code: exactly two [A-Z0-9] characters that name no stock row.
+inline bool originalTrackCutRegistryCode50LA(std::string_view id)noexcept {
+ if(id.size()!=2)return false;
+ for(char c:id)if(!((c>='A'&&c<='Z')||(c>='0'&&c<='9')))return false;
+ for(const auto& row:originalTrackCutIdentities50LA)if(id==row.trackId)return false;
+ return true;
+}
+// Read access: a stock id's slot, or the registry slot while it holds that code.
 inline OriginalTrackCutRuntimeRow50LA* originalTrackCutRuntimeSlot50LA(std::string_view id)noexcept {
  for(std::size_t i=0;i<originalTrackCutIdentities50LA.size();++i)
   if(id==originalTrackCutIdentities50LA[i].trackId)return &originalTrackCutRuntimeRows50LA()[i];
+ auto& registry=originalTrackCutRuntimeRows50LA()[originalTrackCutRegistrySlot50LA];
+ if(registry.present&&registry.code[0]&&id==std::string_view(registry.code.data(),2))return &registry;
  return nullptr;
+}
+// Write access for derivation: a stock id's slot, or the registry slot for a
+// registry code (replacing the course it held; one registry course at a time).
+inline OriginalTrackCutRuntimeRow50LA* originalTrackCutWritableSlot50LA(std::string_view id)noexcept {
+ for(std::size_t i=0;i<originalTrackCutIdentities50LA.size();++i)
+  if(id==originalTrackCutIdentities50LA[i].trackId)return &originalTrackCutRuntimeRows50LA()[i];
+ return originalTrackCutRegistryCode50LA(id)?&originalTrackCutRuntimeRows50LA()[originalTrackCutRegistrySlot50LA]:nullptr;
 }
 // The label every course mount carries (one rule): the admitted archive's
 // digest/size when course select derived its row, else the stock identity.
@@ -139,5 +167,11 @@ inline const OriginalTrackCutIdentity50LA* originalTrackCutIdentity50LA(std::str
  const auto* slot=originalTrackCutRuntimeSlot50LA(id);
  if(slot&&slot->present)return &slot->identity;
  return originalTrackCutStockIdentity50LA(id);
+}
+// The race track ids the cut cameras and the race intro admit: every id with
+// a cut row (the 13 stock rows, or the registry course whose row was derived
+// from its own data). Replaces the 13-code whitelists; stock admission is unchanged.
+inline bool originalRaceTrackIdAdmitted50LA(std::string_view id)noexcept {
+ return originalTrackCutIdentity50LA(id)!=nullptr;
 }
 }

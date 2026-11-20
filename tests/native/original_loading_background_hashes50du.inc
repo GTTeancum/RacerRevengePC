@@ -1,4 +1,6 @@
 // Original loose loading backgrounds; hashes only, no game assets.
+// RECEIPTS (146r): the presenter logs match/differs against these, never refuses.
+// An add-on course has no row here; its row's loading screen is used instead.
 {"CC","e1364ae3bf0f1feec68ae1ae24a4eff186bb075601dd7274cf8cbf707d2a5ea8"},
 {"END","d6be32954eebc7a893fc6630ad754083d515b3783753e26154e18912eda3c03d"},
 {"GA","a59091739ec536cf53c0908a1d4683b3c3f04fd822bea94fc964bf5cb4eab4d5"},

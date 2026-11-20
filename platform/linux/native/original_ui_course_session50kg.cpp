@@ -12,6 +12,11 @@
 #include <limits>
 #include <utility>
 #include "../../../src/assets/original_ui_course_background50kg.h"
+#include "../../../src/game/dlc_course_entries50dl.h"
+#include "../../../src/game/original_course_descriptor50kg.h"
+#include <cstdio>
+#include <string>
+#include <vector>
 namespace rr::platform {
 namespace {
 using S=OriginalUiCourseSessionStatus50KG;using D=OriginalUiCourseSessionDiagnostic50KG;
@@ -44,6 +49,14 @@ bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const Original
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
+// PORT EXTENSION, NOT ORIGINAL (DLC add-on courses, 147c): the stock anchor of the
+// last accepted add-on launch. The original Course screen reopens on the course the
+// profile remembers (1125F, the anchor's stock fields); for an add-on launch that is
+// the anchor, so a Course entry (race return 1AB908 / Hall Cross / Unlock Cross /
+// Rider) whose remembered slot is this anchor shows the add-on entry again. Written
+// only by notifyRouteAccepted; read once per Course entry. One session at a time.
+struct AcceptedAddonAnchor147 {unsigned number=0;std::uint32_t slot=0;bool last=true;};
+AcceptedAddonAnchor147 acceptedAddonAnchor147;
 }
 struct OriginalUiCourseSession50KG::Storage {
     OriginalUiCourseSessionCold50KG cold;OriginalUiCourseSessionSnapshot50KG state{};D faultDetail{};
@@ -76,6 +89,154 @@ struct OriginalUiCourseSession50KG::Storage {
     std::array<bool,2> preparedHorizontalHeld{};
     std::array<std::string,6> planetNamesBA0;
     bool selectionRefreshCompleted=false;
+    // ---- PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (DLC add-on courses, 146r-U;
+    // DESIGN.md 4.2/4.4). Free play (mode34 0) only: after the last eligible stock
+    // course the top course arrows continue through the admitted add-on courses in
+    // number order (the appended controls dlc50DL::planAppendedCourseControls plans
+    // after the authored group), then wrap to the first stock course; Previous runs
+    // the block backwards. An add-on entry is port state only: the original
+    // navigation, widgets, 14E4/40/44, remembered course fields and 1125E stay on
+    // the stock control the block follows (the anchor). Only the original wrap
+    // (Next from the last enabled slot, Previous from the first, as the unchanged
+    // move plan reports it) and the moves inside the block are taken over; every
+    // other move is the original one. Drawn: the item's name in the anchor's
+    // course-name widget, the template course's rotating hologram with the package
+    // preview (or the template's own image), the package or named stock
+    // background. Confirm proposes the original launch for the anchor's stock
+    // fields; acceptance hands the add-on number to dlc50DL::selectAddonCourse.
+    // Tournament (mode34 2) and a session with no admitted add-on course never
+    // reach any of this (no control, no line, no model operation).
+    struct AddonEntry {
+        game::dlc50DL::AppendedCourseControl plan;
+        std::uint16_t templateModel=0;               // the template control's hologram widget
+        std::uint32_t templatePlanet=0,backgroundPlanet=0;
+        std::int32_t previewImage=-1,backgroundImage=-1; // add-on bank images (-1 = template's own / stock planet)
+    };
+    bool addonCarousel=false;std::vector<AddonEntry> addons;
+    std::shared_ptr<OriginalUiCourseAddonImages50DL> addonImages;
+    std::size_t addonSlot=0;bool addonAnchorLast=true,addonDrawLogged=false;
+    std::uint16_t addonAnchorModel=0,addonAnchorName=0,addonShownModel=0;
+    OriginalUiCourseAddonFrame50DL addonFrame{};
+    const AddonEntry* addon()const noexcept{return addonSlot&&addonSlot<=addons.size()?&addons[addonSlot-1]:nullptr;}
+    static int stockCourseIndex(const std::string& code)noexcept{
+        if(code.size()!=2)return -1;const auto& d=game::originalFreshCourseDescriptors50KG;
+        const auto up=[](char c){return c>='a'&&c<='z'?char(c-'a'+'A'):c;};
+        for(std::size_t i=0;i<d.size();++i)if(d[i].first==up(code[0])&&d[i].second==up(code[1]))return static_cast<int>(i);
+        return -1;
+    }
+    std::uint16_t controlWidget(int controlId,WK kind)const noexcept{
+        const auto* page=selection.page();
+        if(!page||controlId<0||std::size_t(controlId)>=page->controls.size())return 0;
+        for(const auto id:page->controls[std::size_t(controlId)].widgets)
+            if(cold.resources->widgets()->state(id).kind==kind)return id;
+        return 0;
+    }
+    bool modelOp(std::uint16_t id,game::OriginalUiControlOperation50KG op)noexcept{
+        auto* model=cold.holograms->model(id);
+        return model&&model->preflightApply(op,true,cold.application->modelMotion,cold.application->modelMode0Ik,faultDetail.model)&&
+            model->apply(op,true,cold.application->modelMotion,cold.application->modelMode0Ik,faultDetail.model);
+    }
+    void addonLog(const char* action)const noexcept{
+        const auto* a=addon();
+        std::fprintf(stderr,"dlc_course_carousel action=%s slot=%zu key=%s number=%u anchor_slot=%u anchor_course=%u anchor_planet=%u\n",
+            action,addonSlot,a?a->plan.key.c_str():"-",a?a->plan.number:0u,state.courseSlot14E4,state.selectedCourse44,state.selectedPlanet40);
+    }
+    // The template hologram an entry shows runs as a selected model (original
+    // select then reset, as a course move applies them); the anchor's own model
+    // keeps its state and its drawing is replaced for that frame only.
+    bool setAddonSlot(std::size_t slot)noexcept{
+        if(!addonCarousel||slot>addons.size())return false;
+        const auto* next=slot?&addons[slot-1]:nullptr;
+        const std::uint16_t want=next&&next->templateModel&&next->templateModel!=addonAnchorModel?next->templateModel:0;
+        if(want!=addonShownModel){
+            if(addonShownModel&&!modelOp(addonShownModel,game::OriginalUiControlOperation50KG::deselect))return false;
+            addonShownModel=0;
+            if(want&&(!modelOp(want,game::OriginalUiControlOperation50KG::select)||
+                      !modelOp(want,game::OriginalUiControlOperation50KG::reset)))return false;
+            addonShownModel=want;
+        }
+        addonSlot=slot;addonDrawLogged=false;
+        game::dlc50DL::setHighlightedAddonCourse(next?next->plan.number:0u);
+        return true;
+    }
+    // Bind: the appended controls, one line each; their images (owner 2 of the bank).
+    void planAddonCourses()noexcept{
+        try{
+            const auto* page=selection.page();if(!page||page->groups.size()<2)return;
+            std::vector<game::dlc50DL::AuthoredCourseControl> authored;
+            for(std::size_t slot=1;slot<=page->groups[1].controls.size();++slot){
+                game::OriginalUiCourseControl50KG c;if(!selection.control(static_cast<std::uint16_t>(slot),c))continue;
+                authored.push_back({int(c.controlId),c.course44,c.planet40,
+                    unsigned(c.controlId<page->controls.size()?page->controls[c.controlId].widgets.size():0u)});
+            }
+            std::vector<game::dlc50DL::AppendedCourseControl> plan;std::string why;
+            if(!game::dlc50DL::planAppendedCourseControls(authored,page->controls.size(),assets::originalUiControlLimit50KG,plan,why)){
+                std::fprintf(stderr,"dlc_course_carousel action=refused reason=\"%s\"\n",why.c_str());return;}
+            std::vector<OriginalUiCourseAddonImageRequest50DL> requests;
+            for(auto& p:plan){
+                AddonEntry e;e.plan=std::move(p);
+                e.templateModel=controlWidget(e.plan.layoutFrom,WK::character);
+                for(const auto& a:authored)if(a.controlId==e.plan.layoutFrom){e.templatePlanet=a.planet;break;}
+                e.backgroundPlanet=e.templatePlanet;
+                if(e.plan.backgroundFile.empty()&&!e.plan.backgroundStock.empty()){
+                    const int index=stockCourseIndex(e.plan.backgroundStock);
+                    for(const auto& a:authored)if(index>=0&&a.courseIndex==unsigned(index)){e.backgroundPlanet=a.planet;break;}
+                }
+                if(cold.resources->backgroundImage(e.backgroundPlanet)==assets::unresolvedMaterialTexture50EA)e.backgroundPlanet=e.templatePlanet;
+                if(!e.plan.preview.empty()&&e.templateModel)requests.push_back({e.plan.preview,false,e.templateModel});
+                if(!e.plan.backgroundFile.empty())requests.push_back({e.plan.backgroundFile,true,0});
+                addons.push_back(std::move(e));
+            }
+            if(!requests.empty()){
+                std::string reason;
+                if(!loadOriginalUiCourseAddonImages50DL(requests,addonImages,reason)){addonImages.reset();
+                    std::fprintf(stderr,"dlc_course_images status=refused reason=\"%s\" fallback=template_images\n",reason.c_str());}
+            }
+            addonCarousel=!addons.empty();
+        }catch(...){addons.clear();addonImages.reset();addonCarousel=false;}
+    }
+    void announceAddonCourses()noexcept{
+        const bool admitted=addonImages&&collector.addonImagesAdmitted();
+        for(auto& e:addons){
+            if(admitted){e.previewImage=e.plan.preview.empty()?-1:addonImages->image(e.plan.preview,false);
+                e.backgroundImage=e.plan.backgroundFile.empty()?-1:addonImages->image(e.plan.backgroundFile,true);}
+            std::fprintf(stderr,"dlc_course_control id=%d number=%u key=%s layout_from=%d template=%s model=%u name=\"%s\" "
+                "preview=%s background=%s background_planet=%u\n",e.plan.controlId,e.plan.number,e.plan.key.c_str(),e.plan.layoutFrom,
+                e.plan.templateCode.c_str(),unsigned(e.templateModel),e.plan.name.c_str(),
+                e.previewImage>=0?e.plan.preview.c_str():e.plan.preview.empty()?"template_image":"refused_template_image",
+                e.backgroundImage>=0?e.plan.backgroundFile.c_str():
+                    (e.plan.backgroundFile.empty()?("stock:"+e.plan.backgroundStock).c_str():"refused_stock_template"),
+                e.backgroundPlanet);
+        }
+        game::dlc50DL::setHighlightedAddonCourse(0);
+        std::fprintf(stderr,"dlc_course_carousel action=ready mode=0 addons=%zu stock_slots=%zu images=%s\n",addons.size(),
+            selection.page()->groups[1].controls.size(),admitted?"package":addonImages?"refused":"none");
+    }
+    // Course entry (147c): reopen on the add-on entry the last accepted launch raced,
+    // when the port selection still holds it and the profile's remembered slot is its
+    // anchor (see AcceptedAddonAnchor147). Otherwise the stock entry stays (no line).
+    // A refused model operation leaves the stock entry shown and is logged, never a fault.
+    void restoreAddonEntry()noexcept{
+        const unsigned number=game::dlc50DL::selectedAddonCourse();
+        const auto& accepted=acceptedAddonAnchor147;
+        if(!addonCarousel||!number||accepted.number!=number)return;
+        if(accepted.slot!=state.courseSlot14E4){
+            std::fprintf(stderr,"dlc_course_carousel action=restore_skipped number=%u anchor_slot=%u remembered_slot=%u\n",
+                number,accepted.slot,state.courseSlot14E4);return;}
+        std::size_t slot=0;
+        for(std::size_t i=0;i<addons.size();++i)if(addons[i].plan.number==number){slot=i+1;break;}
+        if(!slot)return;
+        game::OriginalUiCourseControl50KG anchor;
+        if(selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),anchor)){
+            addonAnchorModel=controlWidget(anchor.controlId,WK::character);
+            addonAnchorName=controlWidget(anchor.controlId,WK::text);
+        }else addonAnchorModel=addonAnchorName=0;
+        addonAnchorLast=accepted.last;
+        if(!setAddonSlot(slot)){
+            std::fprintf(stderr,"dlc_course_carousel action=restore_refused number=%u reason=\"template model operation refused\"\n",number);
+            addonSlot=0;game::dlc50DL::setHighlightedAddonCourse(0);return;}
+        addonLog("restore");
+    }
     game::OriginalUiCourseWidgets50KG& widgets()noexcept{return *cold.resources->widgets();}
     bool exitAccepted()const noexcept{return state.backAccepted||state.launchAccepted;}
     bool operational()const noexcept{return !state.faulted&&!state.quitRequested;}
@@ -381,7 +542,12 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
             s->planetNamesBA0[planet]=text->text.substr(0,40);
             if(cold.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)return result(d,S::resource,0x1DDF00);}
         const auto sourceClock=tournament?cold.applicationAnimation:game::OriginalApplicationAnimationClockView50KG{};
-        if(!s->collector.bind(cold.resources,cold.holograms,d.draw,sourceClock)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
+        // PORT EXTENSION (DLC add-on courses): free play with admitted add-on courses only.
+        if(!tournament&&game::dlc50DL::addonCourseCount())s->planAddonCourses();
+        if(!s->collector.bind(cold.resources,cold.holograms,d.draw,sourceClock))return result(d,S::draw);
+        if(s->addonImages&&!s->collector.setAddonImages(s->addonImages))return result(d,S::draw);
+        if(!s->collector.prepareBank(d.draw))return result(d,S::draw);
+        if(s->addonCarousel)s->announceAddonCourses();
         game::OriginalUiApertureCallbacks50KG callbacks{s.get(),&Storage::available,&Storage::hook,&Storage::overlay};
         if(s->aperture.bindCourse(cold.courseArchive,callbacks,d.aperture)!=AS::ok)return result(d,S::aperture);
         s->state.bound=true;storage_=std::move(s);return result(d,S::ok);
@@ -455,6 +621,8 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         // widgets stay manager-owned and hidden; no invented reparenting.
         if(!s->widgets().disableFreshPopup438(s->faultDetail.widget)){s->fault(S::widget,0x1DA714);break;}
         s->state.popupEnabled438=s->widgets().popupEnabled438();s->state.cameraActive=true;s->state.pageShown=true;
+        // PORT EXTENSION (DLC add-on courses, 147c): reopen on the raced add-on entry.
+        if(s->addonCarousel&&s->state.mode34==0)s->restoreAddonEntry();
         s->cold.application->uiObject3D8=0;s->entered=true;break;}
     case Notice::managerEntry84:
         valid=s->entered&&!s->managerEntered&&t.lifecycle==Life::initialEntry&&t.phase==Phase::none&&e.sourcePC==0x2A3D68;
@@ -552,6 +720,44 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
         if(!navigation||!s->cold.profile->courseSnapshot(profile)||!s->widgetProfile(widgetProfile))return result(d,S::profile);
         const auto before=*navigation;const auto stamp=s->cold.profile->stamp();
         const auto planned=game::planOriginalUiCourseMove50KG(s->selection,before,profile,forward,move);
+        // PORT EXTENSION (DLC add-on courses): the add-on block between the last and
+        // the first stock course. A single unlocked course (plan noChange) is both.
+        if(s->addonCarousel&&before.controllerGroup[0]==1&&(planned==game::OriginalUiCourseSelectionStatus50KG::ok||
+           planned==game::OriginalUiCourseSelectionStatus50KG::noChange)){
+            const auto from=before.groups[1].selectedSlot;
+            const bool wraps=planned==game::OriginalUiCourseSelectionStatus50KG::noChange||
+                (forward?move.courseSlot14E4<=from:move.courseSlot14E4>=from);
+            if(s->addonSlot||wraps){
+                const auto pc=forward?0x1DF480u:0x1DF1C8u;
+                if(!s->effectReady(forward?4u:3u))return result(d,S::audio,pc);
+                s->cpuDrain();s->inOperation=true;
+                const auto count=s->addons.size();bool stockMove=false;const char* action=nullptr;
+                if(!s->addonSlot){
+                    game::OriginalUiCourseControl50KG anchor;
+                    if(s->selection.control(static_cast<std::uint16_t>(s->state.courseSlot14E4),anchor)){
+                        s->addonAnchorModel=s->controlWidget(anchor.controlId,WK::character);
+                        s->addonAnchorName=s->controlWidget(anchor.controlId,WK::text);
+                    }else s->addonAnchorModel=s->addonAnchorName=0;
+                    s->addonAnchorLast=forward;
+                    if(!s->setAddonSlot(forward?1:count))s->fault(S::model,0x2A8D30);else action="enter";
+                }else if(forward?s->addonSlot<count:s->addonSlot>1){
+                    if(!s->setAddonSlot(forward?s->addonSlot+1:s->addonSlot-1))s->fault(S::model,0x2A8D30);else action="step";
+                }else{
+                    const bool across=forward==s->addonAnchorLast;
+                    s->addonLog(across?"leave_wrap":"leave");
+                    if(!s->setAddonSlot(0))s->fault(S::model,0x2A8D30);
+                    // Across the wrap the original move from the anchor follows unchanged.
+                    stockMove=across&&planned==game::OriginalUiCourseSelectionStatus50KG::ok;
+                }
+                if(!s->state.faulted&&!stockMove){
+                    if(action)s->addonLog(action);
+                    s->effect(forward?4u:3u,pc);out.selectionChanged=true;
+                }
+                s->inOperation=false;
+                if(s->state.faulted){d.status=s->faultDetail.status;d.sourcePC=s->faultDetail.sourcePC;return d.status;}
+                if(!stockMove){out.status=S::ok;return result(d,S::ok,forward?0x1DF9C0u:0x1DFBD0u);}
+            }
+        }
         if(planned==game::OriginalUiCourseSelectionStatus50KG::noChange)return result(d,S::noChange);
         if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>13u||
            !assets::originalUiCourseBackgroundName50KG(move.selectedControl.planet40)||
@@ -581,6 +787,17 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     // publication is pending. A fresh Confirm edge can retry after update3.
     if(confirm&&s->state.deferred14D0)return result(d,S::noChange,0x1DFDF0);
     if(!s->effectReady(confirm?1u:5u))return result(d,S::audio,confirm?0x1DEF18:0x1DF0E0);
+    // PORT EXTENSION (DLC add-on courses): an add-on entry confirms only in a mode
+    // its item offers (subtype 3 = Time Trial, 1/2 = Single Event); otherwise nothing happens.
+    if(confirm&&s->addonSlot){
+        const auto* a=s->addon();
+        const auto mode=s->state.subtypeSlot14F4==3?game::dlc50DL::AddonCourseMode::timeTrial:game::dlc50DL::AddonCourseMode::single;
+        if(!a||!game::dlc50DL::addonCourseAllowsMode(a->plan.number,mode)){
+            std::fprintf(stderr,"dlc_course_confirm key=%s number=%u status=refused reason=\"mode not offered by the item\" subtype=%u\n",
+                a?a->plan.key.c_str():"-",a?a->plan.number:0u,s->state.subtypeSlot14F4);
+            return result(d,S::noChange,0x1DED58);
+        }
+    }
     game::OriginalUiCourseContext50KG context;if(!s->context(context))return result(d,S::profile);
     game::OriginalUiRouteDecision50KG decision;
     const auto status=game::dispatchOriginalUiCourse50KG(0,confirm?game::OriginalUiRouteInput50KG::activate:game::OriginalUiRouteInput50KG::back,context,decision);
@@ -642,6 +859,26 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
         profile.laps704!=s->pendingContext.laps14EC||profile.entrants708!=s->pendingContext.entrants14F0||profile.subtype70C!=s->pendingContext.subtypeSlot14F4)
         return result(d,S::profile,0x1DEFCC);
     s->cpuDrain();s->liveStamp=stamp;s->state.backProposalPending=false;s->state.backAccepted=!launch;s->state.launchAccepted=launch;
+    // PORT EXTENSION (DLC add-on courses): the accepted launch hands the highlighted
+    // add-on number to the port-owned selection; a stock launch clears it. The
+    // profile already holds the anchor's stock fields (the original launch writes).
+    if(game::dlc50DL::addonCourseCount()){
+        if(launch){
+            if(const auto* a=s->addon()){
+                const bool selected=game::dlc50DL::selectAddonCourse(a->plan.number);
+                std::fprintf(stderr,"dlc_course_confirm key=%s number=%u status=%s stock_slot=%u stock_course=%u stock_planet=%u subtype=%u\n",
+                    a->plan.key.c_str(),a->plan.number,selected?"selected":"refused",s->state.courseSlot14E4,
+                    s->state.selectedCourse44,s->state.selectedPlanet40,s->state.subtypeSlot14F4);
+                acceptedAddonAnchor147=selected?AcceptedAddonAnchor147{a->plan.number,s->state.courseSlot14E4,s->addonAnchorLast}:
+                    AcceptedAddonAnchor147{};
+            }else{game::dlc50DL::clearAddonCourse();acceptedAddonAnchor147={};}
+        }else if(const auto* a=s->addon();!a||a->plan.number!=acceptedAddonAnchor147.number){
+            // Back from a stock entry, or from another add-on entry than the raced
+            // one: the next Course entry opens on the remembered stock course.
+            acceptedAddonAnchor147={};
+        }
+        if(s->addonCarousel)game::dlc50DL::setHighlightedAddonCourse(0);
+    }
     if(!s->effect(launch?1u:5u,launch?0x1DEF18:0x1DF0E0)){d=s->faultDetail;return d.status;}
     return result(d,S::ok,launch?0x1DEF18:0x1DF0E0);
 }
@@ -724,9 +961,21 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
         if(!clock.applicationAnimation.sameOwner(s->cold.applicationAnimation)||!clock.applicationAnimation.read(actual))
             return result(d,S::unsupportedState,0x29ACA8);
     }
-    OriginalUiCourseProfileColors50KG colors;if(!s->cold.profile->coursePlanetColors(s->state.selectedPlanet40,colors))return result(d,S::profile);
+    // PORT EXTENSION (DLC add-on courses): an add-on entry draws with the palette of its
+    // background planet (the template course's planet for a package background).
+    const auto* addon=s->addon();
+    std::uint32_t backgroundPlanet=s->state.selectedPlanet40,palettePlanet=s->state.selectedPlanet40;
+    if(addon){backgroundPlanet=palettePlanet=addon->backgroundPlanet;
+        s->addonFrame={};s->addonFrame.anchorModel=s->addonAnchorModel;
+        s->addonFrame.templateModel=addon->templateModel?addon->templateModel:s->addonAnchorModel;
+        s->addonFrame.previewImage=addon->previewImage;s->addonFrame.backgroundImage=addon->backgroundImage;
+        s->addonFrame.anchorName=s->addonAnchorName;s->addonFrame.name=&addon->plan.name;}
+    OriginalUiCourseProfileColors50KG colors;
+    if(!s->cold.profile->coursePlanetColors(palettePlanet,colors)&&
+       !s->cold.profile->coursePlanetColors(s->state.selectedPlanet40,colors))return result(d,S::profile);
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
-    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,s->state.selectedPlanet40)&&s->collector.projectOrdinaryWidgets(true,d.draw);
+    s->collector.setAddonFrame(addon?&s->addonFrame:nullptr);
+    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,backgroundPlanet)&&s->collector.projectOrdinaryWidgets(true,d.draw);
     game::OriginalUiCoursePageDrawDiagnostic50KG pageDiagnostic;
     if(okay&&s->state.mode34==0&&!s->page.setEventSelection(s->state.subtypeSlot14F4,s->state.laps14EC,s->state.entrants14F0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&!s->page.applyPlanetPalette(s->widgets(),colors.primary79C,colors.secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
@@ -741,7 +990,12 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     if(okay&&s->operational()){const auto status=s->aperture.render48(s->transition().lifecycle);
         if(!apertureOkay(status)){s->faultDetail.aperture.status=status;s->fault(S::aperture,0x1DEB6C);okay=false;}}
     if(okay&&s->operational())okay=s->collector.projectPrompts(s->state.promptMask42C,d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.finish(d.draw);
-    s->rendering=false;s->inOperation=false;
+    s->rendering=false;s->inOperation=false;s->collector.setAddonFrame(nullptr);
+    if(addon&&okay&&!s->addonDrawLogged){s->addonDrawLogged=true;
+        std::fprintf(stderr,"dlc_course_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u hologram=template:%s model=%u "
+            "preview=%s background=%s anchor_slot=%u\n",addon->plan.key.c_str(),addon->plan.number,s->addonFrame.nameDrawn,s->addonFrame.nameSkipped,
+            addon->plan.templateCode.c_str(),unsigned(s->addonFrame.templateModel),addon->previewImage>=0?"package":"template_image",
+            addon->backgroundImage>=0?"package":("planet:"+std::to_string(addon->backgroundPlanet)).c_str(),s->state.courseSlot14E4);}
     if(!okay||s->state.faulted){if(!s->state.faulted){s->faultDetail.draw=d.draw;s->fault(S::draw,d.draw.sourcePC);}s->cpuDrain();d=s->faultDetail;return d.status;}
     s->state.framePublished=true;++s->state.renders;return result(d,S::ok);
 }

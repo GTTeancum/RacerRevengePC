@@ -23,6 +23,7 @@
 #include "original_racer_manager_entity50la.h"
 #include "original_subtype3_record_owner50la.h"
 #include "original_record_grid_pose50la.h"
+#include "../../src/game/dlc_course_entries50dl.h"
 namespace cold=cold50i;
 namespace interactive_world50DU {
 namespace f=runtime_startup50fl;
@@ -149,13 +150,13 @@ SessionExit50DU Context::run() {
  auto& isGaTrack=this->isGaTrack;
  auto& isGbTrack=this->isGbTrack;
  auto& isGcTrack=this->isGcTrack;
- auto& isMaSaTrack=this->isMaSaTrack;
+ auto& maOrCommonRouteTrack=this->maOrCommonRouteTrack;
  auto& isMaTrack=this->isMaTrack;
  auto& isMbTrack=this->isMbTrack;
  auto& isMcTrack=this->isMcTrack;
  auto& isRaTrack=this->isRaTrack;
  auto& isRcTrack=this->isRcTrack;
- auto& isSaTrack=this->isSaTrack;
+ auto& commonRouteTrack=this->commonRouteTrack;
  auto& isScTrack=this->isScTrack;
  auto& isTaTrack=this->isTaTrack;
  auto& isTbTrack=this->isTbTrack;
@@ -188,7 +189,7 @@ SessionExit50DU Context::run() {
  auto& nativeRacerManager=this->nativeRacerManager;
  auto& nativeRcSelection=this->nativeRcSelection;
  auto& nativeRecordActor=this->nativeRecordActor;
- auto& nativeSaSelection=this->nativeSaSelection;
+ auto& nativeCommonRouteSelection=this->nativeCommonRouteSelection;
  auto& nativeScSelection=this->nativeScSelection;
  auto& nativeSelectedLights=this->nativeSelectedLights;
  auto& nativeTaSelection=this->nativeTaSelection;
@@ -239,7 +240,7 @@ SessionExit50DU Context::run() {
  auto& reportRenderer50DU=*this->reportRenderer50DU;
  auto& requestedWindowSamples=this->requestedWindowSamples;
  auto& s=this->s;
- auto& saOriginalDisc=this->saOriginalDisc;
+ auto& commonRouteOriginalDisc=this->commonRouteOriginalDisc;
  auto& scOriginalDisc=this->scOriginalDisc;
  auto& selectedAudioSettings=this->selectedAudioSettings;
  auto& selectedOriginal=this->selectedOriginal;
@@ -273,7 +274,7 @@ SessionExit50DU Context::run() {
  original_consumed_ta_stage50DU::Owner consumedTaStage(originalMainApplication,*liveAudio);
  original_consumed_gc_stage50DU::Owner consumedGcStage(originalMainApplication,*liveAudio);
  original_consumed_ga_stage50DU::Owner consumedGaStage(originalMainApplication,*liveAudio);
- original_consumed_sa_stage50DU::Owner consumedSaStage(originalMainApplication,*liveAudio);
+ original_consumed_common_route_stage50DU::Owner consumedCommonRouteStage(originalMainApplication,*liveAudio);
  original_consumed_ma_stage50DU::Owner consumedMaStage(originalMainApplication,*liveAudio);
  original_consumed_mb_stage50DU::Owner consumedMbStage(originalMainApplication,*liveAudio);
  original_consumed_sc_stage50DU::Owner consumedScStage(originalMainApplication,*liveAudio);
@@ -285,7 +286,7 @@ SessionExit50DU Context::run() {
  std::shared_ptr<ta_original_world50LE::Owner> taOriginalWorld;
  std::shared_ptr<gc_original_world50LM::Owner> gcOriginalWorld;
  std::shared_ptr<ga_original_world50LH::Owner> gaOriginalWorld;
- std::shared_ptr<sa_original_world50LM::Owner> saOriginalWorld;
+ std::shared_ptr<common_route_world50LM::Owner> commonRouteWorld;
  std::shared_ptr<ma_original_world50LM::Owner> maOriginalWorld;
  std::shared_ptr<sc_original_world50LM::Owner> scOriginalWorld;
  std::shared_ptr<rc_original_world50LM::Owner> rcOriginalWorld;
@@ -371,6 +372,11 @@ SessionExit50DU Context::run() {
  AuthoredClass49N trackClass=AuthoredClass49N::A;
  require50DU(selectAuthoredClass49N(authoredTrackName,2,trackClass),
      "loaded original track's authored handling class unavailable");
+ // PORT EXTENSION, NOT ORIGINAL (DLC add-on course): an add-on code takes the
+ // phy_class of its dlc.json item; the code-letter rule above stays for the 13
+ // stock codes (one rule: the registry row answers for non-stock codes).
+ if(char addonClass=0;rr::game::dlc50DL::addonHandlingClass(authoredTrackName,addonClass))
+     trackClass=addonClass=='A'?AuthoredClass49N::A:addonClass=='B'?AuthoredClass49N::B:AuthoredClass49N::C;
  // The actual human's selected mode controls source215408..21549C cold
  // steering/engine torque binding as well as its later48W input branch.
  // ALL8 keeps the existing bootstrap and per-AI native mode58 rebind intact.
@@ -1078,25 +1084,64 @@ SessionExit50DU Context::run() {
   require50DU(actionsReady,"TC actual ordered action owners rejected");
  }
 
- // Preserve the one actual SA static owner across source prefix and rendering.
- if(saOriginalDisc){
-  saOriginalWorld=std::make_shared<sa_original_world50LM::Owner>();
-  sa_original_world50LM::Diagnostic diagnostic;
-  const bool loaded=saOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
-  require50DU(loaded,diagnostic.message.empty()?"SA original static world rejected":diagnostic.message.c_str());
-  require50DU(saOriginalWorld->mesh(),"SA original mesh publication missing");
+ // Preserve the one common-route static owner across source prefix and rendering.
+ // Its identity is the session row: stock SA = the stock row (receipts); a
+ // registry course = names from its code, its listed SHA/bytes, no stock row.
+ if(commonRouteOriginalDisc){
+  common_route_world50LM::Identity worldIdentity;
+  if(trackSession->registry)require50DU(common_route_world50LM::registryIdentity(trackSession->world->code,
+      trackSession->archiveSha256,trackSession->archiveBytes,worldIdentity),"common-route registry course identity rejected");
+  // inherit.particles: the stock course's particle closure joins this course's
+  // native namespace (see Identity::particleArchive). Members only, in their
+  // stock archive's order; the archive identity is a receipt.
+  rr::game::dlc50DL::AddonCourseLoad particleRow;
+  if(trackSession->registry&&rr::game::dlc50DL::addonCourseLoadByCode(trackSession->world->code,particleRow)&&
+     particleRow.particlesInherited){
+   const auto stockBytes=runtime_startup50fl::readBytes("work/native/project/disc/"+particleRow.particleArchive);
+   rr::assets::ResArchive48C stock;rr::assets::DecodeError48C error;
+   require50DU(!stockBytes.empty()&&stockBytes.size()<=course_archive_receipt50CI::maximumArchiveBytes()&&
+       rr::assets::decodeResource48C(stockBytes,stock,error,nullptr,course_archive_receipt50CI::limits()),
+       "inherited particle archive is not a readable RES");
+   auto subset=std::make_shared<rr::assets::ResArchive48C>();
+   for(const char* wanted:{"particle\\demoprt.prt","particle\\demoprt.psm","particle\\demoprt.pst"}){
+    // The stock archive's own entry (its own spelling), found case-insensitively.
+    const rr::assets::ResourceEntry48C* entry=nullptr;
+    const auto folded=[](std::string s){for(auto& c:s)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');return s;};
+    for(const auto& e:stock.entries)if(folded(e.name)==wanted){entry=&e;break;}
+    std::vector<std::uint8_t> member;
+    require50DU(entry&&rr::assets::extractResMember48C(stock,entry->name,member,error)&&!member.empty()&&
+        member.size()<=std::numeric_limits<std::uint32_t>::max()-subset->decoded.size(),
+        "inherited particle member missing from the named stock archive");
+    subset->entries.push_back({entry->name,static_cast<std::uint32_t>(subset->decoded.size()),static_cast<std::uint32_t>(member.size())});
+    subset->decoded.insert(subset->decoded.end(),member.begin(),member.end());
+   }
+   subset->blocks.push_back({0u,static_cast<std::uint32_t>(subset->decoded.size())});
+   worldIdentity.particleContainer=particleRow.particleArchive;
+   worldIdentity.particleSha=pod_materials50ed_fixture::detail::sha256(stockBytes);
+   worldIdentity.particleBytes=stockBytes.size();
+   worldIdentity.particleArchive=std::move(subset);
+   std::cerr<<"course_route_particle_mount code="<<trackSession->world->code<<" container="<<worldIdentity.particleContainer
+       <<" members=3 archive_bytes="<<worldIdentity.particleBytes<<'\n';
+  }
+  commonRouteWorld=std::make_shared<common_route_world50LM::Owner>(std::move(worldIdentity));
+  common_route_world50LM::Diagnostic diagnostic;
+  const bool loaded=commonRouteWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
+  if(!loaded)std::cerr<<"common-route static world rejected code="<<trackSession->world->code
+      <<" stage="<<diagnostic.stage<<" member="<<diagnostic.member<<'\n';
+  require50DU(loaded,diagnostic.message.empty()?"common-route static world rejected":diagnostic.message.c_str());
+  require50DU(commonRouteWorld->mesh(),"common-route static mesh publication missing");
   if(consumedLaunch&&originalCameraEnabled&&humanCourseEnabled&&(dynamicProfile.game34==2u||dynamicProfile.game34==0u)&&nativeOrdinaryLaunch11258==1){
    openNativeVideo();originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
    const auto domain=originalMainApplication.standardMaterialDomain();
-   require50DU(context&&domain&&domain->prepared(),"SA counted race material context unavailable");
+   require50DU(context&&domain&&domain->prepared(),"common-route counted race material context unavailable");
    if(!sourceModelRenderGlobals)sourceModelRenderGlobals=std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
    rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
-   const bool ready=consumedSaStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
-       *sourceModelRenderGlobals,saOriginalWorld,d,pc);
-   if(!ready)std::cerr<<"consumed_sa_prefix_rejected source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
-   require50DU(ready,"actual consumed SA race/world constructor prefix rejected");
+   const bool ready=consumedCommonRouteStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+       *sourceModelRenderGlobals,commonRouteWorld,d,pc);
+   if(!ready)std::cerr<<"consumed_common_route_prefix_rejected code="<<trackSession->world->code<<" source_pc="<<pc<<" material_pc="<<d.sourcePC<<'\n';
+   require50DU(ready,"actual consumed common-route race/world constructor prefix rejected");
   }
  }
 
@@ -1209,10 +1254,10 @@ SessionExit50DU Context::run() {
  std::size_t scTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::unique_ptr<course_trigger_sources50CT::Owner> maTriggerAuthoring;
  std::unique_ptr<ma_trigger_actions::Owner> maTriggerActions;
- std::unique_ptr<course_trigger_sources50CT::Owner> saTriggerAuthoring;
- std::unique_ptr<sa_trigger_actions::Owner> saTriggerActions;
+ std::unique_ptr<course_trigger_sources50CT::Owner> commonRouteTriggerAuthoring;
+ std::unique_ptr<sa_trigger_actions::Owner> commonRouteTriggerActions;
  std::size_t maTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
- std::size_t saTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
+ std::size_t commonRouteTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::unique_ptr<course_trigger_sources50CT::Owner> gaTriggerAuthoring;
  std::unique_ptr<ga_trigger_actions::Owner> gaTriggerActions;
  std::size_t gaTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
@@ -1259,7 +1304,7 @@ SessionExit50DU Context::run() {
  // other route) still to be retired onto this one; they are not course data.
  // Stock: GA and TA reach it.
  const bool commonTriggerChain=!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack&&
-     !isScTrack&&!isMaTrack&&!isSaTrack&&!isGcTrack;
+     !isScTrack&&!isMaTrack&&!commonRouteTrack&&!isGcTrack;
  if(commonTriggerChain){
   // One data rule (course_trigger_sources50ct.h): triggers and the animation
   // count come from the course's own TOB. Zones from the loaded world; LostAI
@@ -1288,21 +1333,30 @@ SessionExit50DU Context::run() {
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
   }
  }
- if(isSaTrack){
-  // Same data rule as GA/MA (course_trigger_sources50ct.h).
-  saTriggerAuthoring=std::make_unique<course_trigger_sources50CT::Owner>();std::string error;
-  const bool authored=saTriggerAuthoring->load(trackSession->archive,course_trigger_sources50CT::stockSa,
+ if(commonRouteTrack){
+  // Same data rule as GA/MA (course_trigger_sources50ct.h): the row's own TOB
+  // (tracks\<code>.tob); stock SA keeps its receipt slot, a registry code has none.
+  course_trigger_sources50CT::RowStock rowStock;
+  const auto* stock=course_trigger_sources50CT::commonRouteStock(trackSession->world->code,rowStock);
+  require50DU(stock,"common-route course code has no trigger slot");
+  commonRouteTriggerAuthoring=std::make_unique<course_trigger_sources50CT::Owner>();std::string error;
+  const bool authored=commonRouteTriggerAuthoring->load(trackSession->archive,*stock,
       actualWorld.zones.size(),static_cast<std::uint32_t>(rr::game::maxUndertrackNodes50ET),error);
-  require50DU(authored,error.empty()?"SA trigger authoring rejected":error.c_str());
-  // PORT STAND-IN (flagged): the SA action owner implements LostAI only.
-  require50DU(!saTriggerAuthoring->authors(course_trigger_sources50CT::Action::Animation)&&
-      !saTriggerAuthoring->authors(course_trigger_sources50CT::Action::PodSound),
-      "SA trigger Animation/PodSound actions need the common trigger action owner");
-  courseN64Rows=saTriggerAuthoring->n64Rows();
-  if(!saTriggerAuthoring->liveCount())saTriggerAuthoring.reset();
+  require50DU(authored,error.empty()?"common-route trigger authoring rejected":error.c_str());
+  std::cerr<<"course_route_triggers code="<<stock->code<<" stock="<<(commonRouteTriggerAuthoring->stockTob()?1:0)
+      <<" live="<<commonRouteTriggerAuthoring->liveCount()<<'\n';
+  // PORT STAND-IN (flagged): the common-route action owner (sa_trigger_actions,
+  // the former SA chain) implements LostAI only; Animation/PodSound are refused,
+  // not ignored, until it joins the common trigger chain (GA/TA action owner).
+  // No stock or add-on TOB on this route authors either (add-ons author no triggers).
+  require50DU(!commonRouteTriggerAuthoring->authors(course_trigger_sources50CT::Action::Animation)&&
+      !commonRouteTriggerAuthoring->authors(course_trigger_sources50CT::Action::PodSound),
+      "common-route trigger Animation/PodSound actions need the common trigger action owner");
+  courseN64Rows=commonRouteTriggerAuthoring->n64Rows();
+  if(!commonRouteTriggerAuthoring->liveCount())commonRouteTriggerAuthoring.reset();
   else{
-  saTriggerActions=std::make_unique<sa_trigger_actions::Owner>();
-  saTriggerCandidateFirst=sa_trigger_candidates::prepare(*saTriggerAuthoring,*saTriggerActions,
+  commonRouteTriggerActions=std::make_unique<sa_trigger_actions::Owner>();
+  commonRouteTriggerCandidateFirst=sa_trigger_candidates::prepare(*commonRouteTriggerAuthoring,*commonRouteTriggerActions,
       preparedCandidates,preparedBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
   }
  }
@@ -1648,9 +1702,9 @@ SessionExit50DU Context::run() {
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> maTriggerMembership;
  if(maTriggerAuthoring)for(std::size_t i=0;i<maTriggerAuthoring->liveCount();++i)
   maTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
- std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> saTriggerMembership;
- if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerAuthoring->liveCount();++i)
-  saTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity> commonRouteTriggerMembership;
+ if(commonRouteTriggerAuthoring)for(std::size_t i=0;i<commonRouteTriggerAuthoring->liveCount();++i)
+  commonRouteTriggerMembership[i]=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_trigger_authoring50IN::count> gcTriggerMembership;
  if(gcTriggerActions)for(auto& membership:gcTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
@@ -1727,8 +1781,14 @@ SessionExit50DU Context::run() {
   if(isScTrack)return scColdSources->sourcesDecoded()->memberBytes[4];
   if(isRaTrack)return raRuntime->source.memberBytes[3];
   if(!trackSession->tuningInArchive)return runtime_startup50fl::readBytes(trackSession->impactTuning);
+  // The archive that holds the course's TUN: its own archive, or (inherit.tuning,
+  // PORT EXTENSION, NOT ORIGINAL) the named stock course's archive. Same member
+  // read, same decoders below, either way.
+  const char* tuningArchive=trackSession->tuningArchive?trackSession->tuningArchive:trackSession->archive;
+  std::cerr<<"course_route_tuning code="<<trackSession->world->code<<" source="
+      <<(trackSession->tuningArchive?std::string("inherited:")+tuningArchive+"#"+trackSession->impactTuning:std::string("own"))<<'\n';
   rr::assets::ResArchive48C source;rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
-  require50DU(rr::assets::decodeResource48C(runtime_startup50fl::readBytes(trackSession->archive),source,error)&&
+  require50DU(rr::assets::decodeResource48C(runtime_startup50fl::readBytes(tuningArchive),source,error)&&
       rr::assets::extractResMember48C(source,trackSession->impactTuning,bytes,error),
       "actual selected original track tuning unavailable");return bytes;
  }();require50DU(rr::assets::readEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),tuning.size(),x.parameters.impactTuning,diagnostic),"actual selected-track impact tuning");x.parameters.impactTuningBound=true;
@@ -1832,7 +1892,7 @@ SessionExit50DU Context::run() {
  // All these actual authored groups use the same declared native shape5/6
  // backend. MA/SA were already registered, so omitting them here rejected
  // their genuine trigger owners before any geometric/action dispatch.
- query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate||isGaTrack||static_cast<bool>(gaTriggerActions)||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack;
+ query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate||isGaTrack||static_cast<bool>(gaTriggerActions)||maOrCommonRouteTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack;
  if(trackAnimations&&!trackAnimationBinding)require50DU(track_animation_candidates50AN::admitNonBodyResponse(*trackAnimations,
      candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
      "track animation CHARACTER non-body spring response routing differs");
@@ -1894,7 +1954,7 @@ SessionExit50DU Context::run() {
   .consumedRcStage=consumedRcStage,
   .consumedTcStage=consumedTcStage,
   .consumedRaStage=consumedRaStage,
-  .consumedSaStage=consumedSaStage,
+  .consumedCommonRouteStage=consumedCommonRouteStage,
   .consumedTaStage=consumedTaStage,
   .controlPresets=controlPresets,
   .courseColdLoad=courseColdLoad,
@@ -1986,13 +2046,13 @@ SessionExit50DU Context::run() {
   .isGaTrack=isGaTrack,
   .isGbTrack=isGbTrack,
   .isGcTrack=isGcTrack,
-  .isMaSaTrack=isMaSaTrack,
+  .maOrCommonRouteTrack=maOrCommonRouteTrack,
   .isMaTrack=isMaTrack,
   .isMbTrack=isMbTrack,
   .isMcTrack=isMcTrack,
   .isRaTrack=isRaTrack,
   .isRcTrack=isRcTrack,
-  .isSaTrack=isSaTrack,
+  .commonRouteTrack=commonRouteTrack,
   .isScTrack=isScTrack,
   .isTaTrack=isTaTrack,
   .isTbTrack=isTbTrack,
@@ -2064,7 +2124,7 @@ SessionExit50DU Context::run() {
   .nativeRcSelection=nativeRcSelection,
   .nativeRecordActor=nativeRecordActor,
   .nativeRosterOwners=nativeRosterOwners,
-  .nativeSaSelection=nativeSaSelection,
+  .nativeCommonRouteSelection=nativeCommonRouteSelection,
   .nativeScSelection=nativeScSelection,
   .nativeSelectedLights=nativeSelectedLights,
   .nativeTaSelection=nativeTaSelection,
@@ -2147,12 +2207,12 @@ SessionExit50DU Context::run() {
   .resetLifecycle=resetLifecycle,
   .response=response,
   .s=s,
-  .saOriginalDisc=saOriginalDisc,
-  .saOriginalWorld=saOriginalWorld,
-  .saTriggerActions=saTriggerActions,
-  .saTriggerAuthoring=saTriggerAuthoring,
-  .saTriggerCandidateFirst=saTriggerCandidateFirst,
-  .saTriggerMembership=saTriggerMembership,
+  .commonRouteOriginalDisc=commonRouteOriginalDisc,
+  .commonRouteWorld=commonRouteWorld,
+  .commonRouteTriggerActions=commonRouteTriggerActions,
+  .commonRouteTriggerAuthoring=commonRouteTriggerAuthoring,
+  .commonRouteTriggerCandidateFirst=commonRouteTriggerCandidateFirst,
+  .commonRouteTriggerMembership=commonRouteTriggerMembership,
   .scColdSources=scColdSources,
   .scGround=scGround,
   .scOriginalDisc=scOriginalDisc,

@@ -1,0 +1,59 @@
+DLC phase 3 (146c + 146r, merged by 147c): add-on courses on the Course screen and on ONE common race route; add-on course races end on the original Free Play Results flow without touching the stock Hall; Time Trial pick in the runner (build wt-147c-2, linked, not run)
+
+PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (add-on courses). Brought onto main 2b40b66
+as the tree delta of common-route-146r (98832f7) over main 4634754, three-way
+(146c steps 1-2: registry course facts, course_background, arrow-cycle entries,
+dlc_pack.py checks; 146r: the common route, particle closure mounts f9726f6 /
+76a23fd). Design and notes: work/scratch/146r/commit-1.txt .. commit-5.txt,
+CONTRACT.md, host_check.log (copied with this commit).
+
+Conflicts resolved keeping both sides:
+- native_race_intro_transport50la.inl: main's EMPTY event set (no authoring, no
+  bank; zero-cut counted race) kept; the authored path uses 146r's
+  originalRaceTrackIdAdmitted50LA and admits 0 events.
+- dlc_registry50dl.h: 146c course facts + main's "vs has no effect yet" note.
+- terrain_interactive_publication50du.cpp: main's introCutsAuthored (174E6C) gate
+  with 146r's consumedCommonRouteStage.
+- terrain_interactive_world50du.cpp: 146r's common-route world owner (registry
+  identity, inherited particle mount) with main's mode0-or-mode2 counted race.
+- run_windows_takeover.py: --hold-course / --addon-course pick next to
+  --hold-results, --hold-results-hall, --seed-slow-hall, --results-exit.
+
+147c on top (Results flow for an add-on course):
+- An add-on race already answers 1ABFC0 as its early exclusion (146r), so
+  record7E4 stays clear and 1AB5BC takes Unlock10 (only when the row names a
+  stock rival and 187E30 has a pending grant) or Course6 (1AB908); 1AC440 is
+  refused for an add-on race, so the stock Hall rows and the stock save never
+  receive it. New PENDING HOOK line at that moment (records come next round):
+  "dlc_course_record hook=pending key=<pkg>/<item> number=N code=cc
+  records_key=K site=1ABFC0 record7E4=0 stock_hall=untouched stock_save=untouched".
+- Course return: the Course entry reopens on the raced add-on entry when the
+  port selection still holds it and the profile's remembered slot is its stock
+  anchor (the original reopens on the remembered course; for an add-on launch
+  that is the anchor). Line "dlc_course_carousel action=restore slot=.. key=..";
+  a refused model operation logs restore_refused and keeps the stock entry.
+  Back from a stock entry (or another add-on entry) clears that anchor.
+- Time Trial: the Course confirm/launch rule already maps subtype 3 to the
+  item's time_trial mode (146r). Runner --addon-course-mode single|time_trial
+  (RR_TEST_ADDON_COURSE_SUBTYPE) sets the event type with original Down /
+  Right / Up before the course arrows ("addon_course_route event_move=..");
+  the confirm line now carries subtype=. Time Trial still ends on the port's
+  text panel (PORT STAND-IN, unchanged; converted next round).
+- VS: "vs" stays accepted in data; the port's Course screen binds only in
+  mode0 / tournament, so the VS course screen is not reached and nothing is
+  built for two players.
+
+Stand-ins (flagged in code, unchanged from 146r)
+- The other 12 stock courses keep their own loaders (isXxTrack); MA keeps its
+  own world instantiation; lighting Scene::sa / camera Course::sa now mean
+  "common route" (header rename deferred).
+- Common-route trigger action owner is LostAI-only; ATM owner stock-shaped.
+- Add-on Course-screen entries are port state over the anchor control.
+- HostRaceResults50IL text panel for subtypes 2/3.
+
+Headers edited by 147c: tests/native/original_ui_capture_navigation50la.h
+(2 TUs). Full relink wt-147c-1 on wt-146p-23: 250 TUs (146c/146r headers), linked;
+wt-147c-2 on wt-147c-1: 1 TU (Course Back clears the restore anchor), linked.
+Not run (no game runs in this helper).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

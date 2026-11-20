@@ -9,6 +9,15 @@ struct OriginalUiImageBankInput50KG {
     // which pins its real binder owner. Input order becomes explicit remap order.
     std::vector<std::shared_ptr<const OriginalUiScreenAssets50KG>> owners;
     const OriginalUiIpumTextureCache50KG* ipumCache=nullptr;
+    // PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (DLC add-on courses, 146r-U): exact
+    // loose package files (dlc:/ paths the DLC registry admitted at startup) that
+    // an owner's image provenance may name instead of a catalog member. Their
+    // identities are port-owned (never a catalog identity) and their combined
+    // identities use the separate namespace 0x554C. looseOwner keeps the bytes
+    // and identities alive for the bank's lifetime. Empty (every stock screen):
+    // the bank is built exactly as before.
+    std::vector<OriginalUiMemberView50KG> looseMembers;
+    std::shared_ptr<const void> looseOwner;
     // PORT EXTENSION, NOT ORIGINAL (DLC): add-on package menu archives (identity
     // addonUi, never in the catalog). Kept apart from `archives`: they take none
     // of the stock archive slots, catalog ordinals or the 256 stock sources;

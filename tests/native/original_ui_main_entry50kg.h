@@ -36,7 +36,7 @@ namespace tb_original_world50LM { class Owner; }
 namespace mc_original_world50LM { class Owner; }
 namespace rc_original_world50LM { class Owner; }
 namespace tc_original_world50LM { class Owner; }
-namespace sa_original_world50LM { class Owner; }
+namespace common_route_world50LM { class Owner; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
 namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
@@ -1094,7 +1094,7 @@ public:
         original_camera_session50KX::ActualOwners,
         const original_camera_session50KX::AuthoredStorage&)const noexcept;
     // Same-root SA custody requires the genuine consumed SA race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeSaCameraSession50LA(
+    std::shared_ptr<original_camera_session50KX::Session> createNativeCommonRouteCameraSession50LA(
         original_camera_session50KX::ActualOwners,
         const original_camera_session50KX::AuthoredStorage&)const noexcept;
     // Same-root MA custody requires the genuine consumed MA race/world owner.
@@ -1266,8 +1266,8 @@ public:
         std::shared_ptr<rc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
     bool constructConsumedTcRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<tc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedSaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<sa_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
+    bool constructConsumedCommonRouteWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
+        std::shared_ptr<common_route_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
     bool constructConsumedGaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<ga_original_world50LH::Owner>,std::uint32_t& sourcePC)const noexcept;
     const std::int32_t& applicationMode22C()const noexcept{return sourceApplicationMode22C_;}

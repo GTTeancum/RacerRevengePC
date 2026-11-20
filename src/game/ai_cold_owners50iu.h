@@ -2,8 +2,10 @@
 #include "authored_parameters49n.h"
 #include "track_navigation50eu.h"
 #include "original_course_descriptor50kg.h"
+#include "dlc_course_entries50dl.h"
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 namespace rr::game {
 // Typed projection of the writes at16E260/16E630. These defaults are source
@@ -50,15 +52,46 @@ inline bool applyAiCreateClass50IU(AuthoredClass49N actualRaceClass,
 // Neither the visible Course control number nor the selected player pod may
 // substitute for those source fields. Unknown names are rejected unchanged.
 // Metadata binding alone does not admit a native world or change profile locks.
+// Registry (add-on) course, 146r. PORT EXTENSION, NOT ORIGINAL: an add-on code
+// has no descriptor row (1125F stays 0xff) and no tournament order (187B10
+// stays -1). Its race class is the row's ai_class, mapped onto the same three
+// values 16E590..16E5B4 produces (A=1, B=2, C=3), and its course-record pod
+// is the row's rival (0 = none: no racer60 matches, FE4 stays 0 for all).
 struct AiFreshCreateSelection50IU {
     std::uint8_t selectedTrackId1125F=0xff;
     std::int32_t selectedOrder187B10=-1;
     AuthoredClass49N actualRaceClass=AuthoredClass49N::A;
     std::int32_t freshCourseRecordPod11280=0;
     bool bound=false;
+    bool registryCourse=false; // true = bound from the add-on registry row
 };
+inline bool bindRegistryAiCreateSelection50IU(const char* trackCode,
+    AiFreshCreateSelection50IU& out,bool log) noexcept {
+    const char code[3]={trackCode[0],trackCode[1],'\0'};
+    char aiClass=0;unsigned rival=0;
+    try{
+        dlc50DL::AddonCourseLoad row;
+        if(!dlc50DL::addonCourseLoadByCode(code,row))return false;
+        aiClass=row.aiClass;rival=row.rivalRacer;
+    }catch(...){return false;}
+    AiFreshCreateSelection50IU next{};
+    if(aiClass=='A')next.actualRaceClass=AuthoredClass49N::A;
+    else if(aiClass=='B')next.actualRaceClass=AuthoredClass49N::B;
+    else if(aiClass=='C')next.actualRaceClass=AuthoredClass49N::C;
+    else return false; // the registry admits A/B/C only; anything else = no owner
+    if(rival>0x7fffffffu)return false;
+    next.freshCourseRecordPod11280=static_cast<std::int32_t>(rival);
+    next.registryCourse=true;next.bound=true;out=next;
+    if(log){
+        if(rival)std::fprintf(stderr,"course_route_ai code=%s ai_class=%c rival=%u stock=0\n",code,aiClass,rival);
+        else std::fprintf(stderr,"course_route_ai code=%s ai_class=%c rival=none stock=0\n",code,aiClass);
+    }
+    return true;
+}
+// log=false for a second reader of the same race selection (water grid), so a
+// race prints one course_route_ai line.
 inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
-    std::size_t bytes,AiFreshCreateSelection50IU& out) noexcept {
+    std::size_t bytes,AiFreshCreateSelection50IU& out,bool log=true) noexcept {
     if(!trackCode||bytes!=2)return false;
     // Original descriptor rows at profile11278, stride12. Names and record
     // pods are constructor data, independent of human rider and native world
@@ -77,7 +110,9 @@ inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
             break;
         }
     }
-    if(next.selectedTrackId1125F==0xff)return false;
+    // Not a stock descriptor code: the add-on registry row answers (registry
+    // codes are never stock codes); unknown codes are still rejected unchanged.
+    if(next.selectedTrackId1125F==0xff)return bindRegistryAiCreateSelection50IU(trackCode,out,log);
     // Original fresh byte stores17EF00..17F6EC. The187B10 scan compares
     // (1125F&15) with these entries; it does not use the track ID as order.
     constexpr std::uint8_t freshCourseOrder[]{0,11,4,8,7,1,5,9,12,6,10,3,2};
@@ -89,7 +124,11 @@ inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
     //16E590..16E5B4, independent of the PHY filename/class exceptions49N.
     next.actualRaceClass=next.selectedOrder187B10<5?AuthoredClass49N::A:
         next.selectedOrder187B10<9?AuthoredClass49N::B:AuthoredClass49N::C;
-    next.bound=true;out=next;return true;
+    next.bound=true;out=next;
+    if(log)std::fprintf(stderr,"course_route_ai code=%c%c ai_class=%c rival=%d stock=1 track_id=%u order=%d\n",
+        upper(trackCode[0]),upper(trackCode[1]),"?ABC"[static_cast<unsigned>(next.actualRaceClass)&3u],
+        next.freshCourseRecordPod11280,static_cast<unsigned>(next.selectedTrackId1125F),next.selectedOrder187B10);
+    return true;
 }
 // Retained strict GC-only compatibility API. Existing callers keep their
 // defaults and cannot accidentally admit GA under a GC-shaped selection.
@@ -116,13 +155,15 @@ struct AiCreateIdentity50IU {
 };
 //1AE4C4 forms opponent ordinal+human count.16E474 stores FE0,2107E8
 //uses it as vehicle5C. FE0 is an ordinal, never a manager pointer.
+// Course-record pod 0 = an add-on course with rival "none" (PORT EXTENSION,
+// NOT ORIGINAL; every stock row has a pod >0): no racer matches, FE4=0.
 // Zero humans is admitted for an explicitly selected native AI roster. This
 // does not claim the retail1AE620 human-dependent roster root supports it.
 inline bool bindAiCreateIdentity50IU(std::uint32_t actualOpponentOrdinal,
     std::uint32_t actualHumanCount,std::int32_t actualPod60,
     std::int32_t actualCourseRecordPod,AiCreateIdentity50IU& out) noexcept {
     if(actualHumanCount>2||actualOpponentOrdinal>=8||
-       actualHumanCount+actualOpponentOrdinal>=8||actualPod60<=0||actualCourseRecordPod<=0)
+       actualHumanCount+actualOpponentOrdinal>=8||actualPod60<=0||actualCourseRecordPod<0)
         return false;
     out={actualOpponentOrdinal+actualHumanCount,actualPod60,
         actualPod60==actualCourseRecordPod?1u:0u};return true;

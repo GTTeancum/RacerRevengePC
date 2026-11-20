@@ -4,7 +4,7 @@ import pathlib,re,subprocess,sys,json
 MAIN=pathlib.Path(r'D:\Programming\GitHub\RacerRevengePC')
 WT=pathlib.Path(r'D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\agent-a061eb9837b6bc01f')
 OUT=WT/'work'/'scratch'/'146p'/'obj';OUT.mkdir(exist_ok=True)
-BASE=MAIN/'build'/'takeover-b145c'
+BASE=MAIN/'build'/'takeover-b145a'
 r=json.loads((BASE/'build-receipt.json').read_text(encoding='utf-8-sig'))
 TOPS=('src','platform','tests','third_party')
 def remap(t):

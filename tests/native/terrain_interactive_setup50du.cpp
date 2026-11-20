@@ -204,7 +204,7 @@ SessionExit50DU Context::run() {
  auto& consumedRcStage=this->consumedRcStage;
  auto& consumedTcStage=this->consumedTcStage;
  auto& consumedRaStage=this->consumedRaStage;
- auto& consumedSaStage=this->consumedSaStage;
+ auto& consumedCommonRouteStage=this->consumedCommonRouteStage;
  auto& consumedTaStage=this->consumedTaStage;
  auto& controlPresets=this->controlPresets;
  auto& courseColdLoad=this->courseColdLoad;
@@ -296,13 +296,13 @@ SessionExit50DU Context::run() {
  auto& isGaTrack=this->isGaTrack;
  auto& isGbTrack=this->isGbTrack;
  auto& isGcTrack=this->isGcTrack;
- auto& isMaSaTrack=this->isMaSaTrack;
+ auto& maOrCommonRouteTrack=this->maOrCommonRouteTrack;
  auto& isMaTrack=this->isMaTrack;
  auto& isMbTrack=this->isMbTrack;
  auto& isMcTrack=this->isMcTrack;
  auto& isRaTrack=this->isRaTrack;
  auto& isRcTrack=this->isRcTrack;
- auto& isSaTrack=this->isSaTrack;
+ auto& commonRouteTrack=this->commonRouteTrack;
  auto& isScTrack=this->isScTrack;
  auto& isTaTrack=this->isTaTrack;
  auto& isTbTrack=this->isTbTrack;
@@ -374,7 +374,7 @@ SessionExit50DU Context::run() {
  auto& nativeRcSelection=this->nativeRcSelection;
  auto& nativeRecordActor=this->nativeRecordActor;
  auto& nativeRosterOwners=this->nativeRosterOwners;
- auto& nativeSaSelection=this->nativeSaSelection;
+ auto& nativeCommonRouteSelection=this->nativeCommonRouteSelection;
  auto& nativeScSelection=this->nativeScSelection;
  auto& nativeSelectedLights=this->nativeSelectedLights;
  auto& nativeTaSelection=this->nativeTaSelection;
@@ -457,12 +457,12 @@ SessionExit50DU Context::run() {
  auto& resetLifecycle=this->resetLifecycle;
  auto& response=this->response;
  auto& s=this->s;
- auto& saOriginalDisc=this->saOriginalDisc;
- auto& saOriginalWorld=this->saOriginalWorld;
- auto& saTriggerActions=this->saTriggerActions;
- auto& saTriggerAuthoring=this->saTriggerAuthoring;
- auto& saTriggerCandidateFirst=this->saTriggerCandidateFirst;
- auto& saTriggerMembership=this->saTriggerMembership;
+ auto& commonRouteOriginalDisc=this->commonRouteOriginalDisc;
+ auto& commonRouteWorld=this->commonRouteWorld;
+ auto& commonRouteTriggerActions=this->commonRouteTriggerActions;
+ auto& commonRouteTriggerAuthoring=this->commonRouteTriggerAuthoring;
+ auto& commonRouteTriggerCandidateFirst=this->commonRouteTriggerCandidateFirst;
+ auto& commonRouteTriggerMembership=this->commonRouteTriggerMembership;
  auto& scColdSources=this->scColdSources;
  auto& scGround=this->scGround;
  auto& scOriginalDisc=this->scOriginalDisc;
@@ -1066,7 +1066,7 @@ SessionExit50DU Context::run() {
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio,gcGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
- if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedRcStage.race()||consumedMcStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
+ if((consumedRaStage.race()||consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedRcStage.race()||consumedMcStage.race()||consumedCommonRouteStage.race()||consumedGaStage.race()||consumedGcStage.race())&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
      "actual counted muted audio group settings rejected");
  if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
      "explicit muted camera cycle owner rejected");
@@ -1188,9 +1188,13 @@ SessionExit50DU Context::run() {
       materialAudio->prepareGb(gbColdSources,audioRoot,*materialMixer,64,audioError):isTbTrack?
       materialAudio->prepareTb(tbColdSources,audioRoot,*materialMixer,64,audioError):isRcTrack?
       materialAudio->prepareRc(rcColdSources,audioRoot,*materialMixer,64,audioError):
+      // The ONE common race route: the session's own archive (stock SA or an
+      // add-on package) and that code's AUB; SA's stock row is a receipt.
+      commonRouteTrack?materialAudio->prepareCommonRoute(trackSession->archive,trackSession->world->code,
+      audioRoot,*materialMixer,64,audioError):
       materialAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,
       *materialMixer,64,audioError,track_session_assets50IG::codeEquals(trackSession->world->code,"GA")?
-      material_audio50HI::Track::ga:isRaTrack?material_audio50HI::Track::ra:isTcTrack?material_audio50HI::Track::tc:isScTrack?material_audio50HI::Track::sc:isMbTrack?material_audio50HI::Track::mb:isMaTrack?material_audio50HI::Track::ma:isSaTrack?material_audio50HI::Track::sa:
+      material_audio50HI::Track::ga:isRaTrack?material_audio50HI::Track::ra:isTcTrack?material_audio50HI::Track::tc:isScTrack?material_audio50HI::Track::sc:isMbTrack?material_audio50HI::Track::mb:isMaTrack?material_audio50HI::Track::ma:
       trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta));
   require50DU(materialAudioReady,audioError.empty()?"native material audio preparation failed":audioError.c_str());
   // Same-source identity is required; the row counts come from the AUB
@@ -1693,15 +1697,15 @@ SessionExit50DU Context::run() {
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"MA authored trigger cold update"),"MA trigger cold membership failed");
  }
- if(saTriggerAuthoring)for(std::size_t i=0;i<saTriggerAuthoring->liveCount();++i){
-  auto& membership=*saTriggerMembership[i];const auto& authored=saTriggerAuthoring->source(i);
+ if(commonRouteTriggerAuthoring)for(std::size_t i=0;i<commonRouteTriggerAuthoring->liveCount();++i){
+  auto& membership=*commonRouteTriggerMembership[i];const auto& authored=commonRouteTriggerAuthoring->source(i);
   const auto bounds=sa_trigger_candidates::bounds(authored);
-  const auto ref=static_cast<CollectionRef50BX>(saTriggerCandidateFirst+i+1);
+  const auto ref=static_cast<CollectionRef50BX>(commonRouteTriggerCandidateFirst+i+1);
   require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       membership.storage(),ref,authored.zone,ZoneMethod50CL::First,0.f,bounds,membershipWork),
-      "SA authored trigger attachment"),"SA trigger zone attachment failed");
+      "common-route authored trigger attachment"),"common-route trigger zone attachment failed");
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
-      bounds,membershipWork),"SA authored trigger cold update"),"SA trigger cold membership failed");
+      bounds,membershipWork),"common-route authored trigger cold update"),"common-route trigger cold membership failed");
  }
  if(gcTriggerActions)for(std::size_t i=0;i<gcTriggerMembership.size();++i){
   auto& membership=*gcTriggerMembership[i];const auto& authored=gcTriggerAuthoring->source(i);
@@ -1819,8 +1823,8 @@ SessionExit50DU Context::run() {
        source.filter->identity,*source.resource,source.worldMatrix),"SC trigger actual prepared COL pose unavailable");
    if(maTriggerActions&&maTriggerActions->ready())require50DU(maTriggerActions->observePrepared(
        source.filter->identity,*source.resource,source.worldMatrix),"MA trigger lifecycle query pose unavailable");
-   if(saTriggerActions&&saTriggerActions->ready())require50DU(saTriggerActions->observePrepared(
-       source.filter->identity,*source.resource,source.worldMatrix),"SA trigger lifecycle query pose unavailable");
+   if(commonRouteTriggerActions&&commonRouteTriggerActions->ready())require50DU(commonRouteTriggerActions->observePrepared(
+       source.filter->identity,*source.resource,source.worldMatrix),"common-route trigger lifecycle query pose unavailable");
   }
   if(gcTriggerActions&&gcTriggerActions->nativeGroup().dispatches!=reportedGcTriggerDispatches){
    const auto& group=gcTriggerActions->nativeGroup();const auto& actions=gcTriggerActions->counters();
@@ -2607,7 +2611,7 @@ SessionExit50DU Context::run() {
       "TB shared lighting lost its actual authenticated source");
   if(!isRaTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)require50DU(nativeScSelection?gcLightOwner.prepareScNative(bytes,raceRacerCount,gcLightDiagnostic):nativeMbSelection?gcLightOwner.prepareMbNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeMaSelection?gcLightOwner.prepareMaNative(bytes,raceRacerCount,gcLightDiagnostic):
-      nativeSaSelection?gcLightOwner.prepareSaNative(bytes,raceRacerCount,gcLightDiagnostic):
+      nativeCommonRouteSelection?gcLightOwner.prepareCommonRouteNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeGaSelection?gcLightOwner.prepareGaNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
       gcLightOwner.prepare(bytes,raceRacerCount,gcLightDiagnostic),
@@ -3222,7 +3226,7 @@ SessionExit50DU Context::run() {
   .consumedRcStage=consumedRcStage,
   .consumedTcStage=consumedTcStage,
   .consumedRaStage=consumedRaStage,
-  .consumedSaStage=consumedSaStage,
+  .consumedCommonRouteStage=consumedCommonRouteStage,
   .consumedTaStage=consumedTaStage,
   .controlPresets=controlPresets,
   .controller=controller,
@@ -3364,13 +3368,13 @@ SessionExit50DU Context::run() {
   .isGaTrack=isGaTrack,
   .isGbTrack=isGbTrack,
   .isGcTrack=isGcTrack,
-  .isMaSaTrack=isMaSaTrack,
+  .maOrCommonRouteTrack=maOrCommonRouteTrack,
   .isMaTrack=isMaTrack,
   .isMbTrack=isMbTrack,
   .isMcTrack=isMcTrack,
   .isRaTrack=isRaTrack,
   .isRcTrack=isRcTrack,
-  .isSaTrack=isSaTrack,
+  .commonRouteTrack=commonRouteTrack,
   .isScTrack=isScTrack,
   .isTaTrack=isTaTrack,
   .isTbTrack=isTbTrack,
@@ -3473,7 +3477,7 @@ SessionExit50DU Context::run() {
   .nativeRcSelection=nativeRcSelection,
   .nativeRecordActor=nativeRecordActor,
   .nativeRosterOwners=nativeRosterOwners,
-  .nativeSaSelection=nativeSaSelection,
+  .nativeCommonRouteSelection=nativeCommonRouteSelection,
   .nativeScSelection=nativeScSelection,
   .nativeSelectedLights=nativeSelectedLights,
   .nativeTaSelection=nativeTaSelection,
@@ -3624,11 +3628,11 @@ SessionExit50DU Context::run() {
   .retireRcAudioOwnersCall=interactive_frame50DU::BorrowedCall<bool() noexcept>{retireRcAudioOwners},
   .retireTbAudioOwnersCall=interactive_frame50DU::BorrowedCall<bool() noexcept>{retireTbAudioOwners},
   .s=s,
-  .saOriginalDisc=saOriginalDisc,
-  .saOriginalWorld=saOriginalWorld,
-  .saTriggerActions=saTriggerActions,
-  .saTriggerAuthoring=saTriggerAuthoring,
-  .saTriggerMembership=saTriggerMembership,
+  .commonRouteOriginalDisc=commonRouteOriginalDisc,
+  .commonRouteWorld=commonRouteWorld,
+  .commonRouteTriggerActions=commonRouteTriggerActions,
+  .commonRouteTriggerAuthoring=commonRouteTriggerAuthoring,
+  .commonRouteTriggerMembership=commonRouteTriggerMembership,
   .sampleControllerCall=interactive_frame50DU::BorrowedCall<void(bool)>{sampleController},
   .scColdSources=scColdSources,
   .scGround=scGround,

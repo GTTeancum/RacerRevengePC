@@ -5,9 +5,13 @@
 #include "../../../src/game/original_ui_course_clip_camera50kg.h"
 #include "../../../src/game/original_ui_rider_model_fog50kg.h"
 #include "../../../src/game/original_ui_course_static_pst_animation50kg.h"
+#include "../../../src/assets/dlc_files50dl.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <numeric>
 namespace rr::platform {
@@ -51,6 +55,9 @@ struct OriginalUiCourseDrawContribution50KG::Storage {
  std::vector<MaterialTextureSampler50EB> samplers;
  std::vector<std::uint8_t> maxAlpha;
  std::shared_ptr<const MaterialTextureGl50EB> gpu;std::uint64_t publication=0;
+ // PORT EXTENSION (DLC add-on courses): bank owner 2 and the frame's substitutions.
+ std::shared_ptr<const OriginalUiCourseAddonImages50DL> addon;bool addonAdmitted=false;
+ OriginalUiCourseAddonFrame50DL* frame=nullptr;
  std::vector<game::OriginalUiTextureAnimation50KG> animation;std::vector<std::uint32_t> frames;
  std::vector<std::uint32_t> controllerStamps;
  std::vector<game::OriginalUiCourseStaticPstAnimation50KG> staticPstAnimation;
@@ -109,12 +116,75 @@ bool OriginalUiCourseDrawContribution50KG::bind(std::shared_ptr<OriginalUiCourse
   storage_=std::move(s);return true;
  }catch(...){return fail(d,E::allocation);}
 }
+int OriginalUiCourseAddonImages50DL::image(const std::string& path,bool background)const noexcept{
+ for(std::size_t i=0;i<files.size();++i)if(files[i]&&files[i]->path==path&&files[i]->background==background)return static_cast<int>(i);
+ return -1;
+}
+bool loadOriginalUiCourseAddonImages50DL(const std::vector<OriginalUiCourseAddonImageRequest50DL>& requests,
+ std::shared_ptr<OriginalUiCourseAddonImages50DL>& out,std::string& why)noexcept{
+ // PORT EXTENSION, NOT ORIGINAL BEHAVIOUR: see the header. Bounded: at most 64
+ // files, each at most 4 MiB (a background exactly 287772 bytes).
+ out.reset();why.clear();
+ try{
+  auto next=std::make_shared<OriginalUiCourseAddonImages50DL>();std::vector<assets::OriginalUiImageSource50KG> sources;
+  for(const auto& r:requests){
+   if(r.path.empty()||next->image(r.path,r.background)>=0)continue;
+   if(next->files.size()==64){why="more than 64 add-on course images";return false;}
+   auto f=std::make_unique<OriginalUiCourseAddonImages50DL::File>();f->path=r.path;f->background=r.background;f->templateModel=r.templateModel;
+   const auto host=rr::assets::dlc50DL::host(std::filesystem::path(r.path)); // admitted dlc:/ file; throws when it changed after startup
+   std::ifstream file(host,std::ios::binary|std::ios::ate);
+   if(!file){why="cannot open "+r.path;return false;}
+   const auto size=static_cast<std::streamoff>(file.tellg());
+   if(size<=0||size>(std::streamoff(4)<<20)||(r.background&&size!=287772)){why="unexpected size of "+r.path;return false;}
+   f->bytes.resize(static_cast<std::size_t>(size));file.seekg(0);
+   if(!file.read(reinterpret_cast<char*>(f->bytes.data()),size)){why="cannot read "+r.path;return false;}
+   f->name=r.path;
+   f->identity={f->name.c_str(),0,static_cast<std::uint32_t>(f->bytes.size()),
+    r.background?assets::originalUiAddonCourseBackgroundTag50DL:nullptr};
+   next->files.push_back(std::move(f));
+  }
+  if(next->files.empty()){why="no add-on course image listed";return false;}
+  for(std::size_t i=0;i<next->files.size();++i){const auto& f=*next->files[i];
+   const assets::OriginalUiMemberView50KG view{&f.identity,f.bytes.data(),f.bytes.size()};
+   next->views.push_back(view);sources.push_back({std::uint64_t(i)+1,view,0,f.bytes.size(),{}});}
+  next->images=std::make_shared<assets::OriginalUiScreenAssets50KG>();assets::OriginalUiScreenAssetDiagnostic50KG sd;
+  if(!next->images->load(sources,sd)){why="decode failed for "+next->files[std::min(sd.image,next->files.size()-1)]->path;return false;}
+  for(std::size_t i=0;i<next->files.size();++i){const auto* t=next->images->decodedTexture(static_cast<std::uint32_t>(i));
+   if(!t||t->mips.empty()){why="decode failed for "+next->files[i]->path;return false;}
+   if(next->files[i]->background&&(t->kind!=1||t->mips.size()!=1||t->mips[0].width!=640||t->mips[0].height!=448)){
+    why="background is not the 640x448 one-level layout: "+next->files[i]->path;return false;}}
+  out=std::move(next);return true;
+ }catch(const std::exception& e){why=e.what();return false;}
+ catch(...){why="allocation";return false;}
+}
+bool OriginalUiCourseDrawContribution50KG::setAddonImages(std::shared_ptr<const OriginalUiCourseAddonImages50DL> images)noexcept{
+ if(!storage_||storage_->bank||storage_->bankPrepared)return false;storage_->addon=std::move(images);return true;
+}
+bool OriginalUiCourseDrawContribution50KG::addonImagesAdmitted()const noexcept{return storage_&&storage_->addonAdmitted;}
+void OriginalUiCourseDrawContribution50KG::setAddonFrame(OriginalUiCourseAddonFrame50DL* frame)noexcept{if(storage_)storage_->frame=frame;}
 bool OriginalUiCourseDrawContribution50KG::prepareBank(D& d)noexcept{
  d={};if(!storage_||storage_->bank)return fail(d,E::phase);auto& s=*storage_;
+ // PORT EXTENSION (DLC add-on courses): first with the add-on images as owner 2;
+ // when the bank or a sampler refuses them, once more exactly as stock (logged).
+ // Without add-on images this is the single original attempt.
+ for(const bool withAddon:{true,false}){
+  if(withAddon&&!s.addon)continue;
+  s.bank.reset();s.samplers.clear();s.maxAlpha.clear();s.registrations.clear();s.bankPrepared=false;s.addonAdmitted=false;
+  D attempt{};
+  if(prepareBankOnce(withAddon,attempt)){s.addonAdmitted=withAddon;d=attempt;return true;}
+  if(!withAddon){d=attempt;return false;}
+  std::fprintf(stderr,"dlc_course_images status=refused reason=\"the Course bank did not take the add-on images (error %u)\" fallback=template_images\n",unsigned(attempt.error));
+ }
+ return fail(d,E::bank);
+}
+bool OriginalUiCourseDrawContribution50KG::prepareBankOnce(bool withAddon,D& d)noexcept{
+ d={};auto& s=*storage_;
  try{
   assets::OriginalUiImageBankInput50KG input=*s.resources->bankInput();if(input.owners.size()!=1||s.holo->bankInput()->owners.size()!=1)return fail(d,E::bank);
   for(const auto& a:s.holo->bankInput()->archives){bool found=false;for(const auto& b:input.archives)found|=a->identity()==b->identity();if(!found)input.archives.push_back(a);}
-  input.owners.push_back(s.holo->images());auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();assets::OriginalUiImageBankDiagnostic50KG bd;
+  input.owners.push_back(s.holo->images());
+  if(withAddon){if(!s.addon||!s.addon->images)return fail(d,E::bank);input.owners.push_back(s.addon->images);input.looseMembers=s.addon->views;input.looseOwner=s.addon;}
+  auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();assets::OriginalUiImageBankDiagnostic50KG bd;
   if(!bank->load(input,bd))return fail(d,E::bank);s.bank=bank;
   const auto images=bank->images();const auto* textures=images->textures();s.samplers.resize(textures->textureCount());s.maxAlpha.resize(textures->textureCount());
   for(std::uint32_t i=0;i<textures->textureCount();++i){const auto& rgba=textures->texture(i)->texture.rgba;for(std::size_t j=3;j<rgba.size();j+=4)s.maxAlpha[i]=std::max(s.maxAlpha[i],rgba[j]);}
@@ -141,6 +211,16 @@ bool OriginalUiCourseDrawContribution50KG::prepareBank(D& d)noexcept{
    if(planet==2&&s.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)continue;
    OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;auto bgImage=s.mapped(0,s.resources->backgroundImage(planet));
    if(!prepareOriginalUiCourseBackgroundSpan50KG(*images,bgImage,bg,bgState)||!assign(bgImage,bgState.sampler))return fail(d,E::material);}
+  if(withAddon)for(std::uint32_t i=0;i<s.addon->files.size();++i){const auto& f=*s.addon->files[i];const auto index=s.mapped(2,i);
+   if(index==missing)return fail(d,E::bank);
+   if(f.background){OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;
+    if(!prepareOriginalUiCourseBackgroundSpan50KG(*images,index,bg,bgState)||!assign(index,bgState.sampler))return fail(d,E::material);continue;}
+   // A preview takes the template hologram's pass-0 (holo_<template>) material.
+   const auto* m=s.holo->material(f.templateModel);if(!m||m->passes.empty())return fail(d,E::model);
+   assets::OriginalUiLitMaterial50KM policy;OriginalUiMaterialSpan50KG converted;
+   if(!assets::prepareOriginalUiLitMaterial50KM(m->passes[0],*images->decodedTexture(index),policy,d.materialDetail)||
+      !convertOriginalUiLitMaterialSpan50KM(policy,{0,1,1,index,textures->textureCount()},converted)||!assign(index,converted.native.sampler))return fail(d,E::material);
+  }
   for(const auto& p:s.samplers)if(p.minification==MaterialTextureFilter50EB::unspecified)return fail(d,E::material);
   s.bankPrepared=true;return true;
  }catch(...){return fail(d,E::allocation);}
@@ -167,7 +247,10 @@ bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock
  try{if(!s.tournament&&clock.advanceAnimations&&!s.holo->advanceTextureAnimations(clock.milliseconds,d.hologram))return fail(d,E::clock);
   s.sourceMutationInFrame=false;
   s.active=true;s.ordinary=s.page=s.exit=s.prompts=s.top=s.finished=s.failed=false;s.aperture=0;s.vertices.clear();s.w.clear();s.fog.clear();s.spans.clear();s.states.clear();s.orders.clear();
-  OriginalUiMaterialSpan50KG material;if(!prepareOriginalUiCourseBackgroundSpan50KG(*s.bank->images(),s.mapped(0,s.resources->backgroundImage(planet)),material.span,material.native))return fail(d,E::material);
+  // PORT EXTENSION (DLC add-on courses): a package background replaces the planet's.
+  const auto background=s.frame&&s.addonAdmitted&&s.frame->backgroundImage>=0?
+   s.mapped(2,static_cast<std::uint32_t>(s.frame->backgroundImage)):s.mapped(0,s.resources->backgroundImage(planet));
+  OriginalUiMaterialSpan50KG material;if(!prepareOriginalUiCourseBackgroundSpan50KG(*s.bank->images(),background,material.span,material.native))return fail(d,E::material);
   std::array<assets::Vertex48B,4> v{};constexpr float xy[4][2]={{0,0},{640,0},{640,448},{0,448}};
   for(unsigned i=0;i<4;++i){v[i].position[0]=xy[i][0];v[i].position[1]=xy[i][1];v[i].position[2]=0;v[i].uv[0]=(i==1||i==2)?1.f:1.f/640;v[i].uv[1]=i>=2?1.f:1.f/448;v[i].color[0]=v[i].color[1]=v[i].color[2]=128;v[i].color[3]=64;}
   if(!s.add(v.data(),4,nullptr,nullptr,material,nullptr,d)){s.failed=true;return false;}return true;
@@ -220,7 +303,7 @@ bool OriginalUiCourseDrawContribution50KG::appendVertices(const std::vector<asse
 bool OriginalUiCourseDrawContribution50KG::append(const game::OriginalUiOverlayQuad50KG& q,std::uint32_t material,float z,D& d)noexcept{
  try{std::vector<assets::Vertex48B> v(4);constexpr unsigned order[]={0,1,3,2};for(unsigned i=0;i<4;++i){const auto& a=q.vertices[order[i]];v[i].position[0]=a.x;v[i].position[1]=a.y;v[i].position[2]=z;v[i].uv[0]=a.u;v[i].uv[1]=a.v;for(unsigned c=0;c<4;++c)v[i].color[c]=q.sourcePacketColor[c];}return appendVertices(v,material,d);}catch(...){return fail(d,E::allocation);}
 }
-bool OriginalUiCourseDrawContribution50KG::model(std::uint16_t id,D& d)noexcept{
+bool OriginalUiCourseDrawContribution50KG::model(std::uint16_t id,D& d,std::int32_t pass0AddonImage)noexcept{
  auto& s=*storage_;auto* model=s.holo->model(id);auto* source=s.holo->modelAssets(id);if(!model||!source)return fail(d,E::model);if(!model->shown())return true;
  try{game::ModelPalette49S palette;game::OriginalUiCourseHologramSceneDiagnostic50KG md;if(!model->projectPalette(1,palette,md))return fail(d,E::model);
   game::OriginalUiRiderModelFog50KG fog;if(!game::prepareOriginalUiRiderModelFog50KG(*source->hierarchy(),model->graph(),s.render.cameraAfterFog.position,s.render.fogStart,fog))return fail(d,E::model);
@@ -236,7 +319,9 @@ bool OriginalUiCourseDrawContribution50KG::model(std::uint16_t id,D& d)noexcept{
      const bool ok=s.holo->serviceTextureAnimation24A740(id,pass,s.clock.applicationAnimation,d.hologram);
      if(s.holo->textureAnimationMutationSerial()!=before)s.sourceMutationInFrame=true;
      if(!ok)return fail(d,E::clock,d.hologram.sourcePC);}
-    auto image=s.mapped(1,s.holo->currentImage(id,pass));assets::OriginalUiLitMaterial50KM policy;OriginalUiMaterialSpan50KG m;
+    // PORT EXTENSION (DLC add-on courses): the package preview replaces the pass-0 holo texture.
+    auto image=pass==0&&pass0AddonImage>=0&&s.addonAdmitted?s.mapped(2,static_cast<std::uint32_t>(pass0AddonImage)):
+     s.mapped(1,s.holo->currentImage(id,pass));assets::OriginalUiLitMaterial50KM policy;OriginalUiMaterialSpan50KG m;
     const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
     if(image==missing||!assets::prepareOriginalUiLitMaterial50KM(p,*s.bank->images()->decodedTexture(image),policy,d.materialDetail)||!convertOriginalUiLitMaterialSpan50KM(policy,{first,output.slotCount,first+output.slotCount,image,s.bank->images()->textures()->textureCount()},m)||!s.add(vertices.data(),output.slotCount*4u,w.data(),f.data(),m,&p,d))return fail(d,E::material);
    }
@@ -246,7 +331,11 @@ bool OriginalUiCourseDrawContribution50KG::model(std::uint16_t id,D& d)noexcept{
 bool OriginalUiCourseDrawContribution50KG::widgets(bool top,bool ancestors,D& d)noexcept{
  auto& s=*storage_;auto* widgets=s.resources->widgets();const auto* order=widgets->order(top);if(!order)return fail(d,E::widget);
  try{for(auto id:*order){d.widget=id;const auto state=widgets->state(id);if(!ancestors||!state.shown)continue;
-   if(state.kind==game::OriginalUiCourseWidgetKind50KG::character){if(!model(id,d))return false;continue;}
+   if(state.kind==game::OriginalUiCourseWidgetKind50KG::character){
+    // PORT EXTENSION (DLC add-on courses): the template hologram in the anchor's place.
+    if(s.frame&&id==s.frame->anchorModel){if(!model(s.frame->templateModel,d,s.frame->previewImage))return false;continue;}
+    if(!model(id,d))return false;continue;}
+   if(s.frame&&s.frame->name&&id==s.frame->anchorName&&widgets->textDescriptor(id)){if(!addonName(id,d))return false;continue;}
    const bool selectedVariant=state.kind==game::OriginalUiCourseWidgetKind50KG::selectableIcon&&state.selected;
    const auto material=s.resources->widgetMaterial(id,selectedVariant);
    if(const auto* desc=widgets->textDescriptor(id)){
@@ -269,6 +358,32 @@ bool OriginalUiCourseDrawContribution50KG::widgets(bool top,bool ancestors,D& d)
     if(!append(live.layout.quad,material,live.layout.packetDepth,d))return false;
    }
   }return true;
+ }catch(...){return fail(d,E::allocation);}
+}
+// PORT EXTENSION (DLC add-on courses): the add-on name in place of the anchor's
+// course-name line 0, laid out with that widget's own font, colour and position.
+// A name the font cannot lay out is skipped (counted), never replaced by another.
+bool OriginalUiCourseDrawContribution50KG::addonName(std::uint16_t id,D& d)noexcept{
+ auto& s=*storage_;auto* widgets=s.resources->widgets();
+ try{
+  auto* font=s.resources->textFont(id);auto* atlas=s.resources->textAtlas(id);if(!font||!atlas)return fail(d,E::geometry);
+  float z=0;if(!s.resources->textPacketDepth(id,z))return fail(d,E::geometry);
+  const auto& text=*s.frame->name;D quiet{};
+  game::OriginalUiTextInput50KG input{font,atlas,reinterpret_cast<const std::uint8_t*>(text.data()),text.size(),0,0};game::OriginalUiTextLayout50KG glyphs;
+  std::int32_t width=0,height=0;
+  if(text.empty()||!game::layoutOriginalUiText50KG(input,glyphs,quiet.text)||
+     !game::roundOriginalUiTextMetric50KG(glyphs.widthBeforeScaleAndRounding,1,width)||
+     !game::roundOriginalUiTextMetric50KG(glyphs.firstGlyphHeightBeforeScaleAndRounding,1,height)){++s.frame->nameSkipped;return true;}
+  game::OriginalUiCourseTextProjection50KG live;
+  if(!widgets->projectText(id,0,glyphs.fontLineHeight,width,height,true,live,d.widgetDetail)){
+   if(d.widgetDetail.error==game::OriginalUiCourseWidgetError50KG::hidden){d.widgetDetail={};return true;}return fail(d,E::widget);}
+  if(live.line.scale!=1||live.line.rotation!=0||live.line.packetColor[3]>128){++s.frame->nameSkipped;return true;}
+  input.localX=live.position.positionedX;input.localY=live.position.positionedY;
+  if(!game::layoutOriginalUiText50KG(input,glyphs,quiet.text)){++s.frame->nameSkipped;return true;}
+  std::vector<assets::Vertex48B> vertices;vertices.reserve(glyphs.count*4u);
+  for(std::size_t q=0;q<glyphs.count;++q)for(const auto& g:glyphs.quads[q].vertices){assets::Vertex48B v{};v.position[0]=g.x;v.position[1]=g.y;v.position[2]=z;v.uv[0]=g.u;v.uv[1]=g.v;for(unsigned c=0;c<4;++c)v.color[c]=live.line.packetColor[c];vertices.push_back(v);}
+  if(!appendVertices(vertices,s.resources->widgetMaterial(id,false),d))return false;
+  ++s.frame->nameDrawn;return true;
  }catch(...){return fail(d,E::allocation);}
 }
 bool OriginalUiCourseDrawContribution50KG::projectOrdinaryWidgets(bool shown,D& d)noexcept{

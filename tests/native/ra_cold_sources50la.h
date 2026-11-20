@@ -264,7 +264,7 @@ public:
       !a::readAiTrackTuning50IU(text,tuning.size(),s.aiTuning,d.ai)||
       !a::readDynamicImpactAuthoring50IW(text,tuning.size(),s.dynamicImpact,d.impact)||
       !a::readFinalImpactAuthoring49Y(text,tuning.size(),s.finalImpact,d.impact)||
-      !g::bindFreshAiCreateSelection50IU("RA",2,s.freshSelection))return fail("RA actual track tuning/fresh source selection rejected");
+      !g::bindFreshAiCreateSelection50IU("RA",2,s.freshSelection,false))return fail("RA actual track tuning/fresh source selection rejected");
    decoded_=true;d.stage=Diagnostic::Stage::decodedSources;return true;
   }catch(...){return fail("RA cold source allocation/decoder exception");}
  }

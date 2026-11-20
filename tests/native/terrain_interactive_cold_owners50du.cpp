@@ -100,7 +100,7 @@ void OwnersContext::run() {
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
-  if(bankWorldMemberships)for(auto& membership:saTriggerMembership)if(membership){
+  if(bankWorldMemberships)for(auto& membership:commonRouteTriggerMembership)if(membership){
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }

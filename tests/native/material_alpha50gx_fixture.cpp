@@ -247,8 +247,10 @@ bool selectMaSa(const track_materials50fa_fixture::Selection& selection,
     const rr::assets::OriginalUiMaterialTemplates50KG& templates,
     const rr::assets::OriginalUiMaterialRuntime50KG& runtime, Policy& output) {
     using Field = rr::assets::OriginalUiGsField50KG;
+    // Track::course (a registry course on the common race route) takes SA's rule.
     if ((selection.track != track_source_fixture::Track::ma &&
-         selection.track != track_source_fixture::Track::sa) || selection.slot != 1 ||
+         selection.track != track_source_fixture::Track::sa &&
+         selection.track != track_source_fixture::Track::course) || selection.slot != 1 ||
         selection.pass != 1 || selection.passCount != 1 || selection.projectedPrelit ||
         !runtime.overrideKnown || runtime.override435670) return false;
     const auto* inherited = templates.get(rr::assets::OriginalUiTemplate50KG::defaultMt);

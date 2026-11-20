@@ -309,9 +309,9 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(gcTriggerActions)require50DU(gcTriggerActions->beginQuery(mainGcLease),"GC main trigger arena lease unavailable");
  if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(mainTriggerLease),"GA main trigger arena lease unavailable");
  ma_trigger_actions::ActionLease mainMaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- sa_trigger_actions::ActionLease mainSaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
+ sa_trigger_actions::ActionLease mainCommonRouteLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(mainMaLease),"MA main trigger arena lease unavailable");
- if(saTriggerActions)require50DU(saTriggerActions->beginQuery(mainSaLease),"SA main trigger arena lease unavailable");
+ if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->beginQuery(mainCommonRouteLease),"common-route main trigger arena lease unavailable");
  const auto mainQueryAttempt=withMcTriggerLease(false,[&](){return withGbTriggerLease(false,[&](){return withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});});});
  if(isRaTrack&&mainQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
@@ -319,7 +319,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(gcTriggerActions)require50DU(gcTriggerActions->endQuery(),"GC main source trigger action failed after contact commit");
  if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA main source trigger action failed after contact commit");
  if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA main trigger action failed after contact commit");
- if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA main trigger action failed after contact commit");
+ if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->endQuery(),"common-route main trigger action failed after contact commit");
  if(!isTcTrack&&!isGbTrack&&!isMcTrack&&mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainRowMember,mainCrossedPortals,"main");},
@@ -347,9 +347,9 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(gcTriggerActions)require50DU(gcTriggerActions->beginQuery(secondaryGcLease),"GC secondary trigger arena lease unavailable");
  if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(secondaryTriggerLease),"GA secondary trigger arena lease unavailable");
  ma_trigger_actions::ActionLease secondaryMaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
- sa_trigger_actions::ActionLease secondarySaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
+ sa_trigger_actions::ActionLease secondaryCommonRouteLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(secondaryMaLease),"MA secondary trigger arena lease unavailable");
- if(saTriggerActions)require50DU(saTriggerActions->beginQuery(secondarySaLease),"SA secondary trigger arena lease unavailable");
+ if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->beginQuery(secondaryCommonRouteLease),"common-route secondary trigger arena lease unavailable");
  const auto secondaryQueryAttempt=withMcTriggerLease(true,[&](){return withGbTriggerLease(true,[&](){return withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryRowLive,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});});});
  if(isRaTrack&&secondaryQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
@@ -357,7 +357,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(gcTriggerActions)require50DU(gcTriggerActions->endQuery(),"GC secondary source trigger action failed after contact commit");
  if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA secondary source trigger action failed after contact commit");
  if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA secondary trigger action failed after contact commit");
- if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA secondary trigger action failed after contact commit");
+ if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->endQuery(),"common-route secondary trigger action failed after contact commit");
  if(!isTcTrack&&!isGbTrack&&!isMcTrack&&secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryRowMember,secondaryCrossedPortals,"secondary");},

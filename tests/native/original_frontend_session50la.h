@@ -711,7 +711,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         courseTargetModeSupported(target->track)&&(!allAiEnabled||selected.laps==3)&&
         courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
         "actual Course exit could not publish its typed cold-load request");
-    std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code
+    std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<original_course_targets50KX::targetCode(*target)
         <<" rider="<<selected.rider<<" outgoing_world_ticks=0 frontend_only=1\n";
     break;
    }

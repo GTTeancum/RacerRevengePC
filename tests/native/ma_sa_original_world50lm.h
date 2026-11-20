@@ -50,6 +50,7 @@ inline constexpr std::uint32_t expectedRgbaBytes=4136960u;
 inline constexpr std::uint32_t expectedPinnedImages=49u;
 inline constexpr std::uint64_t assetIdentity=0x4d41ull;
 inline constexpr auto selectedTrack=track_source_fixture::Track::ma;
+inline constexpr const char* stockCode="MA";
 namespace detail {
 struct SourceImage { const char* member;const char* sourceSha256;std::uint32_t sourceBytes,width,height,mipIndex,kind,frameCount,initialFrame; };
 inline constexpr SourceImage sourceImages[]={
@@ -182,7 +183,7 @@ inline constexpr auto& exceptionalImages=source_texture50fc_fixture::detail::maE
 #include "original_single_pass_world50lm.inl"
 } // namespace ma_original_world50LM
 
-namespace sa_original_world50LM {
+namespace common_route_world50LM {
 namespace a=rr::assets;
 namespace shared=pod_materials50ed_fixture::detail;
 namespace tm=track_materials50fa_fixture;
@@ -208,8 +209,13 @@ inline constexpr std::uint32_t expectedVertices=244767u;
 inline constexpr std::uint32_t expectedIndices=421551u;
 inline constexpr std::uint32_t expectedRgbaBytes=3547136u;
 inline constexpr std::uint32_t expectedPinnedImages=7u;
+// Stock SA row of the common race route: every value below is a RECEIPT for the
+// stock row only (course_archive_receipt50ci.h). A registry course on the same
+// route gets its own Identity (registryIdentity, original_single_pass_world50lm.inl):
+// names from its code, its listed SHA/bytes, no stock pins or counts.
 inline constexpr std::uint64_t assetIdentity=0x5341ull;
 inline constexpr auto selectedTrack=track_source_fixture::Track::sa;
+inline constexpr const char* stockCode="SA";
 namespace detail {
 struct SourceImage { const char* member;const char* sourceSha256;std::uint32_t sourceBytes,width,height,mipIndex,kind,frameCount,initialFrame; };
 inline constexpr SourceImage sourceImages[]={
@@ -329,4 +335,4 @@ inline constexpr source_texture50fc_fixture::detail::Entry indexedPins[]={
 inline constexpr auto& exceptionalImages=source_texture50fc_fixture::detail::saEntries;
 }
 #include "original_single_pass_world50lm.inl"
-} // namespace sa_original_world50LM
+} // namespace common_route_world50LM

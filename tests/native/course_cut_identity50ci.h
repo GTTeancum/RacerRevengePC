@@ -25,14 +25,26 @@ inline std::string lower(std::string s){for(auto& c:s){if(c=='/')c='\\';else if(
 // Builds and registers the row. Returns false (and registers nothing) when
 // the archive lacks what the cut cameras need; the caller logs and continues
 // (the camera step then refuses that course with its own message).
+// A stock code keeps its stock row's trackId/archiveName (and intro event
+// receipts); a registry code (the common-route course whose code is not
+// stock, PORT EXTENSION) gets the registry slot: its own code, the archive
+// name its session row mounts (container, e.g. "TRACKS/NV.RES") and no stock
+// intro rows (eventCount 0: the intro reads introAud.ini itself).
 inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std::vector<std::uint8_t>& bytes,
-    std::string& error) {
+    std::string& error,const char* container=nullptr) {
     try {
+        if(!trackId){error="no course id";return false;}
         const auto* stock=a::originalTrackCutStockIdentity50LA(trackId);
-        auto* slot=a::originalTrackCutRuntimeSlot50LA(trackId);
-        if(!stock||!slot){error="no cut row for this course id";return false;}
+        auto* slot=a::originalTrackCutWritableSlot50LA(trackId);
+        if(!slot||(!stock&&(!container||!*container))){error="no cut row slot for this course id";return false;}
         a::OriginalTrackCutRuntimeRow50LA next;
-        auto& id=next.identity;id=*stock;
+        auto& id=next.identity;
+        if(stock)id=*stock;
+        else {
+            id={};
+            next.code={trackId[0],trackId[1],'\0'};next.archiveName=container;
+            id.eventCount=0;id.events={};
+        }
         std::string code(trackId);for(auto& c:code)if(c>='A'&&c<='Z')c=char(c+32);
         next.archiveSha=pod_materials50ed_fixture::detail::sha256(bytes);
         id.archiveSha256=nullptr;id.archiveBytes=bytes.size();id.memberCount=archive.entries.size();
@@ -94,7 +106,8 @@ inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std
         }
         next.present=true;
         *slot=std::move(next);slot->bind();
-        std::cerr<<"course_cut_identity code="<<trackId<<" cuts="<<cutCount<<" members="<<id.memberCount<<" derived=1\n";
+        std::cerr<<"course_cut_identity code="<<trackId<<" cuts="<<cutCount<<" members="<<id.memberCount
+                 <<" stock_row="<<(stock?1:0)<<" derived=1\n";
         return true;
     }catch(const std::exception& e){error=e.what();return false;}
 }

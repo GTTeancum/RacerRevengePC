@@ -316,6 +316,9 @@ struct Owner::Storage {
     std::unique_ptr<ScTopologyStorage> scTopology;
     std::unique_ptr<TcTopologyStorage> tcTopology;
     Scene scene=Scene::gc;
+    // False when the SCB read is not the scene's stock SCB (the common route's
+    // add-on course): the stock count pins are then not compared at all.
+    bool stockRow=true;
     // SA:74 spotlights+166 non-emitting ObjectPoints, retained in numeric order.
     static constexpr std::uint32_t maximumLocalLights=240;
     std::uint32_t localLightCount=0;
@@ -682,7 +685,7 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     std::uint32_t numberOfLights=0;
     if(lights&&!ordinal(*lights,"numberoflights",0u,numberOfLights))
         return fail(d,Status::sourceFields,0x2782e0);
-    course_archive_receipt50CI::countReceipt("lighting","lights",numberOfLights,(ga?38u:gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u));
+    if(stockRow)course_archive_receipt50CI::countReceipt("lighting","lights",numberOfLights,(ga?38u:gb?62u:tb?104u:rc?16u:tc?2u:sc?311u:mb?384u:ra?185u:sa?263u:43u));
     std::uint32_t ambientCount=0,directionalCount=0,pointCount=0,emittingPoints=0,spotlights=0;
     std::uint32_t omittedMbNonEmit=0,mbFlasherCount=0,omittedScNonEmit=0;
     localLightCount=0;
@@ -836,7 +839,11 @@ bool Owner::Storage::prepareMaSa(Diagnostic& d) {
     }
     // Stock light-type counts are receipts; every light was read from the data
     // and stored within the 240-slot local-light store (bounds-checked above).
-    if(ambientCount!=(ga?1u:gb?1u:tb?10u:rc?15u:tc?1u:sc?30u:mb?16u:ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(ga?0u:gb?60u:tb?93u:(rc||tc)?0u:sc?165u:mb?337u:ra?15u:sa?166u:20u)||
+    if(!stockRow)
+        std::cerr<<"course_route_lighting stock_row=none zones="<<world.zones.size()<<" portals="<<world.portals.size()
+                 <<" lights="<<numberOfLights<<" ambient="<<ambientCount<<" directional="<<directionalCount
+                 <<" points="<<pointCount<<" emitting="<<emittingPoints<<" spots="<<spotlights<<" local="<<localLightCount<<"\n";
+    else if(ambientCount!=(ga?1u:gb?1u:tb?10u:rc?15u:tc?1u:sc?30u:mb?16u:ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(ga?0u:gb?60u:tb?93u:(rc||tc)?0u:sc?165u:mb?337u:ra?15u:sa?166u:20u)||
        emittingPoints!=(ga?0u:gb?60u:tb?92u:(rc||tc)?0u:sc?19u:mb?124u:ra?15u:sa?0u:14u)||spotlights!=(ga?36u:(gb||tb||rc||tc)?0u:sc?115u:mb?30u:ra?165u:sa?74u:13u)||localLightCount!=(ga?36u:gb?60u:tb?93u:(rc||tc)?0u:sc?134u:mb?154u:ra?180u:sa?240u:33u)||
        (mb&&(omittedMbNonEmit!=213u||mbFlasherCount!=144u))||
        (sc&&omittedScNonEmit!=146u)||(gb&&gbFlasherCount!=2u))
@@ -1007,7 +1014,14 @@ bool Owner::prepareGaNative(const std::vector<std::uint8_t>& scb,std::uint32_t r
 bool Owner::prepareMaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
     return prepareScene(scb,racers,Scene::ma,d);
 }
-bool Owner::prepareSaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+// The ONE common race route's scene (stock SA and every add-on course): the
+// same numeric reader (prepareMaSa) decodes whatever SCB it is given, bounded
+// by the shared topology capacities (maximumZones/maximumPortals, the 240-slot
+// local-light store). SA's 25 zones/portals and 263 lights are its stock row,
+// compared only when the SCB read IS the stock SA SCB (prepareScene).
+// PORT STAND-IN (flagged): the enum value keeps its course name (Scene::sa) to
+// avoid a header rebuild; it selects the common-route scene, not a course.
+bool Owner::prepareCommonRouteNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
     return prepareScene(scb,racers,Scene::sa,d);
 }
 bool Owner::prepareRaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
@@ -1080,8 +1094,11 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
     }
     // Common course rule (course_archive_receipt50ci.h): the SCB's stock
     // identity is a receipt; the scene is decoded from whatever SCB was read.
-    if(!authenticScb(scb,expectedBytes,expectedSha))
+    const bool stockScb=authenticScb(scb,expectedBytes,expectedSha);
+    if(!stockScb)
         std::cerr<<"course_member_identity site=lighting member=scb bytes="<<scb.size()<<" stock=0\n";
+    // Common route: a non-stock SCB has no stock row (no count receipts).
+    const bool stockRow=scene!=Scene::sa||stockScb;
     if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
     try {
         auto next=std::make_unique<Storage>();
@@ -1095,8 +1112,11 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         const auto& w=next->world;
         // Zone/portal counts from the data, bounded by this scene's topology
         // storage (the stock counts are receipts).
-        course_archive_receipt50CI::countReceipt("lighting","zones",w.zones.size(),expectedZones);
-        course_archive_receipt50CI::countReceipt("lighting","portals",w.portals.size(),expectedPortals);
+        if(stockRow){
+            course_archive_receipt50CI::countReceipt("lighting","zones",w.zones.size(),expectedZones);
+            course_archive_receipt50CI::countReceipt("lighting","portals",w.portals.size(),expectedPortals);
+        }
+        next->stockRow=stockRow;
         if(w.zones.empty()||w.zones.size()>next->zones.size()||w.portals.size()>next->portalGeometry.size())
             return fail(d,Status::unsupportedScene,0x272a48);
         next->scene=scene;

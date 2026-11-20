@@ -76,7 +76,7 @@ namespace ra_cold_roster50LA { class FreshExecutionArena; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace gc_original_world50LM { class Owner; }
 namespace ga_original_world50LH { class Owner; }
-namespace sa_original_world50LM { class Owner; }
+namespace common_route_world50LM { class Owner; }
 namespace ma_original_world50LM { class Owner; }
 namespace mb_original_world50LM { class Owner; }
 namespace sc_original_world50LM { class Owner; }
@@ -102,6 +102,14 @@ inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course)
 
  }
 }
+// The common route (C::sa, the former SA chain) is one route for stock SA and
+// for the add-on course whose code is not stock (146r): its track id is the
+// row's own code carried with it ("SA" or e.g. "NV"); empty = stock "SA".
+inline std::string_view introTrackId(rr::game::OriginalCameraStartCourse course,
+    const std::array<char,3>& code)noexcept {
+ if(course==rr::game::OriginalCameraStartCourse::sa&&code[0]&&code[1]&&!code[2])return {code.data(),2};
+ return introTrackId(course);
+}
 
 using namespace rr::game;
 using Bank=native_racer50HN::Bank;
@@ -120,6 +128,8 @@ struct AuthoredInputs {
     // Borrow of the very same MC source retained by actualRadarMapMc. The
     // source-specific AuthoredStorage issues it; never a generic course flag.
     const mc_cold_sources50LA::Owner* mcSourceIdentity=nullptr;
+    // Common route only: the row's upper-case code (stock "SA" or the add-on code).
+    std::array<char,3> courseCode{};
 };
 // These are genuine external application/display inputs. Keep one instance
 // for the application's display lifetime, and borrow it here. The explicitly
@@ -463,14 +473,16 @@ class Session final {
         OriginalTrackParticleCold50LA* particles=nullptr;
         std::uint32_t selectedPod=0;
         OriginalCameraStartCourse course=OriginalCameraStartCourse::unspecified;
+        // Common route only: the row's code issued with the session (AuthoredInputs::courseCode).
+        std::array<char,3> courseCode{};
         // GC issuance records the actual consumed race/world and root-owned map.
         // Comparison-only: the root closes Session before releasing these owners.
         const OriginalRaceConstructor50LA* gcRace=nullptr;
         const gc_original_world50LM::Owner* gcWorld=nullptr;
         const TrackNavigation50EU* gcMap=nullptr;
-        const OriginalRaceConstructor50LA* saRace=nullptr;
-        const sa_original_world50LM::Owner* saWorld=nullptr;
-        const TrackNavigation50EU* saMap=nullptr;
+        const OriginalRaceConstructor50LA* commonRouteRace=nullptr;
+        const common_route_world50LM::Owner* commonRouteWorldPin=nullptr;
+        const TrackNavigation50EU* commonRouteMap=nullptr;
         const OriginalRaceConstructor50LA* maRace=nullptr;
         const ma_original_world50LM::Owner* maWorld=nullptr;
         const TrackNavigation50EU* maMap=nullptr;
@@ -1965,9 +1977,10 @@ public:
                     if(!nativeCamera74ConsumersCurrent())return fail(Status::owner,nativeAttached6C_.pc);
                     if(!taCuts_||startPrelude_.controllerCutCountA8()!=taCuts_->cutCount()||!coldController_.started||
                        !nativeTaIssuance_||nativeTaIssuance_->course!=authored.course||
-                       taCuts_->trackId()!=introTrackId(authored.course)||
+                       nativeTaIssuance_->courseCode!=authored.courseCode||
+                       taCuts_->trackId()!=introTrackId(authored.course,authored.courseCode)||
                        !actual_.taIntroAudio||!actual_.taIntroAuthoring||
-                       actual_.taIntroAuthoring->trackId()!=introTrackId(authored.course)||
+                       actual_.taIntroAuthoring->trackId()!=introTrackId(authored.course,authored.courseCode)||
                        !actual_.startMusicRequest||!actual_.introMusicFadeRequest)
                         return fail(Status::sourcePath,0x174fa4);
                     taPositive_=true;

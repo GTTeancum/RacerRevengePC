@@ -6,6 +6,7 @@
 #include "course_archive_receipt50ci.h"
 #include "course_cut_identity50ci.h"
 #include "../../src/game/original_track_particle_cold50la.h"
+#include "../../src/game/dlc_course_entries50dl.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/original_standard_material_source50la.h"
 #include <cstring>
@@ -29,8 +30,12 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     // Source selection and availability are separate from this shared cold
     // capability. Authenticate the descriptor against the retained catalog;
     // caller-supplied hashes alone must never nominate another archive.
+    // A registry row (the common race route's add-on course) IS its catalog
+    // row: it was built once from the DLC registry for the latched code.
+    // Selecting it again would rebuild the one registry storage under the
+    // caller's borrowed strings, so it is taken as given.
     const char* selectionError=nullptr;
-    const auto* canonical=track_session_assets50IG::select(
+    const auto* canonical=track.registry?&track:track_session_assets50IG::select(
         track.world?track.world->code:nullptr,selectionError);
     require(canonical&&track.world==canonical->world&&track.archive&&
         track.archiveSha256&&canonical->archiveSha256&&
@@ -93,11 +98,37 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     course_archive_receipt50CI::receipt("track_particle",canonical->world->code,bytes,archiveSha,archiveBytes);
     rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;
     const auto limits=course_archive_receipt50CI::limits();
+    require(rr::assets::decodeResource48C(bytes,archive,error,nullptr,limits),
+        "selected original track archive decode rejected");
+    // inherit.particles (add-on row only; PORT EXTENSION, NOT ORIGINAL): an
+    // add-on archive without the particle closure names a stock course whose
+    // own TRACKS/<CODE>.RES supplies it. The row says so (AddonCourseLoad);
+    // a stock course always reads its own archive.
+    rr::game::dlc50DL::AddonCourseLoad addon;
+    const bool inherited=track.registry&&track.world&&
+        rr::game::dlc50DL::addonCourseLoadByCode(track.world->code,addon)&&addon.particlesInherited;
+    if(track.registry)require(addon.number!=0,"registry course row unavailable for its particle source");
+    std::string particleArchiveName;
+    rr::assets::ResArchive48C inheritedArchive;
+    if(inherited){
+        require(!addon.particleArchive.empty(),"inherited particle archive unnamed");
+        particleArchiveName=addon.particleArchive;
+        // readBytes resolves the repository-relative disc path (runtime_asset_paths50LB).
+        const auto inheritedBytes=runtime_startup50fl::readBytes("work/native/project/disc/"+addon.particleArchive);
+        require(rr::assets::decodeResource48C(inheritedBytes,inheritedArchive,error,nullptr,limits),
+            "inherited particle archive decode rejected");
+    }
+    const auto& particleArchive=inherited?inheritedArchive:archive;
+    {
+        std::string code=canonical->world->code;
+        for(auto& c:code)if(c>='A'&&c<='Z')c=static_cast<char>(c+('a'-'A'));
+        std::cerr<<"course_route_particles code="<<code<<" source="
+                 <<(inherited?"inherited:"+particleArchiveName:std::string("own"))<<'\n';
+    }
     std::vector<std::uint8_t> prt,psm,pst;
-    require(rr::assets::decodeResource48C(bytes,archive,error,nullptr,limits)&&
-        rr::assets::extractResMember48C(archive,member,prt,error)&&
-        rr::assets::extractResMember48C(archive,psmMember,psm,error)&&
-        rr::assets::extractResMember48C(archive,pstMember,pst,error),
+    require(rr::assets::extractResMember48C(particleArchive,member,prt,error)&&
+        rr::assets::extractResMember48C(particleArchive,psmMember,psm,error)&&
+        rr::assets::extractResMember48C(particleArchive,pstMember,pst,error),
         "SCB-selected original track PRT/PSM/PST closure unavailable");
     // Verify the selected field against decoded authenticated SCB bytes,
     // never silently substitute a conflicting mutable caller world.
@@ -126,6 +157,14 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     require(!pst.empty(),"Original selected-track particle PST missing");
     const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
         Provider::MemberView selected;Provider::MountView mounted;
+        // Inherited closure: present ONLY in the inherited stock-archive mount
+        // (the stock archive's particle members, mounted beside the course
+        // archive in this namespace by terrain_interactive_publication50du.cpp),
+        // with exactly these bytes.
+        if(inherited)return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
+            provider->mount(selected.mount,mounted)&&mounted.archiveName&&*mounted.archiveName==particleArchiveName&&
+            selected.member&&sameName(*selected.member,requested.c_str())&&selected.data&&selected.revision==providerRevision&&
+            selected.size==original.size()&&!std::memcmp(selected.data,original.data(),original.size());
         return provider->lookup132820(requested,selected)==Provider::Lookup::present&&
             provider->mount(selected.mount,mounted)&&mounted.archiveName&&mounted.archiveSha256&&
             *mounted.archiveName==archiveName&&
@@ -135,7 +174,11 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
             selected.revision==providerRevision&&selected.size==original.size()&&
             !std::memcmp(selected.data,original.data(),original.size());
     };
-    require(matches(member,prt)&&matches(psmMember,psm)&&matches(pstMember,pst)&&
+    const bool prtMatch=matches(member,prt),psmMatch=matches(psmMember,psm),pstMatch=matches(pstMember,pst);
+    if(!(prtMatch&&psmMatch&&pstMatch))std::cerr<<"course_route_particle_closure code="<<canonical->world->code
+        <<" inherited="<<(inherited?1:0)<<" prt="<<prtMatch<<" psm="<<psmMatch<<" pst="<<pstMatch
+        <<" mount="<<(inherited?particleArchiveName:std::string(archiveName))<<'\n';
+    require(prtMatch&&psmMatch&&pstMatch&&
         provider->sealed()&&provider->revision()==providerRevision,
         "Track particle closure differs from the same selected mounted archive");
     auto materialSource=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
@@ -144,8 +187,10 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     // Same domain owns the exact PSM/PST beyond these temporary source vectors.
     // The actual particle owner acquires its canonical reference before the
     // caller's14D370/29E340 population. Failure retains real partial effects.
-    require(domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material),
-        "Original selected-track particle canonical source append rejected");
+    const bool appended=domain->appendOriginalSources({materialSource},{{pstMember,pst}},diagnostic.material);
+    if(!appended)std::cerr<<"course_route_particle_append code="<<canonical->world->code<<" inherited="<<(inherited?1:0)
+        <<" status="<<unsigned(diagnostic.material.status)<<" pc="<<std::hex<<diagnostic.material.sourcePC<<std::dec<<'\n';
+    require(appended,"Original selected-track particle canonical source append rejected");
     const bool prepared=application.withParticleMaterialDirectory160F88([&](const std::string& actualDirectory){
         return owner.prepareNativeTrack(actualDirectory,*particleName,prt,application.entities(),
             std::move(actual382B38),generation,diagnostic);

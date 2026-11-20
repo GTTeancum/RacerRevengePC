@@ -595,8 +595,8 @@ struct Context final {
     gcAtmType& gcAtm;
     using gaAtmType = ga_atm_window_fixture::Owner;
     gaAtmType& gaAtm;
-    using maSaAtmType = ma_sa_atm_window_fixture::Owner;
-    maSaAtmType& maSaAtm;
+    using maCommonRouteAtmType = ma_sa_atm_window_fixture::Owner;
+    maCommonRouteAtmType& maCommonRouteAtm;
     using mbAtmType = mb_atm_window_fixture::Owner;
     mbAtmType& mbAtm;
     using scAtmType = sc_atm_window_fixture::Owner;
@@ -611,8 +611,8 @@ struct Context final {
     rcAtmType& rcAtm;
     using tcAtmType = tc_atm_window_fixture::Owner;
     tcAtmType& tcAtm;
-    using isMaSaTrackType = const bool;
-    isMaSaTrackType& isMaSaTrack;
+    using maOrCommonRouteTrackType = const bool;
+    maOrCommonRouteTrackType& maOrCommonRouteTrack;
     using sourceSkySelectionType = original_track_sky50KX::Owner;
     sourceSkySelectionType& sourceSkySelection;
     using opponentFlamePreparedType = bool[maxHostRaceOpponents50HT];

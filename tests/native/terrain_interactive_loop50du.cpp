@@ -986,7 +986,7 @@ void Context::run() {
      // those live groups or reuse their stale ducking restore configuration.
      require50DU(courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
          "actual Course exit could not publish its typed cold-load request");
-     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code
+     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<original_course_targets50KX::targetCode(*target)
          <<" rider="<<selected.rider<<" outgoing_world_ticks="<<completedFrames<<'\n';
      break; //Real closeWindow + local-owner destruction precede target loading.
     }
@@ -3187,7 +3187,7 @@ void Context::run() {
     // stand-in, to retire the same way).
     // GB dynamic frame exists exactly with its animation owners (TOB [Animations]).
     if(gaAtm.loaded())require50DU(gaAtm.bindFrame(renderFrame),"original GA ATM frame selection rejected");
-    if(maSaAtm.loaded())require50DU(maSaAtm.bindFrame(renderFrame),"MA/SA actual ATM frame selection rejected");
+    if(maCommonRouteAtm.loaded())require50DU(maCommonRouteAtm.bindFrame(renderFrame),"MA/common-route actual ATM frame selection rejected");
     if(mbAtm.loaded())require50DU(mbAtm.bindFrame(renderFrame),"MB actual ATM frame selection rejected");
     if(scAtm.loaded())require50DU(scAtm.bindFrame(renderFrame),"SC actual ATM frame selection rejected");
     if(tbAtm.loaded())require50DU(tbAtm.bindFrame(renderFrame),"TB actual ATM frame selection rejected");
@@ -3205,7 +3205,7 @@ void Context::run() {
     // select() is false otherwise).
     bool gaZoneSkyProbe=false;
     const bool gaZoneSky=sourceSkySelection.select(0u,gaZoneSkyProbe);
-    if(isMaSaTrack||gaZoneSky||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
+    if(maOrCommonRouteTrack||gaZoneSky||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&
          (scZeroSky.ready()?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):

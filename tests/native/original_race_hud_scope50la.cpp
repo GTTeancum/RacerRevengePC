@@ -118,7 +118,7 @@ void Registration::observeConstructed1A8CC4(::interactive_publication50DU::Conte
     //construction must withdraw fresh-null knownness too, never gain a Scope.
     const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>* selected=nullptr;
     for(const auto* candidate:{&actual.consumedRaStage.race(),&actual.consumedTaStage.race(),
-        &actual.consumedMaStage.race(),&actual.consumedMbStage.race(),&actual.consumedScStage.race(),&actual.consumedGbStage.race(),&actual.consumedRcStage.race(),&actual.consumedTcStage.race(),&actual.consumedMcStage.race(),&actual.consumedTbStage.race(),&actual.consumedSaStage.race(),
+        &actual.consumedMaStage.race(),&actual.consumedMbStage.race(),&actual.consumedScStage.race(),&actual.consumedGbStage.race(),&actual.consumedRcStage.race(),&actual.consumedTcStage.race(),&actual.consumedMcStage.race(),&actual.consumedTbStage.race(),&actual.consumedCommonRouteStage.race(),
         &actual.consumedGaStage.race(),&actual.consumedGcStage.race()}){
         if(candidate->get()==published){selected=candidate;break;}
     }

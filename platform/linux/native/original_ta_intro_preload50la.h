@@ -18,7 +18,7 @@ inline bool prepareOriginalTaIntroPcm50LA(
     }
     try{
         std::vector<assets::AudioRequest50HC> requests;requests.reserve(authoring->eventCount());
-        if(!authoring->eventCount()||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"&&authoring->trackId()!="RC"&&authoring->trackId()!="TC"&&authoring->trackId()!="MC"&&authoring->trackId()!="TB")){error="Original race intro event count is outside authenticated race catalog";return false;}
+        if(authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||!rr::assets::originalRaceTrackIdAdmitted50LA(authoring->trackId())){error="Original race intro event count is outside authenticated race catalog";return false;}
         for(unsigned id=1;id<=authoring->eventCount();++id){const auto* event=authoring->event(id);
             if(!event||event->eventId!=id||
                event->factoryFlags!=2||!event->isStream||event->isStereo||event->isLoop||
@@ -27,6 +27,9 @@ inline bool prepareOriginalTaIntroPcm50LA(
             }
             requests.push_back({std::string(event->filename),false,false,true});
         }
+        // NumEvents 0 (the course's own introAud.ini): no intro stream to
+        // preload; an empty bank, the cut cameras still play.
+        if(!authoring->eventCount()){out=std::make_shared<assets::AudioBank50HC>();error.clear();return true;}
         auto next=std::make_shared<assets::AudioBank50HC>();
         if(!assets::loadAudioBank50HC(audioRoot,requests,*next,error))return false;
         if(next->clips.size()!=authoring->eventCount()||next->ready!=authoring->eventCount()||next->missing||next->unsupported||next->invalid){

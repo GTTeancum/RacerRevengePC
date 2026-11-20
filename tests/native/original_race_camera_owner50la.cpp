@@ -33,7 +33,7 @@ bool OriginalRaceConstructor50LA::ownsNativeCameraAdapter34(
         // The counted prefix of the course world this race holds.
         const bool counted=taWorld74_?taWorldCounted_&&taWorldPrefixComplete_:
             gaWorld74_?gaWorldCounted_&&gaWorldPrefixComplete_:
-            saWorld74_?saWorldCounted_&&saWorldPrefixComplete_:
+            commonRouteWorld74_?commonRouteWorldCounted_&&commonRouteWorldPrefixComplete_:
             maWorld74_?maWorldCounted_&&maWorldPrefixComplete_:
             mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_:
             scWorld74_?scWorldCounted_&&scWorldPrefixComplete_:
@@ -55,7 +55,7 @@ bool OriginalRaceConstructor50LA::raceCameraCourse34(OriginalCameraStartCourse c
     if(world74_)return course==OriginalCameraStartCourse::ra;
     if(taWorld74_)return course==OriginalCameraStartCourse::ta;
     if(gaWorld74_)return course==OriginalCameraStartCourse::ga;
-    if(saWorld74_)return course==OriginalCameraStartCourse::sa;
+    if(commonRouteWorld74_)return course==OriginalCameraStartCourse::sa;
     if(maWorld74_)return course==OriginalCameraStartCourse::ma;
     if(mbWorld74_)return course==OriginalCameraStartCourse::mb;
     if(scWorld74_)return course==OriginalCameraStartCourse::sc;

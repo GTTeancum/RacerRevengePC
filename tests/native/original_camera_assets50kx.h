@@ -5,6 +5,10 @@
 #include "pod_materials50ed_fixture.h"
 #include "original_player_identity50ik_fixture.h"
 #include "course_archive_receipt50ci.h"
+#include "course_cut_identity50ci.h"
+#include "../../platform/linux/native/host_track_selection50im.h"
+#include <iostream>
+#include <string>
 #include "../../src/assets/import_decode48c.h"
 #include "rc_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
@@ -132,7 +136,15 @@ public:
         const bool sc=track_session_assets50IG::codeEquals(track.world->code,"SC");
         const bool mb=track_session_assets50IG::codeEquals(track.world->code,"MB");
         const bool rc=track_session_assets50IG::codeEquals(track.world->code,"RC");
-        require(tc||sc||ga||ta||ma||sa||ra||rc||mb||track_session_assets50IG::codeEquals(track.world->code,"GC"),
+        // The common route (OriginalCameraStartCourse::sa): stock SA, or the
+        // latched add-on course whose code is not stock (146r, PORT EXTENSION).
+        // Its row's own code names every member; no course name is keyed.
+        const char* routeCode=rr::platform::courseRouteCode50IM();
+        const bool registry=track.world&&track.world->code&&
+            rr::assets::originalTrackCutRegistryCode50LA(track.world->code)&&
+            routeCode&&track_session_assets50IG::codeEquals(track.world->code,routeCode);
+        const bool commonRoute=sa||registry;
+        require(tc||sc||ga||ta||ma||commonRoute||ra||rc||mb||track_session_assets50IG::codeEquals(track.world->code,"GC"),
             "original camera authoring requires an owned original track");
         require(original_player_identity50IK::admittedPodId(pod)&&!actualPhy.empty(),
             "original camera requires actual selected pod authoring");
@@ -142,15 +154,34 @@ public:
         course_archive_receipt50CI::receipt("camera_assets",track.world->code,bytes,track.archiveSha256,track.archiveBytes);
         rr::assets::ResArchive48C archive;rr::assets::DecodeError48C diagnostic;
         const auto limits=course_archive_receipt50CI::limits();
+        // tracks\<code>.tob: one rule for every course (stock names unchanged).
+        std::string tobMember="tracks\\";
+        for(const char* c=track.world->code;*c;++c)tobMember+=(*c>='A'&&*c<='Z')?char(*c+32):*c;
+        tobMember+=".tob";
         require(rr::assets::decodeResource48C(bytes,archive,diagnostic,nullptr,limits)&&
-            rr::assets::extractResMember48C(archive,tc?"tracks\\tc.tob":sc?"tracks\\sc.tob":mb?"tracks\\mb.tob":ga?"tracks\\ga.tob":ta?"tracks\\ta.tob":ma?"tracks\\ma.tob":sa?"tracks\\sa.tob":ra?"tracks\\ra.tob":rc?"tracks\\rc.tob":"tracks\\gc.tob",tob,diagnostic),
+            rr::assets::extractResMember48C(archive,tobMember,tob,diagnostic),
             "original camera TOB member unavailable");
+        if(registry){
+            // The registry course's cut-camera row, from its own archive (TOB
+            // [CSCameras], tracks\<code>NN.vub, intro INIs) into the one
+            // registry slot. Absent data = no row (logged); the camera step
+            // then refuses this course with its own message.
+            std::string cutError;
+            const bool derived=course_cut_identity50CI::derive(track.world->code,archive,bytes,cutError,track.world->container);
+            if(!derived)std::cerr<<"course_cut_identity code="<<track.world->code<<" derived=0 ("<<cutError<<")\n";
+        }
         inputs={cam.data(),cam.size(),reinterpret_cast<const char*>(actualPhy.data()),actualPhy.size(),
             static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&actualPhy)),tob.data(),tob.size(),
             tc?rr::game::OriginalCameraStartCourse::tc:sc?rr::game::OriginalCameraStartCourse::sc:mb?rr::game::OriginalCameraStartCourse::mb:ga?rr::game::OriginalCameraStartCourse::ga:ta?rr::game::OriginalCameraStartCourse::ta:
-                ma?rr::game::OriginalCameraStartCourse::ma:sa?rr::game::OriginalCameraStartCourse::sa:
+                ma?rr::game::OriginalCameraStartCourse::ma:commonRoute?rr::game::OriginalCameraStartCourse::sa:
                 ra?rr::game::OriginalCameraStartCourse::ra:rc?rr::game::OriginalCameraStartCourse::rc:
                 rr::game::OriginalCameraStartCourse::gc};
+        if(commonRoute){
+            // The common route carries its row's code (stock "SA" or the add-on code).
+            const char* code=track.world->code;
+            for(std::size_t i=0;i<2&&code[i];++i)inputs.courseCode[i]=(code[i]>='a'&&code[i]<='z')?char(code[i]-32):code[i];
+            inputs.courseCode[2]='\0';
+        }
     }
 };
 }

@@ -140,7 +140,7 @@ inline bool loadCold(const std::filesystem::path& trackArchive, const water_reso
         // Grid: Race+0x8C = 0 in the one-view race; track id from the course
         // descriptor table; human count from the session.
         rr::game::AiFreshCreateSelection50IU selection{};
-        if (!trackCode || !rr::game::bindFreshAiCreateSelection50IU(trackCode, 2, selection)) {
+        if (!trackCode || !rr::game::bindFreshAiCreateSelection50IU(trackCode, 2, selection, false)) {
             log = "water grid: course descriptor unavailable"; return false; }
         s.grid = selectWaterGrid50WS(0u, selection.selectedTrackId1125F, humanCount);
         if (!s.grid.bound || waterSurfaceVertexCapacity50WS(s.grid) / (2u * waterStripVertices50WS) >

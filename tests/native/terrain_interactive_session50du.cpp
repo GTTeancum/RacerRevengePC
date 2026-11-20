@@ -152,7 +152,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool isGaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
  const bool isTaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TA");
  const bool isMaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MA");
- const bool isSaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SA");
+ // ONE common race route (146r): stock SA (its stock profile = receipts) and every
+ // registry (add-on) course. The registry flag is data of the session row
+ // (track_session_assets50IG::registrySession); no add-on code is named here.
+ // PORT STAND-IN (flagged): the other twelve stock codes still select their own
+ // loaders below (isXxTrack); they are to be retired onto this route.
+ const bool registryCourse=trackSession->registry;
+ require50DU(!registryCourse||loadedTrack==rr::platform::HostTrack50IM::Course,
+     "registry course row reached the session without the common-route launch identity");
+ const bool commonRouteTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SA")||registryCourse;
+ if(registryCourse)std::cerr<<"course_route_session code="<<trackSession->world->code<<" archive="<<trackSession->archive
+     <<" listed_bytes="<<trackSession->archiveBytes<<" tuning="<<(trackSession->tuningArchive?"inherited":"own")
+     <<" route=common session="<<sessionIndex+1<<'\n';
  const bool isRaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"RA");
  const bool isMbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MB");
  const bool isScTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SC");
@@ -161,7 +172,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool isGbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GB");
  const bool isMcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MC");
  const bool isTbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TB");
- const bool isMaSaTrack=isMaTrack||isSaTrack;
+ const bool maOrCommonRouteTrack=isMaTrack||commonRouteTrack;
  // Direct human worlds use only authenticated original archives. Clearing
  // legacy path descriptors prevents accidental generated visual/sky fallback.
  // GC direct-human capability is entered by the rooted frontend. The
@@ -174,7 +185,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const bool maOriginalDisc=isMaTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool saOriginalDisc=isSaTrack&&
+ const bool commonRouteOriginalDisc=commonRouteTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const bool mbOriginalDisc=isMbTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
@@ -192,7 +203,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool raOriginalDisc=isRaTrack&&originalUiStarted&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty()&&
      !(raAllAiSetting&&std::string(raAllAiSetting)=="1");
- const bool directOriginalHuman=raOriginalDisc||gcOriginalDisc||gaOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
+ const bool directOriginalHuman=raOriginalDisc||gcOriginalDisc||gaOriginalDisc||taOriginalDisc||maOriginalDisc||commonRouteOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
  const bool directOriginalInputs=isRaTrack||directOriginalHuman;
  // Collision ownership is separate from the legacy all-pass/render-policy flag.
  const bool sourceStaticCandidates=trackSession->originalStaticCandidates||taOriginalDisc;
@@ -204,13 +215,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   resolvedTrackAssets.assets.visualRoot="";resolvedTrackAssets.assets.visualMesh="";
   resolvedTrackAssets.assets.visualReport="";resolvedTrackAssets.assets.skyTextureRoot="";
  }
- const bool courseRaceCold=(isGcTrack||isGaTrack||isTaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)&&originalUiStarted;
- require50DU(!(isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)||(!checkpointInput&&!startAtMenu),
+ const bool courseRaceCold=(isGcTrack||isGaTrack||isTaTrack||maOrCommonRouteTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)&&originalUiStarted;
+ require50DU(!(maOrCommonRouteTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)||(!checkpointInput&&!startAtMenu),
      "MA/SA/RA require a fresh ordinary cold race; host startup menu/checkpoint unsupported");
  require50DU(!courseRaceCold||!startAtMenu,"original Course race entry requires RR_START_MENU=0");
  // GA follows the common direct-disc Course rule (its former GA-only host
  // admission and WatchtowerRun gate were port stand-ins, retired).
- require50DU(!(gaOriginalDisc||gcOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc)||
+ require50DU(!(gaOriginalDisc||gcOriginalDisc||taOriginalDisc||maOriginalDisc||commonRouteOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc)||
      (courseRaceCold&&!checkpointInput&&!startAtMenu),
      "direct-disc human route requires actual Main/Course ownership");
  // Retained HOST trigger source is dormant; native Gate has independent ownership.
@@ -259,7 +270,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool nativeTaSelection=nativeSelectedLights&&isTaTrack;
  const bool nativeGaSelection=nativeSelectedLights&&isGaTrack;
  const bool nativeMaSelection=nativeSelectedLights&&isMaTrack;
- const bool nativeSaSelection=nativeSelectedLights&&isSaTrack;
+ const bool nativeCommonRouteSelection=nativeSelectedLights&&commonRouteTrack;
  const bool nativeMbSelection=nativeSelectedLights&&isMbTrack;
  const bool nativeScSelection=nativeSelectedLights&&isScTrack;
  const bool nativeTcSelection=nativeSelectedLights&&isTcTrack;
@@ -313,9 +324,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto originalAiOwnsSlot=[&](std::size_t slot) noexcept {
   return originalAiEnabled&&(allAiEnabled||(humanCourseEnabled?slot!=0:slot==originalAiSlot));
  };
- require50DU(!isMaSaTrack||(raceEnabled&&!checkpointInput&&!startAtMenu&&
+ require50DU(!maOrCommonRouteTrack||(raceEnabled&&!checkpointInput&&!startAtMenu&&
      ((directOriginalHuman&&humanCourseEnabled&&!allAiEnabled)||(!directOriginalHuman&&allAiEnabled))),
-     "MA/SA require either actual Main/Course Player0 plus seven AI or their retained ALL8 route");
+     "MA/common-route courses require either actual Main/Course Player0 plus seven AI or their retained ALL8 route");
+ // The registry course has no retained ALL8 route: only the consumed free-play Course launch reaches it.
+ require50DU(!registryCourse||(consumedLaunch&&directOriginalHuman&&humanCourseEnabled&&!allAiEnabled&&trackAdmission.gcMode2),
+     "registry course requires the consumed free-play Course launch (Player0 plus seven AI, mode2, original disc)");
  require50DU(!isMbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.mbNativeWorldRequested),
      "MB requires the exact original Main/Course Player0 plus seven AI request");
  require50DU(!isScTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.scNativeWorldRequested),
@@ -365,7 +379,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      isGcTrack&&originalCameraEnabled;
  require50DU(!nativeWaterEnabled||(isGcTrack&&originalCameraEnabled&&(!originalUiActive||courseRaceCold)),
      "GC water/particles require the genuine selected fleet/source-camera world");
- require50DU(!(isMaSaTrack||isRaTrack||directOriginalHuman)||originalCameraEnabled,"MA/SA/RA require the actual recovered camera/visibility owner");
+ require50DU(!(maOrCommonRouteTrack||isRaTrack||directOriginalHuman)||originalCameraEnabled,"MA/common-route/RA require the actual recovered camera/visibility owner");
  require50DU(!gcNativeGate||(originalCameraEnabled&&!checkpointInput&&!startAtMenu),
      "GC native world triggers require the genuine fresh fleet/source-camera world");
  const bool gcNativeWorldSelected=isGcTrack&&gcNativeGate&&nativeWaterEnabled&&
@@ -801,13 +815,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .isGaTrack=isGaTrack,
   .isGbTrack=isGbTrack,
   .isGcTrack=isGcTrack,
-  .isMaSaTrack=isMaSaTrack,
+  .maOrCommonRouteTrack=maOrCommonRouteTrack,
   .isMaTrack=isMaTrack,
   .isMbTrack=isMbTrack,
   .isMcTrack=isMcTrack,
   .isRaTrack=isRaTrack,
   .isRcTrack=isRcTrack,
-  .isSaTrack=isSaTrack,
+  .commonRouteTrack=commonRouteTrack,
   .isScTrack=isScTrack,
   .isTaTrack=isTaTrack,
   .isTbTrack=isTbTrack,
@@ -840,7 +854,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .nativeRacerManager=nativeRacerManager,
   .nativeRcSelection=nativeRcSelection,
   .nativeRecordActor=nativeRecordActor,
-  .nativeSaSelection=nativeSaSelection,
+  .nativeCommonRouteSelection=nativeCommonRouteSelection,
   .nativeScSelection=nativeScSelection,
   .nativeSelectedLights=nativeSelectedLights,
   .nativeTaSelection=nativeTaSelection,
@@ -891,7 +905,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   .reportRenderer50DU=reportRenderer50DU,
   .requestedWindowSamples=requestedWindowSamples,
   .s=s,
-  .saOriginalDisc=saOriginalDisc,
+  .commonRouteOriginalDisc=commonRouteOriginalDisc,
   .scOriginalDisc=scOriginalDisc,
   .selectedAudioSettings=selectedAudioSettings,
   .selectedOriginal=selectedOriginal,

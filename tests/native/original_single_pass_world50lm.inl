@@ -10,6 +10,46 @@ struct Diagnostic {
     a::DecodeError48C decode{};
     a::MaterialTextureAssetDiagnostic50EA bank{};
 };
+// The owner's course identity (146r). Default = this namespace's stock row: its
+// pins, counts and SHAs are receipts (stock=1 on the stock bytes). A registry
+// course on the common route (registryIdentity) forms every member name from its
+// own code, carries its LISTED archive SHA/bytes, and has no stock row: no pin
+// tables, no stock counts (receipts log stock_row=none / stock=0).
+// PORT EXTENSION, NOT ORIGINAL for the registry row; MA only uses its stock row.
+struct Identity {
+    std::string code{stockCode};           // upper-case course code (log lines/receipts)
+    std::string container{archiveMember};  // "TRACKS/XX.RES": provider mount name
+    std::string scb{scbMember};            // "TRACKS/XX.SCB"
+    std::string sha{archiveSha};           // stock SHA, or the registry row's listed SHA
+    std::size_t bytes=archiveBytes;
+    std::uint64_t asset=assetIdentity;     // texture identity namespace (asset<<48)
+    track_source_fixture::Track track=selectedTrack;
+    bool stockRow=true;                    // stock pins/counts exist for this row
+    // inherit.particles (registry row only; PORT EXTENSION, NOT ORIGINAL): the
+    // particle closure members (particle\demoprt.prt/.pst/.psm) of the stock
+    // course archive the row names, mounted beside the course archive in the
+    // SAME native namespace before the seal, so the particle owner and the
+    // canonical material domain authenticate them like members of the course
+    // archive. Name/SHA/bytes are the stock archive's own (read from the install).
+    std::string particleContainer,particleSha;
+    std::size_t particleBytes=0;
+    std::shared_ptr<const a::ResArchive48C> particleArchive;
+};
+// Row of a course whose code is not stock: names spelled as the stock row spells
+// its own ("TRACKS/SA.RES" -> "TRACKS/NV.RES"); asset identity = the two code
+// bytes, the rule every stock owner uses (MA 0x4d41, SA 0x5341, ...), so a
+// non-stock code cannot collide with a stock one. false on a malformed code.
+inline bool registryIdentity(const char* code,const char* listedSha,std::size_t listedBytes,Identity& out){
+    if(!code||!code[0]||!code[1]||code[2]||!listedSha)return false;
+    std::string upper(code,2);
+    for(auto& c:upper){if(c>='a'&&c<='z')c=static_cast<char>(c-'a'+'A');
+        if(!((c>='A'&&c<='Z')||(c>='0'&&c<='9')))return false;}
+    Identity next;next.code=upper;next.container="TRACKS/"+upper+".RES";next.scb="TRACKS/"+upper+".SCB";
+    next.sha=listedSha;next.bytes=listedBytes;
+    next.asset=(std::uint64_t(std::uint8_t(upper[0]))<<8)|std::uint8_t(upper[1]);
+    next.track=track_source_fixture::Track::course;next.stockRow=false;
+    out=std::move(next);return true;
+}
 namespace detail {
 inline std::string key(std::string name){return shared::normalized(std::move(name));}
 inline Json fields(const a::MaterialFields48E& value){
@@ -86,16 +126,19 @@ inline std::uint32_t initialFrame(const a::MaterialFields48E& value){
 // Decode only supplied original bytes. The optional output records whether an
 // already retained independent image hash was available and checked. Ordinary
 // image hashes are recorded after decoding, never used to select pixel data.
+// stockPins=false (a row without a stock row): no pin table is consulted; every
+// image is admitted from its own data with its runtime identity.
 inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& mipIndex,
-    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0){
+    bool& animated,a::DecodeError48C& error,bool* independentlyPinned=nullptr,std::uint32_t authoredFrame=0,
+    bool stockPins=true){
     shared::need(source.size()>=12&&source.size()<=8u*1024u*1024u,"Original MA/SA texture source extent");
     const auto name=key(member);const auto sourceSha=shared::sha256(source);
-    const auto* pin=matchedSourceImage(name,source,sourceSha);
+    const auto* pin=stockPins?matchedSourceImage(name,source,sourceSha):nullptr;
     const source_texture50fc_fixture::detail::Entry* outputPin=nullptr;
-    for(const auto& entry:exceptionalImages)if(key(entry.member)==name){
+    if(stockPins)for(const auto& entry:exceptionalImages)if(key(entry.member)==name){
         shared::need(!outputPin,"Ambiguous original MA/SA decoded image pin");outputPin=&entry;
     }
-    for(const auto& entry:indexedPins)if(key(entry.member)==name){
+    if(stockPins)for(const auto& entry:indexedPins)if(key(entry.member)==name){
         if(outputPin)shared::need(std::string(outputPin->outputSha256)==entry.outputSha256,"MA/SA independent pixel pin disagreement");
         outputPin=&entry;
     }
@@ -247,8 +290,11 @@ class Owner final {
         }
     };
     std::unique_ptr<Storage> storage_;
+    Identity identity_{};
 public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
+    explicit Owner(Identity identity):identity_(std::move(identity)){}
+    const Identity& identity()const noexcept{return identity_;}
     bool loaded()const noexcept{return bool(storage_);}
     const a::Mesh48B* mesh()const noexcept{return storage_?&storage_->mesh:nullptr;}
     const std::vector<a::WorldNormal50HK>* normals()const noexcept{return storage_?&storage_->normals:nullptr;}
@@ -278,13 +324,16 @@ public:
             shared::need(canonical==bool(request.canonicalContext)&&canonical==(request.canonicalMaterialPath.actualPrefix36B970!=nullptr),
                 "MA/SA canonical Application/Video/path must be supplied together");
             if(!canonical){shared::need(request.canonicalRacerModels.empty(),"MA/SA racer sources lack their canonical domain");return true;}
-            shared::need(request.track==selectedTrack&&request.canonicalDomain->prepared()&&
+            shared::need(request.track==identity_.track&&request.canonicalDomain->prepared()&&
                 request.canonicalContext->live()&&*request.canonicalMaterialPath.actualPrefix36B970=="textures\\",
                 "MA/SA canonical racers require their actual gameplay directory and live Video");
             storage_->canonicalAttempted=true;storage_->canonicalDomain=request.canonicalDomain;
             const auto& provider=request.canonicalDomain->archiveProvider3E1A70();
             a::OriginalStandardArchiveProvider50LA::Diagnostic mounted;d.stage="ma_sa_original_archive_mount";
-            shared::need(provider&&provider->mountAuthenticatedRes(archiveMember,::rr::assets::originalTrackMountDigest50LA(archiveMember,archiveSha),::rr::assets::originalTrackMountBytes50LA(archiveMember,archiveBytes),storage_->archive,mounted)&&
+            shared::need(provider&&provider->mountAuthenticatedRes(identity_.container,::rr::assets::originalTrackMountDigest50LA(identity_.container,identity_.sha.c_str()),::rr::assets::originalTrackMountBytes50LA(identity_.container,identity_.bytes),storage_->archive,mounted)&&
+                (!identity_.particleArchive||provider->mountAuthenticatedRes(identity_.particleContainer,
+                    ::rr::assets::originalTrackMountDigest50LA(identity_.particleContainer,identity_.particleSha.c_str()),
+                    ::rr::assets::originalTrackMountBytes50LA(identity_.particleContainer,identity_.particleBytes),*identity_.particleArchive,mounted))&&
                 provider->sealNativeMounts(mounted)&&request.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,d.canonical.texture),
                 "Original MA/SA canonical provider mount rejected");
             std::vector<std::shared_ptr<const a::OriginalStandardMaterialSource50LA>> materials;

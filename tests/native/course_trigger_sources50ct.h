@@ -91,7 +91,7 @@ class Owner final {
  std::array<Source,capacity> sources_{};
  std::size_t live_=0;std::uint32_t animations_=0;
  bool attempted_=false,ready_=false,stockTob_=false;
- const char* code_="??";  // the Stock slot code (static string), for log lines
+ std::string code_="??";  // the row's code (owned copy: a registry row's Stock is not static), for log lines
  static void need(bool value,const std::string& reason){if(!value)throw std::runtime_error(reason);}
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
@@ -223,7 +223,7 @@ public:
  // The TOB's own animation count, and whether the TOB is the stock bytes.
  std::uint32_t animationCount()const noexcept{return ready_?animations_:0;}
  bool stockTob()const noexcept{return ready_&&stockTob_;}
- const char* code()const noexcept{return code_;}
+ const char* code()const noexcept{return code_.c_str();}
  std::size_t liveCount()const noexcept{return ready_?live_:0;}
  // Bounds-checked against the live prefix, never the capacity tail.
  const Source& source(std::size_t i)const{
@@ -274,6 +274,23 @@ inline constexpr Stock stockTa{"TA","tracks\\ta.tob","b491e34bf6cbd27869d5b9dc8d
 inline const Stock* commonChainStock(const char* code)noexcept{
  if(!code)return nullptr;const std::string c=code;
  if(c=="GA")return &stockGa;if(c=="TA")return &stockTa;return nullptr;
+}
+// Trigger slot of a course on the common race route (the former SA chain, 146r).
+// Stock SA keeps its receipt slot (stockSa). Any other code is a row WITHOUT
+// stock values: its TOB member is named from its code ("tracks\\nv.tob", spelled
+// as the stock slot spells sa's); its receipts log stock=0 (no stock SHA/count).
+// `storage` owns the row's strings for the load call (Owner::load copies the code).
+// PORT EXTENSION, NOT ORIGINAL (registry rows).
+struct RowStock { std::string code,tobMember; Stock stock{}; };
+inline const Stock* commonRouteStock(const char* code,RowStock& storage){
+ if(!code||!code[0]||!code[1]||code[2])return nullptr;
+ std::string upper(code,2),lower(code,2);
+ for(auto& c:upper)if(c>='a'&&c<='z')c=static_cast<char>(c-'a'+'A');
+ for(auto& c:lower)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');
+ if(upper=="SA")return &stockSa;
+ storage.code=upper;storage.tobMember="tracks\\"+lower+".tob";
+ storage.stock=Stock{storage.code.c_str(),storage.tobMember.c_str(),nullptr,0,nullptr,0,0};
+ return &storage.stock;
 }
 // MB (receipts only; values from the MB route's own stock pins).
 inline constexpr Stock stockMb{"MB","tracks\\mb.tob","6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",4421779,

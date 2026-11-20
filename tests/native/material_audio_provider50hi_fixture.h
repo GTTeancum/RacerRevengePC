@@ -12,7 +12,11 @@
 #include "mc_cold_sources50la.h"
 #include "mc_material_audio_originals50mc.h"
 #include "audio_retained_payload50mc.h"
+#include "runtime_asset_paths50lb.h"
+#include "../../src/assets/dlc_files50dl.h"
 #include <array>
+#include <cctype>
+#include <iostream>
 #include <filesystem>
 #include <string>
 namespace material_audio50HI {
@@ -52,7 +56,9 @@ inline constexpr std::size_t gbExtraFirstVoice=192,gbMaximumExtraVoices=24;
 static_assert(soundCount+gbMaximumExtraVoices==40&&gbExtraFirstVoice+gbMaximumExtraVoices<=rr::platform::originalMaterialFirstVoice50HD);
 inline constexpr std::size_t mcExtraFirstVoice=192,mcMaximumExtraVoices=4;
 static_assert(soundCount+mcMaximumExtraVoices==20&&mcExtraFirstVoice+mcMaximumExtraVoices<=rr::platform::originalMaterialFirstVoice50HD);
-enum class Track:std::uint8_t {ta,gc,ga,ma,sa,ra,mb,sc,tc,rc,tb,gb,mc};
+// course = the common race route's course whose code is not stock (146r): it
+// takes the SA data rule and has NO stock row (no receipts, "stock_row=none").
+enum class Track:std::uint8_t {ta,gc,ga,ma,sa,ra,mb,sc,tc,rc,tb,gb,mc,course};
 struct TrackProfile {
     Track track;const char* archiveName;std::size_t archiveBytes;const char* archiveSha;
     const char* aubName;std::size_t aubBytes;const char* aubSha;
@@ -123,6 +129,37 @@ public:
             d::need(a::decodeResource48C(bytes,archive,decode,nullptr,course_archive_receipt50CI::limits())&&
                 a::extractResMember48C(archive,selected->aubName,aub,decode),"50HI selected original AUB unavailable");
             return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,track,*selected);
+        }catch(const std::exception&e){error=e.what();return false;}
+    }
+    // The ONE common race route (146r): the session's own course archive (a
+    // dlc:/ package path for an add-on course, opened through the DLC overlay)
+    // and its tracks\<code>.aub. The stock row is found from the data (the
+    // profile whose archive is TRACKS/<CODE>.RES) and is a receipt only; a
+    // non-stock code has no stock row. Voice layout: the common route's
+    // selected-track-exclusive extra block (192, bounded by maximumSoundCount).
+    bool prepareCommonRoute(const std::string& archivePath,const char* code,const std::filesystem::path& audioRoot,
+        rr::platform::AudioMixer50HD& mixer,std::size_t firstVoice,std::string& error){
+        namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
+        if(attempted_){error="50HI requires a fresh stable provider";return false;}attempted_=true;
+        try{d::need(firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,"50HI dedicated16-slot range unavailable");
+            d::need(code&&code[0]&&code[1]&&!code[2]&&!archivePath.empty(),"50HI common-route course code/archive missing");
+            std::string upper(code,2),lower(code,2);
+            for(auto& c:upper)c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            for(auto& c:lower)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            courseContainer_="TRACKS/"+upper+".RES";courseAub_="tracks\\"+lower+".aub";
+            const TrackProfile* stock=nullptr;
+            for(const auto& p:trackProfiles)if(courseContainer_==p.archiveName)stock=&p;
+            courseRow_=stock?*stock:TrackProfile{Track::course,nullptr,0,nullptr,nullptr,0,nullptr,0,0,0,0,maSaExtraFirstVoice};
+            courseRow_.archiveName=courseContainer_.c_str();courseRow_.aubName=courseAub_.c_str();
+            d::Inputs files;files.capacity=course_archive_receipt50CI::maximumArchiveBytes();
+            auto bytes=files.read(rr::assets::dlc50DL::host(runtime_asset_paths50LB::resolve(archivePath)),files.capacity);
+            if(stock)course_archive_receipt50CI::receipt("material_audio",courseRow_.archiveName,bytes,courseRow_.archiveSha,courseRow_.archiveBytes);
+            std::cerr<<"course_route_material_audio code="<<lower<<" aub="<<courseRow_.aubName
+                     <<" archive_bytes="<<bytes.size()<<(stock?" stock_row=stock":" stock_row=none")<<'\n';
+            a::ResArchive48C archive;a::DecodeError48C decode;std::vector<std::uint8_t>aub;
+            d::need(a::decodeResource48C(bytes,archive,decode,nullptr,course_archive_receipt50CI::limits())&&
+                a::extractResMember48C(archive,courseRow_.aubName,aub,decode),"50HI common-route course AUB unavailable");
+            return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,courseRow_.track,courseRow_);
         }catch(const std::exception&e){error=e.what();return false;}
     }
     // RC never expands a second complete archive. Retain the same authenticated
@@ -208,7 +245,9 @@ private:
         namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
         const auto* selected=&selectedValue;
         try{
-            course_archive_receipt50CI::memberReceipt("material_audio",selected->aubName,aub,0,0,selected->aubBytes,selected->aubSha);
+            // A row with no stock pins (Track::course) has no receipts.
+            const bool stockRow=selected->aubSha!=nullptr;
+            if(stockRow)course_archive_receipt50CI::memberReceipt("material_audio",selected->aubName,aub,0,0,selected->aubBytes,selected->aubSha);
             std::vector<a::AudioRequest50HC>requests;
             d::need(track==Track::mc?a::readMcMaterialAudioCatalog50HI(aub,catalog_,requests,error):
                 track==Track::tb?a::readTbMaterialAudioCatalog50HI(aub,catalog_,requests,error):
@@ -219,16 +258,16 @@ private:
             activeSoundCount_=collisionRowCount_+driveRowCount_;
             // Row and material counts come from the AUB, bounded by the native
             // sound store; the stock counts are receipts.
-            course_archive_receipt50CI::countReceipt("material_audio","collision_rows",collisionRowCount_,selected->collisionRows);
-            course_archive_receipt50CI::countReceipt("material_audio","drive_rows",driveRowCount_,selected->driveRows);
-            course_archive_receipt50CI::countReceipt("material_audio","materials",catalog_.materialCount,selected->materials);
+            if(stockRow)course_archive_receipt50CI::countReceipt("material_audio","collision_rows",collisionRowCount_,selected->collisionRows);
+            if(stockRow)course_archive_receipt50CI::countReceipt("material_audio","drive_rows",driveRowCount_,selected->driveRows);
+            if(stockRow)course_archive_receipt50CI::countReceipt("material_audio","materials",catalog_.materialCount,selected->materials);
             // FLAG stand-in: the native voice layout below assumes at least the 8+8
             // base rows (fewer would underflow its extra-slot arithmetic).
             d::need(collisionRowCount_>=8&&driveRowCount_>=8&&activeSoundCount_<=maximumSoundCount,"50HI material rows outside the native sound layout (8..44)");
             // The original reads DefaultMaterial from the AUB (the catalog reader
             // bounds it to one material byte); the stock value 1 is a receipt.
-            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc)
-                course_archive_receipt50CI::countReceipt("material_audio","default_material",catalog_.defaultMaterial,1);
+            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc||track==Track::course)
+                if(stockRow)course_archive_receipt50CI::countReceipt("material_audio","default_material",catalog_.defaultMaterial,1);
             // RA declares NumMaterials1. Material2 is outside271674..271804.
             if(track==Track::ra){
                 d::need(catalog_.orderedObjectMaterials.empty(),"RA material assignment traversal differs");
@@ -240,7 +279,7 @@ private:
                 // already resolved every section key from the AUB itself.
                 course_archive_receipt50CI::countReceipt("material_audio","sc_object_materials",catalog_.orderedObjectMaterials.size(),54);
             }
-            course_archive_receipt50CI::countReceipt("material_audio","unique_clips",requests.size(),selected->uniqueClips);
+            if(stockRow)course_archive_receipt50CI::countReceipt("material_audio","unique_clips",requests.size(),selected->uniqueClips);
             d::need(a::loadAudioBank50HC(audioRoot,requests,bank_,error),"50HI real material PCM bank failed");
             // Stock PCM identities and GB/MC traversal counts: receipts (the
             // clips are the disc's own sfx files the AUB names).
@@ -337,6 +376,8 @@ private:
     std::array<Sound,maximumSoundCount>sounds_{};
     std::array<std::size_t,maximumSoundCount>slots_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
+    // Common-route row (prepareCommonRoute): owns the names the row points at.
+    std::string courseContainer_,courseAub_;TrackProfile courseRow_{};
     std::size_t firstVoice_=0,extraFirstVoice_=extraFirstVoice,collisionRowCount_=8,driveRowCount_=8,activeSoundCount_=soundCount;
     rr::game::MaterialAudioState50HI state_{};
     Counters counters_{};bool attempted_=false;

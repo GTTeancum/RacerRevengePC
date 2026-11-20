@@ -158,12 +158,12 @@ struct ContactsContext final {
     interactive_frame50DU::BorrowedCall<void()> requireMbRuntimeNavigation50MB;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saOriginalDiscType = const bool;
-    saOriginalDiscType& saOriginalDisc;
-    using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    saTriggerActionsType& saTriggerActions;
-    using saTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    saTriggerAuthoringType& saTriggerAuthoring;
+    using commonRouteOriginalDiscType = const bool;
+    commonRouteOriginalDiscType& commonRouteOriginalDisc;
+    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
+    commonRouteTriggerActionsType& commonRouteTriggerActions;
+    using commonRouteTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
+    commonRouteTriggerAuthoringType& commonRouteTriggerAuthoring;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;
     using scGroundType = std::unique_ptr<sc_runtime_ground50LA::Owner>;

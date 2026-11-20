@@ -20,18 +20,18 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     const auto* selected=original_course_targets50KX::target(launchSelection_);
     if(!selected)return nullptr;
     if(selected->track==rr::platform::HostTrack50IM::TA){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||world74_||!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_)return nullptr;
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||commonRouteWorld74_||commonRouteWorldCounted_||gcWorld74_||gcWorldCounted_||world74_||!taWorld74_||!taWorldCounted_||!taWorldPrefixComplete_)return nullptr;
         return &taWorldEntity_;
     }
     if(selected->track==rr::platform::HostTrack50IM::RA){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||gcWorld74_||gcWorldCounted_||taWorld74_||taWorldCounted_||!world74_||!world74_->worldColdConstructed_||
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||commonRouteWorld74_||commonRouteWorldCounted_||gcWorld74_||gcWorldCounted_||taWorld74_||taWorldCounted_||!world74_||!world74_->worldColdConstructed_||
            world74_->worldApplication_!=application_||world74_->topologyClosed_||
            world74_->worldEntity_.reference00!=1||
            world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration)return nullptr;
         return &world74_->worldEntity_;
     }
     if(selected->track==rr::platform::HostTrack50IM::GC){
-        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||!gcWorld74_||!gcWorldCounted_||
+        if(gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||commonRouteWorld74_||commonRouteWorldCounted_||world74_||taWorld74_||taWorldCounted_||!gcWorld74_||!gcWorldCounted_||
            !gcWorldPrefixComplete_||gcWorldEntity_.reference00!=1||
            gcWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(gcWorldEntity_))return nullptr;
@@ -39,23 +39,23 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::MA){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!maWorld74_||!maWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!maWorld74_||!maWorldCounted_||
            !maWorldPrefixComplete_||maWorldEntity_.reference00!=1||
            maWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(maWorldEntity_))return nullptr;
         return &maWorldEntity_;
     }
-    if(selected->track==rr::platform::HostTrack50IM::SA){
+    if(original_course_targets50KX::commonRouteTarget(*selected)){ // stock SA or a registry course (146r)
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!saWorld74_||!saWorldCounted_||
-           !saWorldPrefixComplete_||saWorldEntity_.reference00!=1||
-           saWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
-           !application_->entityAuthority_.canRetire(saWorldEntity_))return nullptr;
-        return &saWorldEntity_;
+           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!commonRouteWorld74_||!commonRouteWorldCounted_||
+           !commonRouteWorldPrefixComplete_||commonRouteWorldEntity_.reference00!=1||
+           commonRouteWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
+           !application_->entityAuthority_.canRetire(commonRouteWorldEntity_))return nullptr;
+        return &commonRouteWorldEntity_;
     }
     if(selected->track==rr::platform::HostTrack50IM::GA){
         if(world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||
+           maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||commonRouteWorld74_||commonRouteWorldCounted_||
            !gaWorld74_||!gaWorldCounted_||!gaWorldPrefixComplete_||gaWorldEntity_.reference00!=1||
            gaWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(gaWorldEntity_))return nullptr;
@@ -63,7 +63,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::MB){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!mbWorld74_||!mbWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!mbWorld74_||!mbWorldCounted_||
            !mbWorldPrefixComplete_||mbWorldEntity_.reference00!=1||
            mbWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(mbWorldEntity_))return nullptr;
@@ -71,7 +71,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::SC){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!scWorld74_||!scWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||!scWorld74_||!scWorldCounted_||
            !scWorldPrefixComplete_||scWorldEntity_.reference00!=1||
            scWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(scWorldEntity_))return nullptr;
@@ -79,7 +79,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::GB){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
            !gbWorld74_||!gbWorldCounted_||!gbWorldPrefixComplete_||gbWorldEntity_.reference00!=1||
            gbWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(gbWorldEntity_))return nullptr;
@@ -87,7 +87,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::MC){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||gbWorld74_||gbWorldCounted_||tbWorld74_||tbWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||gbWorld74_||gbWorldCounted_||tbWorld74_||tbWorldCounted_||
            !mcWorld74_||!mcWorldCounted_||!mcWorldPrefixComplete_||mcWorldEntity_.reference00!=1||
            mcWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(mcWorldEntity_))return nullptr;
@@ -95,7 +95,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::TB){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||gbWorld74_||gbWorldCounted_||mcWorld74_||mcWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||gbWorld74_||gbWorldCounted_||mcWorld74_||mcWorldCounted_||
            !tbWorld74_||!tbWorldCounted_||!tbWorldPrefixComplete_||tbWorldEntity_.reference00!=1||
            tbWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(tbWorldEntity_))return nullptr;
@@ -103,7 +103,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::RC){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
            !rcWorld74_||!rcWorldCounted_||!rcWorldPrefixComplete_||rcWorldEntity_.reference00!=1||
            rcWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(rcWorldEntity_))return nullptr;
@@ -111,7 +111,7 @@ inline const OriginalWreckComponent50LA* OriginalRaceConstructor50LA::nativeIntr
     }
     if(selected->track==rr::platform::HostTrack50IM::TC){
         if(gaWorld74_||gaWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||
-           saWorld74_||saWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
+           commonRouteWorld74_||commonRouteWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||
            !tcWorld74_||!tcWorldCounted_||!tcWorldPrefixComplete_||tcWorldEntity_.reference00!=1||
            tcWorldEntity_.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(tcWorldEntity_))return nullptr;
@@ -127,7 +127,7 @@ inline bool OriginalRaceConstructor50LA::constructWorld1A6BC0(
     std::uint32_t& pc)noexcept {
     pc=0x1a6bc0;
     if(!counted_||rolledBack_||!constructorSuffix_||!loadPrefixReached_||!resourcesPrepared_||
-       worldAttempted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||saWorld74_||saWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
+       worldAttempted_||gaWorld74_||gaWorldCounted_||maWorld74_||maWorldCounted_||mbWorld74_||mbWorldCounted_||scWorld74_||scWorldCounted_||gbWorld74_||gbWorldCounted_||rcWorld74_||rcWorldCounted_||tcWorld74_||tcWorldCounted_||mcWorld74_||mcWorldCounted_||tbWorld74_||tbWorldCounted_||commonRouteWorld74_||commonRouteWorldCounted_||world74_||taWorld74_||taWorldCounted_||gcWorld74_||gcWorldCounted_||!world||!raceAudio_||raceGroupCount_!=6||raceGroupsAttached_!=6||
        world->worldColdAttempted_||world->worldColdConstructed_||world->worldApplication_||
        raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration||
        raceAudio_->coldThread_!=std::this_thread::get_id()||!raceAudio_->coldMixer_||
@@ -157,7 +157,7 @@ inline bool OriginalRaceConstructor50LA::rollbackNativeRaceWorldFailure(std::uin
     if(tbWorld74_||tbWorldCounted_)return retireNativeTbWorldPrefix(pc);
     if(rcWorld74_||rcWorldCounted_)return retireNativeRcWorldPrefix(pc);
     if(tcWorld74_||tcWorldCounted_)return retireNativeTcWorldPrefix(pc);
-    if(saWorld74_||saWorldCounted_)return retireNativeSaWorldPrefix(pc);
+    if(commonRouteWorld74_||commonRouteWorldCounted_)return retireNativeCommonRouteWorldPrefix(pc);
     if(gcWorld74_||gcWorldCounted_)return retireNativeGcWorldPrefix(pc);
     if(taWorld74_||taWorldCounted_)return retireNativeTaWorldPrefix(pc);
     if(!world74_)return true;
@@ -185,7 +185,7 @@ inline bool OriginalRaceConstructor50LA::worldResetPredecessor1A6BF0Current()con
         // an empty source list500 and no controller in slot48 yet.
         const bool prefix=taWorld74_?taWorldCounted_&&taWorldPrefixComplete_&&taWorldList500_&&!taWorldListCount50C_:
             gaWorld74_?gaWorldCounted_&&gaWorldPrefixComplete_&&gaWorldList500_&&!gaWorldListCount50C_:
-            saWorld74_?saWorldCounted_&&saWorldPrefixComplete_&&saWorldList500_&&!saWorldListCount50C_:
+            commonRouteWorld74_?commonRouteWorldCounted_&&commonRouteWorldPrefixComplete_&&commonRouteWorldList500_&&!commonRouteWorldListCount50C_:
             maWorld74_?maWorldCounted_&&maWorldPrefixComplete_&&maWorldList500_&&!maWorldListCount50C_:
             mbWorld74_?mbWorldCounted_&&mbWorldPrefixComplete_&&mbWorldList500_&&!mbWorldListCount50C_:
             scWorld74_?scWorldCounted_&&scWorldPrefixComplete_&&scWorldList500_&&!scWorldListCount50C_:

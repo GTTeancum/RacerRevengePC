@@ -1,0 +1,68 @@
+146r: ONE common race route for any course code; add-on courses selectable on the Course screen and raced on it (single-TU compile-checked; full relink wt-146r-2 follows, not run)
+
+PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (add-on courses). Plan:
+work/scratch/146c/COMMON-ROUTE-PLAN.md (146c), contract work/scratch/dlc/DLC-JSON.md
+"Add-on items". Helpers 146r-W/S/P/R/U worked in this tree on disjoint files; shared
+contract work/scratch/146r/CONTRACT.md.
+
+Route
+- The SA race chain IS the common route: SA is one data row (its stock pins, counts
+  and SHAs are receipts, stock=1); a registry course is another row whose every member
+  is named by its own code. Tree-wide rename (work/scratch/146r/rename.py):
+  isSaTrack->commonRouteTrack, sa_original_world50LM->common_route_world50LM,
+  saWorld74_..->commonRouteWorld74_.., saTrigger*->commonRouteTrigger*, consumed stage,
+  camera session, lighting prepare, ATM window owner. No SA-named member on the route.
+- New identities: HostTrack50IM::Course (code latched once per consumed launch,
+  bounds-checked, courseRouteCode50IM), track_source_fixture::Track::course (no stock
+  profile), SessionAssets::registry + tuningArchive; registrySession(code) builds the
+  row from the registry (dlc:/ archive, listed SHA/bytes, names from the code, counts
+  from the data, built once per code).
+- Handoff: original_course_race_targets50kx.h courseRouteTarget; target() picks it for
+  a free-play launch with an add-on selected in an allowed mode (subtype 3 = Time
+  Trial, 1/2 = Single Event); the profile's packed course/planet keep the last stock
+  selection; consume latches the code (course_route_launch line). Restart renews the
+  consumed launch like TA. Cold prefix / consumed stage / world join accept SA or Course.
+- Session: registry row -> commonRouteTrack; requires the consumed free-play launch
+  (Player0 + 7 AI, mode2, original disc); course_route_session line.
+- World (W): common world owner identity per row (code-named archive/SCB, listed SHA,
+  Track::course, asset identity from the code bytes, no stock pins); triggers from
+  tracks\<code>.tob (commonRouteStock); inherit.tuning read from the stock archive.
+- Setup/continuation (S): lighting stock counts compared only for the stock SA SCB;
+  material audio from the session archive + tracks\<code>.aub; Track::course for the
+  registry row; normals/sky rules for course; inherit.particles (demoprt.* from the
+  inherited stock archive) in the particle cold loader and wreck effects.
+- Publication/camera/intro (P): ATM owner exactly when authored (none on the five
+  add-ons; non-stock ATM refused as flagged stand-in); common-route camera session
+  checks the track member against that code's cut row; one registry cut slot filled
+  from the archive; intro whitelists accept any course with a cut row; 0 intro events
+  / 0 script lines accepted.
+- Loading / AI / PHY / Pause / records (R): AI race class from ai_class, record pod
+  from rival (none accepted), no tournament id; PHY class from phy_class at 214954;
+  loading presenter hash table -> receipt, screen file and texts from the row; Pause
+  title from the row; an add-on race never qualifies for / writes the stock Hall
+  (1ABFC0 answers not qualified, 1AC440 refused and logged), RECORDS HOOK left for
+  the 146s side file (dlc_progress50dl.h API).
+- Course screen (U): add-on entries after the 13 stock courses in the arrow cycle,
+  name from package strings, background (package PST or stock), hologram = template
+  hologram with the package preview; confirm hands the number to selectAddonCourse,
+  stock confirm clears it; nothing changes without an admitted add-on course.
+  Runner: --addon-course really steps the arrow and confirms (RR_TEST_ADDON_COURSE_PICK);
+  --hold-course writes the held Course frame for the eye check.
+
+Stand-ins (flagged in code)
+- The other 12 stock codes still select their own loaders (isXxTrack); MA keeps its
+  own world instantiation. Lighting scene enum value Scene::sa and camera start
+  course Course::sa now mean "common route" (header rename deferred).
+- Common-route trigger action owner is LostAI-only (Animation/PodSound refused); no
+  add-on TOB authors triggers. ATM owner stock-shaped (no data ATM reader).
+- Add-on entry on the Course screen is port-owned state over the stock control it
+  follows (rigid 24/84/13 page kept); no two-player VS course entries.
+- Add-on pods as AI on add-on courses (D6) not wired; records shown from
+  hall_defaults until the 146s side file is merged.
+
+Host check (work/scratch/146r/host_check.py, host_check.log): eb, lc, ns, nb, nv
+95/95 decisions pass (members by code, cut/TV cameras, sky named by the SCB, no ATM,
+no triggers, inherited tuning tb / particles ta present in the install, intro 0/0,
+loading-screen layout, preview vs holo_tb, ai/phy class, rival, modes).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

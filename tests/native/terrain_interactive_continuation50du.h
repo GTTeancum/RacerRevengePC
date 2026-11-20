@@ -22,7 +22,7 @@ namespace original_consumed_mc_stage50DU { class Owner; }
 namespace original_consumed_tb_stage50DU { class Owner; }
 namespace original_consumed_rc_stage50DU { class Owner; }
 namespace original_consumed_tc_stage50DU { class Owner; }
-namespace original_consumed_sa_stage50DU { class Owner; }
+namespace original_consumed_common_route_stage50DU { class Owner; }
 namespace original_consumed_ta_stage50DU { class Owner; }
 namespace gb_positional_sound50GB { class Owner; }
 namespace mc_positional_sound50MC { class Owner; }
@@ -218,8 +218,8 @@ struct Context final {
     consumedTcStageType& consumedTcStage;
     using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
     consumedRaStageType& consumedRaStage;
-    using consumedSaStageType = original_consumed_sa_stage50DU::Owner;
-    consumedSaStageType& consumedSaStage;
+    using consumedCommonRouteStageType = original_consumed_common_route_stage50DU::Owner;
+    consumedCommonRouteStageType& consumedCommonRouteStage;
     using consumedTaStageType = original_consumed_ta_stage50DU::Owner;
     consumedTaStageType& consumedTaStage;
     using controlPresetsType = rr::game::ControlPresets49D;
@@ -498,8 +498,8 @@ struct Context final {
     isGbTrackType& isGbTrack;
     using isGcTrackType = const bool;
     isGcTrackType& isGcTrack;
-    using isMaSaTrackType = const bool;
-    isMaSaTrackType& isMaSaTrack;
+    using maOrCommonRouteTrackType = const bool;
+    maOrCommonRouteTrackType& maOrCommonRouteTrack;
     using isMaTrackType = const bool;
     isMaTrackType& isMaTrack;
     using isMbTrackType = const bool;
@@ -510,8 +510,8 @@ struct Context final {
     isRaTrackType& isRaTrack;
     using isRcTrackType = const bool;
     isRcTrackType& isRcTrack;
-    using isSaTrackType = const bool;
-    isSaTrackType& isSaTrack;
+    using commonRouteTrackType = const bool;
+    commonRouteTrackType& commonRouteTrack;
     using isScTrackType = const bool;
     isScTrackType& isScTrack;
     using isTaTrackType = const bool;
@@ -714,8 +714,8 @@ struct Context final {
     nativeRecordActorType& nativeRecordActor;
     using nativeRosterOwnersType = std::shared_ptr<ra_cold_roster50LA::RuntimeOwners>;
     nativeRosterOwnersType& nativeRosterOwners;
-    using nativeSaSelectionType = const bool;
-    nativeSaSelectionType& nativeSaSelection;
+    using nativeCommonRouteSelectionType = const bool;
+    nativeCommonRouteSelectionType& nativeCommonRouteSelection;
     using nativeScSelectionType = const bool;
     nativeScSelectionType& nativeScSelection;
     using nativeSelectedLightsType = const bool;
@@ -1001,16 +1001,16 @@ struct Context final {
     BorrowedCall<bool() noexcept> retireTbAudioOwnersCall;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saOriginalDiscType = const bool;
-    saOriginalDiscType& saOriginalDisc;
-    using saOriginalWorldType = std::shared_ptr<sa_original_world50LM::Owner>;
-    saOriginalWorldType& saOriginalWorld;
-    using saTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    saTriggerActionsType& saTriggerActions;
-    using saTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    saTriggerAuthoringType& saTriggerAuthoring;
-    using saTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
-    saTriggerMembershipType& saTriggerMembership;
+    using commonRouteOriginalDiscType = const bool;
+    commonRouteOriginalDiscType& commonRouteOriginalDisc;
+    using commonRouteWorldType = std::shared_ptr<common_route_world50LM::Owner>;
+    commonRouteWorldType& commonRouteWorld;
+    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
+    commonRouteTriggerActionsType& commonRouteTriggerActions;
+    using commonRouteTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
+    commonRouteTriggerAuthoringType& commonRouteTriggerAuthoring;
+    using commonRouteTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
+    commonRouteTriggerMembershipType& commonRouteTriggerMembership;
     BorrowedCall<void(bool)> sampleControllerCall;
     using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
     scColdSourcesType& scColdSources;

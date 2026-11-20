@@ -10,6 +10,7 @@
 #include "../../../src/game/original_ui_controls_controller50kg.h"
 #include "../../../src/game/original_course_load_selection50kg.h"
 #include "../../../src/game/original_hall_record_queries50kg.h"
+#include "../../../src/game/dlc_course_entries50dl.h"
 #include "../../../src/assets/dlc_progress50dl.h"
 #include "../../../src/assets/dlc_registry50dl.h"
 #include "../../../src/game/dlc_rider_entries50dl.h"
@@ -165,6 +166,44 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::shared_ptr<const game::OriginalUiGameSettingsProfile50KG> betaSettings;
     bool readable() const noexcept {return common&&common->known&&common->mode34<=2;}
 };
+namespace {
+// PORT EXTENSION, NOT ORIGINAL (DLC add-on course, 146r). The add-on course
+// racing now, by the same launch rule the Course target uses
+// (dlc_course_entries50dl.h addonCourseForLaunch); 0 = the stock course that
+// 1125F holds. 1125F/1125E keep the last STOCK selection during an add-on race,
+// so every site below that would read a stock course row for the race asks this
+// first: the add-on row answers, and no stock Hall row / course field is written.
+template<class S> unsigned addonRaceCourse146R(const S& s) noexcept {
+    return s.common?rr::game::dlc50DL::addonCourseForLaunch(s.common->mode34,s.subtype11258):0u;
+}
+// The race's rival (1ABE70 / 187E30 read 11280 of the selected course): the
+// add-on row's rival when it is a stock racer 1..26, otherwise none (-1: no
+// stock racer to beat or unlock; an add-on pod is always unlocked).
+template<class S> std::int32_t raceRival146R(const S& s,std::uint32_t course) noexcept {
+    if(const unsigned n=addonRaceCourse146R(s)){
+        const auto* c=rr::assets::dlc50DL::addonCourse(n);
+        return c&&c->rivalRacer>=1u&&c->rivalRacer<27u?static_cast<std::int32_t>(c->rivalRacer):-1;
+    }
+    return course<s.trackText.size()?s.trackText[course].rival11280:-1;
+}
+void addonRecordsGuardLine146R(const char* site,unsigned number) noexcept {
+    // RECORDS HOOK (dlc_course_entries50dl.cpp, call site 2): the DLC side file
+    // (helper 146s) takes this race's result here: ProgressRaceResult r;
+    // r.courseKey=rr::game::dlc50DL::addonCourseRecordsTarget(number); progress.submit(r).
+    std::fprintf(stderr,"course_route_records site=%s number=%u stock_hall=untouched hook=dlc_progress_submit stock=0\n",site,number);
+    // 147c: the race-end qualification (1ABFC0 at 1AB598, the moment the original
+    // decides record7E4 and so Hall11 versus Unlock10/Course6) is where an add-on
+    // course record will be taken next round. PENDING HOOK, NOT WIRED: nothing is
+    // written; record7E4 stays clear, so 1AB5BC takes Unlock10 (rival) or Course6
+    // and neither the stock Hall rows nor the stock save receive this race.
+    if(std::strcmp(site,"1ABFC0")==0){
+        const auto* c=rr::assets::dlc50DL::addonCourse(number);
+        std::fprintf(stderr,"dlc_course_record hook=pending key=%s number=%u code=%s records_key=%s site=1ABFC0 record7E4=0 "
+            "stock_hall=untouched stock_save=untouched\n",c?c->key.c_str():"-",number,c?c->code.c_str():"-",
+            c?c->recordsKey.c_str():"-");
+    }
+}
+}
 OriginalUiRiderProfileOwner50KG::OriginalUiRiderProfileOwner50KG() noexcept=default;
 OriginalUiRiderProfileOwner50KG::~OriginalUiRiderProfileOwner50KG()=default;
 bool OriginalUiRiderProfileOwner50KG::readWorldProfileByte1B44E8(
@@ -189,6 +228,13 @@ bool OriginalUiRiderProfileOwner50KG::selectedTrackName187330(
     std::array<char,3>& out)const noexcept {
     if(!storage_||!storage_->readable())return false;
     const auto& s=*storage_;const auto index=std::uint32_t(s.packed1125F&15u);
+    // 187330 names the LOADED course: during an add-on race that is the add-on
+    // row's code (PORT EXTENSION, 146r), never the stock course 1125F holds.
+    if(const unsigned n=addonRaceCourse146R(s)){
+        const auto* c=rr::assets::dlc50DL::addonCourse(n);
+        if(!c||c->code.size()!=2)return false;
+        out={c->code[0],c->code[1],'\0'};return true;
+    }
     if(index>=s.trackText.size())return false; //Native supported-table bound.
     const auto& name=s.trackText[index].name11278;
     if(!name[0]||!name[1]||name[2])return false;
@@ -540,6 +586,8 @@ bool OriginalUiRiderProfileOwner50KG::prepareSingleHumanRecordInsertion1AC440(
     d={Stage::Status::profile,0x1ac440u};
     if(!hallRecordsReady()||!storage_->readable()||
        (storage_->common->mode34!=0u&&storage_->common->mode34!=2u))return false;
+    // Add-on race: never a stock Hall row (profile 0x102F0+c*0xE4, c<13).
+    if(const unsigned n=addonRaceCourse146R(*storage_)){addonRecordsGuardLine146R("1AC440_single",n);return false;}
     const auto& s=*storage_;
     OriginalPersistedProfileName50KG first,second;
     //1AC49C uses career219D ONLY for mode2; otherwise1AC4B8 uses player0.
@@ -594,6 +642,7 @@ bool OriginalUiRiderProfileOwner50KG::prepareTwoHumanRecordInsertion1AC440(
     //Pure preparation can observe all existing readable modes0..2, including
     //mode1's two-player profile. This does not enable any launch or result path.
     if(!hallRecordsReady()||!storage_->readable())return false;
+    if(const unsigned n=addonRaceCourse146R(*storage_)){addonRecordsGuardLine146R("1AC440_two",n);return false;}
     const auto& s=*storage_;
     std::array<OriginalPersistedProfileName50KG,2> names;
     if(!s.saveProfile.persistedName(s.common->mode34==2u,
@@ -632,6 +681,15 @@ bool OriginalUiRiderProfileOwner50KG::prepareRaceRecordQualification1ABFC0(
     //neither qualification nor ordinary observations can bypass that owner.
     if(s.subtype11258!=2u&&!s.unlock10FAC[0]&&!s.unlock10FAC[5]&&
        !s.unlock10FAC[13]&&!hallRecordsReady())return false;
+    // Add-on race (PORT EXTENSION, 146r): the stock Hall table of course 1125F
+    // is not this race's table. Answer as 1ABFC0's early exclusion does (v0=0,
+    // no ranks), so 7E4 stays clear and Results never enters stock name entry
+    // or 1AC440; the race's records go to the DLC side file (RECORDS HOOK).
+    if(const unsigned n=addonRaceCourse146R(s)){
+        Query next;next.course_=std::uint32_t(s.packed1125F&15u);next.selector_=selectorA1;
+        next.generation_=s.generation;out=next;d={Query::Status::ok,0x1ac40cu,0,0};
+        addonRecordsGuardLine146R("1ABFC0",n);return true;
+    }
     const game::LapRecordConfig50ID config{s.subtype11258,s.common->playerBits1125C,
         static_cast<std::uint16_t>(s.common->playerBits1125C|
             (std::uint16_t(s.packed1125D)<<8))};
@@ -670,6 +728,16 @@ bool OriginalUiRiderProfileOwner50KG::prepareRaceRivalQualification1ABE70(
     if(course>=s.trackText.size()){
         d={Query::Status::course,0x1abed4u,0};return false;
     }
+    if(addonRaceCourse146R(s)){
+        // Add-on race: the row's rival (stock racer 1..26) on the same 1ABE70
+        // rule; none = no racer to beat (v0=0), never the stock course's rival.
+        const auto rival=raceRival146R(s,course);
+        std::fprintf(stderr,"course_route_rival site=1ABE70 rival=%d stock=0\n",static_cast<int>(rival));
+        if(rival<0){Query next;next.course_=course;next.rival_=-1;next.generation_=s.generation;
+            out=next;d={Query::Status::ok,0x1abf98u,0};return true;}
+        return Query::prepare(course,static_cast<std::int8_t>(rival),s.unlock10FAC,
+            rows,availableRows,actualManagerCount30,s.generation,out,d);
+    }
     return Query::prepare(course,s.trackText[course].rival11280,s.unlock10FAC,
         rows,availableRows,actualManagerCount30,s.generation,out,d);
 }
@@ -698,7 +766,7 @@ bool OriginalUiRiderProfileOwner50KG::storeEndRivalWord1AB5A8(
     const auto value=query.originalV0();const bool changed=s.word7E8!=value;
     if(s.subtype11258!=1u||expected.generation!=s.generation||expected.mode34!=s.common->mode34||
        query.profileGeneration()!=s.generation||query.course()!=course||course>=s.trackText.size()||
-       query.rival11280()!=s.trackText[course].rival11280||
+       query.rival11280()!=raceRival146R(s,course)||
        (changed&&s.generation==std::numeric_limits<std::uint64_t>::max()))return false;
     s.word7E8=value; //Full source word store, even when unchanged, AFTER1ABE70.
     if(changed){++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps;}
@@ -740,6 +808,7 @@ bool OriginalUiRiderProfileOwner50KG::commitSingleHumanHallRecords1AC440(
     const game::OriginalRaceRecordInsertionStage50KG& stage,
     OriginalSaveProfileOwner50KG& prepared,OriginalUiRiderProfileStamp50KG expected,
     OriginalUiRiderProfileStamp50KG& after)noexcept {
+    if(storage_)if(const unsigned n=addonRaceCourse146R(*storage_)){addonRecordsGuardLine146R("1AC440_commit",n);return false;}
     if(!storage_||&prepared==&storage_->saveProfile||stage.secondHumanRanks()||
        expected.generation!=storage_->generation||expected.mode34!=stage.profileMode34()||
        !hallRecordProvenancePreparationCurrent1AC440(stage,prepared))return false;
@@ -1152,7 +1221,7 @@ bool OriginalUiRiderProfileOwner50KG::unlockFacts187E30(game::OriginalUnlockFact
     const auto& s=*storage_;const auto track=std::uint32_t(s.packed1125F&15u);
     if(track>=s.trackText.size()||s.comparison100C0>=s.tournament.careers.size())return false;
     game::OriginalUnlockFacts50PD f;
-    f.unlock10FAC=s.unlock10FAC;f.word7E8=s.word7E8;f.rival11280=s.trackText[track].rival11280;
+    f.unlock10FAC=s.unlock10FAC;f.word7E8=s.word7E8;f.rival11280=raceRival146R(s,track);
     f.career100C0=s.comparison100C0;
     if(!resultsSelectedOrder187B10(f.order187B10))return false;
     for(std::size_t c=0;c<s.tournament.careers.size();++c)

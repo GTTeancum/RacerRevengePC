@@ -1,0 +1,12 @@
+146r fix 2: inherited particle closure mounted in the free-play namespace (NV refused "Track particle closure differs from the same selected mounted archive")
+
+Free play mounts the course namespace in terrain_interactive_publication50du.cpp, not in
+the world owner (that path is the consumed tournament prefix), so the f9726f6 mount was
+never made there. The particle closure members of the stock archive the row names are
+now mounted beside the course archive under the same race lease (released at race end
+with it) before the seal. Member names taken from the stock archive entries; inherited
+name compare folds case. Diagnostic lines course_route_particle_namespace (mounted),
+course_route_particle_closure (which member failed), course_route_particle_append
+(domain status/pc) for the next refusal, if any. Stock courses unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

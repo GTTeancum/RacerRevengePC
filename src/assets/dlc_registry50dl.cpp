@@ -136,6 +136,39 @@ bool readArchive(const fs::path& path,const DecodeLimits48C& limits,ResArchive48
     if(!decodeResource48C(bytes,out,e,nullptr,limits)){why="does not decode ("+e.code+")";return false;}
     return true;
 }
+bool readLoose(const fs::path& path,std::size_t cap,std::vector<std::uint8_t>& out){
+    std::error_code error;const auto size=fs::file_size(path,error);
+    if(error||!size||size>cap)return false;
+    out.assign(static_cast<std::size_t>(size),0);
+    std::ifstream in(path,std::ios::binary);
+    in.read(reinterpret_cast<char*>(out.data()),static_cast<std::streamsize>(out.size()));
+    return in&&in.gcount()==static_cast<std::streamsize>(out.size());
+}
+std::uint32_t word32(const std::vector<std::uint8_t>& b,std::size_t at){
+    return at+4>b.size()?0xffffffffu:std::uint32_t(b[at])|std::uint32_t(b[at+1])<<8|std::uint32_t(b[at+2])<<16|std::uint32_t(b[at+3])<<24;
+}
+// PST shape (kind, levels, smallest-level width/height): the same layout rule as
+// racer-arcade\tools\a2r\geo_pst.py parse() and tools\dlc\dlc_pack.py pst_shape():
+// u16 1, u16 0, u32 kind 0/1/2, u32 levels 1..7, palette 16/256/0 words, then per
+// level h,w,0,0 and its pixels (kind 2: u32 byte count, IPU stream); nothing after.
+struct PstShape {unsigned kind=0,levels=0,width=0,height=0;};
+bool pstShape(const std::vector<std::uint8_t>& b,PstShape& s){
+    if(b.size()<12||(b[0]|b[1]<<8)!=1||(b[2]|b[3]<<8)!=0)return false;
+    s.kind=word32(b,4);s.levels=word32(b,8);
+    if(s.kind>2||s.levels<1||s.levels>7)return false;
+    std::size_t at=12+4u*(s.kind==0?16u:s.kind==1?256u:0u);
+    for(unsigned i=0;i<s.levels;++i){
+        if(at+16>b.size())return false;
+        const auto h=word32(b,at),w=word32(b,at+4);
+        if(word32(b,at+8)||word32(b,at+12)||!w||!h||w>4096||h>4096)return false;
+        std::size_t bytes;
+        if(s.kind==2){if(at+20>b.size())return false;bytes=word32(b,at+16);at+=20;}
+        else{bytes=s.kind==0?std::size_t(w)*h/2:std::size_t(w)*h;at+=16;}
+        if(bytes>b.size()-at)return false;
+        at+=bytes;s.width=w;s.height=h;
+    }
+    return at==b.size();
+}
 DecodeLimits48C podLimits(){
     DecodeLimits48C l;l.resource_file_bytes=RegistryLimits::podArchiveBytes;l.resource_decoded_bytes=RegistryLimits::podDecodedBytes;
     l.resource_entries=RegistryLimits::podEntries;l.resource_name_bytes=RegistryLimits::podNameBytes;return l;
@@ -151,6 +184,18 @@ bool memberNames(const ResArchive48C& a,std::map<std::string,std::string>& out,s
         if(!out.emplace(key,e.name).second){dup=e.name;return false;}
     }
     return true;
+}
+// Stock course facts read from the player's install, names only (inherit rule)
+// and the hologram textures of UI/UICOURSE/UICOURSE.RES (preview rule).
+struct StockArchive {bool ready=false;std::string error;ResArchive48C archive;std::map<std::string,std::string> names;};
+const StockArchive& stockArchive(const fs::path& path,const DecodeLimits48C& limits){
+    static std::map<std::wstring,StockArchive> cache;
+    auto& s=cache[path.wstring()];
+    if(s.ready||!s.error.empty())return s;
+    std::string why,dup;
+    if(!readArchive(path,limits,s.archive,why)){s.error=why;return s;}
+    if(!memberNames(s.archive,s.names,dup)){s.error="lists "+dup+" twice";return s;}
+    s.ready=true;return s;
 }
 // Shared original names: member names the stock archives of one kind carry in
 // common (present in at least two different stock pod archives, or two stock
@@ -480,6 +525,19 @@ bool readCourse(const Package& p,const Json& o,PackageItems& items,AddonCourse& 
             else return fail(reason,where+": modes may only hold single, time_trial and vs");
         }
     }
+    // course_background (146c): {"file": listed PST} or "stock:<code>"; absent = stock:<template>.
+    if(const Json* b=field(o,"course_background")){
+        if(b->is_string()){
+            const auto v=b->get<std::string>();
+            if(!startsWith(v,"stock:"))return fail(reason,where+": course_background must be {\"file\": ...} or \"stock:<code>\"");
+            c.backgroundStockCode=folded(v.substr(6));
+            if(!stockCode(c.backgroundStockCode)||c.backgroundStockCode=="sb")return fail(reason,where+": course_background stock must be a stock course code");
+        }else if(b->is_object()&&b->size()==1&&b->contains("file")){
+            if(!text(*b,"file",raw,true,where+" course_background",reason)||!listedPath(p,raw,norm,where+": course_background file",reason))return false;
+            if(extensionOf(foldCase(norm))!="pst")return fail(reason,where+": course_background file must be a .PST");
+            c.backgroundFile=dlcPath(p.id,norm);
+        }else return fail(reason,where+": course_background must be {\"file\": ...} or \"stock:<code>\"");
+    }else{c.backgroundStockCode=c.courseScreenTemplate;c.backgroundBorrowed=true;}
     c.recordsKey=c.itemId;
     if(!text(o,"records_key",c.recordsKey,false,where,reason))return false;
     if(!recordsKeyText(c.recordsKey))return fail(reason,where+": records_key must be [a-z0-9-]{1,47}");
@@ -647,11 +705,81 @@ bool checkItems(const Package& p,PackageItems& items,const fs::path& stock,std::
         c.ownParticles=names.count("particle\\demoprt.prt")&&names.count("particle\\demoprt.pst")&&names.count("particle\\demoprt.psm");
         if(!c.ownTuning&&c.inheritTuning.empty())return fail(reason,where+": archive has no tracks\\"+c.code+".tun and no inherit.tuning");
         if(!c.ownParticles&&c.inheritParticles.empty())return fail(reason,where+": archive has no particle\\demoprt.prt/.pst/.psm and no inherit.particles");
-        for(const auto* loose:{&c.loadingFile,&c.coursePreview}){
+        for(const auto* loose:{&c.loadingFile,&c.coursePreview,&c.backgroundFile}){
             if(loose->empty())continue;
             std::error_code e;const auto size=fs::file_size(hostOf(p,packagePathOf(*loose)),e);
             if(e||!size||size>RegistryLimits::loosePstBytes)return fail(reason,where+": "+packagePathOf(*loose)+" is empty or larger than 4 MiB");
         }
+        // 146c: members the race path names by code (optional ones are facts, logged).
+        c.cube=names.count("tracks\\"+c.code+".cub")!=0;
+        c.tvCamera=names.count("tracks\\"+c.code+"tvcam.pos")!=0;
+        c.cutCameras=0;
+        for(unsigned n=1;n<=99;++n){
+            const char nn[3]={char('0'+n/10),char('0'+n%10),0};
+            if(!names.count("tracks\\"+c.code+nn+".vub"))break;
+            ++c.cutCameras;
+        }
+        // Intro (contract 2): introAud.ini NumEvents and scrptLns.ini NumberOfLines,
+        // read by key as the race's intro reader does; 0 is accepted, absent = 0.
+        std::vector<std::uint8_t> text;
+        const auto count=[&](const char* member,const char* section,const char* key,unsigned& value,bool& own)->bool{
+            value=0;own=names.count(member)!=0;if(!own)return true;
+            if(!rr::assets::dlc50DL::member(a,names,member,text,why))return fail(reason,where+": archive "+why);
+            const auto parsed=ini(text);const auto s=parsed.find(section);
+            const std::string v=s==parsed.end()||!s->second.count(key)?std::string():s->second.at(key);
+            if(v.empty()||v.size()>4||v.find_first_not_of("0123456789")!=std::string::npos)
+                return fail(reason,where+": "+member+" ["+section+"] "+key+" is not a whole number");
+            value=unsigned(std::stoul(v));return true;
+        };
+        if(!count("audio\\introaud.ini","responseemitter","numevents",c.introEvents,c.ownIntro)||
+           !count("audio\\scrptlns.ini","general","numberoflines",c.scriptLines,c.ownScript))return false;
+        // Loading screen: the presenter's layout rule (one 640x448 indexed-8 level).
+        // Its stock fingerprint check becomes a receipt (listed SHA-256 kept here).
+        if(!c.loadingFile.empty()){
+            std::vector<std::uint8_t> b;
+            if(!readLoose(hostOf(p,packagePathOf(c.loadingFile)),RegistryLimits::loosePstBytes,b)||
+               b.size()!=RegistryLimits::loadingScreenBytes||word32(b,0)!=1||word32(b,4)!=1||word32(b,8)!=1||
+               word32(b,1036)!=448||word32(b,1040)!=640||word32(b,1044)||word32(b,1048))
+                return fail(reason,where+": loading screen "+packagePathOf(c.loadingFile)+" is not the 640x448 one-level layout the loading presenter reads");
+            if(const auto* f=listedFile(p,packagePathOf(c.loadingFile)))c.loadingSha256=f->sha256;
+        }
+        // Course-screen background: the 640x448 one-level indexed layout every stock
+        // *_bkg.pst has and the background decoder reads (2A6490 / 24EA00).
+        if(!c.backgroundFile.empty()){
+            std::vector<std::uint8_t> b;
+            if(!readLoose(hostOf(p,packagePathOf(c.backgroundFile)),RegistryLimits::loosePstBytes,b)||
+               b.size()!=RegistryLimits::loadingScreenBytes||word32(b,0)!=1||word32(b,4)!=1||word32(b,8)!=1||
+               word32(b,1036)!=448||word32(b,1040)!=640||word32(b,1044)||word32(b,1048))
+                return fail(reason,where+": course background "+packagePathOf(c.backgroundFile)+" is not the 640x448 one-level layout of the stock course-screen backgrounds");
+        }
+        // Preview: same shape as the stock texture it stands in for
+        // (ui\textures\holo_<template>.pst in the player's UI/UICOURSE/UICOURSE.RES).
+        if(!c.coursePreview.empty()){
+            std::vector<std::uint8_t> b;PstShape got,want;
+            if(!readLoose(hostOf(p,packagePathOf(c.coursePreview)),RegistryLimits::loosePstBytes,b)||!pstShape(b,got))
+                return fail(reason,where+": preview "+packagePathOf(c.coursePreview)+" is not a PST texture");
+            const auto& ui=stockArchive(stock/"UI"/"UICOURSE"/"UICOURSE.RES",uiLimits());
+            if(!ui.ready)return fail(reason,where+": stock UI/UICOURSE/UICOURSE.RES "+ui.error+" (needed for the preview check)");
+            const std::string holo="ui\\textures\\holo_"+c.courseScreenTemplate+".pst";
+            const auto at=ui.names.find(holo);DecodeError48C e;b.clear();
+            if(at==ui.names.end()||!extractResMember48C(ui.archive,at->second,b,e,RegistryLimits::loosePstBytes)||!pstShape(b,want))
+                return fail(reason,where+": stock "+holo+" cannot be read (needed for the preview check)");
+            const auto shape=[](const PstShape& s){return "kind "+std::to_string(s.kind)+", "+std::to_string(s.levels)+" level(s), "+
+                std::to_string(s.width)+"x"+std::to_string(s.height);};
+            if(got.kind!=want.kind||got.levels!=want.levels||got.width!=want.width||got.height!=want.height)
+                return fail(reason,where+": preview is "+shape(got)+"; the stock texture it stands in for ("+holo+") is "+shape(want));
+            c.previewKind=got.kind;c.previewLevels=got.levels;c.previewWidth=got.width;c.previewHeight=got.height;
+        }
+        // Inherit: the named stock course's archive in the player's install must
+        // carry the member it stands in for (members in the add-on archive win).
+        const auto inherited=[&](const std::string& code,const std::vector<std::string>& wanted,const char* what)->bool{
+            const auto& s=stockArchive(stock/"TRACKS"/(upper(code)+".RES"),DecodeLimits48C{});
+            if(!s.ready)return fail(reason,where+": inherit."+what+" stock TRACKS/"+upper(code)+".RES "+s.error);
+            for(const auto& m:wanted)if(!s.names.count(m))return fail(reason,where+": inherit."+what+" stock TRACKS/"+upper(code)+".RES lacks "+m);
+            return true;
+        };
+        if(!c.ownTuning&&!inherited(c.inheritTuning,{"tracks\\"+c.inheritTuning+".tun"},"tuning"))return false;
+        if(!c.ownParticles&&!inherited(c.inheritParticles,{"particle\\demoprt.prt","particle\\demoprt.pst","particle\\demoprt.psm"},"particles"))return false;
     }
     return true;
 }
@@ -705,7 +833,9 @@ void publishRegistry(std::vector<AdmittedItems>& admitted,std::size_t admittedPa
     for(const auto& c:next.courses)
         lines.push_back("dlc_item key="+c.key+" kind=course code="+c.code+" number="+std::to_string(c.number)+
             " phy_class="+c.phyClass+" ai_class="+c.aiClass+" rival="+(c.rivalRacer?std::to_string(c.rivalRacer):std::string("none"))+
-            " loading="+(c.loadingStock?"stock:"+c.loadingStockCode:std::string("file"))+" course_screen=stock:"+c.courseScreenTemplate+
+            " loading="+(c.loadingStock?"stock:"+c.loadingStockCode:std::string("file"))+
+            " course_background="+(c.backgroundFile.empty()?"stock:"+c.backgroundStockCode+(c.backgroundBorrowed?" background_borrowed=1":""):std::string("file"))+
+            " course_screen=stock:"+c.courseScreenTemplate+
             (c.coursePreview.empty()?" preview=borrowed":" preview=file")+
             " inherit_tuning="+(c.ownTuning?std::string("unused"):c.inheritTuning.empty()?std::string("-"):c.inheritTuning)+
             " inherit_particles="+(c.ownParticles?std::string("unused"):c.inheritParticles.empty()?std::string("-"):c.inheritParticles)+

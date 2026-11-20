@@ -4,6 +4,8 @@
 #include "../../src/game/original_wreck_tuning50la.h"
 #include "../../src/assets/original_phy_cursor50la.h"
 #include "ra_source_camera_ownership50la.h"
+#include "../../src/game/dlc_course_entries50dl.h"
+#include <cstdio>
 
 namespace native_racer_model50LA {
 

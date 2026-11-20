@@ -62,6 +62,11 @@ inline const Profile& get(track_source_fixture::Track track) {
 #else
         throw std::runtime_error("SA native visual assets have not been cold-prepared and pinned");
 #endif
+    // A registry course on the common race route names no stock profile: these
+    // are stock pins, so it gets what a stock code without a pinned row gets.
+    // Its world is loaded by the common-route owner from its own data instead.
+    case track_source_fixture::Track::course:
+        throw std::runtime_error("Course has no stock visual profile (its world loads from its own data)");
     default: throw std::runtime_error("Unsupported original visual track identity");
     }
 }

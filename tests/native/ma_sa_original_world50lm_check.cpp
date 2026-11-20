@@ -44,6 +44,6 @@ void check(const std::filesystem::path& root,const char* code,track_source_fixtu
 int main(int argc,char** argv){try{
  need(argc==2,"usage: check ORIGINAL_DISC_DIRECTORY");need(std::fegetround()==FE_TONEAREST,"rounding mode");
  check<ma_original_world50LM::Owner,ma_original_world50LM::Diagnostic>(argv[1],"MA",track_source_fixture::Track::ma,15532032,485,404992,49,80);
- check<sa_original_world50LM::Owner,sa_original_world50LM::Diagnostic>(argv[1],"SA",track_source_fixture::Track::sa,29638656,1065,813441,7,104);
+ check<common_route_world50LM::Owner,common_route_world50LM::Diagnostic>(argv[1],"SA",track_source_fixture::Track::sa,29638656,1065,813441,7,104);
  return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

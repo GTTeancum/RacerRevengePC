@@ -98,7 +98,7 @@ std::unique_ptr<NativeRaceIntroTransport50LA> NativeRaceIntroTransport50LA::crea
            first>=mixer.count()||count>mixer.count()-first||
            !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||
            mixer.auralMasterOwner_||!mixer.originalSoundMode50KG()||!mixer.canRecordControlChanges())return {};
-    }else if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"&&authoring->trackId()!="RC"&&authoring->trackId()!="TC"&&authoring->trackId()!="MC"&&authoring->trackId()!="TB")||!bank||
+    }else if(!aural||!authoring||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||!rr::assets::originalRaceTrackIdAdmitted50LA(authoring->trackId())||!bank||
        bank->clips.size()!=authoring->eventCount()||bank->ready!=authoring->eventCount()||bank->missing||bank->invalid||bank->unsupported||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
        first>=mixer.count()||count>mixer.count()-first||
        !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||

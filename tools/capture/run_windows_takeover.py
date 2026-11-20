@@ -30,6 +30,9 @@ PLAYER_RACER_ROUTES = ('main-tournament-course-ta',)
 # Add-on riders join the free-play (mode 0) Rider carousel only; the plain
 # free-play route starts from a fresh profile on Rider19 and races TA.
 ADDON_RIDER_ROUTES = ('main-rider-course-ta',)
+# DLC phase 3 (146c, PORT EXTENSION, NOT ORIGINAL): add-on course item key and the free-play route it rides.
+ADDON_COURSE_KEY = re.compile(r'[a-z0-9][a-z0-9-]{2,47}/[a-z0-9][a-z0-9-]{1,46}')
+ADDON_COURSE_ROUTES = ('main-rider-course-ta',)
 
 
 # Tournament course order (career progress219C) -> course code.
@@ -264,8 +267,20 @@ def main():
                              'on (RR_TEST_RIDER_HOLD=1; --route main-rider-course-ta lands on Rider19). The run then '
                              'idles until its wall budget; use a short --seconds (90)')
     parser.add_argument('--addon-course', metavar='PACKAGE/ITEM',
-                        help='Test only (DLC): add-on course (sets RR_TEST_ADDON_COURSE). Not implemented in this '
-                             'build: the variable is passed through and nothing reads it yet')
+                        help='Test only (DLC add-on course, PORT EXTENSION): on the free-play Course screen press the '
+                             'course arrow (Next) until this admitted add-on course is highlighted, then the original '
+                             'Course Confirm (sets RR_TEST_ADDON_COURSE_PICK). Needs --env RR_DLC_ROOT=<DLC folder> and --route '
+                             + ' / '.join(ADDON_COURSE_ROUTES))
+    parser.add_argument('--addon-course-mode', choices=['single', 'time_trial'],
+                        help='With --addon-course: on the Course screen first set the event type (original Down to the '
+                             'event-type row, Right until Single Race / Time Trial shows, Up back to the course row), '
+                             'then pick the add-on course (sets RR_TEST_ADDON_COURSE_SUBTYPE=1 or 3). Default: the '
+                             'event type the Course screen opens on (Single Race on a fresh profile)')
+    parser.add_argument('--hold-course', action='store_true',
+                        help='With --addon-course: stop on the Course screen with the add-on course highlighted (no Confirm, '
+                             'sets RR_TEST_ADDON_COURSE_HOLD=1) and write that Course frame as an image for an eye check '
+                             '(turns logs-only off for this run). The run then idles until its wall budget; use a short '
+                             '--seconds (60)')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
     parser.add_argument('--keep-binaries', action='store_true',
@@ -287,6 +302,12 @@ def main():
             parser.error('--addon-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
         if args.player_racer is not None:
             parser.error('--addon-rider and --player-racer cannot be combined')
+    if args.hold_course and args.addon_course is None:
+        parser.error('--hold-course needs --addon-course')
+    if args.addon_course_mode and args.addon_course is None:
+        parser.error('--addon-course-mode needs --addon-course')
+    if args.hold_course and args.hold_rider:
+        parser.error('--hold-course and --hold-rider cannot be combined (each stops its own screen)')
     if args.hold_rider and args.route not in ADDON_RIDER_ROUTES:
         parser.error('--hold-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
     if args.hold_results and (args.results_exit or args.results_confirm):
@@ -300,10 +321,12 @@ def main():
         if not any(item.startswith('RR_DLC_ROOT=') for item in args.env):
             parser.error('--eyecheck-dlc-hall needs --env RR_DLC_ROOT=<folder with the package>')
     if args.addon_course is not None:
-        if not addon_key.fullmatch(args.addon_course):
-            parser.error('--addon-course expects <package-id>/<item-id>, e.g. n64-vengeance/nv')
-        print('addon_course: --addon-course is not implemented in this build; RR_TEST_ADDON_COURSE is '
-              'passed through and the run uses the route\'s own stock course', flush=True)
+        if not ADDON_COURSE_KEY.fullmatch(args.addon_course):
+            parser.error('--addon-course expects <package-id>/<item-id>, for example n64-vengeance/nv')
+        if args.route not in ADDON_COURSE_ROUTES:
+            parser.error('--addon-course works only with --route ' + ' / '.join(ADDON_COURSE_ROUTES))
+        if not any(item.startswith('RR_DLC_ROOT=') and len(item) > len('RR_DLC_ROOT=') for item in args.env):
+            parser.error('--addon-course needs --env RR_DLC_ROOT=<folder holding the DLC packages>')
     build, output = inside(args.build), inside(args.output)
     assets, sdl = args.assets.resolve(), args.sdl.resolve()
     receipt = json.loads((build / 'build-receipt.json').read_text(encoding='utf-8-sig'))
@@ -362,9 +385,9 @@ def main():
         # In-process route Main -> Options -> Hall TA, then hold (PORT EXTENSION,
         # tests/native/original_ui_capture_navigation50la.h HallRoute).
         env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
-    # A --hold-rider / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
-    logs_only = (args.logs_only and not args.hold_rider and not args.hold_results and not args.hold_results_hall and
-                 args.eyecheck_dlc_hall is None)
+    # A --hold-rider / --hold-course / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
+    logs_only = (args.logs_only and not args.hold_rider and not args.hold_course and not args.hold_results and
+                 not args.hold_results_hall and args.eyecheck_dlc_hall is None)
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
@@ -433,7 +456,14 @@ def main():
         env['RR_TEST_ADDON_RIDER_HOLD' if args.addon_rider is not None else 'RR_TEST_RIDER_HOLD'] = '1'
         env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Rider frame as an image
     if args.addon_course is not None:
-        env['RR_TEST_ADDON_COURSE'] = args.addon_course
+        # Picked through the real Course screen (course arrow, then the original Confirm);
+        # RR_TEST_ADDON_COURSE (startup pre-selection, no UI) is deliberately not set.
+        env['RR_TEST_ADDON_COURSE_PICK'] = args.addon_course
+    if args.hold_course:
+        env['RR_TEST_ADDON_COURSE_HOLD'] = '1'
+    if args.addon_course_mode:
+        env['RR_TEST_ADDON_COURSE_SUBTYPE'] = '3' if args.addon_course_mode == 'time_trial' else '1'
+        env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Course frame as an image
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
     # A run that must reach Results (and what follows it) keeps racing past
@@ -468,13 +498,15 @@ def main():
     for switch in args.renderer_switch:
         env[switch] = '1'
     command = [str(staged), '--assets', str(assets)]
-    result = dict(command=command, route=args.route, playerRacer=args.player_racer, watchdogSeconds=args.seconds,
+    result = dict(command=command, route=args.route, playerRacer=args.player_racer,
+                  watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
                   executableSha256=digest(staged),
                   runtimeHashes={p.name: digest(output / p.name) for p in runtime},
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
+                  addonCourseHold=args.hold_course, addonCourseMode=args.addon_course_mode,
                   eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results, resultsHallCapture=args.hold_results_hall,
                   seedSlowHall=args.seed_slow_hall,
                   resultsExit=args.results_exit,
@@ -622,6 +654,40 @@ def main():
                 draw=re.findall(r'dlc_rider_draw [^\r\n]*', texts),
                 model=re.findall(r'dlc_rider_model[ _][^\r\n]*', texts))
             result['routeCompleted'] = bool(rider_images and result['addonRiderHold']['holdReached'])
+        if args.hold_course:
+            # Same rule for a held Course screen: the Course frame with the add-on
+            # course highlighted was written and the hold was reached.
+            texts = log_text
+            for name in ('stderr.log', 'stdout.log'):
+                extra = output / name
+                if extra.is_file():
+                    texts += extra.read_text(errors='replace')
+            course_images = sorted(str(p) for p in capture.rglob('course-*.ppm'))
+            result['addonCourseHold'] = dict(
+                key=args.addon_course, courseImages=course_images,
+                holdReached=f'addon_course_route hold key={args.addon_course} ' in texts,
+                controls=re.findall(r'dlc_course_control [^\r\n]*', texts),
+                carousel=re.findall(r'dlc_course_carousel [^\r\n]*', texts),
+                draw=re.findall(r'dlc_course_draw [^\r\n]*', texts),
+                images=re.findall(r'dlc_course_images [^\r\n]*', texts))
+            result['routeCompleted'] = bool(course_images and result['addonCourseHold']['holdReached'])
+        elif args.addon_course is not None:
+            texts = log_text
+            for name in ('stderr.log', 'stdout.log'):
+                extra = output / name
+                if extra.is_file():
+                    texts += extra.read_text(errors='replace')
+            result['addonCoursePick'] = dict(
+                key=args.addon_course,
+                confirmed=f'addon_course_route confirm key={args.addon_course} ' in texts,
+                eventMoves=re.findall(r'addon_course_route event_move=[^\r\n]*', texts),
+                launch=re.findall(r'course_route_launch [^\r\n]*', texts),
+                record=re.findall(r'dlc_course_record [^\r\n]*', texts),
+                raceAck=re.findall(r'race_ack route=[^\r\n]*', texts),
+                restore=re.findall(r'dlc_course_carousel action=restore[^\r\n]*', texts),
+                selected=re.findall(r'dlc_course_confirm [^\r\n]*', texts),
+                carousel=re.findall(r'dlc_course_carousel [^\r\n]*', texts),
+                draw=re.findall(r'dlc_course_draw [^\r\n]*', texts))
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

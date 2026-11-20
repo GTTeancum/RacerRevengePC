@@ -52,6 +52,16 @@ bool Owner::continueNativeAeroEngine214954(g::OriginalRacerEntityCold50LA& actua
             if(name[0]=='r'&&name[1]=='a')s.selectedClass=2u;
             else {if(!track(0x214a80u,name))return false;
                 if(name[0]=='s'&&name[1]=='c')s.selectedClass=2u;}}
+        // PORT EXTENSION, NOT ORIGINAL (DLC add-on course, 146r): the code-letter
+        // rule above is the original's for the 13 stock codes; an add-on code takes
+        // its dlc.json phy_class instead (same 1/2/3 values). The Tuning UseA/B/C
+        // overrides below still apply after it, as in the original order.
+        if(char addonClass=0;rr::game::dlc50DL::addonHandlingClass(name.data(),addonClass)){
+            const unsigned before=s.selectedClass?*s.selectedClass:0u;
+            s.selectedClass=addonClass=='A'?1u:addonClass=='B'?2u:3u;
+            if(slot_==0u)std::fprintf(stderr,"course_route_phy code=%s phy_class=%c letter_class=%u stock=0 site=214954\n",
+                name.data(),addonClass,before);
+        }
         at(0x214aacu);s.useValues=true;at(0x214ab8u);s.upgrade3F0=0.f;
         at(0x214ab4u);bool tuning=false;if(!reader.select157D00("Tuning",tuning))return false;
         if(tuning){

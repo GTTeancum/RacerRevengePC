@@ -3,7 +3,7 @@
 #include "original_race_native_retirement50la.h"
 #include "live_audio50hf_fixture.h"
 
-namespace original_consumed_sa_stage50DU {
+namespace original_consumed_common_route_stage50DU {
 // Declare before the actual runtime/GPU borrowers, and after its audio owner.
 // The last fallback runs only after those later owners have released their borrows.
 class Owner final {
@@ -20,11 +20,12 @@ public:
     ~Owner()noexcept {if(!close())std::terminate();}
     bool begin(original_course_targets50KX::ConsumedLaunch& launch,std::uint64_t session,
         std::uint32_t racer,rr::game::OriginalRacerModelRenderGlobals50LA& modelGlobals,
-        const std::shared_ptr<sa_original_world50LM::Owner>& world,
+        const std::shared_ptr<common_route_world50LM::Owner>& world,
         rr::assets::OriginalStandardMaterialDiagnostic50LA& d,std::uint32_t& pc)noexcept {
         d={};pc=0;
         if(attempted_||!world||!world->loaded()||!world->mesh()||!world->bank()||!application_.riderProfile||
-           !launch.matches(*application_.riderProfile,session,rr::platform::HostTrack50IM::SA,racer))return false;
+           !(launch.matches(*application_.riderProfile,session,rr::platform::HostTrack50IM::SA,racer)||
+             launch.matches(*application_.riderProfile,session,rr::platform::HostTrack50IM::Course,racer)))return false;
         attempted_=true;
         if(!audio_.beginCountedRaceAudioStorage())return false;
         auto* mixer=audio_.mixerForCountedConstruction();
@@ -35,7 +36,7 @@ public:
         if(!application_.beginConsumedRaceLoad1A6AA0(*race_,modelGlobals,d)||
            !application_.populateConsumedRaceResources1AA5A0(*race_,d)||
            !race_->constructRaceGroups1A6B5C(*groups,*mixer,pc)||
-           !application_.constructConsumedSaRaceWorld1A6BC0(*race_,world,pc))return false;
+           !application_.constructConsumedCommonRouteWorld1A6BC0(*race_,world,pc))return false;
         // Only this reached prefix. No complete slot30 load or App10 attachment.
         return true;
     }

@@ -7,6 +7,7 @@
 #include "json.hpp"
 #include "runtime_asset_paths50lb.h"
 #include "../../src/assets/dlc_files50dl.h"
+#include "../../src/game/dlc_course_entries50dl.h"
 #include "../../src/assets/dlc_progress50dl.h"
 #include "../../platform/linux/native/native_beta_file50kg.h"
 #include "track_session_assets50ig_fixture.h"
@@ -129,6 +130,9 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   // PC enhancement (NOT ORIGINAL): check DLC packages once, before the first
   // original file is opened. No DLC folder = no overlay, stock paths unchanged.
   rr::assets::dlc50DL::startup();
+  // DLC phase 3 (146c, PORT EXTENSION): one dlc_course line per add-on course
+  // and the RR_TEST_ADDON_COURSE test selection. No add-on course: silent.
+  rr::game::dlc50DL::announceAddonCourses();
   // DLC save side file (PORT EXTENSION, NOT ORIGINAL; src\assets\dlc_progress50dl.h).
   // The registry is frozen here: load the side file once, before the first menu,
   // next to the stock save. With no admitted package nothing is read, created or
@@ -303,10 +307,14 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   // Exception: Restart Race of a consumed TA race re-runs the same consumed
   // constructor (tournament intro/race owners), so it renews the launch.
   std::unique_ptr<original_course_targets50KX::ConsumedLaunch> restartLaunch;
+  // Common route (146r): a registry course is reached only through its consumed
+  // launch, so its Restart renews that launch the same way (same profile, same
+  // port-owned add-on selection; target() must still answer the same target).
   if(exit==SessionExit50DU::Restart&&consumedCourseLaunch&&
-     consumedCourseLaunch->targetsTrack(rr::platform::HostTrack50IM::TA)){
+     (consumedCourseLaunch->targetsTrack(rr::platform::HostTrack50IM::TA)||
+      consumedCourseLaunch->targetsTrack(rr::platform::HostTrack50IM::Course))){
    const bool renewed=consumedCourseLaunch->renewForRestart(sessionIndex+1,restartLaunch);
-   std::cerr<<"consumed_launch_restart track=TA renewed="<<renewed<<'\n';
+   std::cerr<<"consumed_launch_restart track="<<rr::platform::hostTrackCode50IM(effectiveTrack)<<" renewed="<<renewed<<'\n';
   }
   consumedCourseLaunch.reset();
   // Session renderer, GPU, audio and world owners are actually retired.
@@ -340,6 +348,8 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
        (rootedHumanCourseSupported&&((effectiveTrack==rr::platform::HostTrack50IM::GC&&gcNativeWorldRequested)||
         effectiveTrack==rr::platform::HostTrack50IM::GA||
         effectiveTrack==rr::platform::HostTrack50IM::MA||effectiveTrack==rr::platform::HostTrack50IM::SA||
+        // Common route (146r): a registry course reached by the consumed Course launch.
+        effectiveTrack==rr::platform::HostTrack50IM::Course||
         effectiveTrack==rr::platform::HostTrack50IM::MB||
         (effectiveTrack==rr::platform::HostTrack50IM::RA&&raNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::SC&&scNativeWorldRequested)||
@@ -358,7 +368,8 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
   enterOriginalUi=exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::ResultsHallReturn||exit==SessionExit50DU::PauseMenuReturn;
   require50DU(!enterOriginalUi||originalMainApplication.enabled,"original Main application owner unavailable");
   if(exit==SessionExit50DU::Restart){effectiveAudioSettings=selectedAudioSettings;effectiveTrack=selectedTrack;}
-  if(restartLaunch&&effectiveTrack==rr::platform::HostTrack50IM::TA)consumedCourseLaunch=std::move(restartLaunch);
+  if(restartLaunch&&(effectiveTrack==rr::platform::HostTrack50IM::TA||effectiveTrack==rr::platform::HostTrack50IM::Course))
+   consumedCourseLaunch=std::move(restartLaunch);
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;
   startAtMenu=false; // An explicit restart/start immediately enters its fresh session.

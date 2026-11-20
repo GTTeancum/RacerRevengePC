@@ -258,7 +258,10 @@ public:
             const auto& profile = track_visual_profile_fixture::get(request.track);
             const bool ga = request.track == track_source_fixture::Track::ga;
             const bool ma = request.track == track_source_fixture::Track::ma;
-            const bool sa = request.track == track_source_fixture::Track::sa;
+            // Track::course (registry course on the common route) takes SA's data
+            // rule; it has no stock profile (get() above refuses it, as an unpinned code).
+            const bool sa = request.track == track_source_fixture::Track::sa ||
+                request.track == track_source_fixture::Track::course;
             // These selected original profiles preserve world-space roots,
             // every authored pass and source wrap policy. Archive, profile and
             // source image identities remain independent for every track.

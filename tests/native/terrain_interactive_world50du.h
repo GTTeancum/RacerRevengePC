@@ -212,8 +212,8 @@ struct Context final {
     isGbTrackType& isGbTrack;
     using isGcTrackType = const bool;
     isGcTrackType& isGcTrack;
-    using isMaSaTrackType = const bool;
-    isMaSaTrackType& isMaSaTrack;
+    using maOrCommonRouteTrackType = const bool;
+    maOrCommonRouteTrackType& maOrCommonRouteTrack;
     using isMaTrackType = const bool;
     isMaTrackType& isMaTrack;
     using isMbTrackType = const bool;
@@ -224,8 +224,8 @@ struct Context final {
     isRaTrackType& isRaTrack;
     using isRcTrackType = const bool;
     isRcTrackType& isRcTrack;
-    using isSaTrackType = const bool;
-    isSaTrackType& isSaTrack;
+    using commonRouteTrackType = const bool;
+    commonRouteTrackType& commonRouteTrack;
     using isScTrackType = const bool;
     isScTrackType& isScTrack;
     using isTaTrackType = const bool;
@@ -290,8 +290,8 @@ struct Context final {
     nativeRcSelectionType& nativeRcSelection;
     using nativeRecordActorType = std::unique_ptr<original_subtype3_record::Owner>;
     nativeRecordActorType& nativeRecordActor;
-    using nativeSaSelectionType = const bool;
-    nativeSaSelectionType& nativeSaSelection;
+    using nativeCommonRouteSelectionType = const bool;
+    nativeCommonRouteSelectionType& nativeCommonRouteSelection;
     using nativeScSelectionType = const bool;
     nativeScSelectionType& nativeScSelection;
     using nativeSelectedLightsType = const bool;
@@ -388,8 +388,8 @@ struct Context final {
     requestedWindowSamplesType& requestedWindowSamples;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using saOriginalDiscType = const bool;
-    saOriginalDiscType& saOriginalDisc;
+    using commonRouteOriginalDiscType = const bool;
+    commonRouteOriginalDiscType& commonRouteOriginalDisc;
     using scOriginalDiscType = const bool;
     scOriginalDiscType& scOriginalDisc;
     using selectedAudioSettingsType = rr::game::RaceAudioSettings50IC;
