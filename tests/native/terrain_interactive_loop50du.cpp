@@ -268,6 +268,9 @@ void Context::run() {
   humanResultsActive=false;humanResultsReady=false;
   humanResultsCountdown=humanCourseEnabled?4.f:0.f;   // race94 of the human Course route (1A6660)
   recoveryPaused=false;
+  // 1AC8E0 Aural 103210: the race sounds stop and the countdown/result observer starts over
+  // (its race time and phase run again from the countdown after an in-place restart).
+  if(raceAudio)raceAudio->reset();
   auto& common=native_common_results50PD::state();
   common.endActive=false;common.fallback=false;common.replayActive=false;common.acknowledged=false;
   common.routeChosen=false;common.route={};common.endCalls=0;common.lastPC=0;common.lastStatus=0xffu;

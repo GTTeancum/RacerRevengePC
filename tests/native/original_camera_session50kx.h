@@ -1462,8 +1462,15 @@ private:
         auto& host=actual_.hostRace.rows();
         host.phase=race_session50HM::Phase::Countdown;host.error=race_session50HM::Error::None;
         host.resultsClosed=false;host.finishCount=0;host.raceSeconds=0;host.countdownRemaining=0;
-        for(std::uint32_t i=0;i<host.racerCount&&i<race_session50HM::maxRacers;++i)
+        // Each racer row starts over at the grid: no laps, no finish, the start map node.
+        // The row stays an observed snapshot (with its current, complete place order) so the
+        // countdown observers see a valid race at the restarted clock; the next committed
+        // frame refreshes positions and places from the restarted pods.
+        for(std::uint32_t i=0;i<host.racerCount&&i<race_session50HM::maxRacers;++i){
+            const auto place=host.racers[i].place;
             host.racers[i]=race_session50HM::Racer{};
+            host.racers[i].place=place;host.racers[i].observedValid=place!=0;
+        }
         goPublished_=false;goEdgePending_=false;
     }
     // 175430(race48): mode44 = 4; +60 bits 12..16 (the cut cursor) = 0; with

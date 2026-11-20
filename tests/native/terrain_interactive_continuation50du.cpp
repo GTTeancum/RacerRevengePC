@@ -3154,7 +3154,7 @@ SessionExit50DU Context::run() {
      }else{
       // 1AEB88 virtual78 = 216A30 (original AI), same owner set as 2255B0.
       std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
-      if(!originalAiAudio->physicalResetOwners(slot,originalAi.racer60,s,flags22C,field24C)||!flags22C||!field24C){
+      if(!originalAiAudio->restartResetOwners(slot,originalAi.racer60,s,flags22C,field24C)||!flags22C||!field24C){
        pc=0x216a80u;why="AI D40/D44 reset owners unavailable";return;}
       if(track.hasWater())require50DU(slot<nativeWaterRacers.size()&&nativeWaterRacers[slot]&&
           nativeWaterRacers[slot]->bindResetDomain(selectedRuntimeHeightDomain,terrainOwner.lift1F0,heightDomain),

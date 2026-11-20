@@ -582,6 +582,19 @@ public:
         field24C=materialD44_.resetField24C(r.materialD44,r.engine);
         if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
     }
+    // 1AC8E0 -> 1AEA70 -> virtual78 (216A30) for an original AI: the restart runs between
+    // frames (from Pause, the Time Trial finish or Practice), not at a frame cut, so there is
+    // no PostPlayer phase to admit. Same session D40/D44 rows, no copy.
+    bool restartResetOwners(std::size_t slot,std::uint32_t actualPod60,
+        const rr::game::VehicleFrameState49W& frame,std::uint8_t*& flags22C,
+        std::uint32_t*& field24C) noexcept {
+        flags22C=nullptr;field24C=nullptr;
+        if(!ownsSlot(slot)||!actualPod60||frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV)return false;
+        auto& r=racers_[slot];
+        if(r.engine.identity.managerOrdinal!=slot||r.engine.identity.pod60!=actualPod60)return false;
+        field24C=materialD44_.resetField24C(r.materialD44,r.engine);
+        if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
+    }
     // Distinct 228BBC borrow: the same session D40/D44 rows at the AI's own
     // packed-byte cut, where 228BBC calls 2255B0 -> virtual78/216A30 for an
     // original AI whose main190 local Y went negative. Same owners, no copy.
