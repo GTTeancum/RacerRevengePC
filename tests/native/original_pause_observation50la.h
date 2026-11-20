@@ -4,7 +4,11 @@
 #include "original_race_pause_parent50la.h"
 #include "original_race_pause_forward50la.h"
 #include "original_camera_session50kx.h"
-#include "ra_cold_sources50la.h"
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "native_common_results50pd.h"
 #include "../../src/game/original_pause_storage50la.h"
 #include "../../src/game/original_pause_layout50la.h"
 #include "../../src/game/original_pause_native_draw50la.h"
@@ -17,13 +21,16 @@ namespace original_pause_observation50LA {
 class Owner final {
     friend struct ::original_main_entry50KG::Application;
     using Camera=original_camera_session50KX::Session;
-    using Track=ra_cold_sources50LA::DecodedSources;
+    // ALL8 spectator route: the launch's own loaded course (common rewrite, R9).
+    using Track=common_track50CR::Track;
     // Exact consumed Race retained weakly alongside the world-owned Session.
     // No extra source count or lifetime pin; each use revalidates custody.
     std::weak_ptr<rr::game::OriginalRaceConstructor50LA> race_;
     std::weak_ptr<Camera> camera_;
     std::weak_ptr<const Track> track_;
     std::uint64_t cameraGeneration_=0;
+    // ALL8 title: the launch's own track-ID title (17EA08 order), given at bindRace.
+    std::size_t all8TrackText_=0;
     mutable bool lifecycleRejected_=false;
     // Every-track human race route: no consumed RA race; see bindHost.
     bool host_=false;std::size_t hostTrackText_=0;
@@ -63,15 +70,17 @@ public:
            application_->gameSettingsProfile!=settings)return false;
         return pause->refreshSettings1BB590(*controls,*settings,d);
     }
-    // RA-only current native source join. The shared source is the aggregate's
-    // actual loaded-track borrow, not SessionAssets or a host track label.
+    // ALL8 spectator join (humans34 == 0) on whichever course the launch names:
+    // the race's one World carries this SAME loaded Track (common rewrite, R9;
+    // the former RA identity track 7 / order 4 / pod 9 / class A is gone).
+    // trackTextId is the launch's original track-ID title (17EA08 order).
     bool bindRace(const std::shared_ptr<Camera>& camera,
-        const std::shared_ptr<const Track>& track)noexcept {
+        const std::shared_ptr<const Track>& track,std::size_t trackTextId)noexcept {
         if(cameraGeneration_||!application_||!camera||!track)return false;
         const auto pause=pause_.lock();const auto controls=controls_.lock();
         if(!pause||!controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
         race_=application_->sourceRace28COwner_;
-        camera_=camera;track_=track;cameraGeneration_=camera->generation_;return true;
+        camera_=camera;track_=track;cameraGeneration_=camera->generation_;all8TrackText_=trackTextId;return true;
     }
     bool captureTitle(Diagnostic& d)const noexcept {
         d={};if(!application_||!cameraGeneration_)return false;
@@ -79,9 +88,8 @@ public:
         const auto camera=camera_.lock();const auto track=track_.lock();
         if(!pause||!controls||!camera||!track||camera->generation_!=cameraGeneration_||
            application_->controlsProfile!=controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
-        // Original descriptor17EA64/6C: trackID7's1127C slot is localization108.
-        // The camera is proven to use this SAME RA map and selected metadata.
-        return pause->refreshTitle1BB010(camera->raceFlags1B0_,108,d);
+        // Original descriptor17EA64/6C: the launch track ID's 1127C title slot.
+        return pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,d);
     }
     // Inactive CPU preparation only. Caller must first obtain actual parent
     // and last-camera admission; this does not dispatch1B9220 or a GPU draw.
@@ -98,7 +106,7 @@ public:
         // captureTitle/captureSettings remain observations, not callback calls.
         if(!rr::game::OriginalPauseLayout50LA::visible(*pause))
             return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
-        if(!pause->refreshTitle1BB010(camera->raceFlags1B0_,108,observation)||
+        if(!pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,observation)||
            !pause->refreshSettings1BB590(*controls,*settings,observation))return false;
         return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
     }
@@ -322,10 +330,16 @@ public:
     // the race's 1A87A0 first, then Pause 1BD7C0, as the App10 sibling chain
     // Race -> Pause100 orders them. A row whose body leaves the race (1, 9,
     // 10) ends the batch; the loop then performs that row's departure.
+    // Row reports what the original row did (the loop never rebuilds or tears
+    // down for it, common rewrite R9): restart = 1BD934 ran 1AC8E0(race,1) in
+    // place (restarted=true) or was refused; main/course = step-18 departure
+    // queued 17DE10 (departed=true) or was refused; record = Time Trial 1BDAB4
+    // opened the Results record page 3.
     struct CountedInput {
-        enum class Row : std::uint8_t { none,restart,main,course };
+        enum class Row : std::uint8_t { none,restart,main,course,record };
         Row row=Row::none;
         bool startConsumed=false,refused=false,closed=false,navigated=false;
+        bool restarted=false,departed=false;
         std::uint32_t sourcePC=0,gate=0,selection=0;
     };
     bool dispatchCountedRaceInput(rr::game::InputEvent48Z* events,rr::game::DeviceButtonRecord48Y* records,
@@ -431,7 +445,7 @@ public:
     void unbind()noexcept {
         host_=false;hostTrackText_=0;hostTrackName_.clear();
         counted_=countedPending_=countedOwnsOpen_=countedWorldPaused_=false;countedDevice_=0;
-        race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
+        race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;all8TrackText_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
 private:
@@ -480,14 +494,14 @@ private:
         const auto& race=application_->sourceRace28COwner_;
         if(!race||(cameraGeneration_&&race_.lock()!=race)||race->pause100_.get()!=&p||
            !race->nativeCameraAdapter34LifetimeCurrent(c))return false;
-        const auto& selection=track.freshSelection;
+        // The launch's own course: this race's one World holds this SAME loaded
+        // Track; no course, pod or class is named (CLAUDE.md common path).
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.generation_&&
             p.stage_==rr::game::OriginalPauseStorage50LA::Stage::derivedResources&&
             p.context_&&p.context_->live()&&p.context_->materialApplication()==application_->materialApplication&&
             c.actual_.applicationMaterials==p.domain_->materials382B38()&&
-            &c.actual_.preferences==&controls&&c.actual_.actualRadarMapB8==&track.map&&
-            selection.bound&&selection.selectedTrackId1125F==7&&selection.selectedOrder187B10==4&&
-            selection.freshCourseRecordPod11280==9&&selection.actualRaceClass==rr::game::AuthoredClass49N::A&&
+            &c.actual_.preferences==&controls&&race->world74_&&race->world74_->track.get()==&track&&
+            track.loaded()&&c.actual_.humanCount34==0u&&
             c.actual_.launchKind11258==static_cast<std::uint32_t>(p.subtype11258_);
     }
 };

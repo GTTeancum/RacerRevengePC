@@ -195,8 +195,9 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
     //1AB55C/1AB560 -> 1ABBC0 -> 1ABBE8 (Time Trial): 199770(F8,0,1,1,1,1) at
     //1ABC00, then 1AC8E0(race,0) at 1ABC0C restarts the race in place.
     //No 1ABFC0/1ABE70/20C read: the Time Trial records are taken only from the
-    //Pause Quit row (1BDA74). The F8 store runs here; the in-place restart has
-    //no native owner yet, so the caller falls back (source status, logged).
+    //Pause Quit row (1BDA74). The F8 store runs here; 1ABC0C 1AC8E0(race,0) is
+    //the common race start (common_race_end50CR::Owner::continue1A7DD0 calls
+    //common_race_start50CR::Owner::begin in place; no session reload).
     if(results104_&&current.subtype==3u){
         if(!f8Attached_||!f8Owner_||f8Source_!=f8Owner_.get()||
            !f8Source_->belongsTo(application_,entity_.sessionGeneration)){
@@ -210,10 +211,27 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
             stop(S::source,0x1abc00,"Time Trial F8 visibility leaf rejected before its stores");return;
         }
         reached();
-        stop(S::source,0x1abc0c,"Time Trial 1ABC0C in-place restart 1AC8E0 has no native owner yet; F8 shown");return;
+        stop(S::callerReturned,0x1abc0c,"Time Trial 1ABBE8 F8 shown; 1ABC0C 1AC8E0(race,0) in-place restart due");return;
+    }
+    //1ABC1C (Practice, 11258==2): race1B0 bit5, 199770(F8,0,1,1,1,1), then the
+    //VCR channel loop, 288630 and 1ABD28 1AC8E0(race,0) with bit4 set (replay).
+    //The F8 and bit5 stores run here; the rest is the common race end/start
+    //(common_race_end50CR::Owner::continue1A7DD0, R9).
+    if(results104_&&current.subtype==2u){
+        if(!f8Attached_||!f8Owner_||f8Source_!=f8Owner_.get()||
+           !f8Source_->belongsTo(application_,entity_.sessionGeneration)){
+            stop(S::owner,0x1abc1c,"Practice 1ABC1C actual published/attached Race+F8 absent");return;
+        }
+        flags1B0KnownValue_=std::uint8_t(flags1B0KnownValue_|0x20u);
+        flags1B0KnownMask_=std::uint8_t(flags1B0KnownMask_|0x20u);
+        if(!f8Source_->visibility199770(0,1,1,1,1)){
+            stop(S::source,0x1abc3c,"Practice F8 visibility leaf rejected after bit5");return;
+        }
+        reached();
+        stop(S::callerReturned,0x1abd28,"Practice 1ABC1C F8 shown; 1ABD28 1AC8E0(race,0) replay restart due");return;
     }
     if(!results104_||current.subtype!=1u){
-        stop(S::incomplete,0x1abbc0,"Actual1AB520 null104/non-subtype1 branch; separate tail unimplemented");return;
+        stop(S::incomplete,0x1abbc0,"Actual1AB520 null104 branch; separate tail unimplemented");return;
     }
     reached();
     const auto scope=endHud_.lock();

@@ -301,7 +301,7 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                                 platform::OriginalApplicationAural50KG::Diagnostic ad;
                                 if(!aural||!race.raceAudio_||!scope||!scope->music_||!scope->announcer_||
                                    !scope->gameplay_||!scope->engines_||!scope->endStateCurrent(race,*observer.camera_)||
-                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                    !aural->stopResultsNative26D070(application,*race.raceAudio_,*scope->music_,audio,
                                        *scope->announcer_,*scope->gameplay_,*scope->engines_,scope->countdown_,
                                        race.entity_.sessionGeneration,ad))
@@ -310,12 +310,12 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                                 // Summary differs from name DONE: fade0 FIRST,
                                 // then feedback2. Do not borrow .5/order/AD8.
                                 if(!scope->endStateCurrent(race,*observer.camera_)||
-                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                    !scope->music_->requestFade1A4AB0(0.f).completed())
                                     return stop(Impl::S::incomplete,0x1c8f08,"Results summary actual Music fade0 incomplete");
                                 if(!feedback(2,0x1c8f20))return false;
                                 if(!scope->endStateCurrent(race,*observer.camera_)||
-                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                                   (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                    !aural->finishResultsNative267BE0(application,*race.raceAudio_,ad))
                                     return stop(Impl::S::owner,0x1c8f38,"Results summary actual control finish unavailable");
                                 if(!application.suspendResultsBlockingInput50LA(*this,race,*observer.camera_,host,
@@ -468,7 +468,7 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                             if(!aural||!race.raceAudio_||!musicScope||!musicScope->music_||!musicScope->announcer_||
                                !musicScope->gameplay_||!musicScope->engines_||
                                !musicScope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):(race.world74_!=nullptr||!musicScope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):!musicScope->music_)||
                                !aural->stopResultsNative26D070(application,*race.raceAudio_,*musicScope->music_,audio,
                                    *musicScope->announcer_,*musicScope->gameplay_,*musicScope->engines_,
                                    musicScope->countdown_,race.entity_.sessionGeneration,ad))
@@ -477,12 +477,12 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                             changed(); // Native transport effects are consumed, never replayable.
                             if(!feedback(2,special?0x1ca620u:0x1ca720u))return false;
                             if(!musicScope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):(race.world74_!=nullptr||!musicScope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):!musicScope->music_)||
                                !musicScope->music_->requestFade1A4AB0(0.5f).completed())
                                 return stop(Impl::S::incomplete,special?0x1ca63cu:0x1ca73cu,
                                     "Results actual same10C music fade incomplete; prior native stop/feedback retained");
                             if(!musicScope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):(race.world74_!=nullptr||!musicScope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):!musicScope->music_)||
                                !aural->finishResultsNative267BE0(application,*race.raceAudio_,ad))
                                 return stop(Impl::S::owner,special?0x1ca654u:0x1ca754u,
                                     "Results real same-Application native control completion unavailable after stop/fade");
@@ -593,7 +593,7 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                             platform::OriginalApplicationAural50KG::Diagnostic ad;
                             if(!aural||!race.raceAudio_||!scope||!scope->music_||!scope->announcer_||
                                !scope->gameplay_||!scope->engines_||!scope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                !aural->stopResultsNative26D070(application,*race.raceAudio_,*scope->music_,audio,
                                    *scope->announcer_,*scope->gameplay_,*scope->engines_,scope->countdown_,
                                    race.entity_.sessionGeneration,ad))
@@ -601,12 +601,12 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                             changed();
                             // Unlike summary: .5; unlike name DONE: Music BEFORE feedback.
                             if(!scope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                !scope->music_->requestFade1A4AB0(0.5f).completed())
                                 return stop(Impl::S::incomplete,0x1c9868,"Results tournament actual Music fade incomplete");
                             if(!feedback(2,0x1c9880))return false;
                             if(!scope->endStateCurrent(race,*observer.camera_)||
-                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):(race.world74_!=nullptr||!scope->music_))||
+                               (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                !aural->finishResultsNative267BE0(application,*race.raceAudio_,ad))
                                 return stop(Impl::S::owner,0x1c9898,"Results tournament actual control finish unavailable");
                             if(!application.suspendResultsBlockingInput50LA(*this,race,*observer.camera_,host,
