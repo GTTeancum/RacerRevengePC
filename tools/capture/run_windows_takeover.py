@@ -178,6 +178,11 @@ def main():
                              'the tournament Results replay) and write ONE frame of it as an image 3 s after it '
                              'appears (sets RR_TEST_RESULTS_HOLD=1; turns logs-only off for this run). The run then '
                              'holds there until --seconds. Not with --results-exit or --results-confirm')
+    parser.add_argument('--hold-results-hall', action='store_true',
+                        help='Test only: when the race returns to the Hall of Fame (the 1AB5BC record row, after '
+                             '--results-exit main), write the settled Hall frame once as '
+                             'capture/frontend-session-N/hall-M.ppm (sets RR_TEST_RESULTS_HALL_CAPTURE=1; turns '
+                             'logs-only off for this run). The run then holds on the Hall until --seconds')
     parser.add_argument('--ieee-subnormals', action='store_true',
                         help='Reproduction only: disable the PS2 no-subnormal float mode')
     parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
@@ -306,7 +311,8 @@ def main():
         # tests/native/original_ui_capture_navigation50la.h HallRoute).
         env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
     # A --hold-rider / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
-    logs_only = args.logs_only and not args.hold_rider and not args.hold_results and args.eyecheck_dlc_hall is None
+    logs_only = (args.logs_only and not args.hold_rider and not args.hold_results and not args.hold_results_hall and
+                 args.eyecheck_dlc_hall is None)
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
@@ -350,6 +356,8 @@ def main():
         env.setdefault('RR_TEST_RESULTS_CONFIRM', '2')
     if args.hold_results:
         env['RR_TEST_RESULTS_HOLD'] = '1'
+    if args.hold_results_hall:
+        env['RR_TEST_RESULTS_HALL_CAPTURE'] = '1'
     if args.camera_cycle:
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:
@@ -404,7 +412,7 @@ def main():
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
-                  eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results,
+                  eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results, resultsHallCapture=args.hold_results_hall,
                   resultsExit=args.results_exit,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,

@@ -219,6 +219,11 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // Free Play's 1AB908 row opens Course6 first; a fresh frontend opens Main4.
   const bool raceReturnScreen=raceReturnGarage||firstScreen==11||firstScreen==7||firstScreen==10||firstScreen==6;
   if(raceReturnScreen)std::cerr<<"frontend_race_return first_screen="<<unsigned(firstScreen)<<'\n';
+  // Unattended test only: RR_TEST_RESULTS_HALL_CAPTURE=1 writes the settled
+  // race-return Hall (screen 11, the 1AB5BC Hall row) once, as hall-N.
+  const bool raceReturnHallCapture=raceReturnScreen&&firstScreen==11&&[]{
+      const char* v=std::getenv("RR_TEST_RESULTS_HALL_CAPTURE");return v&&std::string(v)=="1";}();
+  if(raceReturnHallCapture)std::cerr<<"test_results_hall_capture armed first_screen=11\n";
   original_ui_capture_navigation50LA::TournamentRoute tournamentRoute(captureRun.navigateTournamentTa()&&!raceReturnScreen);
   original_ui_capture_navigation50LA::TournamentReturnRoute tournamentReturnRoute(captureRun.navigateTournamentTa()&&raceReturnScreen);
   original_ui_capture_navigation50LA::HallRoute hallRoute(captureRun.navigateHallTa()&&!raceReturnScreen);
@@ -630,7 +635,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto stage=snapshot.route.screen==4?windows_capture50LD::Stage::main:
         snapshot.route.screen==5?windows_capture50LD::Stage::rider:
         snapshot.route.screen==6?windows_capture50LD::Stage::course:
-        (hallRoute.enabled()&&snapshot.route.screen==11)?windows_capture50LD::Stage::hall:windows_capture50LD::Stage::other;
+        ((hallRoute.enabled()||raceReturnHallCapture)&&snapshot.route.screen==11)?windows_capture50LD::Stage::hall:windows_capture50LD::Stage::other;
     const bool sourceAccepted=originalMain.submittedScreen==5&&originalMain.sourceFrameGeneration&&
         originalMain.submittedTriangles&&originalMain.coordinator.gpu()&&
         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
