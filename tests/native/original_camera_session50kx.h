@@ -686,7 +686,6 @@ class Session final {
     bool directStartPending_=false;
     // The in-place restart's one 1A9750(race, a1) call (rebindRacerCameras1ACBA0).
     OriginalRaceViewportCall restartViewport_;
-    bool restartViewportCold_=false,restartViewportPending_=false;
     OriginalRaceStartCountdown countdown_;
     // race+D4 PodRaceStartOverlay (196F20), one per race on every course.
     // Shared with the renderer, which may outlive this Session.
@@ -1391,7 +1390,7 @@ public:
     // 3C/40/44 rows, +4C/+50/+54 (no port field in LapTimingManager50ID).
     bool rebindRacerCameras1ACBA0(std::uint32_t a1,bool replay1B0bit4)noexcept{
         if(!onOwnerThread()||closed_||abandoned_||!coldBound_||!displayInputs_){set(Status::owner,0x1acba0);return false;}
-        if(pendingDisplayWork()||restartViewportPending_||exit_.requestPending()||taSkipFadeRequest_.pending()||
+        if(pendingDisplayWork()||exit_.requestPending()||taSkipFadeRequest_.pending()||
            (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published)){
             set(Status::order,0x1acba0);return false;}
         const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
@@ -1454,8 +1453,10 @@ public:
         set(Status::complete,0x1ace10);return true;
     }
 private:
-    // Host rows mirror the one restarted race clock (they keep no clock of
-    // their own): Countdown, no finish, no race time, unobserved racers. The
+    // PORT STAND-IN (restart.txt item 9): the host race rows are port bookkeeping with no
+    // original counterpart (the original has no host race rows to restart). They mirror the
+    // one restarted race clock (they keep no clock of their own): Countdown, no finish, no
+    // race time; each racer row is reset to the grid and keeps its place, with observedValid. The
     // countdown seconds are re-installed by 1AFD80 (a1 == 0 here, a1 != 0 at
     // the intro exit, which requires exactly these rows).
     void restartHostRows1AC8E0()noexcept{
@@ -1513,19 +1514,24 @@ private:
         taExitReason_=0;taSkipFadeFinished_=false;countdownInstalled_=false;
         return true;
     }
-    // One 1A9750(race, cold) invocation per restart; a blocked renderer drain
-    // keeps this same call for the next frame (no prefix replay).
+    // One 1A9750(race, cold) invocation per restart, completed inside 1AC8E0 as
+    // in the original (no frame runs in between). Its 244D60/245910 drain
+    // finishes the GL work already submitted to the context: the restart is
+    // reached from the Pause screen, whose display completion leaves no
+    // privately committed gameplay image, so the drain uses the initialized-
+    // context completion (the same glFinish) instead of waiting for a gameplay
+    // image that only a later frame could produce (that wait held every frame
+    // and stalled the display). Anything short of completion refuses with its pc.
     bool beginRestartViewport1A9750(bool cold)noexcept{
-        restartViewport_=OriginalRaceViewportCall{};restartViewportCold_=cold;
-        return resumeRestartViewport1A9750();
-    }
-    bool resumeRestartViewport1A9750()noexcept{
         auto& app=*displayInputs_;
-        result_.start=restartViewport_.advance(restartViewportCold_,display_,sceneBorrow(),app.renderer,app.diagnostic);
-        if(result_.start.status==OriginalCameraStartStatus::complete){restartViewportPending_=false;return true;}
-        if(result_.start.status==OriginalCameraStartStatus::rendererNoImage||
-           result_.start.status==OriginalCameraStartStatus::rendererDrain){restartViewportPending_=true;return true;}
-        restartViewportPending_=false;set(Status::renderer,result_.start.sourcePC);return false;
+        restartViewport_=OriginalRaceViewportCall{};
+        const auto policy=display_.drainPolicy;display_.drainPolicy=OriginalCameraDrainPolicy::initializedContext;
+        result_.start=restartViewport_.advance(cold,display_,sceneBorrow(),app.renderer,app.diagnostic);
+        display_.drainPolicy=policy;
+        if(result_.start.status==OriginalCameraStartStatus::complete)return true;
+        std::fprintf(stderr,"race_start_camera pc=1A9750 cold=%u refused_status=%u refused_pc=%x\n",
+            unsigned(cold),unsigned(result_.start.status),unsigned(result_.start.sourcePC));
+        set(Status::renderer,result_.start.sourcePC?result_.start.sourcePC:0x1a9750);return false;
     }
 public:
     // 1983A0 on the race's one start overlay (raceD4): age 0.75, the four
@@ -1865,7 +1871,7 @@ public:
             (endingFadeRequested_&&!endingFade_.complete()));
     }
     bool pendingDisplayWork()const noexcept {
-        return displayInputs_&&(restartViewportPending_||videoRequestPending50LA()||(displayInputs_->video.flags404Low6&3u)||
+        return displayInputs_&&(videoRequestPending50LA()||(displayInputs_->video.flags404Low6&3u)||
             (raceFlags1B0_&8u)||displayInputs_->fadeManagerA8==8||
             (asyncFade_.started()&&!asyncFade_.complete())||
             (taSkipAsyncFade_.started()&&!taSkipAsyncFade_.complete())||
@@ -2216,8 +2222,6 @@ public:
         if(!actual_.followQueries.get()||!coldBound_||!displayInputs_)return set(Status::owner);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
         if(frameStage_==FrameStage::idle||frameStage_==FrameStage::published){
-            // A restart's 1A9750 blocked on the renderer drain resumes first.
-            if(restartViewportPending_&&!resumeRestartViewport1A9750())return fail(Status::renderer,result_.start.sourcePC);
             if(pendingDisplayWork())return set(Status::videoPending);
             if(publicationCount_==std::numeric_limits<std::uint64_t>::max())return fail(Status::order);
             if(!frame||frame<=completedFrame_)return set(Status::order);

@@ -325,7 +325,8 @@ SessionExit50DU Context::run() {
  terrainBindings.flags31=3;terrainBindings.preservedFlagsF8=0;
  std::string terrainAuthoringError;
  const bool terrainAuthored=terrain_probe_authoring50fq_fixture::prepare(terrainOwner,query,
-     x.parameters,phy,terrainBindings,terrainAuthoringError);
+     x.parameters,phy,terrainBindings,terrainAuthoringError,
+     originalBootstrapCollision); // slot 0's own pod (C2), not a POD01 default
  require50DU(terrainAuthored,terrainAuthoringError.c_str());
  for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=terrainOwner.lowerEndpoint140.v[axis];
  x.parameters.bodies.main.probeLocal140[3]=1.f;

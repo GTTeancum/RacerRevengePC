@@ -1273,8 +1273,17 @@ void Context::run() {
     // not native race ticks and cannot contribute catch-up/countdown time.
     hostClock.pause(monotonicNow50DU());
     if(result.status==sourceCamera::Status::videoPending){
+     if(result.start.status!=OriginalCameraStartStatus::videoClockWait){
+      // Name the step that stopped: which display effect and its source pc.
+      const char* step=asynchronous?(endingFade?"async_fade_out_260850_ending":
+          (sourceCameraSession->taSkipVideoResumePending()?"async_fade_in_260610_ta_skip":"async_fade_in_260610")):
+          "blocking_fade_25AA4C";
+      std::cerr<<"camera_display_terminal step="<<step<<" start_status="<<static_cast<unsigned>(result.start.status)
+          <<" start_pc="<<std::hex<<result.start.sourcePC<<" session_pc="<<result.sourcePC<<std::dec
+          <<" tick="<<completedFrames<<" publications="<<sourceCameraSession->publicationCount()<<'\n';
+     }
      require50DU(result.start.status==OriginalCameraStartStatus::videoClockWait,
-         "original camera display stopped at a terminal source/backend boundary");
+         "original camera display stopped at a terminal source/backend boundary (see camera_display_terminal)");
      if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
      captureCommitted();std::this_thread::sleep_for(std::chrono::milliseconds(1));continue;
     }
@@ -2311,7 +2320,7 @@ void Context::run() {
         auto particlesRestart161F60=[this](const char*& reason)->bool{
          if(!track.roles.emitters)return true;
          common_track50CR::Diagnostic d;
-         if(!track.roles.emitters->restart161F60(d)){reason="161F60 track particle emitter restart rejected";return false;}
+         if(!track.roles.emitters->restart161F60(d)){static thread_local std::string why;why="161F60 track particle emitter restart rejected: "+d.reason;reason=why.c_str();return false;}
          return true;};
         common.restartWorld=[sceneReset2702E0,particlesRestart161F60](const char*& reason){
          // The native world restart is the particle clear (161F60, wreck

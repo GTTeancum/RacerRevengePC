@@ -1106,8 +1106,9 @@ OriginalGcParticleReceipt50KG OriginalGcParticleManager50KG::populateColdFog(std
 }
 bool OriginalGcParticleManager50KG::removeRestartParticles161F60(std::uint32_t& pc)noexcept {
     auto& r=restartRemoval_;
-    if(r.attempted){pc=r.pc;return false;} // One reached invocation, no replay.
-    r.attempted=true;pc=r.pc=0x161f60;
+    // 161F60 runs on every call: 1A824C (each 1A8158 replay loop) and 1AC978 (every 1AC8E0
+    // restart). Each invocation starts its own cursor; nothing carries over between calls.
+    r={};r.attempted=true;pc=r.pc=0x161f60;
     if(!storage_)return false;
     auto& s=*storage_;
     r.indexA2=0;r.offsetA3=0; //161F68/70, before count128 read.
