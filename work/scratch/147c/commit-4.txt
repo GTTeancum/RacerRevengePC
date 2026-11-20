@@ -1,0 +1,19 @@
+Stock TA Time Trial: the issued native camera custody only for the consumed counted race, as on every other course (build wt-147c-5, linked, not run)
+
+Evidence: evidence\c147-ta-tt4 (wt-147c-4, --course-mode time_trial on
+main-rider-course-ta): "require_failed same-Application TA native camera custody
+rejected" at video_and_renderer_publication. The publication stage chose the
+issued native camera custody for TA unconditionally (isTaTrack), while every
+other course (and the common route: NV Time Trial raced) takes it only when its
+consumed counted-race stage exists, and otherwise the ordinary camera session.
+TA Time Trial has no counted race (no consumed TA stage, a 1-racer bank), so the
+TA issuer refused. Now TA follows the same rule inside a Course launch
+(consumedTaStage.race()); outside a Course launch (direct start) TA keeps its
+former term, unchanged. Kept minimal: helper 148r is making Time Trial a counted
+race with zero cuts; with that, TA Time Trial reaches the same custody through
+its consumed stage.
+
+One TU: tests/native/terrain_interactive_publication50du.cpp. Relink wt-147c-5 on
+wt-147c-4: 1 TU, linked.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
