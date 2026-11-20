@@ -1,6 +1,6 @@
 #pragma once
 #include "track_navigation50eu.h"
-#include "../../src/game/track_navigation_view50mb.h"
+#include "../../src/game/navigation_view50cr.h"
 #include "grid_center50ac.h"
 #include <bit>
 #include <cfenv>
@@ -65,11 +65,14 @@ template<class Track> inline bool prepare(const Track& map,std::size_t capacity,
 inline bool prepare(const TrackNavigation50EU& map,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
     return detail::prepare(map,maxUndertrackNodes50ET,rank,out);
 }
-inline bool prepare(const TrackNavigationView50EU& view,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
-    if(!view.gatesPrepared()||view.role()!=NavigationRole50MB::Map||!view.count()||view.count()>view.capacity())return false;
+// Common rewrite (R4): 2A2880 on the one map view of the common navigation
+// store, for every course (replaces the MB view and the GB/MC/TB/TC overloads
+// of source_grid50{gb,mc,tb,tc}_fixture.h). The node extent is the map's own.
+inline bool prepare(const NavigationView50CR& view,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
+    if(!view.gatesPrepared()||view.role()!=NavigationRole50CR::map||!view.count()||view.count()>view.capacity())return false;
     struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
     struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
-    const Navigation map{{view.track().nodes(),view.count()},view.nodes(),true};
+    const Navigation map{{view.nodes(),view.count()},view.gates(),true};
     return detail::prepare(map,view.capacity(),rank,out);
 }
 } // namespace source_grid50IG

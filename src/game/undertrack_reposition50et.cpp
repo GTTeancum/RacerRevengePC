@@ -1,4 +1,4 @@
-#include "track_navigation_view50mb.h"
+#include "navigation_view50cr.h"
 #include "undertrack_shared50mb.inl"
 namespace rr::game {
 using namespace undertrack_detail50MB;
@@ -14,9 +14,11 @@ bool bindUndertrackPlacement50ET(const UndertrackSelection50ET& selection,const 
     UndertrackPlacement50ET& out,UndertrackDiagnostic50ET& d) noexcept {
     return undertrack_detail50MB::bind(selection,b,maxUndertrackNodes50ET,out,d);
 }
-bool selectUndertrackReposition50ET(const UndertrackTrackView50ET& view,const UndertrackProgress50ET& progress,
+// The one view overload (common rewrite R4): every course's map/AI graph comes
+// from the one navigation store, sized from the spline's own node count.
+bool selectUndertrackReposition50ET(const NavigationView50CR& view,const UndertrackProgress50ET& progress,
     const UndertrackInput50ET& in,UndertrackSelection50ET& out,UndertrackDiagnostic50ET& d) noexcept {
-    if(!view.runtimeValid()||view.role()!=(in.vehicle58?NavigationRole50MB::Ai:NavigationRole50MB::Map))
+    if(!view.runtimeValid()||view.role()!=(in.vehicle58?NavigationRole50CR::ai:NavigationRole50CR::map))
         return fail(d,E::Track,0x2a2850);
     struct ReadOnly {const UndertrackNode50ET* nodes;std::uint32_t count;};
     const ReadOnly track{view.nodes(),view.count()};
@@ -25,7 +27,7 @@ bool selectUndertrackReposition50ET(const UndertrackTrackView50ET& view,const Un
     if(!separate(arrays,6))return false;
     return undertrack_detail50MB::select(track,view.capacity(),progress,in,out,d);
 }
-bool bindUndertrackPlacement50ET(const UndertrackSelection50ET& selection,const TrackNavigationView50EU& view,
+bool bindUndertrackPlacement50ET(const UndertrackSelection50ET& selection,const NavigationView50CR& view,
     const std::uint32_t* visibility,const std::uint32_t* collision,std::size_t zones,
     UndertrackPlacement50ET& out,UndertrackDiagnostic50ET& d) noexcept {
     UndertrackTableBindings50ET bindings{};

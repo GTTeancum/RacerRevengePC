@@ -106,17 +106,32 @@ template<class Track> inline bool validTrack(const Track& track,std::size_t capa
         for(std::size_t j=0;j<n.nextCount;++j)if(n.next[j]>=track.count)return false;}
     return true;
 }
+// In-place value reset of a reader scratch (same effect as `scratch={}`, without
+// a whole-scratch temporary on the stack: the common navigation store's scratch
+// is heap-owned and sized by navigationNodeLimit50ET).
+template<class Graph> inline void clearGraph(Graph& g) noexcept {
+    for(auto& n:g.nodes)n=UndertrackNode50ET{};
+    g.count=0;
+}
+template<class Scratch> inline void clearReader(Scratch& s) noexcept {
+    clearGraph(s.track);
+    std::memset(s.seen,0,sizeof s.seen);std::memset(s.fields,0,sizeof s.fields);
+    std::memset(s.nextFields,0,sizeof s.nextFields);
+}
 template<std::size_t N,class Scratch,class Track>
 inline bool read(const char* text,std::size_t bytes,Scratch& scratch,
     Track& out,UndertrackDiagnostic50ET& d) noexcept {
-    static_assert(N==256||N==265||N==292||N==268||N==293||N==270||N==269||N==213||N==257||N==173); // MC exact original Map/Ai extent, not a new generic bound.
+    // N is the reader's node-index guard: the legacy fixed 256-node store, or the
+    // common store's navigationNodeLimit50ET (whose blocks are then sized from
+    // the file's NumNodes). No per-course extent list.
+    static_assert(N==maxUndertrackNodes50ET||N==navigationNodeLimit50ET);
     const Span spans[]={{text,bytes},{&scratch,sizeof scratch},{&out,sizeof out},{&d,sizeof d}};
     if(!separate(spans,4))return false;
     if(!text||!bytes)return fail(d,E::Input,0x2a1260);
     if(bytes>maxUndertrackText50ET)return fail(d,E::Limit,0x2a1260);
     for(std::size_t i=0;i<bytes;++i){const auto c=static_cast<unsigned char>(text[i]);
         if((c<32&&c!=9&&c!=10&&c!=13)||c>126)return fail(d,E::Syntax,0x2a1260,i);}
-    scratch={};bool trackSeen=false,countSeen=false;int section=-2;std::size_t at=0;
+    clearReader(scratch);bool trackSeen=false,countSeen=false;int section=-2;std::size_t at=0;
     while(at<bytes){const auto begin=at;while(at<bytes&&text[at]!='\n')++at;
         auto line=trim({text+begin,at-begin,begin});if(at<bytes)++at;
         if(line.n>255)return fail(d,E::Limit,0x2a1260,line.offset);

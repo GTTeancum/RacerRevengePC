@@ -10,6 +10,16 @@ namespace rr::game {
 constexpr std::size_t maxUndertrackNodes50ET=256;
 constexpr std::size_t maxUndertrackNext50ET=8;
 constexpr std::size_t maxUndertrackText50ET=65536;
+// Common rewrite (R4): the one node-count guard of the 2A1260 spline reader for
+// the common navigation store (tests/native/common_navigation50cr.cpp). The
+// original sizes its node array from the file's NumNodes; the port reader
+// refuses a spline above this guard and then sizes every navigation block from
+// the file's own count. The guard bounds the reader's per-call scratch and the
+// per-call visit arrays (1A0DA0/1ACF70); it is at or below the
+// common_track50CR::blockRow nav_* ceilings (checked at runtime). Stock maximum
+// is 293 nodes.
+// PORT STAND-IN (flagged): allocation guard only, never a size and never a gate.
+constexpr std::size_t navigationNodeLimit50ET=1024;
 struct UndertrackNode50ET {
     float position[4]{};
     std::uint32_t next[maxUndertrackNext50ET]{};

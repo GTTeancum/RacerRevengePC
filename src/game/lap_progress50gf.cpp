@@ -48,68 +48,17 @@ bool prepareLapProgressTrack50GF(const TrackNavigationScratch50EU& scratch,
     const auto marker=[&](std::uint32_t i) noexcept {return (scratch.fieldMask[i]&16u)!=0;};
     return prepareLapProgressTrack50GFShared50MB(scratch.candidate,marker,out,d);
 }
-bool prepareLapProgressTrack50GF(const TrackNavigationView50EU& map,
-    const AiTrackMetadataView50IU& metadata,LapProgressTrackView50MB& out,
-    LapProgressDiagnostic50GF& d) noexcept {
+// The one common map view (R4, PLAN 2.5): every course's markers.
+bool prepareLapProgressTrack50GF(const NavigationView50CR& map,
+    LapProgressTrack50GF& out,LapProgressDiagnostic50GF& d) noexcept {
+    const AiTrackMetadataView50IU metadata{map};
     if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
         return fail(d,E::Track,0x2a1980);
-    LapProgressTrackView50MB next{};
+    LapProgressTrack50GF next{};
     const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
-    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
-    next.map_=map;next.metadata_=metadata;out=next;return true;
+    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next,d))return false;
+    out=next;return true;
 }
-// TC-CONSUMER-BEGIN 0
-bool prepareLapProgressTrack50GF(const TrackNavigationView50TC& map,
-    const AiTrackMetadataView50TC& metadata,LapProgressTrackView50TC& out,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
-        return fail(d,E::Track,0x2a1980);
-    LapProgressTrackView50TC next{};
-    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
-    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
-    next.map_=map;next.metadata_=metadata;out=next;return true;
-}
-// TC-CONSUMER-END 0
-
-// TB-CONSUMER-BEGIN 0
-bool prepareLapProgressTrack50GF(const TrackNavigationView50TB& map,
-    const AiTrackMetadataView50TB& metadata,LapProgressTrackView50TB& out,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
-        return fail(d,E::Track,0x2a1980);
-    LapProgressTrackView50TB next{};
-    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
-    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
-    next.map_=map;next.metadata_=metadata;out=next;return true;
-}
-// TB-CONSUMER-END 0
-
-// GB-CONSUMER-BEGIN 0
-bool prepareLapProgressTrack50GF(const TrackNavigationView50GB& map,
-    const AiTrackMetadataView50GB& metadata,LapProgressTrackView50GB& out,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
-        return fail(d,E::Track,0x2a1980);
-    LapProgressTrackView50GB next{};
-    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
-    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
-    next.map_=map;next.metadata_=metadata;out=next;return true;
-}
-// GB-CONSUMER-END 0
-
-// MC-CONSUMER-BEGIN 0
-bool prepareLapProgressTrack50GF(const TrackNavigationView50MC& map,
-    const AiTrackMetadataView50MC& metadata,LapProgressTrackView50MC& out,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
-        return fail(d,E::Track,0x2a1980);
-    LapProgressTrackView50MC next{};
-    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
-    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
-    next.map_=map;next.metadata_=metadata;out=next;return true;
-}
-// MC-CONSUMER-END 0
-
 
 static bool applyPlayerLapCrossing50GFShared50MB(const LapProgressTrack50GF& track,std::size_t extent,
     const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
@@ -164,53 +113,14 @@ bool applyPlayerLapCrossing50GF(const LapProgressTrack50GF& track,
     LapProgressDiagnostic50GF& d) noexcept {
     return applyPlayerLapCrossing50GFShared50MB(track,maxUndertrackNodes50ET,crossing,state,continuation,receipt,d);
 }
-bool applyPlayerLapCrossing50GF(const LapProgressTrackView50MB& track,
+bool applyPlayerLapCrossing50GF(const NavigationView50CR& map,const LapProgressTrack50GF& track,
     const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
     LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
     LapProgressDiagnostic50GF& d) noexcept {
-    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
-    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
+    if(!navigation_consumer_detail50MB::mapReady(map)||track.nodeCount!=map.count())
+        return fail(d,E::Track,0x2a2fc0);
+    return applyPlayerLapCrossing50GFShared50MB(track,map.capacity(),crossing,state,continuation,receipt,d);
 }
-// TC-CONSUMER-BEGIN 1
-bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TC& track,
-    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
-    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
-    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
-}
-// TC-CONSUMER-END 1
-
-// TB-CONSUMER-BEGIN 1
-bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TB& track,
-    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
-    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
-    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
-}
-// TB-CONSUMER-END 1
-
-// GB-CONSUMER-BEGIN 1
-bool applyPlayerLapCrossing50GF(const LapProgressTrackView50GB& track,
-    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
-    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
-    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
-}
-// GB-CONSUMER-END 1
-
-// MC-CONSUMER-BEGIN 1
-bool applyPlayerLapCrossing50GF(const LapProgressTrackView50MC& track,
-    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
-    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
-    LapProgressDiagnostic50GF& d) noexcept {
-    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
-    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
-}
-// MC-CONSUMER-END 1
-
 
 bool resumePlayerLapAfterCallback50GF(LapProgressState50GF& state,
     LapProgressContinuation50GF& continuation,LapProgressDiagnostic50GF& d) noexcept {

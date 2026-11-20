@@ -71,37 +71,13 @@ bool beginWrongWayProgress50GO(const UndertrackTrack50ET& map,
     const LapProgressTrack50GF& markers,const WrongWayProgressInput50GO&,
     WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
     WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-bool beginWrongWayProgress50GO(const TrackNavigationView50EU& map,
-    const LapProgressTrackView50MB& markers,const WrongWayProgressInput50GO&,
+// The one wrong-way rule over the one common map view (R4, PLAN 2.5): markers
+// are the common_lap50CR::Tracker's, prepared from this same map (node count
+// must equal the map's). Every course takes this overload.
+bool beginWrongWayProgress50GO(const ::common_track50CR::NavigationView& map,
+    const LapProgressTrack50GF& markers,const WrongWayProgressInput50GO&,
     WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
     WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-// TC-CONSUMER-BEGIN 0
-bool beginWrongWayProgress50GO(const TrackNavigationView50TC& map,
-    const LapProgressTrackView50TC& markers,const WrongWayProgressInput50GO&,
-    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
-    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-// TC-CONSUMER-END 0
-
-// TB-CONSUMER-BEGIN 0
-bool beginWrongWayProgress50GO(const TrackNavigationView50TB& map,
-    const LapProgressTrackView50TB& markers,const WrongWayProgressInput50GO&,
-    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
-    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-// TB-CONSUMER-END 0
-
-// GB-CONSUMER-BEGIN 0
-bool beginWrongWayProgress50GO(const TrackNavigationView50GB& map,
-    const LapProgressTrackView50GB& markers,const WrongWayProgressInput50GO&,
-    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
-    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-// GB-CONSUMER-END 0
-
-// MC-CONSUMER-BEGIN 0
-bool beginWrongWayProgress50GO(const TrackNavigationView50MC& map,
-    const LapProgressTrackView50MC& markers,const WrongWayProgressInput50GO&,
-    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
-    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
-// MC-CONSUMER-END 0
 
 // Invoke only after pending's actual native effect has completed. This advances
 // SetColor -> SetPosition -> SetText -> Show -> complete, or Hide -> complete.

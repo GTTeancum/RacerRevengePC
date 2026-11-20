@@ -71,73 +71,6 @@ struct AiRouteChoiceOwners50MB {
     const AiObservedRacer50IV* racers=nullptr;
     std::size_t racerCount=0;
 };
-// TC-CONSUMER-BEGIN 0
-struct AiRouteChoiceOwners50TC {
-    AiTrackMetadataView50TC metadata;
-    const std::uint32_t& fieldFE4;
-    const std::uint32_t& aiStateFE8;
-    const std::uint32_t& packingPolicy1000;
-    std::uint32_t& sharedRandomState;
-    // Borrow source-owned scalars: state/target selection can change after
-    // this object is constructed and before same-frame171FE0 calls.
-    const std::uint32_t* attackMode1050=nullptr;
-    const bool* target1008Present=nullptr;
-    const std::uint32_t* target1008ManagerIndex=nullptr;
-    const AiObservedRacer50IV* racers=nullptr;
-    std::size_t racerCount=0;
-};
-// TC-CONSUMER-END 0
-
-// TB-CONSUMER-BEGIN 0
-struct AiRouteChoiceOwners50TB {
-    AiTrackMetadataView50TB metadata;
-    const std::uint32_t& fieldFE4;
-    const std::uint32_t& aiStateFE8;
-    const std::uint32_t& packingPolicy1000;
-    std::uint32_t& sharedRandomState;
-    // Borrow source-owned scalars: state/target selection can change after
-    // this object is constructed and before same-frame171FE0 calls.
-    const std::uint32_t* attackMode1050=nullptr;
-    const bool* target1008Present=nullptr;
-    const std::uint32_t* target1008ManagerIndex=nullptr;
-    const AiObservedRacer50IV* racers=nullptr;
-    std::size_t racerCount=0;
-};
-// TB-CONSUMER-END 0
-
-// GB-CONSUMER-BEGIN 0
-struct AiRouteChoiceOwners50GB {
-    AiTrackMetadataView50GB metadata;
-    const std::uint32_t& fieldFE4;
-    const std::uint32_t& aiStateFE8;
-    const std::uint32_t& packingPolicy1000;
-    std::uint32_t& sharedRandomState;
-    // Borrow source-owned scalars: state/target selection can change after
-    // this object is constructed and before same-frame171FE0 calls.
-    const std::uint32_t* attackMode1050=nullptr;
-    const bool* target1008Present=nullptr;
-    const std::uint32_t* target1008ManagerIndex=nullptr;
-    const AiObservedRacer50IV* racers=nullptr;
-    std::size_t racerCount=0;
-};
-// GB-CONSUMER-END 0
-
-// MC-CONSUMER-BEGIN 0
-struct AiRouteChoiceOwners50MC {
-    AiTrackMetadataView50MC metadata;
-    const std::uint32_t& fieldFE4;
-    const std::uint32_t& aiStateFE8;
-    const std::uint32_t& packingPolicy1000;
-    std::uint32_t& sharedRandomState;
-    // Borrow source-owned scalars: state/target selection can change after
-    // this object is constructed and before same-frame171FE0 calls.
-    const std::uint32_t* attackMode1050=nullptr;
-    const bool* target1008Present=nullptr;
-    const std::uint32_t* target1008ManagerIndex=nullptr;
-    const AiObservedRacer50IV* racers=nullptr;
-    std::size_t racerCount=0;
-};
-// MC-CONSUMER-END 0
 
 enum class AiDrivingError50IV : std::uint8_t {
     None,Owner,Arithmetic,RouteChoice,Predecessor,Traversal,Capacity,Unsupported
@@ -524,7 +457,7 @@ inline bool advanceAiNavigation50IV(const TrackNavigation50EU&map,const TrackNav
     AiDrivingDiagnostic50IV&d) noexcept {
     return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
 }
-inline bool advanceAiNavigation50IV(const TrackNavigationView50EU&map,const TrackNavigationView50EU&ai,
+inline bool advanceAiNavigation50IV(const NavigationView50CR&map,const NavigationView50CR&ai,
     const AiTrackMetadataView50IU&metadata,const float previousCA0[4],const float local190[4],
     std::uint32_t actualZoneOrdinal48,TrackNavigationProgress50EU&progress,
     std::uint32_t&lapCC8,std::uint8_t&flagsCD8,AiNavigationState50IV&state,
@@ -534,57 +467,6 @@ inline bool advanceAiNavigation50IV(const TrackNavigationView50EU&map,const Trac
         return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ffe0);
     return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
 }
-// TC-CONSUMER-BEGIN 1
-inline bool advanceAiNavigation50IV(const TrackNavigationView50TC&map,const TrackNavigationView50TC&ai,
-    const AiTrackMetadataView50TC&metadata,const float previousCA0[4],const float local190[4],
-    std::uint32_t actualZoneOrdinal48,TrackNavigationProgress50EU&progress,
-    std::uint32_t&lapCC8,std::uint8_t&flagsCD8,AiNavigationState50IV&state,
-    AiBoostDecisionState50IT&boost,const AiRouteChoiceOwners50TC&routeOwners,
-    AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::pairReady(map,ai)||!metadata.matches(ai)||!routeOwners.metadata.matches(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ffe0);
-    return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
-}
-// TC-CONSUMER-END 1
-
-// TB-CONSUMER-BEGIN 1
-inline bool advanceAiNavigation50IV(const TrackNavigationView50TB&map,const TrackNavigationView50TB&ai,
-    const AiTrackMetadataView50TB&metadata,const float previousCA0[4],const float local190[4],
-    std::uint32_t actualZoneOrdinal48,TrackNavigationProgress50EU&progress,
-    std::uint32_t&lapCC8,std::uint8_t&flagsCD8,AiNavigationState50IV&state,
-    AiBoostDecisionState50IT&boost,const AiRouteChoiceOwners50TB&routeOwners,
-    AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::pairReady(map,ai)||!metadata.matches(ai)||!routeOwners.metadata.matches(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ffe0);
-    return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
-}
-// TB-CONSUMER-END 1
-
-// GB-CONSUMER-BEGIN 1
-inline bool advanceAiNavigation50IV(const TrackNavigationView50GB&map,const TrackNavigationView50GB&ai,
-    const AiTrackMetadataView50GB&metadata,const float previousCA0[4],const float local190[4],
-    std::uint32_t actualZoneOrdinal48,TrackNavigationProgress50EU&progress,
-    std::uint32_t&lapCC8,std::uint8_t&flagsCD8,AiNavigationState50IV&state,
-    AiBoostDecisionState50IT&boost,const AiRouteChoiceOwners50GB&routeOwners,
-    AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::pairReady(map,ai)||!metadata.matches(ai)||!routeOwners.metadata.matches(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ffe0);
-    return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
-}
-// GB-CONSUMER-END 1
-
-// MC-CONSUMER-BEGIN 1
-inline bool advanceAiNavigation50IV(const TrackNavigationView50MC&map,const TrackNavigationView50MC&ai,
-    const AiTrackMetadataView50MC&metadata,const float previousCA0[4],const float local190[4],
-    std::uint32_t actualZoneOrdinal48,TrackNavigationProgress50EU&progress,
-    std::uint32_t&lapCC8,std::uint8_t&flagsCD8,AiNavigationState50IV&state,
-    AiBoostDecisionState50IT&boost,const AiRouteChoiceOwners50MC&routeOwners,
-    AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::pairReady(map,ai)||!metadata.matches(ai)||!routeOwners.metadata.matches(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ffe0);
-    return advanceAiNavigation50IVShared50MB(map,ai,metadata,previousCA0,local190,actualZoneOrdinal48,progress,lapCC8,flagsCD8,state,boost,routeOwners,d);
-}
-// MC-CONSUMER-END 1
 
 //171FE0: segment/gate projection is intentionally not centerline interpolation.
 template<class Navigation,class RouteOwners>
@@ -615,52 +497,13 @@ inline bool aiDesiredPosition50IV(const TrackNavigation50EU&ai,const TrackNaviga
     const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
     return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
 }
-inline bool aiDesiredPosition50IV(const TrackNavigationView50EU&ai,const TrackNavigationProgress50EU&p,
+inline bool aiDesiredPosition50IV(const NavigationView50CR&ai,const TrackNavigationProgress50EU&p,
     AiNavigationState50IV&state,const AiRouteChoiceOwners50MB&routeOwners,
     const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
     if(!navigation_consumer_detail50MB::aiJoined(ai,routeOwners.metadata))
         return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x171fe0);
     return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
 }
-// TC-CONSUMER-BEGIN 2
-inline bool aiDesiredPosition50IV(const TrackNavigationView50TC&ai,const TrackNavigationProgress50EU&p,
-    AiNavigationState50IV&state,const AiRouteChoiceOwners50TC&routeOwners,
-    const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(ai,routeOwners.metadata))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x171fe0);
-    return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
-}
-// TC-CONSUMER-END 2
-
-// TB-CONSUMER-BEGIN 2
-inline bool aiDesiredPosition50IV(const TrackNavigationView50TB&ai,const TrackNavigationProgress50EU&p,
-    AiNavigationState50IV&state,const AiRouteChoiceOwners50TB&routeOwners,
-    const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(ai,routeOwners.metadata))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x171fe0);
-    return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
-}
-// TB-CONSUMER-END 2
-
-// GB-CONSUMER-BEGIN 2
-inline bool aiDesiredPosition50IV(const TrackNavigationView50GB&ai,const TrackNavigationProgress50EU&p,
-    AiNavigationState50IV&state,const AiRouteChoiceOwners50GB&routeOwners,
-    const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(ai,routeOwners.metadata))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x171fe0);
-    return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
-}
-// GB-CONSUMER-END 2
-
-// MC-CONSUMER-BEGIN 2
-inline bool aiDesiredPosition50IV(const TrackNavigationView50MC&ai,const TrackNavigationProgress50EU&p,
-    AiNavigationState50IV&state,const AiRouteChoiceOwners50MC&routeOwners,
-    const float local190[3],float horizon,VisualVector49R&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiJoined(ai,routeOwners.metadata))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x171fe0);
-    return aiDesiredPosition50IVShared50MB(ai,p,state,routeOwners,local190,horizon,out,d);
-}
-// MC-CONSUMER-END 2
 
 //170B50: all manager racers, including the human, retained in original order.
 template<class Navigation>
@@ -710,7 +553,7 @@ inline bool buildAiRacerLists50IV(const TrackNavigation50EU&ai,const TrackNaviga
     AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
     return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
 }
-inline bool buildAiRacerLists50IV(const TrackNavigationView50EU&ai,const TrackNavigationProgress50EU&p,
+inline bool buildAiRacerLists50IV(const NavigationView50CR&ai,const TrackNavigationProgress50EU&p,
     const AiProfile50IU&profile,const AiObservedRacer50IV*racers,std::size_t count,
     std::uint32_t selfIndex,const float local190[3],const float localForward[3],
     AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
@@ -718,49 +561,6 @@ inline bool buildAiRacerLists50IV(const TrackNavigationView50EU&ai,const TrackNa
         return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x170b50);
     return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
 }
-// TC-CONSUMER-BEGIN 3
-inline bool buildAiRacerLists50IV(const TrackNavigationView50TC&ai,const TrackNavigationProgress50EU&p,
-    const AiProfile50IU&profile,const AiObservedRacer50IV*racers,std::size_t count,
-    std::uint32_t selfIndex,const float local190[3],const float localForward[3],
-    AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiReady(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x170b50);
-    return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
-}
-// TC-CONSUMER-END 3
-
-// TB-CONSUMER-BEGIN 3
-inline bool buildAiRacerLists50IV(const TrackNavigationView50TB&ai,const TrackNavigationProgress50EU&p,
-    const AiProfile50IU&profile,const AiObservedRacer50IV*racers,std::size_t count,
-    std::uint32_t selfIndex,const float local190[3],const float localForward[3],
-    AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiReady(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x170b50);
-    return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
-}
-// TB-CONSUMER-END 3
-
-// GB-CONSUMER-BEGIN 3
-inline bool buildAiRacerLists50IV(const TrackNavigationView50GB&ai,const TrackNavigationProgress50EU&p,
-    const AiProfile50IU&profile,const AiObservedRacer50IV*racers,std::size_t count,
-    std::uint32_t selfIndex,const float local190[3],const float localForward[3],
-    AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiReady(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x170b50);
-    return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
-}
-// GB-CONSUMER-END 3
-
-// MC-CONSUMER-BEGIN 3
-inline bool buildAiRacerLists50IV(const TrackNavigationView50MC&ai,const TrackNavigationProgress50EU&p,
-    const AiProfile50IU&profile,const AiObservedRacer50IV*racers,std::size_t count,
-    std::uint32_t selfIndex,const float local190[3],const float localForward[3],
-    AiRacerLists50IV&out,AiDrivingDiagnostic50IV&d) noexcept {
-    if(!navigation_consumer_detail50MB::aiReady(ai))
-        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x170b50);
-    return buildAiRacerLists50IVShared50MB(ai,p,profile,racers,count,selfIndex,local190,localForward,out,d);
-}
-// MC-CONSUMER-END 3
 
 //172E60 source steering. Main scene axes are LOCAL 28A530 outputs.
 inline bool steerAi50IV(const float direction[3],const float forward[3],float upY,
