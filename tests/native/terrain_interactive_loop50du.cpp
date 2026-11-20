@@ -1307,7 +1307,11 @@ void Context::run() {
       sourcePauseObservation.hostSettingFeedback(true,in.right);
      }
      const bool canResume=!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready;
-     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
+     if(in.confirm&&row==10)
+      std::cerr<<"pause_quit_admission row=10 ui="<<originalUiStarted<<" camera="<<originalCameraEnabled
+          <<" root="<<native_common_results50PD::state().rootPublished<<" fallback="<<native_common_results50PD::state().fallback
+          <<" profile="<<bool(originalMainApplication.riderProfile)
+          <<" mode34="<<(originalMainApplication.riderProfile?originalMainApplication.riderProfile->stamp().mode34:99u)<<'\n';     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
      else if(in.confirm&&row==1)action=MenuResult::Restart;
      else if(in.confirm&&row==9)action=MenuResult::ReturnOriginalMain;
      else if(in.confirm&&row==10&&originalUiStarted&&originalCameraEnabled&&

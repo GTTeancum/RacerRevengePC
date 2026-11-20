@@ -1,0 +1,17 @@
+Pause QUIT row 10: log its admission facts on every row-10 confirm; runner --pause-quit implies --race-full (build wt-148r-6, linked, not run)
+
+Evidence c148-ta-pausequit2 (wt-148r-4): the drawn original Pause opened
+(original_pause_host bound=1, host page 2) and row 10 was confirmed
+(test_pause_quit row=10 confirm=1), but the 1BDA74 branch did not engage (no
+pause_quit line) and the former port Quit ran. One admission fact was false;
+the log did not say which.
+
+- terrain_interactive_loop50du.cpp: every row-10 confirm now logs
+  "pause_quit_admission row=10 ui=.. camera=.. root=.. fallback=.. profile=..
+  mode34=.." before the row dispatch. No behaviour change.
+- run_windows_takeover.py: --pause-quit implies --race-full (as --results-exit).
+
+Diagnostic step towards item (2) (the original Pause owner on every counted
+race), not the item itself. 1 TU. Relink wt-148r-6 on wt-148r-5, linked. Not run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
