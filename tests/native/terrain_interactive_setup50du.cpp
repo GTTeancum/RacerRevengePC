@@ -1,4 +1,5 @@
 #include "../../src/assets/dlc_files50dl.h"
+#include "../../src/game/original_ui_game_options_controller50kg.h" // C15: 1865B4 profile reset (soundMode1101C)
 #include "native_last_failure50pd.h"
 #include <cfenv>
 #include "../../platform/linux/native/loading_progress_step113a.h"
@@ -646,8 +647,12 @@ SessionExit50DU Context::run() {
    gameplaySoundMode=originalMainApplication.soundMode;
    if(!gameplaySoundMode){
     gameplaySoundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
-    require50DU(gameplaySoundMode->initializeFromProfile1101C(1),
-        "direct native race stereo-mode construction rejected");
+    // C15: the profile's own 1101C value; with no profile, the original reset 1865B4 value.
+    rr::game::OriginalUiGameSettingsProfile50KG resetProfile{};
+    rr::game::resetOriginalUiGameSettingsProfileFields50KG(resetProfile);
+    const auto& profile1101C=originalMainApplication.gameSettingsProfile?*originalMainApplication.gameSettingsProfile:resetProfile;
+    require50DU(gameplaySoundMode->initializeFromProfile1101C(profile1101C.soundMode1101C),
+        "direct native race stereo-mode construction from the profile rejected");
    }
    // The cold load binds the Application's one mode before 05.12 (world); reuse it.
    if(!(materialMixer&&materialMixer->originalSoundMode50KG()==gameplaySoundMode.get()))
@@ -672,8 +677,12 @@ SessionExit50DU Context::run() {
   // PodSound action; the voice file is the action's own Filename (one rule for
   // every course; stock GA/GC: BIGDOOR).
   if(const auto* podSound=track.roles.triggerSource?track.roles.triggerSource->firstPodSound():nullptr){
+   // C12: every PodSound action's own file is loaded (first-use order); each action plays its own.
+   std::vector<std::string> podSoundFiles{podSound->filename};
+   for(const auto& source:track.roles.triggerSource->sources())for(const auto& action:source.actions)
+    if(action.kind==course_trigger_sources50CT::ActionKind::PodSound)podSoundFiles.push_back(action.filename);
    triggerAudio=std::make_unique<gc_gate_audio50IN::Owner>();
-   const bool prepared=materialMixer&&audioGroups&&triggerAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError,podSound->filename);
+   const bool prepared=materialMixer&&audioGroups&&triggerAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError,podSoundFiles);
    require50DU(prepared&&triggerAudio->available(),audioError.empty()?"trigger PodSound PCM/World4D8 voice unavailable":audioError.c_str());
   }
   if(raceEnabled){
@@ -867,20 +876,12 @@ SessionExit50DU Context::run() {
  require50DU(laps.map().sameOwner(mapView)&&laps.ai().sameOwner(aiView)&&laps.field()==raceRacerCount,
      "lap tracker views differ from the track's navigation");
  lapOwner.track=laps.markers();
- // AI/map metadata of the one store, copied into the AI owner rows. The row
- // store is the AI's fixed 1AAB30 layout: a spline larger than it is refused
- // before any write.
- const auto bindAiMetadata=[&](const common_track50CR::NavigationView& view,AiTrackMetadata50IU& out,const char* refusal){
-  const auto* rows=view.metadata();
-  if(!rows){require50DU(!originalAiEnabled,refusal);return;}
-  const std::uint32_t count=view.count();
-  require50DU(count<=std::size(out.nodes),refusal);
-  out={};
-  for(std::uint32_t i=0;i<count;++i)out.nodes[i]=rows[i];
-  out.trackLength3C=view.trackLength3C();out.count=count;out.bound=true;
- };
- bindAiMetadata(mapView,originalAiMapMetadata,"map spline AI metadata unavailable or larger than the AI owner rows");
- bindAiMetadata(aiView,originalAiMetadata,"AI spline metadata unavailable or larger than the AI owner rows");
+ // AI/map metadata: the AI consumers read the one shared store through
+ // AiTrackMetadataView50IU (navigation_view50cr.h; 1AAB30 reads the loaded spline), sized from
+ // each spline's own count (TB/TC/MB/GB 257-293 points). No fixed-size copy is made: the
+ // legacy AiTrackMetadata50IU rows (256) stay unbound and nothing reads them.
+ require50DU(!originalAiEnabled||(mapView.metadata()&&aiView.metadata()),"map/AI spline AI metadata unavailable");
+ (void)originalAiMapMetadata;(void)originalAiMetadata;
  require50DU(rr::host::readCourseSpeedLimits50GK(reinterpret_cast<const char*>(track.documents.aiSpline.data()),
      track.documents.aiSpline.size(),aiView.count(),courseLimits,courseDiagnostic),
      "the track's A spline speed metadata was rejected");

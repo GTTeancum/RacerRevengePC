@@ -1,4 +1,5 @@
 #pragma once
+#include "original_parameter_lookup50cr.h"
 // ONE reader for the course AUB's [Sounds] soul-tree and ambient sound lists,
 // every course (TA..RA, converted tracks). It follows the original scene
 // sound load (SLUS_202.68):
@@ -72,21 +73,17 @@ namespace positional_sounds50SR_detail {
 inline const ParameterBlock48F* find(const ParameterDocument48F& d,const std::string& name)noexcept{
  for(const auto& b:d.blocks)if(b.name==name)return &b;return nullptr;
 }
-// 158240: the first field with this key in the selected block.
+// 158240 -> 1583AC: the shared original midpoint search (original_parameter_lookup50cr.h); a
+// duplicated label resolves to the copy the original lands on, not the first (GC SoultreeSound15).
 inline const std::string* field(const ParameterBlock48F* b,const char* key)noexcept{
- if(!b)return nullptr;for(const auto& f:b->fields)if(f.name==key)return &f.value;return nullptr;
+ const auto* f=packedField1583AC(b,key);return f?&f->value:nullptr;
 }
 inline int folded(char c)noexcept{return c>='a'&&c<='z'?c-'a'+'A':c;}
 inline bool same(const std::string& a,const char* b)noexcept{
  std::size_t i=0;for(;b[i];++i)if(i>=a.size()||folded(a[i])!=folded(b[i]))return false;return i==a.size();
 }
-// 158920.
-inline std::int32_t integer158920(const std::string& t)noexcept{
- if(!t.empty()&&folded(t[0])=='T')return 1;if(!t.empty()&&folded(t[0])=='F')return 0;
- if(same(t,"ON"))return 1;if(same(t,"OFF"))return 0;
- if(!t.empty()&&folded(t[0])=='Y')return 1;if(!t.empty()&&folded(t[0])=='N')return 0;
- return static_cast<std::int32_t>(std::strtol(t.c_str(),nullptr,0));
-}
+// 158920: the shared rule (original_parameter_lookup50cr.h).
+using ::rr::assets::integer158920;
 inline std::int32_t integer(const ParameterBlock48F* b,const char* key,std::int32_t fallback)noexcept{
  const auto* v=field(b,key);return v?integer158920(*v):fallback;
 }

@@ -130,18 +130,19 @@ bool OwnershipBridge::podTrackReleaseVisibility(const common_track50CR::Track& t
     auto* lights=track.roles.lights.get();
     return lights&&lights->canReleaseSceneZones272A78(&track)&&lights->releaseSceneZones272A78(&track);
 }
-// 1AA57C World4A0: the same counted particle owner the racer's 210890 already used.
-// PORT STAND-IN: the particle owner's wreck-borrower field (OriginalTrackParticleCold50LA::
-// nativeWreckBorrower_) is writable only by its retired RA friends; until the owner admits this
-// bridge (area E), the borrow is refused so the owner can never retire under a live borrow.
+// 1AA57C World4A0: the same counted particle owner the racer's 210890 already used. The
+// owner admits this bridge as its one wreck borrower (admitWreckBorrower165E90), so it can
+// never close or retire under a live borrow; the release withdraws it.
 bool OwnershipBridge::podTrackRetainParticles(g::OriginalTrackParticleCold50LA& actual)noexcept {
     if(nativeWreckParticles_)return false;
-    (void)actual;
-    std::fprintf(stderr,"pod_load_track_particles_refused reason=borrower");std::fputc(10,stderr);
-    return false;
+    if(!actual.admitWreckBorrower165E90(*this)){
+        std::fprintf(stderr,"pod_load_track_particles_refused reason=borrower");std::fputc(10,stderr);
+        return false;
+    }
+    nativeWreckParticles_=&actual;return true;
 }
 bool OwnershipBridge::podTrackReleaseParticles(g::OriginalTrackParticleCold50LA& actual)noexcept {
-    if(nativeWreckParticles_!=&actual)return false;
+    if(nativeWreckParticles_!=&actual||!actual.withdrawWreckBorrower165E90(*this))return false;
     nativeWreckParticles_=nullptr;return true;
 }
 // 1AE280: every racer's 2129C0 in manager order. The 4C0[0]/4C4[0] borrow is

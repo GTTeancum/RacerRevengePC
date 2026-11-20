@@ -137,8 +137,10 @@ public:
    const auto code=std::string(track.code());
    const auto& aub=track.documents.aub;
    if(aub.empty()){std::cerr<<"positional_sounds site=common course="<<code<<" aub=absent soultree_read=0\n";error.clear();return true;}
-   a::ParameterDocument48F doc;a::DecodeError48C de{};
-   need(aub.size()<=2u*1024u*1024u&&a::decodeParameters48F(aub,doc,de),"positional sound AUB authoring rejected");
+   // Duplicate labels retained: the 1583AC search picks the copy the original reads (B8).
+   a::ParameterDocument48F doc;a::DecodeError48C de{};a::WorldLimits48F aubLimits{};aubLimits.retainDuplicateLabels=true;
+   aubLimits.input_bytes=std::max(aubLimits.input_bytes,aub.size());
+   need(aub.size()<=2u*1024u*1024u&&a::decodeParameters48F(aub,doc,de,nullptr,aubLimits),"positional sound AUB authoring rejected");
    auto read=std::make_unique<a::OriginalPositionalSounds50SR>();
    need(a::readOriginalPositionalSounds50SR(doc,"common",*read,error),error);
    const auto& list=read->soulTree;
@@ -164,11 +166,17 @@ public:
     for(unsigned k=0;k<3;++k)row->position[k]=s.position[k];
     row->loop=s.looping!=0;row->oneShot=s.oneShot!=0;row->resetWhenInaudible=s.resetWhenInaudible!=0;
     row->nearDistance=s.minDistance;row->farDistance=s.maxDistance;row->triggerDistance=s.oneShotDistance;row->chance=s.randomTriggerPercent;
-    need(row->nearDistance>=0&&row->nearDistance<row->farDistance&&row->triggerDistance>=0&&row->chance>=0&&row->chance<=100,
-       label+"ranges rejected");
+    // 2787B0 stores MinDistance/MaxDistance as authored, without ordering them (MB
+    // SoultreeSound99 authors 480 > 190). Only non-finite values are refused. With min>max
+    // the attenuation below reaches 100 before far and never divides by (far-near).
+    // How the original falloff 291350 treats min>max is not traced (flagged, not refused).
+    need(std::isfinite(row->nearDistance)&&std::isfinite(row->farDistance)&&std::isfinite(row->triggerDistance)&&
+       std::isfinite(row->chance),label+"distances not finite");
+    // 2787B0 reads Looping per sound row; the PCM file is only a name. One request per
+    // file name (the bank's decode ignores request.loop); every row keeps its own loop flag
+    // (SA steamrom, MB steam02/metlwsh2/glaswsh1/ventroom are authored both ways).
     auto found=std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==row->name;});
-    if(found==requests.end())requests.push_back({row->name,row->loop,false,false});
-    else need(found->loop==row->loop,"positional PCM delivery flags conflict");
+    if(found==requests.end())requests.push_back({row->name,false,false,false});
     if(!states_.slot(i,0x2787B0u))throw std::runtime_error("positional state row refused");
    }
    // Trigger Sound actions (05.09 trigger list, already read): distinct files.

@@ -2,6 +2,7 @@
 #include "original_smoke_numeric50rc.h"
 #include "water_wake50jc.h"
 #include <cfenv>
+#include <cstdio>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -151,8 +152,12 @@ bool authentic(const std::vector<std::uint8_t>& b,OriginalGcPodDustMember50KG me
         "2e89d1d1c6d44804dc25687d837699ab3207e8a800ee3756875e5760226957e2",
         "02ae885a7fa05b2d1370c4d0148bfbc51614a340ea04abe3098812a89ab33d9b",
         "f559ef3678be818686c576ffc58eb7bbae7f30dc07f271bfe264b2960ccda914"};
+    // Receipt only (C3): every pod reads its own dust EMT; the stock size/digest is logged.
     const auto i=static_cast<unsigned>(member);
-    return i<6&&b.size()==sizes[i]&&hashMatches(b.data(),b.size(),hashes[i]);
+    if(i>=6||b.empty()||b.size()>64u*1024u)return false;
+    if(!(b.size()==sizes[i]&&hashMatches(b.data(),b.size(),hashes[i])))
+        std::fprintf(stderr,"common_pod_file member=dust%u bytes=%zu receipt=differs\n",i,b.size());
+    return true;
 }
 } // namespace
 OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(

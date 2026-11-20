@@ -72,7 +72,8 @@ bool Owner::loadDecoded(const a::ResArchive48C& archive,const a::World48F& world
                     const auto stem=candidate.substr(0,candidate.find_last_of('.'));
                     shared::need(shared::name(stem),"Invalid original single-pass world texture basename");
                     const a::ResourceEntry48C* texture=nullptr;
-                    for(const char* extension:{".pst",".ipu",".tga",".atm"}){
+                    // C17: .ipu is not tried (no decoder reads a bare .ipu member; no archive authors one).
+                    for(const char* extension:{".pst",".tga",".atm"}){
                         texture=next->entry("textures\\"+stem+extension);if(texture)break;
                     }
                     shared::need(texture,"Single-pass world required texture absent: "+map.name);

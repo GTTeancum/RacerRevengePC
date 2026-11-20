@@ -93,8 +93,9 @@ void ContactsContext::run() {
     if(audioEnabled)podSound={.context=triggerAudio.get(),
         .preflight=[](void* p,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{
          const auto* voice=static_cast<const gc_gate_audio50IN::Owner*>(p);return voice->available()&&voice->ready();},
-        .apply=[](void* p,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{
-         auto* voice=static_cast<gc_gate_audio50IN::Owner*>(p);voice->start();return !voice->failed();},
+        .apply=[](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept->bool{
+         auto* voice=static_cast<gc_gate_audio50IN::Owner*>(p);
+         if(e.authored)voice->start(e.authored->filename);else voice->start();return !voice->failed();},
         .sourcePc=0x1b5b00u};
     else podSound={.context=triggerAudio.get(),
         .preflight=[](void*,const course_trigger_actions50CT::ActionEvent&)noexcept->bool{return true;},

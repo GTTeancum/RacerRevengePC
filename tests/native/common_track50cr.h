@@ -292,6 +292,12 @@ struct Documents final {
     rr::assets::ParameterDocument48F aubDocument;  // AUB parameters
     std::string waterName;                         // SCB Environment water name; empty = no water (A9)
     std::uint32_t waterLogicalOffset=0;
+    // 1B44A0..1B4528: TOB [PodRacer] and [Rain], read at 05.02 with 158B30 (158920 rule,
+    // T/F/ON/OFF/Y/N or strtol base 0; absent field = the original default).
+    std::uint32_t trackEmitsDust51C=0;   // [PodRacer] TrackEmitsDust -> World+51C (default 0)
+    std::int32_t ipuCacheSize524=3;      // [PodRacer] IPUCacheSize   -> World+524 (default 3)
+    bool podRacerBlock=false;            // [PodRacer] present (157D00)
+    bool rainActive=false;               // [Rain] RainActive (default 0): 2D0290 rain owner -> World+534
 };
 
 // ---------------------------------------------------------------- archive (step 4)

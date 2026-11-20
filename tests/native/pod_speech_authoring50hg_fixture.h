@@ -2,6 +2,9 @@
 #include "lap_sound_owner50gh_fixture.h"
 #include "../../src/game/pod_speech50hg.h"
 #include <array>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <string_view>
 
 namespace pod_speech50HG {
@@ -74,15 +77,18 @@ inline bool readPlayerSpeechChance(float& out,std::string& error,
     const std::filesystem::path& path) {
     namespace shared=pod_materials50ed_fixture::detail;
     try {
-        shared::Inputs input;input.capacity=255;const auto bytes=input.read(path,255);
-        shared::need(bytes.size()==255&&shared::sha256(bytes)==
-            "24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c",
-            "50HG original SPCHPCT.INI identity mismatch");
-        const std::string_view text(reinterpret_cast<const char*>(bytes.data()),bytes.size());
-        shared::need(text.find("HumanPercent=0.35f")!=std::string_view::npos,
-            "50HG effective human probability missing");
-        // Binary32 conversion of the authenticated original decimal0.35.
-        out=.35f;error.clear();return true;
+        shared::Inputs input;input.capacity=32768;const auto bytes=input.read(path,32768);
+        // The stock digest is a log-only receipt (C4); HumanPercent is read from the file.
+        if(!(bytes.size()==255&&shared::sha256(bytes)=="24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c"))
+            std::fprintf(stderr,"common_shared_file member=SPCHPCT.INI bytes=%zu receipt=differs\n",bytes.size());
+        const std::string text(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+        const auto key=text.find("HumanPercent=");
+        shared::need(key!=std::string::npos,"50HG HumanPercent missing");
+        // atof prefix rule (158A70): "0.35f" reads 0.35; the trailing f stops the number.
+        const char* begin=text.c_str()+key+13;char* end=nullptr;
+        const double value=std::strtod(begin,&end);
+        shared::need(end!=begin&&std::isfinite(value)&&value>=0.0&&value<=1.0,"50HG HumanPercent unreadable");
+        out=static_cast<float>(value);error.clear();return true;
     }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
     catch(...){try{error="50HG speech probability read failed";}catch(...){}return false;}
 }

@@ -25,6 +25,7 @@
 // Host memory only: writes go to the caller's per-instance vector, sized
 // from the world, every index bounds-checked before the write.
 #include "../assets/import_world48f.h"
+#include "../assets/original_parameter_lookup50cr.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -52,22 +53,10 @@ inline const assets::ParameterBlock48F* findBlock(const assets::ParameterDocumen
     for (const auto& b : p.blocks) if (b.name == name) return &b;
     return nullptr;
 }
-// 1583AC: midpoint search over the sorted label table, then both endpoints.
+// 1583AC: the shared midpoint search (src/assets/original_parameter_lookup50cr.h).
 inline const assets::ParameterField48F* packedField(const assets::ParameterBlock48F& b,
     const std::string& name) noexcept {
-    if (b.fields.empty()) return nullptr;
-    if (b.fields.size() == 1) return b.fields[0].name == name ? &b.fields[0] : nullptr;
-    std::size_t low = 0, high = b.fields.size() - 1, middle = (high - low) / 2;
-    for (;;) {
-        const int comparison = name.compare(b.fields[middle].name);
-        if (!comparison) return &b.fields[middle];
-        if (comparison >= 0) low = middle; else high = middle;
-        if (high - low < 2) break;
-        middle = low + (high - low) / 2;
-    }
-    if (b.fields[low].name == name) return &b.fields[low];
-    if (b.fields[high].name == name) return &b.fields[high];
-    return nullptr;
+    return assets::packedField1583AC(b, name);
 }
 inline char fold(char c) noexcept { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c; }
 inline bool equalFolded(const std::string& a, const std::string& b) noexcept {
@@ -75,12 +64,10 @@ inline bool equalFolded(const std::string& a, const std::string& b) noexcept {
     for (std::size_t i = 0; i < a.size(); ++i) if (fold(a[i]) != fold(b[i])) return false;
     return true;
 }
-// 158920 boolean field. -1 = not a recognised value (no store).
-inline int booleanValue(std::string s) noexcept {
-    for (auto& c : s) if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
-    if (s == "T" || s == "TRUE") return 1;
-    if (s == "F" || s == "FALSE") return 0;
-    return -1;
+// 158920 (shared rule): a present field always yields a value (T*/F*, ON/OFF, Y*/N*, else
+// strtol base 0). 271B4C stores it into +148; 27AC74 keeps it as a flag (nonzero = receives).
+inline int booleanValue(const std::string& s) noexcept {
+    return assets::integer158920(s) != 0 ? 1 : 0;
 }
 inline std::string instanceStem(const std::string& slt) {
     const auto dot = slt.find('.');
@@ -97,11 +84,16 @@ inline std::string geometryStem(const std::string& member) {
 }
 } // namespace static_model_params50ps_detail
 
-// world: the course's decoded world (actualWorld). Its parameters carry the
-// exact TOB bytes; they are decoded again with duplicate labels retained so
-// the 1583AC lookup sees the original label table.
+// world: the course's decoded world (actualWorld): its instances and their SCB
+// parameter blocks (names, StaticType). tob: the course's own TOB bytes
+// (track.documents.tob, 05.02) -- 271A00 runs in the TOB stage; no SCB carries
+// [StaticModelParams]. The TOB is decoded again with duplicate labels retained
+// so the 1583AC lookup sees the original label table.
+// 271AE0 reads AllowShadowReceiving with 158B30 (158920 T/TRUE/F/FALSE, any
+// case) and default 1: an absent or unrecognised value stores 1.
 // receiving: output, one entry per world instance, 1 by default (27A208).
 inline bool applyStaticModelParams50PS(const assets::World48F& world,
+    const std::vector<std::uint8_t>& tob,
     std::vector<std::uint32_t>& receiving, StaticModelParamsReceipt50PS& receipt,
     std::string& error) {
     namespace d = static_model_params50ps_detail;
@@ -114,7 +106,8 @@ inline bool applyStaticModelParams50PS(const assets::World48F& world,
     assets::DecodeError48C why{};
     assets::WorldLimits48F limits{};
     limits.retainDuplicateLabels = true;
-    if (!assets::decodeParameters48F(world.parameters.original_bytes, table, why, nullptr, limits)) {
+    if (tob.empty()) { receipt.instances = instanceCount; receipt.receiving = instanceCount; receiving = std::move(next); return true; }
+    if (!assets::decodeParameters48F(tob, table, why, nullptr, limits)) {
         error = "static model params: track TOB rejected"; return false;
     }
     // Names and types of the loaded statics, in world order.
@@ -152,12 +145,13 @@ inline bool applyStaticModelParams50PS(const assets::World48F& world,
         if (requested) selected = requested; else ++receipt.rowsMissingSection;
         const auto* slt = selected ? d::packedField(*selected, "slt") : nullptr;
         const auto* shadow = selected ? d::packedField(*selected, "allowshadowreceiving") : nullptr;
-        if (!slt || !shadow) { ++receipt.rowsMissingFields; continue; }
+        if (!slt) { ++receipt.rowsMissingFields; continue; } // empty name: matches no model
         const auto dot = slt->value.rfind('.');
         const std::string modelName = slt->value.substr(0, dot == std::string::npos ? slt->value.size() : dot);
-        const int value = d::booleanValue(shadow->value);
+        int value = shadow ? d::booleanValue(shadow->value) : 1;
+        if (!shadow) ++receipt.rowsMissingFields;
         if (modelName.empty()) { ++receipt.rowsMissingFields; continue; }
-        if (value < 0) { ++receipt.rowsUnknownValue; continue; }
+        if (value < 0) { ++receipt.rowsUnknownValue; value = 1; } // 158B30 default
         ++receipt.rowsApplied;
         std::size_t matched = 0;
         for (std::size_t i = 0; i < instanceCount; ++i) {

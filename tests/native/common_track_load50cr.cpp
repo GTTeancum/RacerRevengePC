@@ -22,7 +22,8 @@
 #include "stock_course_receipts50cr.h"
 #include "track_collision_world50cr.h"
 #include "single_pass_world50lm.h"
-#include "track_static_model_params50cr.h"   // 271A00 rows (I2 applies them to the standard models)
+// 271A00 [StaticModelParams]: the one reader is src/game/original_static_model_params50ps.h over
+// documents.tob, applied to the standard models by the static world (continuation).
 #include "track_atm50cr.h"
 #include "track_particle_emitters50cr.h"  // Roles::emitters teardown (quiesce, closeAfterPool)
 #include "mc_world_semantics50mc.h"
@@ -33,6 +34,8 @@
 #include "pod_materials50ed_fixture.h"
 #include "original_ui_main_entry50kg.h"
 #include "../../src/assets/dlc_files50dl.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
+#include <iostream>
 #include "../../src/assets/dlc_registry50dl.h"
 #include "../../src/game/dlc_course_entries50dl.h"
 #include "../../src/assets/original_standard_archive_provider50la.h"
@@ -288,7 +291,7 @@ bool readScene270900(Track& track,const LoadInputs&,Diagnostic& d)noexcept{
             // PORT STAND-IN: the strict decoder is the port's; the tolerant reader still lives
             // in an MC-named file (mc_world_semantics50mc.h) and applies to every course.
             world={};a::DecodeError48C tolerant;
-            if(!mc_world_semantics50MC::decodeWorld(scb,world,tolerant,nullptr,limits))
+            if(!mc_world_semantics50MC::decodeWorld(scb,world,tolerant,nullptr,limits,track.identity.scbMember))
                 return refuse(d,step,0x270900u,"SCB SceneInfo decode: "+error.code+" / "+tolerant.code);
         }
         if(world.zones.empty()||world.zones.size()>track_runtime_storage50IG::hardZones||
@@ -348,6 +351,27 @@ bool readTob1B4330(Track& track,const LoadInputs&,Diagnostic& d)noexcept{
             actions+=n;
         }
         track.counts.triggerActions=actions;
+        // 1B4490..1B44CC: [PodRacer] TrackEmitsDust (World+51C, default 0) and IPUCacheSize
+        // (World+524, default 3), both 158B30; 157D00 miss skips both (defaults stay).
+        // 1B44D0..1B4554: [Rain] RainActive (158B30, default 0); nonzero allocates the 2D0290
+        // rain owner at World+534. PORT STAND-IN: the original reads [Rain] only when the
+        // application byte (0x382B80)->2DC->1125C bits 5..6 equal 1 (not traced: read always,
+        // recorded only); the 2D0290 rain owner is not built, so RainActive draws nothing.
+        {
+            const auto* podRacer=a::findBlock157D00(doc,"podracer");
+            track.documents.podRacerBlock=podRacer!=nullptr;
+            if(podRacer){
+                track.documents.trackEmitsDust51C=static_cast<std::uint32_t>(a::integer158B30(podRacer,"trackemitsdust",0));
+                track.documents.ipuCacheSize524=a::integer158B30(podRacer,"ipucachesize",3);
+            }
+            const auto* rain=a::findBlock157D00(doc,"rain");
+            track.documents.rainActive=rain&&a::integer158B30(rain,"rainactive",0)!=0;
+            const auto tobName=track.identity.tobMember;
+            log::trackDataNamed("tob.track_emits_dust",track.code(),tobName,track.documents.trackEmitsDust51C,false,0u);
+            log::trackDataNamed("tob.ipu_cache_size",track.code(),tobName,static_cast<std::uint32_t>(track.documents.ipuCacheSize524),false,0u);
+            log::trackDataNamed("tob.rain_active",track.code(),tobName,track.documents.rainActive?1u:0u,false,0u);
+            if(track.documents.rainActive)std::cerr<<"track_rain course="<<track.code()<<" rain_active=1 owner=2D0290 built=0 (PORT STAND-IN)\n";
+        }
         track.documents.tob=std::move(tob);track.documents.tobDocument=std::move(doc);
         // AUB (1B4720 binds it after the TOB): bytes and document for 05.12 (R7). An AUB that
         // does not decode is left empty here; 05.12 refuses it with its own reason.
@@ -364,6 +388,13 @@ bool readTob1B4330(Track& track,const LoadInputs&,Diagnostic& d)noexcept{
     catch(...){return refuse(d,step,0x1B4330u,"TOB allocation failed");}
 }
 
+// PORT STAND-IN (B4, not built): the ground-surface rows 276880 (TerrainZone1..8, each read by
+// its descriptor's own load through the vtable) and 272520 (ZoneCollisionObject -> placed
+// collision object) are not read; their consumer, the per-surface dust 217A90 GenerateDust, is
+// not built either. Only the PC surface option reads TerrainZone (terrain_interactive_world50du).
+// PORT STAND-IN (B7, not built): TOB [SunFlares] (271E48 NumberOfSunFlares; TA/TB/TC 2,
+// SA/RA/MA 1) and directional-light HasLensFlare are not read or drawn on any course; the
+// flarezretrieveN materials (totalTextureMaps=0) are not admitted by decodeMaterial48E.
 // ---------------------------------------------------------------- 05.03 physics index + storage plan
 bool buildPhysicsIndex270CDC(Track& track,const LoadInputs&,Diagnostic& d)noexcept{
     constexpr auto step=log::Step::physicsIndex270CDC;
@@ -526,7 +557,11 @@ bool Load::run(Track& track,const Identity& identity,const std::shared_ptr<Provi
 namespace {
 template<class T> bool releaseRole(std::shared_ptr<T>& role,const char* name,bool& all)noexcept{
     if(!role)return true;
-    const bool released=role.use_count()==1;
+    const auto holders=role.use_count();
+    const bool released=holders==1;
+    // A refused role names how many other owners still hold it (the race-side holder that
+    // the original destroys before 1316A0 is still alive).
+    if(!released)std::fprintf(stderr,"common_teardown_holders role=%s holders=%ld\n",name,static_cast<long>(holders-1));
     if(released)role.reset();
     log::teardownRole(name,released);
     if(!released)all=false;
@@ -535,8 +570,22 @@ template<class T> bool releaseRole(std::shared_ptr<T>& role,const char* name,boo
 }
 bool Track::release()noexcept{
     bool all=true;
-    // Reverse role order, teardown step 18.
-    releaseRole(roles.navigation,"navigation",all);
+    // Reverse role order, teardown step 18. The original retires the race (racers, AI, lap
+    // state: every reader of the splines) and the World (1B2870, its zone-index binding)
+    // before the track bank 1316A0. Here the navigation store is the Track's own: its 1ACF70
+    // binding to the collision world is undone first (the lease no longer pins the world,
+    // and any remaining race-side view reads runtimeValid()==false), then the Track drops
+    // its reference. The store holds immutable spline rows only; a race-side view that
+    // outlives this (scope unwinding after the stage close) frees them when it goes, and is
+    // logged (common_teardown_holders). It never writes the store.
+    if(roles.navigation){
+        roles.navigation->worldLease.reset();roles.navigation->world=nullptr;
+        const auto holders=roles.navigation.use_count();
+        if(holders>1)std::fprintf(stderr,"common_teardown_holders role=navigation holders=%ld deferred=immutable_rows\n",
+            static_cast<long>(holders-1));
+        roles.navigation.reset();
+        log::teardownRole("navigation",true);
+    }
     releaseRole(roles.sounds,"sounds",all);
     releaseRole(roles.audio,"aub",all);
     releaseRole(roles.water,"water",all);

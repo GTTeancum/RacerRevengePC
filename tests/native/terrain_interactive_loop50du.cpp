@@ -3098,7 +3098,8 @@ void Context::run() {
     // Unauthored sky tiles remain absent; do not invent lower sky geometry.
     // Common rewrite (I4): one clear colour for every course, the track's
     // Fog.ColorRGB carried by the one sky owner (zero sky cubes included).
-    const float* clearColor=skyOwner?skyOwner->clearRgba():nullptr;
+    // 13E830: World3EC from the 05.11 sky step (track.roles.sky), which exists with zero cubes (SC).
+    const float* clearColor=sourceSkySelection.clearRgba();
     require50DU(clearColor,"authored track clear color unavailable");
     hudTiming.finish();
     EngineFlareOutput50GV flameOutput{};EngineFlareDiagnostic50GV flameDiagnostic{};

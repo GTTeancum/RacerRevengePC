@@ -12,7 +12,8 @@ namespace shared=pod_materials50ed_fixture::detail;
 // Opaque bank identity for this exact source image, not an inferred GL name.
 inline constexpr std::uint64_t textureIdentity=0x474344454d4f5052ull;
 inline constexpr std::uint64_t materialIdentity=0x4743504152544943ull;
-inline constexpr std::size_t rgbaBytes=128u*1024u*4u;
+inline constexpr std::size_t rgbaBytes=128u*1024u*4u;           // stock atlas (receipt only)
+inline constexpr std::size_t maximumAtlasRgbaBytes=1024u*1024u*4u; // the 1024 per-texture GS bound
 struct Diagnostic {
     std::string message;
     a::DecodeError48C source{};
@@ -51,32 +52,37 @@ public:
         d={};try{
             using shared::need;
             need(!storage_,"GC particle material already loaded");
-            need(a::authenticOriginalGcParticlePsm50KG(psm),"GC original demoprt.psm identity differs");
+            // The PSM is admitted by its own structure (prepareOriginalGcParticleMaterial50KG); the
+            // stock GC identity is a receipt there.
             // The atlas pixels (PST) are each course's own data: the stock GC identity is a
             // receipt, not a gate (TA authors its own demoprt.pst). The PSM stays authenticated:
             // it is the one ParticleCode material every stock course shares.
-            std::cerr<<"common_track_data role=particles.atlas_pst receipt="
-                <<(a::authenticOriginalGcParticlePst50KG(pst)?"match":"differs")<<" value="<<pst.size()<<std::endl;
+            // The caller logs the course's own receipt (common_track_data role=particles.atlas_pst,
+            // stock_course_receipts50CR::findHash(course,...)); nothing here compares with GC.
             need(pst.size()>=16&&pst.size()<=8u*1024u*1024u,"track particle atlas PST extent");
             auto next=std::make_unique<Storage>();
             a::TextureLimits48E limits;
             limits.input_bytes=pst.size();
-            limits.decoded_bytes=2u*rgbaBytes+16u;
+            limits.decoded_bytes=2u*maximumAtlasRgbaBytes+16u;
             need(a::decodeTexture48E(pst,next->sourceTexture,d.source,nullptr,limits),
                 "GC original demoprt PST decode");
             need(a::prepareOriginalGcParticleMaterial50KG(psm,templates,runtime,
                 next->sourceTexture,next->material,d.material),"GC original particle material policy");
+            const std::size_t atlasRgba=next->sourceTexture.mips.empty()?0u:next->sourceTexture.mips[0].rgba.size();
+            need(atlasRgba&&atlasRgba<=maximumAtlasRgbaBytes,"track particle atlas RGBA extent");
             const a::MaterialTextureAssetInput50EA image{textureIdentity,&next->sourceTexture.base_rrtex};
             const std::array<a::MaterialTextureSlotInput50EA,2> slots{{
                 {{materialIdentity,0,1,1},textureIdentity,a::MaterialTextureRequirement50EA::required},
                 {{materialIdentity,0,1,2},textureIdentity,a::MaterialTextureRequirement50EA::required}}};
             const a::MaterialTextureAssetsInput50EA input{
-                &image,1,slots.data(),2,{1,2,rgbaBytes+16u,rgbaBytes,1024}};
+                &image,1,slots.data(),2,{1,2,atlasRgba+16u,atlasRgba,1024}};
             need(next->bank.load(input,d.bank),"GC immutable particle atlas bank");
             const auto* published=next->bank.texture(0);
-            need(published&&published->identity==textureIdentity&&published->texture.width==128&&
-                published->texture.height==1024&&published->texture.rgba==next->sourceTexture.mips[0].rgba,
-                "track particle atlas must decode to the 128x1024 ParticleCode atlas (renderer UV frame)");
+            need(published&&published->identity==textureIdentity&&
+                published->texture.width==next->sourceTexture.mips[0].width&&
+                published->texture.height==next->sourceTexture.mips[0].height&&
+                published->texture.rgba==next->sourceTexture.mips[0].rgba,
+                "track particle atlas bank differs from its decoded PST");
             storage_=std::move(next);return true;
         }catch(const std::exception& e){try{d.message=e.what();}catch(...){}return false;}
         catch(...){try{d.message="GC particle cold source failure";}catch(...){}return false;}
@@ -118,7 +124,7 @@ public:
         const p::MaterialTextureSampler50EB sampler{
             p::MaterialTextureFilter50EB::linear,p::MaterialTextureFilter50EB::linear,
             p::MaterialTextureWrap50EB::repeat,p::MaterialTextureWrap50EB::repeat};
-        auto request=caller;request.samplers=&sampler;request.samplerCount=1;request.maximumGpuBytes=rgbaBytes;
+        auto request=caller;request.samplers=&sampler;request.samplerCount=1;request.maximumGpuBytes=storage_->sourceTexture.mips.empty()?0u:storage_->sourceTexture.mips[0].rgba.size();
         return gpu_.create(request,storage_->bank,d);
     }
     // Any close attempt ends renderer publication. If cleanupIncomplete is

@@ -138,14 +138,17 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
         // One generic INI, one SPCHPCT, at most eight2496-byte named INIs.
         // These are cold metadata reads only; no selector or RNG is touched.
         d::Inputs input;input.capacity=32768;
-        const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",11704);
-        const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",255);
-        d::need(generic.size()==11704&&d::sha256(generic)==
-            "24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab","50IE original GEN_ANN.INI differs");
-        d::need(percentages.size()==255&&d::sha256(percentages)==
-            "24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c","50IE original SPCHPCT.INI differs");
+        const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",32768);
+        const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",32768);
+        // Stock digests are log-only receipts; the files are read by their own rows (C4).
+        if(!(generic.size()==11704&&d::sha256(generic)=="24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab"))
+            std::cerr<<"common_shared_file member=GEN_ANN.INI bytes="<<generic.size()<<" receipt=differs\n";
+        if(!(percentages.size()==255&&d::sha256(percentages)=="24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c"))
+            std::cerr<<"common_shared_file member=SPCHPCT.INI bytes="<<percentages.size()<<" receipt=differs\n";
         const std::string_view pct(reinterpret_cast<const char*>(percentages.data()),percentages.size());
-        d::need(pct.find("DaxGenericPercent=0.80f")!=pct.npos&&pct.find("DaxSpeechDelay=7.0f")!=pct.npos,
+        // PORT STAND-IN (flagged): DaxGenericPercent / DaxSpeechDelay are required present; the
+        // announcer selector still uses the stock values (0.80 / 7.0), not the read ones.
+        d::need(pct.find("DaxGenericPercent=")!=pct.npos&&pct.find("DaxSpeechDelay=")!=pct.npos,
             "50IE original announcer fields absent");
         const auto g=detail::events(generic,150);
         next.cues.reserve(roster?74+18*named:42+12*named);

@@ -4,6 +4,8 @@
 #include <iostream>
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/import_world48f.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
+#include <string_view>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -40,9 +42,11 @@ inline std::uint32_t findBlock(const ParameterDocument48F& p, const std::string&
     malformed(found != p.blocks.end() && found->name == name, "world.missing_block", 0, "Required scene block is missing");
     return static_cast<std::uint32_t>(found - p.blocks.begin());
 }
+// 158240 -> 1583AC: the shared original search; a duplicated label resolves to the copy the
+// original lands on (B8), for every block and field.
 inline const ParameterField48F& field(const ParameterBlock48F& block, const std::string& name) {
-    const auto found = std::lower_bound(block.fields.begin(), block.fields.end(), name, [](const ParameterField48F& a, const std::string& b) { return a.name < b; });
-    malformed(found != block.fields.end() && found->name == name, "world.missing_field", block.offset, "Required scene parameter is missing"); return *found;
+    const auto* found = rr::assets::packedField1583AC(block, name);
+    malformed(found != nullptr, "world.missing_field", block.offset, "Required scene parameter is missing"); return *found;
 }
 inline std::uint32_t number(const ParameterField48F& f, std::uint32_t maximum) {
     malformed(!f.value.empty(), "world.integer_syntax", f.value_offset, "Empty unsigned decimal integer"); std::uint32_t n = 0;
@@ -115,9 +119,7 @@ inline bool modelName(const std::string& text) {
     while (i < text.size() && text[i] >= '0' && text[i] <= '9') ++i; return i > begin && i == text.size();
 }
 inline const ParameterField48F* optionalField(const ParameterBlock48F& b,const char* key) {
- const ParameterField48F* result=nullptr;
- for(const auto& f:b.fields)if(f.name==key){malformed(!result,"mc.world.duplicate_used_field",f.entry_offset,"Duplicate interpreted field");result=&f;}
- return result;
+ return rr::assets::packedField1583AC(b,key);
 }
 inline Vec sourceUp(const ParameterBlock48F& b){
  const auto* f=optionalField(b,"upvector");
@@ -126,28 +128,30 @@ inline Vec sourceUp(const ParameterBlock48F& b){
 }
 inline bool sourceLighting(const ParameterBlock48F& b){
  const auto* f=optionalField(b,"uselighting");
- // 27A5BC supplies1;158B60 stores that default when lookup fails.
+ // 27A5BC supplies1;158B60 stores that default when lookup fails; a present value is read
+ // with the one 158920 rule (T*/F*, ON/OFF, Y*/N* any case, else strtol base 0).
  if(!f)return true;
- require(f->value=="T"||f->value=="t"||f->value=="F",DecodeKind48C::unsupported,"world.lighting_flag",f->value_offset,"Only authenticated MC F/t and proven T flags supported");
- return f->value=="T"||f->value=="t";
+ return rr::assets::integer158920(f->value)!=0;
 }
 
 }
+// PORT STAND-IN (flagged): this tolerant SCB reader serves every course but keeps its MC file
+// and namespace name (a rename touches every includer; deferred). member: the course's own SCB.
 inline bool decodeWorld(const std::vector<std::uint8_t>& input, World48F& output, DecodeError48C& error,
-    const DecodeHooks48C* hooks=nullptr, const WorldLimits48F& limits=WorldLimits48F{}) {
+    const DecodeHooks48C* hooks=nullptr, const WorldLimits48F& limits=WorldLimits48F{},
+    std::string_view member={}) {
     using namespace detail;
     error = {};
     try {
         // Common course rule (course_archive_receipt50ci.h): the stock SCB
         // identity is a receipt; the decoder's own rules below admit the data.
         if(!(input.size()==187711&&pod_materials50ed_fixture::detail::sha256(input)=="26f5d637533ee9840e916e02d5cef7b06d68352f1b7e0b11a48bf050d73df51e"))
-            std::cerr<<"course_member_identity site=mc_world_semantics member=tracks\\mc.scb bytes="<<input.size()<<" stock=0\n";
+            std::cerr<<"course_member_identity site=tolerant_world_semantics member="<<(member.empty()?std::string_view("-"):member)
+                <<" bytes="<<input.size()<<" mc_stock=0\n";
         World48F world;auto representationLimits=limits;representationLimits.retainDuplicateLabels=true;
         if(!decodeParameters48F(input,world.parameters,error,hooks,representationLimits))return false;
-        for(const auto& block:world.parameters.blocks)for(std::size_t i=1;i<block.fields.size();++i)
-          malformed(block.fields[i-1].name!=block.fields[i].name ||
-            (block.name=="environment"&&(block.fields[i].name=="type"||block.fields[i].name=="colorrgb")),
-            "mc.world.duplicate_scope",block.fields[i].entry_offset,"Only retained unused MC Environment duplicates admitted");
+        // Duplicate labels are admitted in every block: each lookup resolves them with the
+        // original 1583AC search (B8), never a first-copy or MC-only rule.
         const auto& p = world.parameters; world.scene_info_block = findBlock(p, "sceneinfo"); const auto& info = p.blocks[world.scene_info_block];
         bool hasZones=false,hasPortals=false,hasFlat=false;
         for(const auto& f:info.fields){hasZones=hasZones||f.name=="numzones";hasPortals=hasPortals||f.name=="numportals";}

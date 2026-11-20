@@ -59,7 +59,8 @@ bool latch(Status status,CourseDriverState50GK& s,CourseDriverDiagnostic50GK& d)
 }
 bool routeValid(const Route& route,const CourseSpeedLimits50GK& limits) noexcept {
     const auto count=route.count;
-    if(!route.gatesPrepared||count<2||count>game::maxUndertrackNodes50ET||limits.count!=count)return false;
+    if(!route.gatesPrepared||count<2||count>game::navigationNodeLimit50ET||limits.count!=count||
+       limits.values.size()!=count)return false;
     for(std::uint32_t i=0;i<count;++i){const auto& n=route.trackNodes[i];
         if(!n.nextCount||n.nextCount>game::maxUndertrackNext50ET)return false;
         for(std::uint32_t j=0;j<n.nextCount;++j)if(n.next[j]>=count)return false;
@@ -126,10 +127,11 @@ bool readCourseSteeringLookahead50GK(const char* text,std::size_t bytes,float& o
 bool readCourseSpeedLimits50GK(const char* text,std::size_t bytes,std::uint32_t count,
     CourseSpeedLimits50GK& out,CourseDriverDiagnostic50GK& d) noexcept {
     d={};
-    if(!text||!bytes||bytes>game::maxUndertrackText50ET||count<2||count>game::maxUndertrackNodes50ET)
+    if(!text||!bytes||bytes>game::maxUndertrackText50ET||count<2||count>game::navigationNodeLimit50ET)
         return stop(Status::InvalidText,d);
     CourseSpeedLimits50GK next{};next.count=count;
-    bool seen[game::maxUndertrackNodes50ET]{};
+    std::vector<bool> seen;
+    try{next.values.assign(count,0.f);seen.assign(count,false);}catch(...){return stop(Status::InvalidText,d);}
     int section=-1;std::size_t at=0;
     while(at<bytes){const auto begin=at;while(at<bytes&&text[at]!='\n')++at;
         auto line=trim({text+begin,at-begin});if(at<bytes)++at;d.textOffset=begin;
@@ -154,7 +156,7 @@ bool readCourseSpeedLimits50GK(const char* text,std::size_t bytes,std::uint32_t 
         seen[section]=true;next.values[section]=speed;
     }
     for(std::uint32_t i=0;i<count;++i)if(!seen[i]){d.node=i;return stop(Status::InvalidText,d);}
-    out=next;d={};return true;
+    out=std::move(next);d={};return true;
 }
 
 static bool driveRoute50GK(const Route& route,const CourseSpeedLimits50GK& limits,

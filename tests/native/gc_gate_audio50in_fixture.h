@@ -25,7 +25,11 @@ struct Counters {std::uint64_t requests=0,starts=0,unavailable=0,rejected=0;};
 // requests overlapping starts. A second start while playing fails explicitly.
 class Owner final {
     a::AudioBank50HC bank_;
-    p::AudioClip50HD clip_{};
+    p::AudioClip50HD clip_{};   // the first PodSound file (stock: the only one)
+    // C12: every PodSound action's own file, by normalized name (stock TB/GA/GB/GC: one each).
+    std::vector<std::pair<std::string,p::AudioClip50HD>> clips_;
+    static std::string normalized(std::string n){
+        for(auto&c:n){if(c=='\\')c='/';if(c>='A'&&c<='Z')c=static_cast<char>(c+32);}return n;}
     p::AudioMixer50HD*mixer_=nullptr;
     p::RaceAudioGroups50IC*groups_=nullptr;
     bool attempted_=false,prepared_=false,available_=false;
@@ -46,6 +50,13 @@ public:
     // admitted by the shared audio bank and mixer clip rules only.
     bool prepare(p::AudioMixer50HD&mixer,p::RaceAudioGroups50IC&groups,
         const std::filesystem::path&audioRoot,std::string&error,std::string requested=filename){
+        return prepare(mixer,groups,audioRoot,error,std::vector<std::string>{std::move(requested)});
+    }
+    // Every PodSound action's file (distinct, first-use order); files[0] is the default clip.
+    bool prepare(p::AudioMixer50HD&mixer,p::RaceAudioGroups50IC&groups,
+        const std::filesystem::path&audioRoot,std::string&error,const std::vector<std::string>& files){
+        if(files.empty()){error="50IN PodSound file list empty";return false;}
+        std::string requested=files.front();
         if(attempted_){error="50IN Gate audio requires a fresh stable owner";return false;}
         attempted_=true;
         if(!groups.uses(mixer)||voice>=mixer.count()||mixer.active(voice)||
@@ -57,10 +68,17 @@ public:
             for(auto&c:requested){if(c=='\\')c='/';if(c>='A'&&c<='Z')c=static_cast<char>(c+32);}
             const bool stockFile=requested==filename;
             if(!stockFile)std::cerr<<"course_member_identity site=pod_sound member="<<requested<<" stock=0\n";
-            const std::vector<a::AudioRequest50HC> requests={{requested.c_str(),false,false,false}};
+            std::vector<a::AudioRequest50HC> requests={{requested.c_str(),false,false,false}};
+            for(std::size_t i=1;i<files.size();++i){const auto n=normalized(files[i]);bool seen=false;
+                for(const auto&r:requests)seen=seen||r.name==n;if(!seen)requests.push_back({n,false,false,false});}
             if(!a::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
             const auto*sound=bank_.find(requested.c_str());
-            if(!sound||bank_.clips.size()!=1){error="50IN Gate audio catalog differs";return false;}
+            if(!sound||bank_.clips.size()!=requests.size()){error="50IN Gate audio catalog differs";return false;}
+            clips_.clear();
+            for(const auto&r:requests){const auto*s=bank_.find(r.name.c_str());
+                if(s&&s->state==a::AudioAssetState50HC::ready){
+                    const p::AudioClip50HD c{s->pcm.samples.data(),s->pcm.frames,s->pcm.sampleRate,s->pcm.channels,0,0};
+                    if(p::AudioMixer50HD::validClip(c))clips_.push_back({r.name,c});}}
             const bool present=sound->state==a::AudioAssetState50HC::ready;
             if(present){
                 const auto&pcm=sound->pcm;
@@ -90,7 +108,14 @@ public:
         return !failed()&&ownership()&&!mixer_->active(voice)&&
             (!available_||p::AudioMixer50HD::validClip(clip_));
     }
-    void start()noexcept {
+    // The action's own file (C12); an unknown or empty name plays the first file.
+    void start(const std::string& file)noexcept {
+        const p::AudioClip50HD* chosen=nullptr;
+        try{const auto n=normalized(file);for(const auto&c:clips_)if(c.first==n)chosen=&c.second;}catch(...){}
+        startClip(chosen?*chosen:clip_);
+    }
+    void start()noexcept {startClip(clip_);}
+    void startClip(const p::AudioClip50HD& clip)noexcept {
         ++counters_.requests;
         if(failed()){++counters_.rejected;return;}
         if(!prepared_){failure_=Failure::Unprepared;++counters_.rejected;return;}
@@ -99,7 +124,7 @@ public:
         if(!available_){++counters_.unavailable;return;}
         // Constructor volume100,center pan,base pitch. Group gain belongs ONLY
         // to World4D8.1B5B00's mask2 is immediate submission,not a loop request.
-        if(!mixer_->play(voice,clip_,1.f,1.f,false,0.f)){
+        if(!mixer_->play(voice,clip,1.f,1.f,false,0.f)){
             failure_=Failure::BackendRejected;++counters_.rejected;return;
         }
         ++counters_.starts;

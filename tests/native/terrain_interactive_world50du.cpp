@@ -5,6 +5,7 @@
 // roster (10) and the one collision world's storage. Courses differ only in the files
 // the Track read; nothing below names a course or a pod (PLAN 2.1, 2.2, B-C01..B-C18).
 #include "native_last_failure50pd.h"
+#include "../../src/game/original_ui_game_options_controller50kg.h" // C15: 1865B4 profile reset (soundMode1101C)
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "../../src/game/n64_track_hazards_runtime50nh.h"
@@ -397,8 +398,14 @@ SessionExit50DU Context::run() {
  if(!audioMixer->originalSoundMode50KG()){
   if(!soundMode)soundMode=originalMainApplication.soundMode;
   if(!soundMode){
+   // C15: the profile's own 1101C value (the Application's game-settings profile); with no
+   // profile yet, the original profile reset 1865B4 value (resetOriginalUiGameSettingsProfileFields50KG).
+   rr::game::OriginalUiGameSettingsProfile50KG resetProfile{};
+   rr::game::resetOriginalUiGameSettingsProfileFields50KG(resetProfile);
+   const auto& profile1101C=originalMainApplication.gameSettingsProfile?*originalMainApplication.gameSettingsProfile:resetProfile;
    auto mode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
-   require50DU(mode->initializeFromProfile1101C(1),"race stereo-mode construction (1101C) rejected");
+   require50DU(mode->initializeFromProfile1101C(profile1101C.soundMode1101C),
+       "race stereo-mode construction (1101C) from the profile rejected");
    soundMode=std::move(mode);
   }
   require50DU(audioMixer->bindOriginalSoundMode50KG(soundMode),
@@ -442,7 +449,9 @@ SessionExit50DU Context::run() {
   const bool read=ct::readNavigation2A1260(*trackOwner,s.animationShared.libm,d); // logs its own common_load step=08
   require50DU(read,d.reason.empty()?"navigation 2A1260 refused":d.reason.c_str());
  }
- const auto trackCollision=track.roles.collision;
+ // A reference, not a second owner: the collision world is the Track's (released by
+ // Track::release after the race-side holders, 1316A0 order).
+ auto* const trackCollision=track.roles.collision.get();
  // 2A2880 grid input on the one collision world: the map spline's first node and the
  // selected racer's own PHY lift (session row grid rank, data).
  {
@@ -554,7 +563,7 @@ SessionExit50DU Context::run() {
  }
  // Animation memberships publish exactly when the TOB authors animations.
  require50DU(bool(trackAnimationBinding)==bool(trackAnimations)&&
-     (!trackAnimationBinding||trackAnimationBinding->completePreparation(trackCollision,trackAnimationBindingDiagnostic)),
+     (!trackAnimationBinding||trackAnimationBinding->completePreparation(track.roles.collision,trackAnimationBindingDiagnostic)),
      trackAnimationBindingDiagnostic.message.empty()?"track animation visual/collision publication rejected":trackAnimationBindingDiagnostic.message.c_str());
  require50DU(track_collision_world50CR::publishStorageRole(*trackOwner)&&track.roles.storage,
      "the collision world's storage role was not published");

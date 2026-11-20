@@ -195,6 +195,13 @@ bool Owner::loadAll(const common_track50CR::Track& track,
                 refuse(d,slot,pathPc,"slot already owns a rig");
                 log::roster(slot,row.racer60,row.source,row.human,false,d.reason);break;
             }
+            // PORT STAND-IN (B1, flagged): the original pod load 2129C0 and wreck chain 165E90
+            // (OwnershipBridge::loadPodRosterFromTrack2129C0: exclusion lists 212ABC, handling,
+            // wreck tuning 215AF8, cables 212DF0, spin 212ED0) are not called here. Their
+            // prerequisites (camera Session racer entities, the 1750A0 camera prefix, the follow
+            // owner and the wreck backing) are built only by the retired RA aggregate; the common
+            // race has no OwnershipBridge. The particle owner now admits the bridge as its wreck
+            // borrower (admitWreckBorrower165E90), so the call can be wired once the bridge exists.
             // 2129C0 inputs: this slot's own pod archive (stock Pods\PodNN\ or
             // the registry dlc:/ member), the same constructor for every pod.
             rigs[slot]=std::make_unique<native_racer50HW::Rig>(".",row.archive);

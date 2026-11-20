@@ -8,6 +8,9 @@
 #include "opponent_engine_audio50hx_fixture.h"
 #include "original_player_identity50ik_fixture.h"
 #include "../../src/game/pod_speech50hg.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
+#include <cstdio>
+#include <type_traits>
 
 namespace selected_player_audio50IJ {
 using Catalog=std::array<rr::assets::AudioRequest50HC,gameplay_audio50HE::cueCount>;
@@ -42,21 +45,25 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
                 native_racer50HW::rig_detail::lower(cue.filename))found=&request;
             d::need(found,"50IK original course/global cue absent");next.catalog[i]=*found;
         }
-        d::Inputs input;input.capacity=identity->archiveBytes;
-        const auto bytes=input.read(id::archivePath(discRoot,*identity),identity->archiveBytes);
-        d::need(bytes.size()==identity->archiveBytes&&d::sha256(bytes)==identity->archiveSha256,
-            std::string("50IK original archive identity differs: ")+identity->podId);
+        // The pod archive's stock identity is a receipt; the archive is read from its own bytes.
+        constexpr std::size_t podArchiveCeiling=16u*1024u*1024u;
+        d::Inputs input;input.capacity=podArchiveCeiling;
+        const auto bytes=input.read(id::archivePath(discRoot,*identity),podArchiveCeiling);
+        const bool archiveStock=bytes.size()==identity->archiveBytes&&d::sha256(bytes)==identity->archiveSha256;
+        std::fprintf(stderr,"common_pod_file pod=%s member=archive bytes=%zu receipt=%s\n",identity->podId,
+            bytes.size(),archiveStock?"match":"differs");
         a::ResArchive48C archive;a::DecodeError48C decode;a::DecodeLimits48C limits;
-        limits.resource_file_bytes=identity->archiveBytes;
+        limits.resource_file_bytes=bytes.size();
         limits.resource_decoded_bytes=16u*1024u*1024u;limits.resource_entries=512;limits.resource_name_bytes=256;
         d::need(a::decodeResource48C(bytes,archive,decode,nullptr,limits),
             std::string("50IK original archive decode failed: ")+identity->podId);
         const auto member=[&](const std::string& name,const char* digest){
             std::vector<std::uint8_t> result;
-            d::need(a::extractResMember48C(archive,name,result,decode,8192),
+            d::need(a::extractResMember48C(archive,name,result,decode,64u*1024u),
                 std::string("50IK original member missing: ")+identity->podId+"/"+name);
-            d::need(d::sha256(result)==digest,
-                std::string("50IK original member identity differs: ")+identity->podId+"/"+name);
+            // The stock digest is a log-only receipt; the member is read from its own bytes.
+            std::fprintf(stderr,"common_pod_file pod=%s member=%s bytes=%zu receipt=%s\n",identity->podId,
+                name.c_str(),result.size(),digest&&d::sha256(result)==digest?"match":"differs");
             return result;
         };
         const auto put=[&](AudioBank50HE bank,unsigned key,const a::AudioRequest50HC& request){
@@ -74,15 +81,33 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
             // bank, the shared file's own count otherwise).
             const auto rows=source_announcer_authoring50IE::detail::eventRows(bytes,
                 static_cast<unsigned>(next.catalog.size()));
-            d::need(rows.presentCount==count,std::string("50IK original event count differs: ")+identity->podId+"/"+name);
+            // The file's own NumEvents/EventN rows decide; `count` (sounds.ini [Indices] for a
+            // speech bank) is compared and logged, never a gate.
+            if(count!=~0u&&rows.presentCount!=count)
+                std::fprintf(stderr,"common_pod_file pod=%s member=%s events=%u indices=%u receipt=differs\n",
+                    identity->podId,name.c_str(),unsigned(rows.presentCount),count);
             for(unsigned key=1;key<=rows.declared;++key)if(rows.present[key-1])put(bank,key,rows.rows[key-1]);
         };
         const auto speechPrefix="audio\\speech\\"+native_racer50HW::rig_detail::lower(identity->podId)+"\\";
-        const auto expected=id::speechCounts(*identity);
+        // sounds.ini [Indices]: the pod's own speech counts (the identity table is a receipt).
+        const auto counts=native_racer50HW::rig_detail::ini(member(speechPrefix+"sounds.ini",id::speechCountsSha256(*identity)));
+        constexpr const char* keys[]={"numberoflowdamagesounds","numberofwallhitsounds","numberofpassedsounds",
+            "numberofattackedsounds","numberofpassingsounds","numberofattackingsounds",
+            "numberofdeathsounds","numberofwinsounds","numberoflosesounds"};
+        auto expected=id::speechCounts(*identity);
+        for(unsigned i=0;i<9;++i){
+            const auto text=native_racer50HW::rig_detail::value(counts,"indices",keys[i]);
+            const auto read=rr::assets::integer158920(text);
+            d::need(!text.empty()&&read>=0&&read<=255,std::string("50IK sounds.ini [Indices] count unreadable: ")+keys[i]);
+            if(static_cast<unsigned>(read)!=unsigned(expected[i]))
+                std::fprintf(stderr,"common_pod_file pod=%s member=sounds.ini key=%s value=%d receipt=differs\n",
+                    identity->podId,keys[i],int(read));
+            expected[i]=static_cast<std::remove_reference_t<decltype(expected[i])>>(read);
+        }
         events(AudioBank50HE::PodEvent,"audio\\p_event.ini",
-            "49856d31023a3c57d4792df3675ef83928b82d25332e1b0d9b7f9fd80f0e5dfd",6);
+            "49856d31023a3c57d4792df3675ef83928b82d25332e1b0d9b7f9fd80f0e5dfd",~0u);
         events(AudioBank50HE::PodDebris,"audio\\p_debris.ini",
-            "243e211ea41df694d0c7f4e21d1f3ff0073da6dd70d34d00f2b0c659a645ddd5",4);
+            "243e211ea41df694d0c7f4e21d1f3ff0073da6dd70d34d00f2b0c659a645ddd5",~0u);
         events(AudioBank50HE::PodCurses,speechPrefix+"curses.ini",identity->cursesSha256,
             unsigned(expected[0])+expected[1]+expected[2]+expected[3]);
         events(AudioBank50HE::PodTaunts,speechPrefix+"taunts.ini",identity->tauntsSha256,
@@ -91,16 +116,13 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
             unsigned(expected[6])+expected[7]+expected[8]);
         const auto wrecks=native_racer50HW::rig_detail::ini(member("audio\\wrecks.txt",
             "0043194bf11fece83668b5dda8b25f928e0c338f2a60b87fc29e71b39be463e6"));
-        d::need(native_racer50HW::rig_detail::value(wrecks,"vehiclesoundemitter","numsounds")=="4",
-            "50IK original selected wreck count differs");
-        for(unsigned key=1;key<=4;++key)put(AudioBank50HE::PodWreck,key,
+        // wrecks.txt [VehicleSoundEmitter] NumSounds: the file's own count (stock 4); a key past
+        // the native cue catalog is refused by put() before any write.
+        const auto wreckCount=rr::assets::integer158920(
+            native_racer50HW::rig_detail::value(wrecks,"vehiclesoundemitter","numsounds"));
+        d::need(wreckCount>=0&&wreckCount<=64,"50IK wrecks.txt NumSounds unreadable");
+        for(unsigned key=1;key<=unsigned(wreckCount);++key)put(AudioBank50HE::PodWreck,key,
             {native_racer50HW::rig_detail::value(wrecks,"sound"+std::to_string(key),"filename"),false,false,false});
-        const auto counts=native_racer50HW::rig_detail::ini(member(speechPrefix+"sounds.ini",id::speechCountsSha256(*identity)));
-        constexpr const char* keys[]={"numberoflowdamagesounds","numberofwallhitsounds","numberofpassedsounds",
-            "numberofattackedsounds","numberofpassingsounds","numberofattackingsounds",
-            "numberofdeathsounds","numberofwinsounds","numberoflosesounds"};
-        for(unsigned i=0;i<9;++i)d::need(native_racer50HW::rig_detail::value(counts,"indices",keys[i])==
-            std::to_string(expected[i]),"50IK original selected speech count differs");
         next.speech={expected[0],expected[1],expected[2],expected[3],expected[4],expected[5],expected[6],expected[7],expected[8]};
         const auto phy=member(std::string("Pods\\")+identity->podId+"\\"+identity->podId+".phy",identity->phySha256);
         const auto mapping=opponent_audio50HX::detail::readMapping({identity->podId,&phy});
@@ -118,7 +140,9 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
             if(!exists)next.requests.push_back(request);
         }
         std::size_t speechSlots=0;for(const auto count:expected)speechSlots+=count;
-        d::need(authoredSlots==20u+speechSlots,"50IK selected semantic catalog count differs");
+        if(authoredSlots!=20u+speechSlots)   // stock receipt: 20 shared/pod rows + the speech rows
+            std::fprintf(stderr,"common_pod_file pod=%s catalog=%zu stock_layout=%zu receipt=differs\n",
+                identity->podId,authoredSlots,20u+speechSlots);
         out=std::move(next);error.clear();return true;
     }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
     catch(...){try{error="50IK selected original audio preparation failed";}catch(...){}return false;}

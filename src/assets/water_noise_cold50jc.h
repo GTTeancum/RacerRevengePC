@@ -38,9 +38,12 @@ inline bool readWaterNoiseTexture50JC(const std::vector<std::uint8_t>& input,
                   const char* detail) {
         diagnostic={kind,code,offset,detail};return false;
     };
-    if(input.size()!=gcWaterNoiseFileBytes50JC)
-        return fail(DecodeKind48C::unsupported,"water.noise_gc_extent",input.size(),
-            "Only the authenticated1068-byte GC baseDisplacement member is admitted");
+    // The member's size is not a gate (stock GC is gcWaterNoiseFileBytes50JC, a receipt): the
+    // header and the pixel-plane extent below admit it. PORT STAND-IN (flagged): the reader's
+    // fixed 16x16 BGRA32 plane is its capacity; another authored shape is refused by shape.
+    if(input.size()<18u||input.size()>64u*1024u)
+        return fail(DecodeKind48C::unsupported,"water.noise_extent",input.size(),
+            "baseDisplacement member outside the TGA header/extent bound");
     if(input[0]!=0||input[1]!=0||input[2]!=2)
         return fail(DecodeKind48C::unsupported,"water.noise_tga_kind",0,
             "Only original ID-free uncompressed true-color TGA is admitted");

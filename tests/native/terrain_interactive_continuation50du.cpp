@@ -66,6 +66,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "gc_particle_materials50kg_fixture.h"
+#include "stock_course_receipts50cr.h"
 #include "native_gc_other_particle_children50kg_fixture.h" // the water racer's particle children (bindCold)
 #include "original_position_stats_prestage50la.h"
 #include "../../src/game/original_static_model_params50ps.h"
@@ -2286,7 +2287,7 @@ SessionExit50DU Context::run() {
  std::vector<std::uint32_t> staticShadowReceiving;
  {
   rr::game::StaticModelParamsReceipt50PS receipt;std::string error;
-  require50DU(rr::game::applyStaticModelParams50PS(actualWorld,staticShadowReceiving,receipt,error),
+  require50DU(rr::game::applyStaticModelParams50PS(actualWorld,track.documents.tob,staticShadowReceiving,receipt,error),
       error.empty()?"original static-model parameters rejected":error.c_str());
   require50DU(staticShadowReceiving.size()==actualWorld.instances.size(),"static shadow receiver table extent");
   std::cerr<<"shadow_receivers course="<<track.code()<<" instances="<<receipt.instances
@@ -2324,15 +2325,6 @@ SessionExit50DU Context::run() {
  // (05.11 274AE0, track.roles.sky, R6).
  const rr::assets::ResArchive48C* courseArchive=track.archive.decoded();
  require50DU(courseArchive,"race track archive is not decoded");
- long courseSkyCubes=1;
- {
-  const rr::assets::ParameterBlock48F* environment=nullptr;
-  for(const auto& b:actualWorld.parameters.blocks)if(b.name=="environment")environment=&b;
-  if(environment)for(const auto& f:environment->fields){
-   if(f.name=="numberofskycubes"){char* end=nullptr;courseSkyCubes=std::strtol(f.value.c_str(),&end,10);
-    require50DU(!f.value.empty()&&end&&!*end&&courseSkyCubes>=0,"course NumberOfSkyCubes unreadable");}
-  }
- }
  // Late environment storage joins the one race payload ledger.
  // PORT STAND-IN: the race payload ledger (remainingPayloadBytes/
  // reserveAdditionalPayload, formerly MC/GB only) is a host allocation guard for
@@ -2341,15 +2333,15 @@ SessionExit50DU Context::run() {
   require50DU(bytes<=remainingPayloadBytes(),reason);
   reserveAdditionalPayload(bytes,reason);
  };
- auto skyOwner=std::make_unique<sky50gw_fixture::Owner>();
- sky50gw_fixture::Diagnostic skyDiagnostic{};
- if(courseSkyCubes>0){
-  const bool loaded=skyOwner->loadFromCourseData(*courseArchive,actualWorld,skyDiagnostic);
-  require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
-  std::cerr<<"course_sky_data track="<<track.code()<<" cubes="<<courseSkyCubes<<" tiles="<<skyOwner->spans()->size()
-      <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
- }else std::cerr<<"course_sky_data track="<<track.code()<<" cubes=0\n";
+ // The sky is loaded once, by 05.11 (274AE0, common_track_lighting50cr.cpp readSky274AE0):
+ // the zone rows, the cube images (none for a zero-cube track) and the 13E830 clear colour
+ // (World3EC from [Fog], present with zero cubes). The race draws that owner's images; no
+ // second decode with its own NumberOfSkyCubes parse.
  require50DU(static_cast<bool>(track.roles.sky),"race track zone sky selection (274AE0) missing");
+ auto& skyOwner=track.roles.sky->imageStorage();
+ std::cerr<<"course_sky_data track="<<track.code()<<" cubes="<<track.roles.sky->cubeCount()
+     <<" tiles="<<(skyOwner&&skyOwner->spans()?skyOwner->spans()->size():0u)
+     <<" textures="<<(skyOwner&&skyOwner->bank()?skyOwner->bank()->textureCount():0u)<<'\n';
  auto& sourceSkySelection=*track.roles.sky;
  // Borrow the same application Video on each cold race. Local renderer/GPU
  // owners still close before its real host; a later session reopens that host
@@ -2401,6 +2393,16 @@ SessionExit50DU Context::run() {
       " material="+diagnostic.material.field+" error="+std::to_string(static_cast<unsigned>(diagnostic.material.error))+
       " source="+diagnostic.source.code+" bank="+diagnostic.bank.parserMessage;
   require50DU(particleMaterialLoaded,particleMaterialWhy.c_str());
+  {
+   // 1B4DC0 reads the course's own particle\demoprt.pst: the receipt is that course's own
+   // stock SHA-256 (none for an add-on course), log-only.
+   const auto& pst=track.roles.particles->particlePst();
+   const auto* stock=stock_course_receipts50CR::findHash(track.code(),"particles.atlas_pst");
+   const std::string actual=pod_materials50ed_fixture::detail::sha256(pst);
+   std::cerr<<"common_track_data role=particles.atlas_pst course="<<track.code()<<" source=particle"<<char(92)<<"demoprt.pst value="
+       <<pst.size()<<" receipt="<<(!stock?std::string("none"):stock->sha256==actual?std::string("match"):
+          "differs("+std::string(stock->sha256.substr(0,12))+")")<<std::endl;
+  }
   require50DU(particleRender.prepare(*track.roles.particles->particles())==OriginalGcParticleRenderStatus50KG::complete,
       "actual track shared-manager render allocation rejected");
  }

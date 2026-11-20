@@ -43,6 +43,7 @@ class Owner final : public p::VehicleWindowEnvironmentUv50DS {
         std::string member;std::uint32_t surface=0;
         std::vector<math::Vertex> vertices;
         float qPosition=0,qNormal=0;
+        bool worldSpace=false;            // the PSG's own world_space flag (every placement of it)
     };
     struct Placement {                    // one placed environment-mapped surface
         std::size_t source=0;std::array<float,16> matrix{};
@@ -100,7 +101,6 @@ public:
                 const auto& instance=instances[s.worldInstanceIndex];
                 // One distinct raw source per (PSG member, surface).
                 std::size_t k=0;while(k<sources_.size()&&!(sources_[k].member==instance.geometry_member&&sources_[k].surface==s.surfaceIndex))++k;
-                bool worldSpace=false;
                 if(k==sources_.size()){
                     Source src;src.member=instance.geometry_member;src.surface=s.surfaceIndex;
                     common_track50CR::Bytes bytes;common_track50CR::Diagnostic md;
@@ -129,9 +129,12 @@ public:
                     src.vertices.reserve(surface->vertexCount);
                     for(std::uint32_t v=0;v<surface->vertexCount;++v){const auto& rv=raw.vertices[surface->vertexStart+v];
                         src.vertices.push_back({rv.position,rv.normal});}
-                    worldSpace=scene.world_space;
+                    src.worldSpace=scene.world_space;
                     sources_.push_back(std::move(src));
                 }
+                // C9: the flag belongs to the cached source, so a second placement of a
+                // world-space model also takes the identity matrix.
+                const bool worldSpace=sources_[k].worldSpace;
                 need(sources_[k].vertices.size()==s.vertexCount,"environment UV: placement vertex count");
                 Placement placement;placement.source=k;
                 for(unsigned m=0;m<16;++m){

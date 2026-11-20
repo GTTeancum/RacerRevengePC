@@ -147,6 +147,19 @@ public:
         return prepared()&&particles_->removeRestartParticles161F60(pc);
     }
 
+    // 1AA57C World4A0 lent to the pod load 2129C0 / wreck chain 165E90 (every pod, every
+    // course): one borrower at a time, admitted only while prepared and open. close() and
+    // the 160E00 retirement refuse while it is held; the borrower withdraws it itself.
+    bool admitWreckBorrower165E90(const ::ra_source_camera50LA::OwnershipBridge& borrower) noexcept {
+        if(nativeWreckBorrower_||closed_||!prepared())return false;
+        nativeWreckBorrower_=&borrower;return true;
+    }
+    bool withdrawWreckBorrower165E90(const ::ra_source_camera50LA::OwnershipBridge& borrower) noexcept {
+        if(nativeWreckBorrower_!=&borrower)return false;
+        nativeWreckBorrower_=nullptr;return true;
+    }
+    bool wreckBorrowed165E90() const noexcept {return nativeWreckBorrower_!=nullptr;}
+
     // Fresh detached owning-reference cleanup only. Real borrowers must be closed
     // first. Refuse foreign references/links or an attachment lock before any
     // release.1B4E88..98 dispatches slot10; actual3CDE40 is142590. Its
@@ -1181,7 +1194,8 @@ private:
         d={};
         if(resourcesAttempted_)return fail(d,S::alreadyPrepared,resourcesFailurePC_?resourcesFailurePC_:0x161174u);
         if(!prepared()||capacity130_!=5000||depthBucketCount118_!=2500||
-           authenticatedGlowScalar!=128.f||std::fegetround()!=FE_TONEAREST)
+           !std::isfinite(authenticatedGlowScalar)||authenticatedGlowScalar<0.f||authenticatedGlowScalar>255.f||
+           std::fegetround()!=FE_TONEAREST) // GlowScalar is the PRT's own value (stock 128)
             return fail(d,S::input,0x160e00u);
         const auto* child=particles_->auxiliaryChild();
         if(!child||!child->constructed)return fail(d,S::particle,0x160e38u);

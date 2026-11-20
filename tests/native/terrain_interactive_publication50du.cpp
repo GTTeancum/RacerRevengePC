@@ -1032,7 +1032,8 @@ void Context::run() {
   require50DU(!authoredFogSetting||std::string(authoredFogSetting)=="0"||
       std::string(authoredFogSetting)=="1","RR_AUTHORED_WORLD_FOG must be 0 or 1");
   // The sky's clear RGB (274AE0; a track authoring no sky cube still has one).
-  const float* trackClearRgba=skyOwner?skyOwner->clearRgba():nullptr;
+  // 13E830 World3EC, from the 05.11 sky step (track.roles.sky): present with zero cubes (SC).
+  const float* trackClearRgba=sourceSkySelection.clearRgba();
   if(!authoredFogSetting||std::string(authoredFogSetting)=="1"){
    auto& fog=renderRequest.track.worldFog;
    const float* color=trackClearRgba;
@@ -1162,9 +1163,10 @@ void Context::run() {
        actualWorld.instances[span.worldInstanceIndex].zone<=actualWorld.zones.size(),
        "static model zone outside the world's authored zones");
    binding.sourceZone=actualWorld.instances[span.worldInstanceIndex].zone;
-   // An EnvironmentMapCompressed pass draws its projected UVs from the track's
-   // authored animated-texture/material data (one ATM owner, 05.14).
-   require50DU(!binding.sourceEnvironmentMap||roles.atm,"environment-map pass lacks its projection owner");
+   // An EnvironmentMapCompressed pass draws its projected UVs from the track load's
+   // environment-UV producer (renderRequest.track.environmentUv), not from the ATM owner: a
+   // course with environment maps and no ATM is drawn (C8).
+   require50DU(!binding.sourceEnvironmentMap||renderRequest.track.environmentUv,"environment-map pass lacks its projection owner");
    trackBindings.push_back(binding);
   }
   {

@@ -41,7 +41,9 @@ namespace rr::game::original_gc_gameplay_lighting_candidate {
 // counts. PORT STAND-IN (flagged): maximumZones/maximumPortals are allocation
 // ceilings against a corrupt file (stock maxima: SC 30 zones / 34 portals), not
 // sizes and not admission gates; a larger world is refused and logged.
-constexpr std::uint32_t maximumRacers=8, maximumZones=64, maximumPortals=64;
+// 256 = the shared zone-world ceiling (track_runtime_storage50IG::hardZones) the fog (05.05)
+// and sky (05.11) steps also accept, so a 65..256-zone course is not refused at 05.13 only.
+constexpr std::uint32_t maximumRacers=8, maximumZones=256, maximumPortals=256;
 enum class Status : std::uint8_t {
     complete, unprepared, alreadyPrepared, sourceIdentity, sourceShape,
     sourceFields, unsupportedScene, phase, identity, bounds, registration,

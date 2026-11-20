@@ -11,7 +11,7 @@
 // course: two-letter track code, PODnn for a stock pod, or ALL for a value shared by every course/pod.
 // value: integer as pinned; a decimal value is stored as its IEEE-754 double bit pattern and its note
 // starts with "f64:<literal>". SHA-256 pins are in hashReceipts.
-// Rows: 3263 numeric, 1093 hash; 4 text-valued rows stay in the TSV only.
+// Rows: 3263 numeric, 1106 hash; 4 text-valued rows stay in the TSV only.
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -3287,7 +3287,7 @@ inline constexpr std::array<Receipt,3263> receipts{{
  {"ALL","pod_announcer.cues_single_per_named",12ull,"tests\\native\\source_announcer_authoring50ie_fixture.h:121; per named bank"},
 }};
 
-inline constexpr std::array<HashReceipt,1093> hashReceipts{{
+inline constexpr std::array<HashReceipt,1106> hashReceipts{{
  {"TA","archive_sha256","b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8"},
  {"RA","archive_sha256","1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2"},
  {"GC","archive_sha256","69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9"},
@@ -4381,6 +4381,19 @@ inline constexpr std::array<HashReceipt,1093> hashReceipts{{
  {"POD17","pod_announcer.declared.sha256","ff897119ce1d9eba85e7f9b69f1811bd9d182dfb87db6afe3f022442ec6a2398"},
  {"ALL","pod_gen_ann.sha256","24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab"},
  {"ALL","pod_spchpct.sha256","24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c"},
+ {"TA","particles.atlas_pst","08363cd9b2ebb557f2c8c673caa9084f2042721afbb112d5bbc8b5e08a4c49ba"},
+ {"TB","particles.atlas_pst","9266d01d81b65f5be72e15380eaf251d34af713dfa7875cadffaa5eb81c1183a"},
+ {"TC","particles.atlas_pst","9fe4c6d8c9399d50cbfd4b82c4b420b3584ee7af97f5eae4316302c4bd342a9c"},
+ {"SA","particles.atlas_pst","41e8f989e3c5b875be8dd85e38a6dfcb33372fad34eebed62e8134be55b26ff1"},
+ {"SC","particles.atlas_pst","75a36310131d44eb1111c58bd372099b20f6b24cf9846746f5408055a2dcedc9"},
+ {"RA","particles.atlas_pst","e01d9c314d4c8c31e9d1e56cbbf4573e722c3ce1965e1daddfbeb33844b82bb6"},
+ {"RC","particles.atlas_pst","730d836d0decb8c5460b1318ec90ef82d88f342fbd92fc81580c190b5c09f019"},
+ {"MA","particles.atlas_pst","d9506d37883d481d52f917e1d99d4bb57406c0f10191c5e233e91190d282909e"},
+ {"MB","particles.atlas_pst","f5ea0c3c3de3084af5ffb8c46f71f26604b7ebc1a8f6ebc2c25cf670a906a6ba"},
+ {"MC","particles.atlas_pst","027296fc1e953a6a936482bf1f51a6ad91e653bf5c322225e73396a259ed2361"},
+ {"GA","particles.atlas_pst","05256d6b6cfcb5392cc38d4a2d5ce789ef2ea87fa10331d3597105be37b76b6a"},
+ {"GB","particles.atlas_pst","e00d1321525795ed19676514f733ea3b4027925f2b1367afd45b189c4bee2642"},
+ {"GC","particles.atlas_pst","3c454a0bd95c12cd75168ec3da3c4ced43e60e5a1d1c4536ec65583d0350a165"},
 }};
 
 inline constexpr const Receipt* find(std::string_view course, std::string_view role) noexcept {

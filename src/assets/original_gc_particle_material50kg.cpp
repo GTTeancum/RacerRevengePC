@@ -1,4 +1,5 @@
 #include "original_gc_particle_material50kg.h"
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -145,7 +146,11 @@ bool prepareOriginalGcParticleMaterial50KG(const std::vector<std::uint8_t>& byte
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=1;
     try{
-        if(!authenticOriginalGcParticlePsm50KG(bytes))return fail(d,Error::archive,"GC demoprt.psm identity");
+        // The stock PSM identity is a receipt (all 13 stock PSMs are GC's bytes today); the
+        // material is admitted by its own structure below, on every course.
+        if(bytes.empty()||bytes.size()>64u*1024u)return fail(d,Error::archive,"track particle PSM extent");
+        std::fprintf(stderr,"common_particle_psm bytes=%zu receipt=%s\n",
+            bytes.size(),authenticOriginalGcParticlePsm50KG(bytes)?"match":"differs(gc)");
         const auto* inherited=templates.get(OriginalUiTemplate50KG::defaultMt);
         const auto* expectedDefault=defaultMtIdentity();
         if(!templates.loaded()||!inherited||!expectedDefault||inherited->identity!=expectedDefault)
@@ -153,7 +158,7 @@ bool prepareOriginalGcParticleMaterial50KG(const std::vector<std::uint8_t>& byte
         if(!runtime.overrideKnown)return fail(d,Error::templateOwner,"owned particle material runtime",0x248924);
         if(runtime.override435670)return fail(d,Error::unsupportedValue,"435670 override",0x248924);
         Material48E source;DecodeError48C decode;
-        if(!decodeMaterial48E(bytes,source,decode,nullptr,psmIdentity.bytes)){
+        if(!decodeMaterial48E(bytes,source,decode,nullptr,bytes.size())){
             d.document.byteOffset=decode.offset;
             return fail(d,Error::document,"GC demoprt.psm");
         }
@@ -161,9 +166,12 @@ bool prepareOriginalGcParticleMaterial50KG(const std::vector<std::uint8_t>& byte
         const auto& pass=source.passes[0];
         if(pass.pass!=1||pass.microprogram!="ParticleCode"||pass.texture_count_defaulted||pass.textures.size()!=2)
             return fail(d,Error::profile,"GC ParticleCode two contexts",0x2474a0);
+        // Both ParticleCode contexts name the one atlas the course's PRT names (C11: the name
+        // is data, not "demoprt").
         for(unsigned state=0;state<2;++state)
-            if(pass.textures[state].slot!=state+1||pass.textures[state].name!="demoprt")
-                return fail(d,Error::textureName,"GC demoprt context map",0x247338);
+            if(pass.textures[state].slot!=state+1||pass.textures[state].name.empty()||
+               pass.textures[state].name!=pass.textures[0].name)
+                return fail(d,Error::textureName,"track ParticleCode context map",0x247338);
         // Generic PSM lexical decoder preserves only present values here.
         // Its source_offset is the original LINE start, not a value offset;
         // retain that for diagnostics without inventing a UI DAT identity.
@@ -178,8 +186,10 @@ bool prepareOriginalGcParticleMaterial50KG(const std::vector<std::uint8_t>& byte
         if(texture.revision!=1||texture.flags||texture.kind!=1||texture.mips.size()!=1)
             return fail(d,Error::texture,"GC single indexed8 demoprt mip");
         const auto& mip=texture.mips[0];
-        if(mip.width!=128||mip.height!=1024||mip.rgba.size()!=128u*1024u*4u)
-            return fail(d,Error::texture,"GC demoprt128x1024");
+        // The atlas extent is the PST's own (stock 128x1024); PRT frame UVs are normalized.
+        if(!mip.width||!mip.height||mip.width>1024u||mip.height>1024u||
+           mip.rgba.size()!=std::size_t(mip.width)*mip.height*4u)
+            return fail(d,Error::texture,"track particle atlas extent");
         OriginalGcParticleMaterial50KG next;
         next.identity=&psmIdentity;next.textureIdentity=&pstIdentity;next.templateIdentity=inherited->identity;
         for(std::size_t i=3;i<mip.rgba.size();i+=4)

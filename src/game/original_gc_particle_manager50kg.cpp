@@ -191,9 +191,12 @@ bool readFog(const Document& doc,FogDefinition& f) noexcept {
 }
 bool readOriginalGcParticleText50KG(const Bytes& bytes,std::size_t expectedBytes,
     const char* expectedSha256,Document& output) noexcept {
+    // The stock size/digest is a log-only receipt: every pod's and course's EMT/PRT text is
+    // read from its own bytes (C2/C3). Only the reader's byte bound refuses.
+    if(bytes.empty()||bytes.size()>assets::originalUiDatByteLimit50KG)return false;
     if(!expectedSha256||std::strlen(expectedSha256)!=64||bytes.size()!=expectedBytes||
-       expectedBytes>assets::originalUiDatByteLimit50KG||
-       !hashMatches(bytes.data(),bytes.size(),expectedSha256))return false;
+       !hashMatches(bytes.data(),bytes.size(),expectedSha256))
+        std::cerr<<"common_particle_text bytes="<<bytes.size()<<" stock_bytes="<<expectedBytes<<" receipt=differs\n";
     try {Document result;if(!readText(bytes,result))return false;output=std::move(result);return true;}
     catch(...){return false;}
 }
@@ -892,14 +895,12 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepareTrackAtlas160
         // Authenticated MC declares152 frames but Group9 ends at152. Preserve
         // that exact source metadata, not a synthetic153rd frame. frame(152)
         // remains null and real render consumers fail closed before dereference.
-        const bool mcAuthoredEndpoint=prt.size()==10770&&hashMatches(prt.data(),prt.size(),
-            "a92a82d85adea560886fc0e6911baede2f11e9448b9ac4365bf7037e9e809020");
+        // One rule for every PRT (no hash): a LastFrame at or past NumFrames is kept as
+        // authored; frame(n>=NumFrames) is null and consumers fail closed before use.
         for(std::size_t i=0;i<next->groups.size();++i){
             auto& g=next->groups[i];const auto* section=findSection(atlas,"Group"+std::to_string(i));
             if(!integer(section,"TypeID",g.type)||!integer(section,"FirstFrame",g.first)||
-               !integer(section,"LastFrame",g.last)||g.first<0||g.last<g.first||
-               (g.last>=frames&&!(mcAuthoredEndpoint&&frames==152&&groups==10&&
-                 i==9&&g.type==8&&g.first==129&&g.last==152)))
+               !integer(section,"LastFrame",g.last)||g.first<0||g.last<g.first)
                 return Status::authoredData;
         }
         for(std::size_t i=0;i<next->frames.size();++i){

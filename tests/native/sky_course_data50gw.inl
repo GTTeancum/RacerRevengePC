@@ -82,11 +82,12 @@ template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
             for(unsigned i=0;i<9;++i)need(f32(header+44+i*4)==cubSourcePose[i],"CUB authored origin/look/up");
         }
         if(internalCubes>1)std::cerr<<"course_sky_data cub_internal_cubes="<<internalCubes<<" drawn=base\n";
-        const auto& fog=cd::uniqueBlock(world.parameters,"fog","Course sky [Fog]");
-        const auto* rgb=cd::uniqueField(fog,"colorrgb");
-        need(rgb&&rgb->find('\0')==std::string::npos,"Course sky [Fog] ColorRGB missing");
+        // The 13E830 clear colour (World3EC, [Fog] ColorRGB) belongs to the 05.11 sky selection
+        // (original_track_sky50KX::Owner::clearRgba over the tolerant 05.05 fog reader; a track
+        // may author no [Fog]). The image loader does not re-parse [Fog]; its own clearRgba stays
+        // opaque black and nothing draws it.
         auto next=std::make_unique<Storage>();
-        parseFogRgb(rgb->c_str(),next->clearRgba);
+        next->clearRgba={{0.f,0.f,0.f,1.f}};
         next->cubeMember=member;next->cubeBytes=cub.size();next->internalCubes=internalCubes;next->cubeSha256=sha256(cub);
         next->nativeRaProof=std::make_unique<NativeRaSourceProof>();
         auto& proof=*next->nativeRaProof;

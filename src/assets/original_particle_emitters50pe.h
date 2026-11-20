@@ -28,7 +28,7 @@
 // bit-identical. PORT STAND-IN (flagged): text that conversion cannot read is
 // refused instead of being read as a partial value.
 //
-// Storage is ONE capacity (the largest stock table, MC's 40) with a live count;
+// Storage is sized from the authored NumberOfEmitters (guard 4096) with a live count;
 // a TOB that names more emitters than the store holds is refused with a log line
 // before any row is written.
 #include "import_world48f.h"
@@ -40,9 +40,12 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace rr::assets::particle_emitters50PE {
-inline constexpr std::size_t capacity=40;
+// Allocation guard only (stock maximum MC 40): the table is sized from the authored
+// NumberOfEmitters (27DE00 allocates that count); a count above the guard is refused before any write.
+inline constexpr std::size_t capacity=4096;
 enum class Type:std::int32_t {Smoke=0,Dust=1,Spark=2,Fire=8,Explosion=9,Firework=11,Fog=12};
 inline bool validType(std::int32_t t)noexcept{return t==0||t==1||t==2||t==8||t==9||t==11||t==12;}
 enum class Unloaded:std::uint8_t {None,NoFilename,NoInstances,InvalidType};
@@ -58,7 +61,7 @@ struct Emitter {
  bool loaded()const noexcept{return unloaded==Unloaded::None;}
 };
 struct Table {
- std::array<Emitter,capacity> rows{};
+ std::vector<Emitter> rows;   // sized once from NumberOfEmitters
  std::size_t authored=0;   // NumberOfEmitters
  std::size_t live=0;       // found ParticleEmitterN blocks, rows [0,live)
  std::size_t loadedCount=0,attachedCount=0,missing=0;
@@ -122,11 +125,12 @@ inline bool read(const ParameterDocument48F& p,const char* site,Table& out){
  if(authored<0)return refuse("NumberOfEmitters below zero",0);
  if(static_cast<std::size_t>(authored)>capacity)return refuse("NumberOfEmitters exceeds the emitter store capacity",0);
  next.authored=static_cast<std::size_t>(authored);
+ next.rows.assign(next.authored,Emitter{});
  std::string types;
  for(std::size_t i=0;i<next.authored;++i){
   const auto label="particleemitter"+std::to_string(i+1);const auto* b=detail::select(p,label);
   if(!b){++next.missing;std::cerr<<"particle_emitters site="<<s<<" "<<label<<" not defined (skipped, 27DF00)\n";continue;}
-  if(next.live>=capacity)return refuse("emitter rows exceed the store capacity",i+1);
+  if(next.live>=next.rows.size())return refuse("emitter rows exceed the authored count",i+1);
   auto& e=next.rows[next.live];e=Emitter{};e.block=b;e.ordinal=static_cast<std::uint32_t>(i+1);
   if(const auto* v=detail::find(*b,"startingzone"))e.startingZone=detail::integer158B30(*v);
   if(const auto* v=detail::find(*b,"typeid"))e.typeId=detail::integer158B30(*v);

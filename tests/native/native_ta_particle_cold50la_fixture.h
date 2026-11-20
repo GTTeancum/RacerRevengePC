@@ -99,15 +99,16 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     std::vector<std::uint8_t> prt,psm,pst;
     if(inherited){
         require(!addon.particleArchive.empty(),"inherited particle archive unnamed");
-        // readBytes resolves the repository-relative disc path (runtime_asset_paths50LB).
-        const auto inheritedBytes=runtime_startup50fl::readBytes("work/native/project/disc/"+addon.particleArchive);
-        rr::assets::ResArchive48C inheritedArchive;rr::assets::DecodeError48C error;
-        require(rr::assets::decodeResource48C(inheritedBytes,inheritedArchive,error),
-            "inherited particle archive decode rejected");
-        require(rr::assets::extractResMember48C(inheritedArchive,members.prt,prt,error)&&
-            rr::assets::extractResMember48C(inheritedArchive,members.psm,psm,error)&&
-            rr::assets::extractResMember48C(inheritedArchive,members.pst,pst,error),
-            "inherited particle PRT/PSM/PST closure unavailable");
+        // C11: the closure the archive owner already mounted beside the course archive is read
+        // through the provider (the one mounted copy); the stock archive is not read again.
+        const auto mounted=[&](const std::string& name,std::vector<std::uint8_t>& out){
+            Provider::MemberView view;
+            if(provider->lookup132820(name,view)!=Provider::Lookup::present||!view.data||!view.size||
+               view.size>maximumMemberBytes)return false;
+            out.assign(view.data,view.data+view.size);return true;
+        };
+        require(mounted(members.prt,prt)&&mounted(members.psm,psm)&&mounted(members.pst,pst),
+            "inherited particle PRT/PSM/PST closure unavailable in the mounted namespace");
     }else{
         common_track50CR::Diagnostic member;
         require(track.archive.member(members.prt,prt,maximumMemberBytes,member)&&

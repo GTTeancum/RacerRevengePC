@@ -1,4 +1,5 @@
 #include "original_native_list_method_custody50la.h"
+#include "../assets/original_parameter_lookup50cr.h"
 #include <thread>
 #include "../../tests/native/common_track50cr.h"
 #include "original_gc_gameplay_lighting_candidate.h"
@@ -68,10 +69,9 @@ const assets::ParameterBlock48F* block(const assets::ParameterDocument48F& p,con
     for(const auto& b:p.blocks)if(b.name==name){if(found)return nullptr;found=&b;}
     return found;
 }
+// 158240 -> 1583AC: the shared original search (a duplicate resolves as the original does).
 const assets::ParameterField48F* field(const assets::ParameterBlock48F& b,const char* name) noexcept {
-    const assets::ParameterField48F* found=nullptr;
-    for(const auto& f:b.fields)if(f.name==name){if(found)return nullptr;found=&f;}
-    return found;
+    return assets::packedField1583AC(b,name);
 }
 bool textField(const assets::ParameterBlock48F& b,const char* key,const char* text) noexcept {
     const auto* f=field(b,key);return f&&f->value==text;

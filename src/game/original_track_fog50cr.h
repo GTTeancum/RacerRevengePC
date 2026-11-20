@@ -31,6 +31,7 @@
 //          end38 = near54 + vis*(far50-near54), start34 = (1-haz)*(end38-min58),
 //          +60 = 1, renderer(442F70)+28 = +30 (viewport clear colour, 2B4878).
 #include "../assets/import_world48f.h"
+#include "../assets/original_parameter_lookup50cr.h"
 #include "../assets/track_start50ad.h"
 #include "original_camera_start_effects.h"
 #include "original_zone_fog_overlap50cr.h"
@@ -120,11 +121,9 @@ inline bool fogBlock(const assets::ParameterDocument48F& doc,const char* name,
 // 158240 lookup inside the selected block only.
 inline bool fogField(const assets::ParameterBlock48F& b,const char* name,
     const assets::ParameterField48F*& out,FogD50CR& d,std::uint32_t pc,std::uint32_t zone) noexcept {
-    out=nullptr;
-    for(const auto& f:b.fields)if(f.name==name){
-        if(out)return fogFail(d,FogS50CR::duplicateField,pc,f.entry_offset,zone);
-        out=&f;
-    }
+    // 1583AC: the shared original search; a duplicated label resolves as the original does (B8).
+    (void)d;(void)pc;(void)zone;
+    out=assets::packedField1583AC(b,name);
     return true;
 }
 // 158B80 number. Same rule as the Garage DAT reader: an omitted integral zero

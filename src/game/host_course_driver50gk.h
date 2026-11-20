@@ -2,13 +2,16 @@
 #include "track_navigation50eu.h"
 #include "navigation_view50cr.h"
 #include "device_held48y.h"
+#include <vector>
 
 namespace rr::host {
 // HOST-AUTHORED COURSE TEST AID. This is not the original game's AI controller.
 // It reads an actual authored route and canonical body observations, and emits
 // ordinary player input. It cannot mutate vehicle, contact, route or lap state.
+// Sized from the spline's own node count (TB/TC/MB/GB author 257-293), bounded by the
+// common navigation reader's guard game::navigationNodeLimit50ET before any write.
 struct CourseSpeedLimits50GK {
-    float values[game::maxUndertrackNodes50ET]{};
+    std::vector<float> values;
     std::uint32_t count=0;
 };
 enum class CourseDriverStatus50GK : std::uint8_t {

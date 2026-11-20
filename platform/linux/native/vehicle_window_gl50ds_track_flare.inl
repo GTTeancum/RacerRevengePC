@@ -26,7 +26,7 @@ bool VehicleWindowGl50DS::Storage::hasTrackFlareResources() const noexcept {
     }
 
 bool VehicleWindowGl50DS::Storage::createTrackFlares() noexcept {
-        trackFlareCount=0;trackFlareImage.clear();trackFlareVertices.clear();trackFlareFrameRows.clear();
+        trackFlareCount=0;trackFlareImage.clear();trackFlareDepthWrite.clear();trackFlareVertices.clear();trackFlareFrameRows.clear();
         // Frontend, viewer and host-check routes supply no race track; a track
         // whose lights author no flare has no rows. Neither is a refusal.
         if(!request.commonTrack||!request.commonTrack->roles.lights)return true;
@@ -64,6 +64,7 @@ bool VehicleWindowGl50DS::Storage::createTrackFlares() noexcept {
             std::vector<std::vector<std::uint8_t>> rrtex(names.size());
             std::vector<U> nameImage(names.size(),trackFlareUnresolved);
             std::vector<assets::MaterialTextureAssetInput50EA> inputs;
+            std::vector<std::uint8_t> nameDepthWrite(names.size(),0);
             std::size_t rgbaBytes=0;U images=0;
             for(std::size_t n=0;n<names.size();++n){
                 const auto refuse=[&](const char* why,const std::string& detail){
@@ -76,27 +77,55 @@ bool VehicleWindowGl50DS::Storage::createTrackFlares() noexcept {
                 for(const auto& pass:material.passes)if(pass.pass==1)
                     for(const auto& t:pass.textures)if(t.slot==1&&!t.name.empty())map=&t;
                 if(!map){refuse("material_map","ShaderPass_1 TextureMap_1 absent");continue;}
-                std::string mapName=map->name;
-                for(char& c:mapName)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');
-                if(!track.archive.member("textures\\"+mapName+".pst",pst,4u*1024u*1024u,md)){refuse("texture",md.reason);continue;}
-                assets::Texture48E decoded;
-                if(!assets::decodeTexture48E(pst,decoded,decode)||decoded.mips.empty()||decoded.base_rrtex.empty()){
-                    refuse("texture_decode",decode.code);continue;}
-                const auto& base=decoded.mips.back();
-                const std::size_t bytes=std::size_t(base.width)*base.height*4u;
-                if(!base.width||!base.height||base.width>1024u||base.height>1024u||base.rgba.size()!=bytes){
-                    refuse("texture_extent",mapName);continue;}
+                // The pass's own fields: animatedMapInitialFrame (ATM frame) and zWriteDisabled
+                // (depth write, as the world's material_alpha policy takes it: 0 = write).
+                const assets::MaterialPass48E* pass1=nullptr;
+                for(const auto& pass:material.passes)if(pass.pass==1)pass1=&pass;
+                const auto passField=[&](const char* wanted)->const std::string*{
+                    if(!pass1)return nullptr;
+                    for(const auto& f:pass1->fields.authored){
+                        if(f.name.size()!=std::strlen(wanted))continue;bool same=true;
+                        for(std::size_t k=0;k<f.name.size()&&same;++k){char x=f.name[k],y=wanted[k];
+                            if(x>='A'&&x<='Z')x=static_cast<char>(x-'A'+'a');if(y>='A'&&y<='Z')y=static_cast<char>(y-'A'+'a');same=x==y;}
+                        if(same)return &f.value;}
+                    return nullptr;};
+                std::uint32_t frame=0;
+                if(const auto* text=passField("animatedMapInitialFrame")){
+                    char* end=nullptr;const long v=std::strtol(text->c_str(),&end,10);
+                    if(!end||*end||v<0||v>=64){refuse("material_frame",*text);continue;}
+                    frame=static_cast<std::uint32_t>(v);}
+                bool depthWrite=false;
+                if(const auto* text=passField("zWriteDisabled"))depthWrite=std::strtol(text->c_str(),nullptr,10)==0;
+                // 24DADC: the request's last dot is replaced by .pst; then the one static-world
+                // texture reader's candidate order (single_pass_world50lm_cold.cpp): .pst, .tga,
+                // .atm (GB gam_flare_c is an ATM). .ipu is not decodable and not tried (C17).
+                const auto candidate=assets::detail::originalPstCandidate24DADC(map->name);
+                std::string stem=candidate.substr(0,candidate.find_last_of('.'));
+                for(char& c:stem)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');
+                std::string member;
+                for(const char* extension:{".pst",".tga",".atm"}){
+                    const auto name="textures\\"+stem+extension;
+                    if(track.archive.exists(name)){member=name;break;}}
+                if(member.empty()){refuse("texture","no .pst/.tga/.atm member for "+stem);continue;}
+                if(!track.archive.member(member,pst,4u*1024u*1024u,md)){refuse("texture",md.reason);continue;}
+                std::string key=member;for(char& c:key){if(c=='\\')c='/';if(c>='a'&&c<='z')c=static_cast<char>(c-'a'+'A');}
+                course_world_texture50ST::Shape shape;std::vector<std::uint8_t> image;
+                try{image=course_world_texture50ST::decode("track_flare",key,pst,frame,shape,decode);}
+                catch(const std::exception& e){refuse("texture_decode",e.what());continue;}
+                const std::size_t bytes=std::size_t(shape.width)*shape.height*4u;
+                if(!shape.width||!shape.height||shape.width>1024u||shape.height>1024u||image.size()<16){
+                    refuse("texture_extent",member);continue;}
                 if(bytes>trackFlareImageBytes-rgbaBytes)
                     return fail(*diagnostic,VehicleWindowError50DS::limits,"track flare images exceed the RGBA guard");
-                rgbaBytes+=bytes;rrtex[n]=std::move(decoded.base_rrtex);
+                rgbaBytes+=bytes;rrtex[n]=std::move(image);nameDepthWrite[n]=depthWrite?1u:0u;
                 nameImage[n]=images++;
-                std::fprintf(stderr,"track_flare_image name=%s map=%s width=%u height=%u program=%s\n",names[n].c_str(),
-                    mapName.c_str(),unsigned(base.width),unsigned(base.height),
-                    material.passes.empty()?"":material.passes.front().microprogram.c_str());
+                std::fprintf(stderr,"track_flare_image name=%s map=%s member=%s frame=%u width=%u height=%u depth_write=%d program=%s\n",
+                    names[n].c_str(),stem.c_str(),member.c_str(),unsigned(frame),unsigned(shape.width),unsigned(shape.height),
+                    depthWrite?1:0,material.passes.empty()?"":material.passes.front().microprogram.c_str());
             }
-            inputs.reserve(images);
-            for(std::size_t n=0;n<names.size();++n)if(nameImage[n]!=trackFlareUnresolved)
-                inputs.push_back({std::uint64_t(nameImage[n])+1u,&rrtex[n]});
+            inputs.reserve(images);trackFlareDepthWrite.assign(images,0);
+            for(std::size_t n=0;n<names.size();++n)if(nameImage[n]!=trackFlareUnresolved){
+                inputs.push_back({std::uint64_t(nameImage[n])+1u,&rrtex[n]});trackFlareDepthWrite[nameImage[n]]=nameDepthWrite[n];}
             std::size_t unresolved=0;
             for(std::size_t i=0;i<flares.size();++i){
                 if(rowName[i]!=trackFlareUnresolved)trackFlareImage[i]=nameImage[rowName[i]];
@@ -260,6 +289,8 @@ bool VehicleWindowGl50DS::Storage::drawTrackFlares() noexcept {
                 const auto* asset=trackFlareTextures.asset(image);
                 if(!asset||!asset->name){accepted=fail(*diagnostic,VehicleWindowError50DS::material,"track flare image missing");break;}
                 gl.bindTexture(texture2D,asset->name);boundImage=image;
+                // Depth write from the flare's own material pass (B9): RA flare1 writes, SA/MA/MB/GB do not.
+                gl.depthMask(image<trackFlareDepthWrite.size()&&trackFlareDepthWrite[image]?1:0);
             }
             bindTrackZoneScissor(flares[row].zone);
             drawGl.drawElementsBaseVertex(0x0004,6,0x1405,reinterpret_cast<const void*>(std::uintptr_t(n)*6u*sizeof(U)),0);

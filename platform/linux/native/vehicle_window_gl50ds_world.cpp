@@ -3,6 +3,8 @@
 #include "../../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "../../../src/game/original_light_flash50cr.h"
 #include "../../../src/assets/import_texture48e.h"
+#include "../../../src/assets/original_texture_candidate50tc.h"
+#include "../../../tests/native/course_world_texture50st.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

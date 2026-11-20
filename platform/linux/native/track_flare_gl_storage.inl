@@ -19,6 +19,7 @@ MaterialTextureGl50EB trackFlareTextures;              // one bank: one image pe
 assets::MaterialTextureAssets50EA trackFlarePixels;    // its CPU bank (publication receipt)
 std::uint64_t trackFlarePublication=0;
 std::vector<U> trackFlareImage;                         // per cold row: bank index, or unresolved
+std::vector<std::uint8_t> trackFlareDepthWrite;          // per bank image: its PSM pass-1 zWriteDisabled==0
 std::size_t trackFlareCount=0;                          // cold trackFlares().size()
 U trackFlareVertexBuffer=0,trackFlareIndexBuffer=0,trackFlareVertexArray=0;
 std::vector<assets::Vertex48B> trackFlareVertices;      // 4 per cold row, rebuilt each frame
