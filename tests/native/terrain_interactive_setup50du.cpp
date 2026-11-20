@@ -23,6 +23,8 @@
 #include "positional_sound_rows50sr.h"            // R7: track.roles.sounds
 #include "material_audio_provider50hi_fixture.h"  // R7: track.roles.audio
 #include "native_results_world_stop26d070.h"
+#include "original_disc_effects50lb.h"            // the six shared pod effect files (EMT)
+#include "effect_cold50bj.h"                      // buildEffectControlOwner50BJ
 #include "gc_gate_audio50in_fixture.h"            // triggerAudio: the one PodSound voice (shared kernel)
 #include "original_follow_query_bridge50kx.h"     // the one Follow bridge (B-C18)
 #include "native_spring_detector_policy50la.h"
@@ -565,10 +567,6 @@ SessionExit50DU Context::run() {
       context->music->requestFade1A4AB0(seconds).completed();
  };
  std::unique_ptr<race_mode1_host50ID::Owner> mode1;
- // PORT STAND-IN (W0 request): the continuation/frame contexts still carry a
- // unique_ptr material provider; the one provider is track.roles.audio (05.12).
- // This empty owner is passed until the context member borrows the role.
- std::unique_ptr<material_audio50HI::Provider> materialAudio;
  // This owner dies before the live mixer/shared boost PCM and owns96..116.
  auto opponentAudio=std::make_unique<opponent_audio50HX::Owner>();
  auto originalAiAudio=std::make_unique<native_original_ai_audio::Owner>();
@@ -1161,8 +1159,8 @@ SessionExit50DU Context::run() {
    }
   }
   if(auto borrow=track.roles.collision->borrow()){
-   if(const auto* actions=borrow.actions();actions&&actions->nativeGroup().dispatches!=reportedTriggerDispatches){
-    reportedTriggerDispatches=actions->nativeGroup().dispatches;
+   if(const auto* actions=borrow.actions();actions&&actions->nativeGroup()&&actions->nativeGroup()->dispatches!=reportedTriggerDispatches){
+    reportedTriggerDispatches=actions->nativeGroup()->dispatches;
     std::cerr<<"TRIGGER WORLD ACTION: dispatches="<<reportedTriggerDispatches
         <<" opening_active="<<(trackAnimations&&trackAnimations->rowCount()&&!trackAnimations->state(0).active90.empty()?
             int(trackAnimations->state(0).active90[0]):-1)
@@ -2057,7 +2055,9 @@ SessionExit50DU Context::run() {
  // The one race start (1A6AA0 fresh, 1AC8E0 restart) and the one end dispatch
  // (1A7DD0) of this race, for every course; publication binds them to the
  // counted race (common_race_start50cr.h, common_race_end50cr.h).
- common_race_start50CR::Owner raceStart{originalMainApplication};
+ // The Application holds a weak handle (bindRaceStart50CR), so the owner is shared.
+ const auto raceStartOwner=std::make_shared<common_race_start50CR::Owner>(originalMainApplication);
+ auto& raceStart=*raceStartOwner;
  common_race_end50CR::Owner raceEnd{originalMainApplication};
  // Continue synchronously: suffix-owned Bank/window/gameplay resources retire
  // before these prefix locals, including on exceptional unwind.
@@ -2067,6 +2067,7 @@ SessionExit50DU Context::run() {
   .roster=roster,
   .raceStart=raceStart,
   .raceEnd=raceEnd,
+  .raceStartOwner=raceStartOwner,
   .acceptLiveQueryCall=interactive_frame50DU::BorrowedCall<bool(const rr::game::VehicleLiveQueryResult50EQ&,rr::game::Type2StaticQuery49X&,const rr::game::LiveZoneMembership50EN&,std::uint64_t&,const char*)>{acceptLiveQuery},
   .actualHeight=actualHeight,
   .actualWorld=actualWorld,
@@ -2243,7 +2244,7 @@ SessionExit50DU Context::run() {
   .mainMembershipStorage=mainMembershipStorage,
   .mainQueryRef=mainQueryRef,
   .managerRuntimeSelection=managerRuntimeSelection,
-  .materialAudio=materialAudio,
+  .materialAudio=track.roles.audio,  // the one material provider (05.12)
   .materialOwner=materialOwner,
   .waterUpdateSequence=waterUpdateSequence,
   .membershipWork=membershipWork,

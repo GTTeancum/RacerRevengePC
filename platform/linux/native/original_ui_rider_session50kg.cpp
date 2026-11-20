@@ -793,8 +793,7 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
     if((cold.requestedTraversalRiders&~hiddenTraversalMask)||
        !game::originalUiRiderPreviewRequest50KG(cold.previewSet,cold.requestedPreviewRiders,requested))
         return result(d,Status::invalidInput);
-    const bool gasgano=(cold.profile&&cold.profile->gasganoTestProfile())||
-        game::originalUiRiderRequested50KG(requested,7);
+    const bool gasgano=game::originalUiRiderRequested50KG(requested,7);
     const auto population=(cold.prepareCleggLockedPreview||game::originalUiRiderRequested50KG(requested,3))?
         (gasgano?game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview:
                   game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview):
@@ -843,8 +842,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
     if(cold.previewSet==game::OriginalUiRiderPreviewSet50KG::gasgano7&&!gasgano)
         return result(d,Status::invalidInput);
     // Resource opt-in never changes the actual profile or source Confirm rules.
-    if(gasgano&&!gasganoPreview&&
-       (!cold.profile||!cold.profile->gasganoTestProfile()))return result(d,Status::invalidInput);
+    if(gasgano&&!gasganoPreview)return result(d,Status::invalidInput);
     const bool fromMain=cold.previousScreen==4&&cold.predecessorResources&&
         !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&!cold.predecessorTournament&&
         cold.predecessorResources->loaded()&&cold.predecessorResources->materials()&&cold.predecessorResources->particleMaterial();

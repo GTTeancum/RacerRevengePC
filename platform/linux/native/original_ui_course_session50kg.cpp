@@ -60,12 +60,6 @@ AcceptedAddonAnchor147 acceptedAddonAnchor147;
 }
 struct OriginalUiCourseSession50KG::Storage {
     OriginalUiCourseSessionCold50KG cold;OriginalUiCourseSessionSnapshot50KG state{};D faultDetail{};
-    bool sebulbaTbTest=false;
-    bool kraidGbTest=false;
-    bool youngAnakinMcTest=false;
-    bool scorchRcTest=false;
-    bool tzidikTcTest=false;
-    bool gasganoScTest=false; // Captured from the retained owner at bind.
     OriginalUiCourseDrawContribution50KG collector;
     game::OriginalUiCourseSelectionData50KG selection;
     game::OriginalUiCoursePageDraw50KG page;
@@ -262,8 +256,6 @@ struct OriginalUiCourseSession50KG::Storage {
         const auto* w=cold.resources->widgets();
         return w&&w->popupClones438()&&w->popupTemplatesHidden438()&&!w->popupEnabled438();
     }
-    bool testProfileCurrent(const game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
-        return p.youngAnakinMcTest==youngAnakinMcTest&&p.youngAnakinMcTest==cold.profile->youngAnakinMcTestProfile()&&p.kraidGbTest==kraidGbTest&&p.kraidGbTest==cold.profile->kraidGbTestProfile()&&p.sebulbaTbTest==sebulbaTbTest&&p.sebulbaTbTest==cold.profile->sebulbaTbTestProfile()&&p.scorchRcTest==scorchRcTest&&p.scorchRcTest==cold.profile->scorchRcTestProfile()&&p.tzidikTcTest==tzidikTcTest&&p.tzidikTcTest==cold.profile->tzidikTcTestProfile()&&p.gasganoScTest==gasganoScTest&&p.gasganoScTest==cold.profile->gasganoScTestProfile();}
     bool resumableTournamentProfile(OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& c,
         game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
         constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
@@ -271,14 +263,14 @@ struct OriginalUiCourseSession50KG::Storage {
         if(!cold.profile->selectedTournamentCourseSnapshot(c,p)||!p.ownerReady||p.mode34!=2||cold.commonProfile->mode34!=2||
            !cold.profile->courseRiderSelectionSnapshot(rider)||rider.rider!=c.career100C0||(c.progress219C&31u)>=13u||((c.cardFlag100BC||p.cardFlag100BC)&&!c.nativeBetaStorage)||
            ((cold.commonProfile->playerBits1125C>>5)&3)!=1||p.courseOrder100C4!=order||
-           !sameStamp(c.stamp,cold.profile->stamp())||!testProfileCurrent(p))return false;
+           !sameStamp(c.stamp,cold.profile->stamp()))return false;
         for(auto medal:c.medals1938)if(medal>8)return false;
         return true;
     }
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
         const bool valid=state.mode34==2?resumableTournamentProfile(c,p):
-            cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&testProfileCurrent(p);
+            cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile);
         return valid&&(!entered||sameStamp(cold.profile->stamp(),liveStamp))&&
             (!entered||(p.packed1125E>>5)==state.selectedPlanet40);
     }
@@ -332,7 +324,7 @@ struct OriginalUiCourseSession50KG::Storage {
     bool widgetProfile(game::OriginalUiCourseWidgetProfile50KG& out)const noexcept{
         game::OriginalUiCourseRememberedProfile50KG p;OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
         if(state.mode34==2){if(!resumableTournamentProfile(c,p))return false;}
-        else if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile)||!testProfileCurrent(p))return false;
+        else if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile))return false;
         out={};
         if(state.mode34==2){
             game::OriginalUiCourseEntryPrefix50KG e;game::OriginalUiCourseMode2EntryPlan50KG m;
@@ -343,7 +335,7 @@ struct OriginalUiCourseSession50KG::Storage {
             out.selectedRider=rider.rider;out.selectedUnlock10FAC=rider.unlock10FAC;
             out.courseSlot14E4=m.courseSlot14E4;out.tier14E8=m.tier14E8;
         }
-        out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
+        out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
         out.nativeBetaStorage=p.nativeBetaStorage;out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
     }
@@ -506,12 +498,6 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         return result(d,S::audio,0x1DA924);
     try{
         auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();s->state.mode34=tournament?2u:0u;
-        s->gasganoScTest=cold.profile->gasganoScTestProfile();
-        s->tzidikTcTest=cold.profile->tzidikTcTestProfile();
-        s->scorchRcTest=cold.profile->scorchRcTestProfile();
-        s->sebulbaTbTest=cold.profile->sebulbaTbTestProfile();
-        s->kraidGbTest=cold.profile->kraidGbTestProfile();
-        s->youngAnakinMcTest=cold.profile->youngAnakinMcTestProfile();
         if(!s->processCurrent()||!s->profileCurrent()||s->coldStamp.generation>std::numeric_limits<std::uint64_t>::max()-2)return result(d,S::profile);
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
         game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
@@ -855,7 +841,7 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
            !sameStamp(stamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::profile,0x1DF0B4);
     }else if(s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
         stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=0||!s->cold.profile->courseSnapshot(profile)||
-        !bounded(profile,*s->cold.commonProfile)||!s->testProfileCurrent(profile)||profile.course700!=s->pendingContext.courseSlot14E4||
+        !bounded(profile,*s->cold.commonProfile)||profile.course700!=s->pendingContext.courseSlot14E4||
         profile.laps704!=s->pendingContext.laps14EC||profile.entrants708!=s->pendingContext.entrants14F0||profile.subtype70C!=s->pendingContext.subtypeSlot14F4)
         return result(d,S::profile,0x1DEFCC);
     s->cpuDrain();s->liveStamp=stamp;s->state.backProposalPending=false;s->state.backAccepted=!launch;s->state.launchAccepted=launch;

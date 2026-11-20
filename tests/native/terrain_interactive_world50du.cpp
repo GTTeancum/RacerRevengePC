@@ -383,6 +383,10 @@ SessionExit50DU Context::run() {
   require50DU(audioPrepared,error.empty()?"shared audio preparation rejected":error.c_str());
   liveAudioPrepared=true;preparedAudioRoot=audioRoot;
  }
+ // Step 11 (1AF330, 2C2B50, 2C4B30): the speech banks are loaded by the shared live
+ // audio prepare above (once per process; a retained prepare keeps its banks).
+ clog::load(clog::Step::speech1AF330,liveAudioPrepared,liveAudioPrepared?1u:0u,
+     liveAudioPrepared?std::string_view{}:std::string_view{"live audio not prepared"});
  auto* audioMixer=liveAudio->mixerForMaterialOwner();auto* audioGroups=liveAudio->groupsForProviders();
  require50DU(audioMixer&&audioGroups&&audioGroups->uses(*audioMixer),"shared mixer/groups unavailable");
 
@@ -393,9 +397,9 @@ SessionExit50DU Context::run() {
  coldLoadDiagnostics.begin("track_load");
  {
   const ct::LoadInputs inputs{
-   .application=originalMainApplication,
-   .race=*race,
-   .world=*race->world74(),
+   .application=&originalMainApplication,
+   .race=race.get(),
+   .world=race->world74(),
    .entities=originalMainApplication.entities(),
    .materials382B38=materialDomain->materials382B38(),
    .mixer=audioMixer,
@@ -420,7 +424,7 @@ SessionExit50DU Context::run() {
  // ---- Step 08: both splines (2A1160/2A1260), node counts from the files.
  {
   ct::Diagnostic d;
-  const bool read=ct::readNavigation2A1260(*trackOwner,d); // logs its own common_load step=08
+  const bool read=ct::readNavigation2A1260(*trackOwner,s.animationShared.libm,d); // logs its own common_load step=08
   require50DU(read,d.reason.empty()?"navigation 2A1260 refused":d.reason.c_str());
  }
  const auto trackCollision=track.roles.collision;
@@ -504,10 +508,21 @@ SessionExit50DU Context::run() {
       trackAnimationBindingDiagnostic.message.empty()?"track animation visual prefix rejected":trackAnimationBindingDiagnostic.message.c_str());
  }
  {
+  // The one trigger action owner's source half (274E90 rows over the one group,
+  // LostAI targets against the step-08 AI spline's node count) is prepared before
+  // the collision world takes it: prepareStorage reads its live rows and bounds.
+  // Its destinations (PodSound voice, Sound, Particles, LostAI Reset) are bound in
+  // the cold contacts once their owners exist, before the racer identities.
+  if(const auto& actions=track.roles.triggerActions){
+   const ct::NavigationView splineAi=ct::navigationView(track,ct::NavigationRole::ai);
+   require50DU(actions->prepareSource(track.roles.triggerSource,track.roles.triggers,
+       static_cast<std::uint32_t>(splineAi.count()),trackAnimations),"trigger action source preparation rejected");
+  }
   track_collision_world50CR::StorageRequest request{};
   request.application=originalMainApplication.entities();
-  request.triggerSource=track.roles.triggerSource.get();
-  request.triggers=track.roles.triggers.get();
+  // Same pointer as Track::roles.triggerActions (W0 round 2, I2 item 2): the
+  // collision world holds it and closes it at retirement.
+  request.actions=track.roles.triggerActions;
   request.animations=trackAnimations;
   request.names.firstIdentity=0x10000000u; // Explicit collision-object native namespace.
   request.names.collisionTypeTag=query.collisionTypeTag;request.names.groupTypeTag=query.groupTypeTag;

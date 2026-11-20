@@ -374,6 +374,21 @@ bool OriginalSimpleVCR50LA::reset287BE0(OriginalSimpleVCRDiagnostic50LA& d)noexc
         return Impl::stop(d,0x287be0,"Actual initialized SimpleVCR owner absent");
     impl_->reset();d.sourcePC=0x287c70;return true;
 }
+bool OriginalSimpleVCR50LA::clear287B60(OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
+        return Impl::stop(d,0x287b60,"Actual initialized SimpleVCR owner absent");
+    auto& p=*impl_;
+    //287B64 ANDI t2,zero,1 yields ZERO: five ordered bit clears, bit0/4/6 untouched.
+    constexpr std::uint8_t masks[]={0x20,0x02,0x04,0x08,0x80};
+    for(const auto mask:masks)p.setBit(mask,false);
+    p.reset(); //287BD8 tail jump 287BE0.
+    d.sourcePC=0x287c70;return true;
+}
+bool OriginalSimpleVCR50LA::setRecordBit1ACDE0(OriginalSimpleVCRDiagnostic50LA& d)noexcept {
+    d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
+        return Impl::stop(d,0x1acdd4,"Actual initialized SimpleVCR owner absent");
+    impl_->setBit(0x02u,true);d.sourcePC=0x1acde0;return true;
+}
 bool OriginalSimpleVCR50LA::copyBackup288630(OriginalSimpleVCRDiagnostic50LA& d)noexcept {
     d={};if(!impl_||!impl_->current()||!impl_->setupComplete)
         return Impl::stop(d,0x288630,"Actual initialized SimpleVCR owner absent");

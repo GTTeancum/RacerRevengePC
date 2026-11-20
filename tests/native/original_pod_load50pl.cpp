@@ -1,13 +1,18 @@
 // PodLoad: the original per-racer pod load 2129C0 (210770 caller), run for
 // every slot in the 1AE280 manager order, on every course that reaches it.
 // D:\Programming\GitHub\RacerRevengePC\work\scratch\pod-load-all\PLAN.md 3.1/3.2.
-// Track-side inputs come only through original_pod_load50pl.h.
+// Track-side inputs come only through original_pod_load50pl.h, backed by the
+// race's one common Track (common rewrite, area C: RA's scene owner is retired).
 #include "original_camera_session50kx.h"
-#include "original_race_world_join50la.h"
-#include "ra_cold_aggregate50la.h"
 #include "ra_fresh_execution_arena50la.h"
+#include "original_race_constructor50la.h"
+#include "common_race_world50cr.h"
+#include "common_track50cr.h"
+#include "track_collision_world50cr.h"
 #include "original_pod_load50pl.h"
 #include "../../src/game/original_native_collision_categories.h"
+#include "../../src/game/original_gc_gameplay_lighting_candidate.h"
+#include <exception>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -15,61 +20,129 @@
 #include <string>
 
 namespace original_pod_load50PL {
-// Provider backed by the track's source scene owner (its source-loaded 4C0/4C4
-// search nodes and World4A0 particle owner). One implementation per kind of
-// track data, chosen by what the loaded track owns, not by course name.
+// Provider over the race's one Track, for every course (same code, the data differs):
+//  4C4[0] = the collision world's one Storage (track.roles.storage: its LiveZoneWorld50EN and
+//           ZoneLifecycle50CL), zone 0 of the SCB zones;
+//  4C0[0] = the lighting owner's visibility world (track.roles.lights), zone 0;
+//  World4A0 = track.roles.particles; Race70 = track.roles.water (nullptr = NONE).
+// One borrower at a time; the borrow is released before the bridge closes, and the bridge's
+// collision-world borrow keeps the Storage alive meanwhile (Track::release closes it later).
 class SceneTrackData50PL final : public TrackDataProvider50PL {
 public:
-    SceneTrackData50PL(ra_pod_scene50LA::Owner& scene,const void* water)noexcept:scene_(scene),water_(water){}
+    SceneTrackData50PL(const common_track50CR::Track& track,const std::string* particleDirectory36B530)noexcept
+        :track_(track),directory_(particleDirectory36B530){}
     bool retainWreckZones(ra_source_camera50LA::OwnershipBridge& borrower,std::uint64_t generation,
         rr::game::OriginalWreckSetupZones50LA& zones,ZoneRef50PL& visibility,ZoneRef50PL& collision)noexcept override {
-        if(borrower.nativeWreckZoneOwner_)return false;
-        rr::game::CollectionRef50BX v=0,c=0;
-        if(!borrower.podSceneRetainZones(scene_,generation,zones,v,c))return false;
-        visibility=v;collision=c;borrower.nativeWreckZoneOwner_=&scene_;return true;
+        if(borrower.nativeWreckZoneOwner_||borrower_||!generation)return false;
+        auto* world=track_.roles.collision.get();auto* storage=track_.roles.storage.get();
+        if(!world||!storage||!world->queryReady()||track_.documents.world.zones.empty()||
+           !storage->world.zoneCount||!storage->lifecycle.zoneCount)return false;
+        auto* visibility4C0=borrower.podTrackRetainVisibility(track_);
+        if(!visibility4C0){
+            std::fprintf(stderr,"pod_load_track_zones_refused reason=visibility4C0");std::fputc(10,stderr);
+            return false;
+        }
+        if(&visibility4C0->lifecycle==&storage->lifecycle||!visibility4C0->lifecycle.zoneCount||
+           !visibility4C0->portals.zoneCount){
+            if(!borrower.podTrackReleaseVisibility(track_))std::terminate(); //Never strand the lent rows.
+            return false;
+        }
+        // Native registry refs encode SearchNode.ordinal48+1; 4C0[0]/4C4[0] are zone 0.
+        visibility=1u;collision=1u;
+        zones.visibility4C0=visibility4C0;zones.visibilityZoneField=&visibility;
+        zones.collision4C4=&storage->world;zones.collisionLifecycle=&storage->lifecycle;
+        zones.collisionZoneField=&collision;
+        zones.nativeVisibilityNode=&visibilityNode_;zones.nativeCollisionNode=&collisionNode_;
+        borrower_=&borrower;generation_=generation;borrower.nativeWreckZoneOwner_=this;return true;
     }
     bool releaseWreckZones(ra_source_camera50LA::OwnershipBridge& borrower)noexcept override {
-        if(borrower.nativeWreckZoneOwner_!=&scene_)return false;
-        if(!borrower.podSceneReleaseZones(scene_))return false;
-        borrower.nativeWreckZoneOwner_=nullptr;return true;
+        if(borrower_!=&borrower||borrower.nativeWreckZoneOwner_!=this)return false;
+        // The caller has retired every piece/query borrower first; the particle
+        // borrow (if any) ends with the zone borrow, as 1AE4B0's pair does.
+        if(borrower.nativeWreckParticles_&&!borrower.podTrackReleaseParticles(*borrower.nativeWreckParticles_))return false;
+        if(!borrower.podTrackReleaseVisibility(track_))return false;
+        borrower_=nullptr;generation_=0;borrower.nativeWreckZoneOwner_=nullptr;return true;
     }
     bool retainWreckParticles(ra_source_camera50LA::OwnershipBridge& borrower,
         rr::game::OriginalTrackParticleCold50LA* actual4A0)noexcept override {
-        return borrower.podSceneRetainParticles(scene_,actual4A0);
+        if(borrower_!=&borrower||borrower.nativeWreckZoneOwner_!=this||!actual4A0||
+           actual4A0!=track_.roles.particles.get()||!actual4A0->prepared())return false;
+        return borrower.podTrackRetainParticles(*actual4A0);
     }
-    const void* water3FC()const noexcept override{return water_;}
+    const void* water3FC()const noexcept override{return track_.roles.water.get();}
+    bool zonesHeldBy(const ra_source_camera50LA::OwnershipBridge& borrower,
+        const void* visibilityNode,const void* collisionNode)const noexcept override {
+        return borrower_==&borrower&&generation_&&visibilityNode==&visibilityNode_&&
+            collisionNode==&collisionNode_&&track_.roles.collision&&track_.roles.collision->queryReady()&&
+            track_.roles.storage;
+    }
+    rr::game::OriginalTrackParticleCold50LA* particles4A0()const noexcept override{return track_.roles.particles.get();}
+    const std::string* particleDirectory36B530()const noexcept override{return directory_;}
+    const common_track50CR::Track& track()const noexcept{return track_;}
 private:
-    ra_pod_scene50LA::Owner& scene_;
-    const void* water_=nullptr;
+    const common_track50CR::Track& track_;
+    const std::string* directory_=nullptr;
+    const ra_source_camera50LA::OwnershipBridge* borrower_=nullptr;
+    std::uint64_t generation_=0;
+    // PORT STAND-IN: host identities for the incoming 4C0[0]/4C4[0] search-node arguments
+    // (165EC8/165ED0 keep them as identities only); the common track has no SearchNode entity.
+    struct Node final {std::uint32_t ordinal48=0;};
+    Node visibilityNode_{},collisionNode_{};
 };
 }
 
 namespace ra_source_camera50LA {
 namespace g=rr::game;
 
-// The loaded track's source scene owner supplies its own 4C0/4C4, 4A0 and
-// Race70 water through the provider; nothing here is course-specific.
-bool OwnershipBridge::loadPodRosterFromScene2129C0(original_camera_session50KX::Session& session,
-    const g::OriginalRaceConstructor50LA& race,::ra_pod_scene50LA::Owner& scene,const void* water3FC,
+// The race's one Track supplies its own 4C0/4C4, 4A0 and Race70 water through
+// the provider; nothing here is course-specific.
+bool OwnershipBridge::bindTrackDataProvider(const common_track50CR::Track& track,
+    const std::string* particleDirectory36B530)noexcept {
+    if(podTrackStorage_||(track_&&track_!=&track)||!track.loaded())return false;
+    try {podTrackStorage_=std::make_unique<original_pod_load50PL::SceneTrackData50PL>(track,particleDirectory36B530);}
+    catch(...){return false;}
+    return true;
+}
+bool OwnershipBridge::loadPodRosterFromTrack2129C0(original_camera_session50KX::Session& session,
+    const g::OriginalRaceConstructor50LA& race,const common_track50CR::Track& track,
     const g::UndertrackPhysicsDomain50EW& heights,const std::string& directory,
     const std::string& actualParticleDirectory36B530,std::uint32_t& actualRawRandom,std::uint32_t& pc)noexcept {
-    try {
-        if(podTrackStorage_)return false;
-        podTrackStorage_=std::make_unique<original_pod_load50PL::SceneTrackData50PL>(scene,water3FC);
-    }catch(...){return false;}
+    if(!podTrackStorage_&&!bindTrackDataProvider(track,&actualParticleDirectory36B530))return false;
+    auto* provider=static_cast<original_pod_load50PL::SceneTrackData50PL*>(podTrackStorage_.get());
+    if(&provider->track()!=&track||provider->particleDirectory36B530()!=&actualParticleDirectory36B530)return false;
     return loadPodRoster2129C0(session,race,*podTrackStorage_,heights,directory,actualParticleDirectory36B530,actualRawRandom,pc);
 }
-// The scene owner admits only its bridge as borrower (friend); these forward
-// the provider's calls unchanged.
-bool OwnershipBridge::podSceneRetainZones(::ra_pod_scene50LA::Owner& scene,std::uint64_t generation,
-    g::OriginalWreckSetupZones50LA& zones,g::CollectionRef50BX& visibility,g::CollectionRef50BX& collision)noexcept {
-    return scene.retainNativeWreckFirstZones(this,generation,zones,visibility,collision);
+// 272A78/165E90: the lighting owner lends its 4C0 zone rows and visibility world to this
+// bridge against the race's Track (one lender at a time), for every course.
+g::ResetVisibilityWorld50EY* OwnershipBridge::podTrackRetainVisibility(const common_track50CR::Track& track)noexcept {
+    auto* lights=track.roles.lights.get();if(!lights)return nullptr;
+    std::size_t count=0;
+    const auto* rows=lights->retainSceneZones272A78(&track,count);
+    if(!rows||!count||count!=track.documents.world.zones.size()){
+        if(rows&&!lights->releaseSceneZones272A78(&track))std::terminate(); //Never strand the lent rows.
+        return nullptr;
+    }
+    auto* world=lights->nativeWreckVisibility165E90(&track,rows);
+    if(!world&&!lights->releaseSceneZones272A78(&track))std::terminate();
+    return world;
 }
-bool OwnershipBridge::podSceneReleaseZones(::ra_pod_scene50LA::Owner& scene)noexcept {
-    return scene.releaseNativeWreckFirstZones(this);
+bool OwnershipBridge::podTrackReleaseVisibility(const common_track50CR::Track& track)noexcept {
+    auto* lights=track.roles.lights.get();
+    return lights&&lights->canReleaseSceneZones272A78(&track)&&lights->releaseSceneZones272A78(&track);
 }
-bool OwnershipBridge::podSceneRetainParticles(::ra_pod_scene50LA::Owner& scene,g::OriginalTrackParticleCold50LA* actual)noexcept {
-    return scene.retainNativeWreckParticles(this,actual);
+// 1AA57C World4A0: the same counted particle owner the racer's 210890 already used.
+// PORT STAND-IN: the particle owner's wreck-borrower field (OriginalTrackParticleCold50LA::
+// nativeWreckBorrower_) is writable only by its retired RA friends; until the owner admits this
+// bridge (area E), the borrow is refused so the owner can never retire under a live borrow.
+bool OwnershipBridge::podTrackRetainParticles(g::OriginalTrackParticleCold50LA& actual)noexcept {
+    if(nativeWreckParticles_)return false;
+    (void)actual;
+    std::fprintf(stderr,"pod_load_track_particles_refused reason=borrower");std::fputc(10,stderr);
+    return false;
+}
+bool OwnershipBridge::podTrackReleaseParticles(g::OriginalTrackParticleCold50LA& actual)noexcept {
+    if(nativeWreckParticles_!=&actual)return false;
+    nativeWreckParticles_=nullptr;return true;
 }
 // 1AE280: every racer's 2129C0 in manager order. The 4C0[0]/4C4[0] borrow is
 // taken once for the whole roster (1AE0C8/1AE488 pass the same rows; 1AE4B0)
@@ -335,3 +408,5 @@ bool OwnershipBridge::loadPodRacer2129C0(std::size_t slot,original_camera_sessio
     }catch(...){return false;}
 }
 }
+
+#include "original_pod_wreck_chain50pl.inl"

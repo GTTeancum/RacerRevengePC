@@ -10,7 +10,7 @@
 #include "track_collision_world50cr.h"            // track.roles.collision: Borrow::actions()
 #include "course_trigger_actions50ct.h"           // the one trigger action owner (2A00A0/2A0E20)
 #include "positional_sound_rows50sr.h"            // track.roles.sounds: Sound action sink
-#include "../../src/game/original_track_particle_cold50la.h" // track.roles.particles: Particles action sink
+#include "track_particle_emitter_sink50cr.h"     // track.roles.emitters: Particles action sink (15A500)
 #include "gc_gate_audio50in_fixture.h"            // triggerAudio: the one PodSound voice (shared kernel)
 #include "undertrack_owners50ew_fixture.h"
 #include "source_announcer50ie_fixture.h"
@@ -105,12 +105,15 @@ void ContactsContext::run() {
        .animations=track.roles.animation,
        .podSound=podSound,
        .sound=track.roles.sounds?track.roles.sounds->triggerSink():course_trigger_actions50CT::ActionSink{},
-       .particles=track.roles.particles?track.roles.particles->triggerSink():course_trigger_actions50CT::ActionSink{},
-       // LostAI Reset (1B5A60 pose reset, authored by MB's UpShaft) has no
-       // common sink yet: an authored Reset action is refused by prepare (logged).
-       .lostAiReset={}};
-   require50DU(actions->prepare(track.roles.triggerSource,track.roles.triggers,aiView.count(),destinations),
-       "trigger/action destinations rejected");
+       // Particles: the ground-effects owner's own adapter (15A500/15A560, area E).
+       .particles=track.roles.emitters?track_particle_emitters50CR::triggerSink(*track.roles.emitters):course_trigger_actions50CT::ActionSink{},
+       // LostAI Reset TRUE (1B5A60 -> 2255B0 pose reset): the action owner's one
+       // slot sink; the frame lends it per original-AI main690 query (frame_physics).
+       .lostAiReset=actions->lostAiResetSink().sink()};
+   // The source half (rows, group, LostAI targets) was prepared before the
+   // collision world took the owner (world.cpp); bind the destinations now.
+   require50DU(actions==track.roles.triggerActions.get(),"the collision world lends a different trigger action owner");
+   require50DU(actions->bindDestinations(destinations),"trigger/action destinations rejected");
    // 2A00A0's chance draw: the one application RNG (308030) with its lazy
    // seed/range slots and the application clock; IgnoreTrigger PLAYER/AI
    // lists (2DC630) from the manager+34 human prefix.
@@ -121,6 +124,9 @@ void ContactsContext::run() {
    require50DU(actions->bindRacerIdentities(identities,originalAiHumanCount,
        {&s.noiseOwner().sharedRandomState,&sessionRandom,&applicationClock},racerBank.count()),
        "trigger racer identity/chance binding rejected");
+   // The collision world publishes query readiness (the action owner's bindQuery)
+   // once the identities are bound; observePrepared below needs a ready owner.
+   require50DU(track.roles.collision->bindQuery(),"the track's collision world refused its trigger query binding");
    // Bound from here: the cold closer (I3) unbinds the action owner on failure.
    coldNavigationBound=true;
    for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){

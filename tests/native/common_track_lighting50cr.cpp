@@ -190,6 +190,7 @@ bool prepareLights(Track& track,const LoadInputs& inputs,Diagnostic& d)noexcept 
         count(track,"lights.local",scb,tally->local);
         count(track,"lights.omitted_nonemitting",scb,tally->omittedNonEmitting);
         count(track,"lights.flashers",scb,tally->flashers);
+        count(track,"lights.flares",scb,tally->flares);
         count(track,"lights.missing_slots",scb,tally->missingSlots);
         count(track,"lights.light92_repeats",scb,tally->missingSlots);
         count(track,"lights.scb_bytes",scb,track.documents.scb.size());

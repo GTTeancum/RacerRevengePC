@@ -31,6 +31,9 @@ class Owner final {
     std::uint64_t cameraGeneration_=0;
     // ALL8 title: the launch's own track-ID title (17EA08 order), given at bindRace.
     std::size_t all8TrackText_=0;
+    // Registry (add-on) course ALL8 spectator: the row's track name; empty = the
+    // LOC title above (bindRaceNamed, as bindHostNamed).
+    std::string all8TrackName_;
     mutable bool lifecycleRejected_=false;
     // Every-track human race route: no consumed RA race; see bindHost.
     bool host_=false;std::size_t hostTrackText_=0;
@@ -82,6 +85,17 @@ public:
         race_=application_->sourceRace28COwner_;
         camera_=camera;track_=track;cameraGeneration_=camera->generation_;all8TrackText_=trackTextId;return true;
     }
+    // Registry (add-on) course, as bindHostNamed (PORT EXTENSION, NOT ORIGINAL):
+    // the ALL8 title is the row's name, never a stock course's LOC title. Empty
+    // name = refused (no owner).
+    bool bindRaceNamed(const std::shared_ptr<Camera>& camera,
+        const std::shared_ptr<const Track>& track,const std::string& trackName)noexcept {
+        if(trackName.empty()||!bindRace(camera,track,0))return false;
+        try{all8TrackName_=trackName;}catch(...){
+            race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;return false;
+        }
+        return true;
+    }
     bool captureTitle(Diagnostic& d)const noexcept {
         d={};if(!application_||!cameraGeneration_)return false;
         const auto pause=pause_.lock();const auto controls=controls_.lock();
@@ -89,7 +103,8 @@ public:
         if(!pause||!controls||!camera||!track||camera->generation_!=cameraGeneration_||
            application_->controlsProfile!=controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
         // Original descriptor17EA64/6C: the launch track ID's 1127C title slot.
-        return pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,d);
+        return all8TrackName_.empty()?pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,d):
+            pause->refreshTitleText1BB010(camera->raceFlags1B0_,all8TrackName_,d);
     }
     // Inactive CPU preparation only. Caller must first obtain actual parent
     // and last-camera admission; this does not dispatch1B9220 or a GPU draw.
@@ -106,7 +121,8 @@ public:
         // captureTitle/captureSettings remain observations, not callback calls.
         if(!rr::game::OriginalPauseLayout50LA::visible(*pause))
             return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
-        if(!pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,observation)||
+        if(!(all8TrackName_.empty()?pause->refreshTitle1BB010(camera->raceFlags1B0_,all8TrackText_,observation):
+                pause->refreshTitleText1BB010(camera->raceFlags1B0_,all8TrackName_,observation))||
            !pause->refreshSettings1BB590(*controls,*settings,observation))return false;
         return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
     }
@@ -445,7 +461,7 @@ public:
     void unbind()noexcept {
         host_=false;hostTrackText_=0;hostTrackName_.clear();
         counted_=countedPending_=countedOwnsOpen_=countedWorldPaused_=false;countedDevice_=0;
-        race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;all8TrackText_=0;lifecycleRejected_=false;
+        race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;all8TrackText_=0;all8TrackName_.clear();lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
 private:

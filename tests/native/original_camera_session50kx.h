@@ -662,8 +662,8 @@ class Session final {
     OriginalCameraObjectChildHeads objectChildren_;
     OriginalCameraControllerEntityFields controllerEntity_;
     OriginalCameraSceneOwner spatial_;
-    OriginalSelectedCameraVisibilityBacking50SC visibilityBacking_;
-    OriginalSelectedCameraVisibilityKeys50SC visibilityKeys_;
+    OriginalSelectedCameraVisibilityBacking visibilityBacking_;
+    OriginalSelectedCameraVisibilityKeys visibilityKeys_;
     OriginalFollowSceneBinding sceneBinding_;
     CameraSceneState49F scene_;
     OriginalCameraSceneTick tick_;
@@ -1364,6 +1364,37 @@ public:
         }catch(...){return false;}
     }
     std::shared_ptr<const OriginalRaceStartOverlay50HU> startOverlay()const noexcept{return startOverlay_;}
+    // 1ACBA0 (in-place restart 1AC8E0), course-free: per human i below
+    // race+1B0 low2, 1750A0(race48[i], 1AF330(racerB0,i), i, 0) re-binds that
+    // human's controller to its racer and re-places the follow camera on the
+    // grid (2A2880, 179580, 13DDB0, 1148D0/175224 visibility), then camera34[i]
+    // vtable+18; with a1 != 0 also 175430(race48) (mode44 4, cut cursor 0,
+    // 1756D0 when the cut count is nonzero, 62/63 flags, 7C restart, 199770).
+    // PORT STAND-IN (flagged): only the racer-identity part of 1750A0 is
+    // checked (the racer owners survive the restart, so its binding stores are
+    // unchanged). The grid re-placement, the visibility re-registration, the
+    // camera34 vtable+18 reset and 175430 are not ported: the call refuses
+    // with the first unported pc in diagnostic(), so the race start logs the
+    // step as refused (same camera behaviour as before the rewrite).
+    bool rebindRacerCameras1ACBA0(std::uint32_t a1)noexcept{
+        if(!onOwnerThread()||closed_||abandoned_||!coldBound_){set(Status::owner,0x1acba0);return false;}
+        // 1A95B0 builds one controller per human; the native camera owns the
+        // single-human slot. Zero humans: the 1ACBA0 loop and 175430 do not run.
+        if(!actual_.humanCount34){
+            if(a1){set(Status::owner,0x175430);return false;}
+            set(Status::complete,0x1acbdc);return true;
+        }
+        if(actual_.humanCount34!=1u||!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||
+           !actual_.bank.active(0)){set(Status::owner,0x1750a0);return false;}
+        set(Status::sourcePath,0x175174);return false; // 2A2880 grid re-placement: not ported.
+    }
+    // 1983A0 on the race's one start overlay (raceD4): age 0.75, the four
+    // once-flags cleared (the in-place restart 1AC8E0 at 1ACDF0). False when
+    // the overlay was never loaded (caller logs the refusal).
+    bool resetStartOverlay1983A0()noexcept{
+        if(!startOverlay_||!startOverlay_->loaded())return false;
+        startOverlay_->reset1983A0();return true;
+    }
     // 1982C0/197C10 for the drawn view; returns the draw (with its 1A4B80
     // sound events) or null when the overlay is absent.
     const OriginalRaceStartOverlayDraw50HU* drawStartOverlay(std::uint32_t drawnView268)noexcept{
@@ -1969,7 +2000,7 @@ public:
                     return fail(Status::sourcePath,0x1a6d98);
                 if(taPositive_&&!taFirstSelected_){
                     if(!bindTaRegistryBefore7C())return fail(Status::owner,0x1752d0);
-                    result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
+                    result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility(actual_.visibility,generation_,key(scene_),
                         spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                     if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete)
                         return fail(Status::visibility,0x175224);
@@ -2021,7 +2052,7 @@ public:
                 ++coldPhase_;break;}
             case 7:
                 if(taPositive_){++coldPhase_;break;}
-                result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
+                result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility(actual_.visibility,generation_,key(scene_),
                     spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                 if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete){
                     if(result_.visibilityJoin.sceneAttached)return fail(Status::visibility,0x175224);

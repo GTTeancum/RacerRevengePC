@@ -4,10 +4,6 @@
 #include "compound_collision50ij.h"
 #include "spring_query48n.h"
 #include "gate_trigger_action50kg.h"
-#include "native_trigger_group50ga.h"
-#include "native_trigger_group50tc.h"
-#include "native_trigger_group50tb.h"
-#include "native_trigger_group50gb.h"
 #include "native_trigger_group50mc.h"
 #include "native_trigger_box_geometry50ma.h"
 
@@ -60,22 +56,12 @@ struct Type2StaticCandidate49X {
     // Only indexed50CC supports this bounded registered shape5 Gate owner.
     // Shared track lifetime, never per-racer copied or rolled back.
     GateTriggerBinding50KG* gate=nullptr;
-    // Alternative shared native trigger set. Exactly one of gate/group is used
-    // for shape5/6. Original action/reciprocal state lives in this shared owner.
-    NativeTriggerGroup50GA* nativeTriggers=nullptr;
-    std::size_t nativeTriggerIndex=0;
-    // RA originals only: current authored COL segments against the authored
-    // sphere, never the historical108E90 triangle/descriptor interpretation.
-    // No previous matrix or swept surface. Default leaves all other tracks alone.
-    bool raOriginalTriggerSegments=false;
-    NativeTriggerBox50MA nativeTriggerBox{}; // shape6 only, inline immutable geometry
-    // Separately typed exact TC22/3 owner; never mixed with gate/nativeTriggers.
-    NativeTriggerGroup50TC* nativeTriggersTC=nullptr;
-    // Distinct exact TB16/2 source owner; exclusive with every other schema.
-    NativeTriggerGroup50TB* nativeTriggersTB=nullptr;
+    // The one shared native trigger group of the race (common rewrite: every
+    // course, 2A00A0 order). Exactly one of gate/nativeTriggersMC is used for
+    // shape5/6. Original action/reciprocal state lives in this shared owner.
     NativeTriggerGroup50MC* nativeTriggersMC=nullptr;
-    // Distinct exact GB18/5 source owner; exclusive with every other schema.
-    NativeTriggerGroup50GB* nativeTriggersGB=nullptr;
+    std::size_t nativeTriggerIndex=0;
+    NativeTriggerBox50MA nativeTriggerBox{}; // shape6 only, inline immutable geometry
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {

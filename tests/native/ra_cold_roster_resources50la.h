@@ -25,9 +25,9 @@ class Resources final {
     std::array<std::vector<std::uint8_t>,8> aiSources_;
     // SAME authenticated full archives, retained without a second reopen.
     std::array<std::vector<std::uint8_t>,8> rawRes_;
-    // Input custody only, not12CEA0/1ADF80 issuance. The source archive catalog
-    // currently admits gameplay POD01 only. Other human IDs stay absent.
-    std::shared_ptr<const a::OriginalUiArchive50KG> sourceHumanPod01Archive_;
+    // Common rewrite (area C): the human-POD01-only source archive custody
+    // (taken only for racer 1 in slot 0) is retired: a per-pod port stand-in
+    // with no reader. Every pod's archive is the same rawRes_ row below.
     std::shared_ptr<WreckBacking> wreckBacking_;
     std::array<std::vector<std::uint8_t>,6> effects_;
     std::uint32_t humanCount_=0;
@@ -77,19 +77,6 @@ public:
                     member!=collision->storage_->raw[i])throw std::runtime_error("retained collision bytes differ from original pod");
                 if(!a::extractResMember48C(archive,prefix+native_racer50HW::rig_detail::lower(rig->podId)+".ai",
                     result->aiSources_[slot],d))throw std::runtime_error("actual selected pod AI source unavailable");
-                if(slot==0&&humanCount==1u&&pin->racer60==1u){
-                    // Authenticate from the SAME already-read, hash-pinned
-                    // input before rawRes publication. Never reopen a file or
-                    // promote native mount/Player readiness into source IO.
-                    auto sourceInput=std::make_shared<a::OriginalUiArchive50KG>();
-                    a::OriginalUiArchiveDiagnostic50KG sourceInputDiagnostic;
-                    if(!sourceInput->load(a::OriginalUiArchiveId50KG::sourcePod01,bytes,sourceInputDiagnostic))
-                        throw std::runtime_error("actual human POD01 encoded source custody rejected");
-                    // Existing const-input archive API owns an encoded copy
-                    // and authenticated decoded/member/block tables. Keep the
-                    // original rawRes allocation for existing wreck consumers.
-                    result->sourceHumanPod01Archive_=std::move(sourceInput);
-                }
                 result->rawRes_[slot]=std::move(bytes);
             }
             // Existing fixed corpus identities, retained here instead of trusting

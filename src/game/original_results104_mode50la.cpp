@@ -74,15 +74,14 @@ OriginalResults10450LA::ModeCpuPrefix OriginalResults10450LA::continueModeFeedba
         p.stop(d,Impl::S::incomplete,0x1af7e0,"Results private mode feedback already returned");
         return out.prefix;
     }
-    const auto operation=p.loadedRosterOperation.lock();
-    if(!Read::loadedOperationOwnerFieldsCurrent(operation,Read::raceWorldIdentity(race),p.application,p.domain,p.component.sessionGeneration)||
-       !Read::loadedOperationBankCurrent(operation,Read::observerBankIdentity(observer))){
+    const auto* const operation=p.loadedRoster;
+    if(!Read::loadedRosterCurrent(operation,race,Read::observerBankIdentity(observer))){
         p.stop(d,Impl::S::owner,0x1af770,"Results actual manager human-count/feedback ownership absent");return out.prefix;
     }
     // A missing device borrow stops AFTER the first manager34 loop read.
     // Keep that consumed value across retry instead of restarting the setter.
     if(!out.humanCountKnown){
-        out.actualHumanCount=Read::operationHumanCount(operation);out.humanCountKnown=true;
+        out.actualHumanCount=Read::rosterHumanCount(operation);out.humanCountKnown=true;
     }
     if(out.actualHumanCount){
         out.nextSourcePC=0x1af7a4;

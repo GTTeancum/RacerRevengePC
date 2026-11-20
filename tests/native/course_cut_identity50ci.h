@@ -3,10 +3,10 @@
 // course archive actually loaded, as the original reads it (174DF0 reads
 // [CSCameras].NumberOfCameras into track+3E4; each cut's [CSCameraN]
 // InitialZone; tracks\xxNN.vub per cut; audio\introAud.ini and
-// audio\scrptLns.ini). The stock table (original_track_cut_identity50la.h)
-// is used unchanged for a stock archive; any other archive gets a row derived
-// here and registered in the table header's runtime slot (the one place that
-// holds it). Everything is host memory; nothing is written into game memory.
+// audio\scrptLns.ini). Every course, stock included, gets the row derived
+// here from its own archive, held in the table header's code-keyed runtime
+// rows (the one place that holds it); the stock table is an integrity receipt
+// only. Everything is host memory; nothing is written into game memory.
 // Bounds: at most 7 cuts and 8 members (the row's own arrays).
 // FLAG stand-in: intro EVENT byte offsets (introAud.ini layout) are taken
 // from the stock row; the intro reader still checks them against the bytes.
@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace course_cut_identity50CI {
@@ -25,14 +26,17 @@ inline std::string lower(std::string s){for(auto& c:s){if(c=='/')c='\\';else if(
 // Builds and registers the row. Returns false (and registers nothing) when
 // the archive lacks what the cut cameras need; the caller logs and continues
 // (the camera step then refuses that course with its own message).
-// A stock code keeps its stock row's trackId/archiveName (and intro event
-// receipts); a registry code (the common-route course whose code is not
-// stock, PORT EXTENSION) gets the registry slot: its own code, the archive
-// name its session row mounts (container, e.g. "TRACKS/NV.RES") and no stock
-// intro rows (eventCount 0: the intro reads introAud.ini itself).
-inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std::vector<std::uint8_t>& bytes,
-    std::string& error,const char* container=nullptr) {
+// A code with a stock integrity row keeps that row's trackId/archiveName (and
+// intro event receipts); any other code (add-on, PORT EXTENSION, class A12)
+// gets its own code, the archive name its session row mounts (container, e.g.
+// "TRACKS/NV.RES") and no stock intro rows (eventCount 0: the intro reads
+// introAud.ini itself).
+// archiveSha256/archiveBytes: the digest and size of the archive actually
+// loaded (the common Track's archive), so no second copy of its bytes is held.
+inline bool derive(const char* trackId,const a::ResArchive48C& archive,std::string_view archiveSha256,
+    std::uint64_t archiveBytes,std::string& error,const char* container=nullptr) {
     try {
+        if(archiveSha256.empty()||!archiveBytes){error="archive digest/size unavailable";return false;}
         if(!trackId){error="no course id";return false;}
         const auto* stock=a::originalTrackCutStockIdentity50LA(trackId);
         auto* slot=a::originalTrackCutWritableSlot50LA(trackId);
@@ -46,8 +50,8 @@ inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std
             id.eventCount=0;id.events={};
         }
         std::string code(trackId);for(auto& c:code)if(c>='A'&&c<='Z')c=char(c+32);
-        next.archiveSha=pod_materials50ed_fixture::detail::sha256(bytes);
-        id.archiveSha256=nullptr;id.archiveBytes=bytes.size();id.memberCount=archive.entries.size();
+        next.archiveSha=std::string(archiveSha256);
+        id.archiveSha256=nullptr;id.archiveBytes=static_cast<std::size_t>(archiveBytes);id.memberCount=archive.entries.size();
         const auto find=[&](const std::string& wanted,std::size_t& ordinal)->const a::ResourceEntry48C*{
             const auto key=lower(wanted);const a::ResourceEntry48C* found=nullptr;
             for(std::size_t i=0;i<archive.entries.size();++i)if(lower(archive.entries[i].name)==key){
@@ -110,6 +114,13 @@ inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std
                  <<" stock_row="<<(stock?1:0)<<" derived=1\n";
         return true;
     }catch(const std::exception& e){error=e.what();return false;}
+}
+// Archive bytes in hand: the same rule over their own digest and size.
+inline bool derive(const char* trackId,const a::ResArchive48C& archive,const std::vector<std::uint8_t>& bytes,
+    std::string& error,const char* container=nullptr) {
+    std::string sha;
+    try {sha=pod_materials50ed_fixture::detail::sha256(bytes);}catch(const std::exception& e){error=e.what();return false;}
+    return derive(trackId,archive,sha,bytes.size(),error,container);
 }
 // The archive label a course mount carries: the digest/size of the archive
 // actually admitted at course select (derived row) or, for a stock archive,

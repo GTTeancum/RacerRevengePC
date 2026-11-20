@@ -38,11 +38,7 @@ struct NativePauseMenuTransfer50LA final {
             now.entrants714==before.entrants714&&now.laps718==before.laps718&&now.packed1125E==packed&&
             now.cardFlag100BC==before.cardFlag100BC&&now.nativeBetaStorage==before.nativeBetaStorage&&
             now.availability11018==before.availability11018&&now.planet0Primary79C==before.planet0Primary79C&&
-            now.planet0Secondary7A0==before.planet0Secondary7A0&&now.courseOrder100C4==before.courseOrder100C4&&
-            now.mawhonicRylothTest==before.mawhonicRylothTest&&now.wanMbTest==before.wanMbTest&&
-            now.sebulbaTbTest==before.sebulbaTbTest&&now.scorchRcTest==before.scorchRcTest&&
-            now.tzidikTcTest==before.tzidikTcTest&&now.gasganoScTest==before.gasganoScTest&&
-            now.kraidGbTest==before.kraidGbTest&&now.youngAnakinMcTest==before.youngAnakinMcTest;
+            now.planet0Secondary7A0==before.planet0Secondary7A0&&now.courseOrder100C4==before.courseOrder100C4;
     }
     rr::game::OriginalWreckComponent50LA request;
     std::uint64_t generation=0,pollRevision=0;

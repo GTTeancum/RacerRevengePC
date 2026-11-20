@@ -614,6 +614,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // It retires before this original early fixture/rig/audio prefix, on all exits.
  interactive_world50DU::Context world50DU{
   .track=*raceTrack,
+  .trackOwner=raceTrack,
   .roster=raceRoster,
   .allAiControllerSamples=allAiControllerSamples,
   .allAiEnabled=allAiEnabled,

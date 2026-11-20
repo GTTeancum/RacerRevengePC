@@ -243,9 +243,10 @@ using namespace vehicle_window_gl50ds_detail;
 
 struct VehicleWindowGl50DS::Storage {
     // Leases of the one track load's role owners whose data the cold track,
-    // sky, water, animation and particle descriptors borrow. Taken at create
+    // sky, water, animation, particle (manager and the ground-effect emitters
+    // that emit into it) and flare (lights) passes borrow. Taken at create
     // from request.commonTrack, released only after checked GPU retirement.
-    std::array<std::shared_ptr<const void>,9> trackRoleLeases{};
+    std::array<std::shared_ptr<const void>,11> trackRoleLeases{};
     void retireTrackLeases() noexcept;
     struct MaterialUv { float value[4] = {1.f, 1.f, 0.f, 0.f}; };
     struct Material {
@@ -681,6 +682,7 @@ bool uiCoverageDisjointTraced=false;
 #include "native_raster_operands_gl_storage.inl"
 #include "original_gc_particle_gl_storage50kg.inl"
 #include "destination_alpha_gl_storage.inl"
+#include "track_flare_gl_storage.inl"
 #include "original_race_hud_render.inl"
 #include "original_race_start_overlay_render.inl"
 #include "original_time_stats_render.inl"

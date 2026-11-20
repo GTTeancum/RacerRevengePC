@@ -62,7 +62,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerWi
 #endif
     using Observation=::original_position_stats_adapter50LA::Owner;
     using Profile=rr::platform::OriginalUiRiderProfileOwner50KG;
-    const auto operation=p.loadedRosterOperation.lock();
+    const auto* const operation=p.loadedRoster;
     const auto before=race.profile_->stamp();const auto generation=p.component.sessionGeneration;
     const auto current=[&](){const auto now=race.profile_->stamp();
         return careerRosterCurrentNative(operation,race,p.application,p.domain,generation,observer)&&

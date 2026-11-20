@@ -6,6 +6,14 @@
 
 namespace rr::host { namespace {
 using Status=CourseDriverStatus50GK;
+// The authored route as read by this host aid: the one common map/AI view's
+// track nodes and 2A1D80 gates (every course; counts are the file's).
+struct Route {
+    const game::UndertrackNode50ET* trackNodes=nullptr;
+    const game::TrackNavigationNode50EU* gates=nullptr;
+    std::uint32_t count=0;
+    bool gatesPrepared=false;
+};
 struct Slice {const char* p;std::size_t n;};
 Slice trim(Slice s) noexcept {
     auto space=[](char c){return c==' '||c=='\t'||c=='\r';};
@@ -49,29 +57,29 @@ bool stop(Status status,CourseDriverDiagnostic50GK& d) noexcept {d.status=status
 bool latch(Status status,CourseDriverState50GK& s,CourseDriverDiagnostic50GK& d) noexcept {
     s.stopped=true;s.stopReason=status;return stop(status,d);
 }
-bool routeValid(const game::TrackNavigation50EU& route,const CourseSpeedLimits50GK& limits) noexcept {
-    const auto count=route.track.count;
+bool routeValid(const Route& route,const CourseSpeedLimits50GK& limits) noexcept {
+    const auto count=route.count;
     if(!route.gatesPrepared||count<2||count>game::maxUndertrackNodes50ET||limits.count!=count)return false;
-    for(std::uint32_t i=0;i<count;++i){const auto& n=route.track.nodes[i];
+    for(std::uint32_t i=0;i<count;++i){const auto& n=route.trackNodes[i];
         if(!n.nextCount||n.nextCount>game::maxUndertrackNext50ET)return false;
         for(std::uint32_t j=0;j<n.nextCount;++j)if(n.next[j]>=count)return false;
         for(unsigned j=0;j<3;++j)if(!finite(n.position[j]))return false;
-        if(!finite(route.nodes[i].left54)||!finite(route.nodes[i].right58)||
+        if(!finite(route.gates[i].left54)||!finite(route.gates[i].right58)||
            !finite(limits.values[i])||limits.values[i]<0.f)return false;}
     return true;
 }
-float halfWidth(const game::TrackNavigation50EU& route,std::uint32_t node) noexcept {
+float halfWidth(const Route& route,std::uint32_t node) noexcept {
     //50EU has already applied TrackWidth/2 to the authored per-side offsets.
-    return std::max(1.f,.5f*(route.nodes[node].left54+route.nodes[node].right58));
+    return std::max(1.f,.5f*(route.gates[node].left54+route.gates[node].right58));
 }
 // Input-only route sampling. Never changes canonical navigation, the graph,
 // speed metadata, safety width or a vehicle pose. At most one authored lap.
-bool steeringPointAhead(const game::TrackNavigation50EU& route,std::uint32_t node,
+bool steeringPointAhead(const Route& route,std::uint32_t node,
     const float* start,float distance,float* aim,std::uint32_t& segments) noexcept {
     if(!finite(distance)||distance<=0.f)return false;
     float point[3]={start[0],start[1],start[2]};segments=0;
-    for(std::uint32_t visits=0;visits<route.track.count;++visits){
-        const auto& n=route.track.nodes[node];
+    for(std::uint32_t visits=0;visits<route.count;++visits){
+        const auto& n=route.trackNodes[node];
         const float span=length(n.position[0]-point[0],n.position[2]-point[2]);
         if(!finite(span))return false;
         if(span>.001f){
@@ -149,7 +157,7 @@ bool readCourseSpeedLimits50GK(const char* text,std::size_t bytes,std::uint32_t 
     out=next;d={};return true;
 }
 
-bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLimits50GK& limits,
+static bool driveRoute50GK(const Route& route,const CourseSpeedLimits50GK& limits,
     const CourseDriverTuning50GK& t,const CourseDriverInput50GK& in,
     CourseDriverState50GK& state,CourseDriverOutput50GK& out,CourseDriverDiagnostic50GK& d) noexcept {
     out={};d={};d.node=in.currentNode;
@@ -159,13 +167,13 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
        !finite(in.yawRate))return stop(Status::InvalidInput,d);
     for(float x:in.pose.v)if(!finite(x))return stop(Status::InvalidInput,d);
     for(float x:in.worldVelocity.v)if(!finite(x))return stop(Status::InvalidInput,d);
-    if(!routeValid(route,limits)||in.currentNode>=route.track.count||in.previousNode>=route.track.count||
+    if(!routeValid(route,limits)||in.currentNode>=route.count||in.previousNode>=route.count||
        in.currentNode==in.previousNode)return stop(Status::InvalidRoute,d);
     bool connected=false;
-    const auto& previous=route.track.nodes[in.previousNode];
+    const auto& previous=route.trackNodes[in.previousNode];
     for(std::uint32_t i=0;i<previous.nextCount;++i)connected|=previous.next[i]==in.currentNode;
     if(!connected)return stop(Status::InvalidRoute,d);
-    const auto& current=route.track.nodes[in.currentNode];
+    const auto& current=route.trackNodes[in.currentNode];
     const float px=in.pose.v[12],py=in.pose.v[13],pz=in.pose.v[14];
     const float hx=in.pose.v[8],hz=in.pose.v[10],headingLength=length(hx,hz);
     const float sx=current.position[0]-previous.position[0],sz=current.position[2]-previous.position[2];
@@ -196,8 +204,8 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     float bend=0.f,lastX=tx,lastZ=tz;
     std::uint32_t node=in.currentNode;
     bool found=false;
-    for(std::uint32_t visits=0;visits<route.track.count;++visits){
-        const auto& n=route.track.nodes[node];
+    for(std::uint32_t visits=0;visits<route.count;++visits){
+        const auto& n=route.trackNodes[node];
         const float dx=n.position[0]-point[0],dz=n.position[2]-point[2];
         const float distance=length(dx,dz);
         if(!finite(distance))return stop(Status::InvalidRoute,d);
@@ -295,6 +303,13 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     out.left=clamp(commonDemand+d.turn,-1.f,1.f);
     out.right=clamp(commonDemand-d.turn,-1.f,1.f);
     d.status=Status::Driving;return true;
+}
+
+bool driveCourse50GK(const game::NavigationView50CR& view,const CourseSpeedLimits50GK& limits,
+    const CourseDriverTuning50GK& t,const CourseDriverInput50GK& in,
+    CourseDriverState50GK& state,CourseDriverOutput50GK& out,CourseDriverDiagnostic50GK& d) noexcept {
+    const Route route{view.nodes(),view.gates(),view.count(),view.runtimeValid()&&view.gatesPrepared()&&view.gates()};
+    return driveRoute50GK(route,limits,t,in,state,out,d);
 }
 
 bool applyCourseThrottlePacket50GK(const CourseDriverOutput50GK& out,game::DevicePacket48Y& packet) noexcept {

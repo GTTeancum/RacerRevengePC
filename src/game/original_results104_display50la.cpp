@@ -107,7 +107,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
         //Exactly three icons210/270/2D0, not fourth Circle330. Repeated shared
         //texture aliases remain separate reached2DF8A0/demand occurrences.
         for(std::size_t i=0;i<3;++i){d.object=0x210+0x60*i;if(!texture((*p.icons210)[i],0x1c168c))return false;}
-        const auto operation=p.loadedRosterOperation.lock();const auto* bank=demandObserverBankIdentity1C16F8(observer);
+        const auto* const operation=p.loadedRoster;const auto* bank=demandObserverBankIdentity1C16F8(observer);
         // Native same-Operation current Bank bound, not a full source B0
         // constructor receipt. Read the actual count at EACH reached loop
         // condition1C16F8, never use portraitsCount alone as a live count.

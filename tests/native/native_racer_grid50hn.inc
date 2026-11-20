@@ -8,7 +8,7 @@
 // Four front starts and three back starts retain at least42 lateral or
 //40 longitudinal units between pod centers, with player40 behind the back row.
 auto placeOpponentAtGrid50HN=[&](std::size_t racer){
- requireMbRuntimeNavigation50MB();
+ requireRuntimeNavigation();
  require50DU(racer<racerBank.count(),"invalid native grid slot");
  racerBank.visit(racer,[&](){
   require50DU(completedFrames==0,"opponent grid placement requires fresh state");

@@ -11,8 +11,8 @@ ra_cold_roster50LA::Operation* OwnershipBridge::nativeRacerOperationCurrent(
     if(!nativeRacerInputOwnerCurrent(session,model))return nullptr;
     const auto pin=std::static_pointer_cast<BankPin>(bankLifetime_.lock());
     auto* op=pin&&pin->owner.get()==this&&pin->rosterOperation?pin->rosterOperation.get():nullptr;
-    if(!op||op->terminal_||op->closed_||op->constructorOnly_||!op->aggregate_||
-       op->aggregate_->terminal_||op->aggregate_->closed_||op->aggregate_->runtimeQueries_.get()!=this||
+    if(!op||op->terminal_||op->closed_||op->constructorOnly_||!op->runtime_||
+       op->runtime_.get()!=this||
        op->bank_!=bankIdentity_||op->generation_!=model.generation_||op->entities_!=model.application_||
        op->resources_!=rosterResources_||!op->resources_||!op->owners_||
        &op->arena_.live!=model.fixture_||&op->arena_.live.state!=&actual_->frame||
@@ -119,7 +119,7 @@ bool OwnershipBridge::continueNativePlayerResources1AE104(original_camera_sessio
        model.failurePC_!=outer.pc||racer.nativePostEmberPC_!=outer.pc||
        model.nativePhyLoad_!=&phy||racer.nativePhyLoad_!=&phy||!phy.closed()||phy.aborted()||phy.activeReaders()||
        race.cameraNativeAdapter34_!=&session||!race.nativeCameraAdapter34LifetimeCurrent(session)||
-       !race.world74_||race.world74_->runtimeQueries_.get()!=this||race.world74_->terminal_||race.world74_->closed_||
+       !race.world74_||!track_||race.world74_->trackData()!=track_||
        race.application_!=op->entities_||!race.resourcesPrepared_||!op->domain_||
        race.resourceDomain_!=op->domain_||op->application_->standardMaterialDomain()!=op->domain_||
        session.actual_.applicationMaterials!=op->domain_->materials382B38()||!race.resourceContext_)return false;
@@ -189,7 +189,7 @@ bool OwnershipBridge::continueNativeBaseRacerSpeech22A1D0(original_camera_sessio
        !racer.nativeSpeechD48_||*racer.nativeSpeechD48_||h.speechEntity||h.speechRetired||
        !op->application_||op->application_->race28C()!=&race||
        race.cameraNativeAdapter34_!=&session||!race.nativeCameraAdapter34LifetimeCurrent(session)||
-       !race.world74_||race.world74_->runtimeQueries_.get()!=this||race.application_!=op->entities_)return false;
+       !race.world74_||!track_||race.world74_->trackData()!=track_||race.application_!=op->entities_)return false;
     h.speechCallAttempted=true;
     const auto at=[&](std::uint32_t address)noexcept {pc=h.speechPC=address;};
     at(0x1ae110u);
@@ -228,9 +228,9 @@ bool OwnershipBridge::continueNativeBaseRacerSpeech22A1D0(original_camera_sessio
     // Native input custody at the reached load boundary. Use the SAME mounted
     // namespace and Resources-owned selected Rig, not loose extraction or the
     // earlier independently prepared native catalog as source-loader success.
-    if(!op->domain_||op->application_->standardMaterialDomain()!=op->domain_||
-       !op->aggregate_->rosterMountComplete_||op->aggregate_->rosterMountDomain_!=op->domain_||
-       op->aggregate_->rosterMountApplication_!=op->application_||!op->resources_||
+    // Common rewrite (area C): the pod archives are mounted in this same Application domain by
+    // the common roster (every course); RA's aggregate roster-mount receipt is retired.
+    if(!op->domain_||op->application_->standardMaterialDomain()!=op->domain_||!op->resources_||
        op->resources_->rigs_[0].get()!=model.actualRig())return false;
     const auto& provider=op->domain_->archiveProvider3E1A70();
     const std::shared_ptr<const native_racer50HW::Rig> rig(op->resources_,op->resources_->rigs_[0].get());
@@ -318,7 +318,7 @@ bool OwnershipBridge::readNativeHandlingProfile216040(original_camera_session50K
     bool& profileRequired,std::array<float,6>& abilities)const noexcept {
     if(!nativeHandlingOperationCurrent(session,model)||race.cameraNativeAdapter34_!=&session||
        !race.nativeCameraAdapter34LifetimeCurrent(session)||!race.world74_||
-       race.world74_->runtimeQueries_.get()!=this||race.world74_->terminal_||race.world74_->closed_)return false;
+       !track_||race.world74_->trackData()!=track_)return false;
     // The actual Application350 is a borrowed native process field. Nonzero
     // skips216040 without requiring or inventing a profile ability row.
     if(session.actual_.application350!=0){profileRequired=false;return true;}

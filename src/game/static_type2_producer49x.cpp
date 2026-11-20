@@ -228,7 +228,7 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     };
     for(std::size_t i=0;i<count;++i){
         const auto& candidate=candidates[i];const auto& c=candidate.candidate.collision;
-        if(candidate.nativeTriggersTC||candidate.nativeTriggersMC||candidate.nativeTriggersTB||candidate.nativeTriggersGB)return Status::UnsupportedScope; // TC/TB/GB E8 requires indexed50CC.
+        if(candidate.nativeTriggersMC)return Status::UnsupportedScope; // Trigger E8 requires indexed50CC.
         if(!readFilter(c.filter)||!read(candidate.candidate.sceneName,candidate.candidate.sceneNameBytes)||!finite(c.sphere))return Status::InvalidInput;
         if(candidate.shapeType==0){
             const auto status=validateMesh(c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii,candidate.nodeRadiusCount,candidate.maxDepth);

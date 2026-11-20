@@ -237,6 +237,13 @@ public:
         auto next=source;next.waterProvider334=provider();next.waterGlobals=globals();
         next.terrain348Lift1F0=&actual348Lift1F0;output=next;return true;
     }
+    // The human reset's height domain (216A30 water334 + live348 lift) over the SAME
+    // completed runtime: the one water owner's name for bindRuntimeHeightDomain on
+    // every course with water (replaces the retired mc_water50MC binding).
+    bool bindResetDomain(const UndertrackPhysicsDomain50EW& source,
+        const float& actual348Lift1F0,UndertrackPhysicsDomain50EW& output) const noexcept {
+        return bindRuntimeHeightDomain(source,actual348Lift1F0,output);
+    }
     WaterHeightResult50JC query(float (&position)[3],std::uint32_t* effect=nullptr) const noexcept {
         if(!initialized_||!idle())return {WaterHeightStatus50JC::Owner,0x2b10f0u,0};
         return queryWaterHeight50JC(provider_,globals_,position,effect);

@@ -22,7 +22,7 @@ bool Context::advance(std::size_t actualRacerSlot,Part part,
   return replayDestroy228620(actualRacerSlot,static_cast<std::uint32_t>(part)-static_cast<std::uint32_t>(Part::Replay44_1)+1u,
       preparedOuterFactor);
  NativeCalls runNative{*this};
- requireMbRuntimeNavigation50MB();
+ requireRuntimeNavigation();
  require50DU(preparedOuterFactor==.016f&&liveSubstepScale==60.f,
      "isolated two-phase client retains its actual16ms one-substep domain");
  const bool sourceAiAudio=originalAiAudioEnabled&&s.fields.vehicle58==1u;

@@ -26,8 +26,7 @@
 //
 // Native bounds (flagged): the renderer's existing boundary admits a
 // translation on (a) a single-pass surface and (b) a two-pass surface whose
-// both passes scroll, under the policy value still named scLavaTwoPass
-// (renderer header rename and shape generalisation ride renderer batch 4/18).
+// both passes scroll (policy uvScrollTwoPass).
 // A surface with one of two passes animated, or more than two passes, is
 // refused at load with a log line rather than drawn wrong.
 namespace track_uv_animation50uv_fixture {
@@ -106,7 +105,7 @@ public:
             return false;
         output.sourceUvAnimation=true;
         // Stand-in name: the renderer's adjacent two-pass UV boundary.
-        if(s.sourcePassCount==2)output.sourceUvPolicy=rr::platform::NativeTrackUvPolicy50DS::scLavaTwoPass;
+        if(s.sourcePassCount==2)output.sourceUvPolicy=rr::platform::NativeTrackUvPolicy50DS::uvScrollTwoPass;
         return true;
     }
     // One attempt. Reads only the loaded track's own records.

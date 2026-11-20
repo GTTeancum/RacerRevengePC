@@ -61,15 +61,14 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRecordSu
     using Read=::original_results_roster50LA::Read;
     Read::Record row;
     const auto* materials=p.domain->materials382B38().get();const auto generation=p.component.sessionGeneration;
-    const auto operation=p.loadedRosterOperation.lock();const auto before=Read::profileStamp(race);
+    const auto* const operation=p.loadedRoster;const auto before=Read::profileStamp(race);
     const auto current=[&](){const auto now=Read::profileStamp(race);
-        return Read::loadedOperationOwnerFieldsCurrent(operation,Read::raceWorldIdentity(race),p.application,p.domain,generation)&&
-            Read::loadedOperationBankCurrent(operation,Read::observerBankIdentity(observer))&&
+        return generation&&Read::loadedRosterCurrent(operation,race,Read::observerBankIdentity(observer))&&
             now.generation==before.generation&&now.mode34==before.mode34&&p.context->live();
     };
     if(!current()||!Read::captureRecord(observer,p.application.get(),materials,generation,manager,row)||
        row.bank!=Read::observerBankIdentity(observer)||row.vehicle58!=0u||
-       !Read::loadedOperationRacerCurrent(operation,manager,row.racer60)||!current())
+       !Read::loadedRosterRacerCurrent(operation,manager,row.racer60)||!current())
         return stop(Impl::S::owner,managerPC,"Results actual first-human loaded Bank/rig/publication absent");
     calls.managerIndex=manager;calls.publication=row.publication;
     const auto samePublication=[&](){return current()&&Read::recordCurrent(observer,row);};

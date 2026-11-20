@@ -39,14 +39,21 @@ bool constructTaOwners174FA4()noexcept {
 // +64/+68/+6C/+70/+78/+7C children stay as this port builds them for the
 // zero-cut case (the live 7C start owner). Only the Application-issued same
 // Session reaches this, on every course (RA Free Play / Time Trial included).
-bool constructCountedControllerWithoutCuts174A30()noexcept {
+// 174EA8: subtype 2/3 always, and subtype 1 with P+34 != 2 (174E90) and
+// App+350 == 0 (174E9C), zero the cut count. Same rule as prepare174DF0.
+bool launchZeroesCuts174EA8()const noexcept {
     const auto launch=actual_.launchKind11258;
-    const bool cutsZeroed=launch==2u||launch==3u||
-        (launch==1u&&actual_.configuration34!=2u&&actual_.application350==0); //Same rule as prepare174DF0.
+    return launch==2u||launch==3u||(launch==1u&&actual_.configuration34!=2u&&actual_.application350==0);
+}
+bool constructCountedControllerWithoutCuts174A30()noexcept {
+    // The count 174E48 keeps is zero: zeroed by 174EA8, or the World's own
+    // [CSCameras] count (World+3E4) is zero. Data, never a course code.
+    const bool cutsZero=launchZeroesCuts174EA8()||
+        (nativeTaIssuance_&&nativeTaIssuance_->world&&nativeTaIssuance_->world->cutCount3E4()==0u);
     //1A95B0 builds one controller per human (race+1B0 low2); the native
     // camera owns the single-human slot only. Zero humans: no controller.
     if(zeroCutController_||actual_.humanCount34!=1u||!nativeTaIssuance_||nativeTaCutAuthoring_||taCuts_||
-       actual_.taIntroAuthoring||actual_.taIntroAudio||!cutsZeroed)return false;
+       actual_.taIntroAuthoring||actual_.taIntroAudio||!cutsZero)return false;
     if(!constructColdController174A30(nativeTaIssuance_->generation))return false;
     zeroCutController_=true; //One-way native history; never rearmed.
     return true;

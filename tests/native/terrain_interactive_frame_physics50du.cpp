@@ -5,6 +5,11 @@
 #include "native_dynamic_contact_peers50iw_fixture.h"
 #include "native_racer_cables50hw_fixture.h"
 #include "original_ai_audio_owner.h"
+#include "original_ai_physical_recovery.h"     // 1B27C0 -> 2255B0 trigger reset (LostAI Reset)
+#include "course_trigger_actions50ct.h"        // the one LostAI Reset sink slot
+#include "native_gc_water_racer50kg_fixture.h" // 216B78 reset height domain (A9)
+#include "../../src/game/ai_runtime50iv.h"
+#include "../../src/game/collision_result_binding50mb.h"
 #include "track_collision_world50cr.h"   // R3: the one collision world and its per-racer query bracket
 #include "lap_drive50gj_fixture.h"
 #include "live_audio50hf_fixture.h"
@@ -170,7 +175,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   const track_collision_world50CR::QueryLease lease{actualRacerSlot,qfilter.identity,actualCollider,
       &navigationProgress.reset.vehicleC80,audioListenerReady?&queryListener:nullptr,audioListenerReady?1u:0u};
   VehicleLiveQueryResult50EQ result{};bool entered=false;
-  const bool accepted=collisionWorld.queryRacer(lease,[&](track_runtime_storage50IG::Storage& actual){
+  const bool accepted=collisionWorld.queryRacer(racerBank,lease,[&](track_runtime_storage50IG::Storage& actual){
    if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
    if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
     const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryRowMember:mainRowMember;
@@ -202,7 +207,114 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
       "pod contact: roster row in the 690 list before step R5 (294BB0 in-order dispatch not wired)");
   if(actualRacerSlot==0&&completedFrames%3600u==0u)roster_pod_contact50PC::reportSummary(std::cerr,completedFrames);}
  {
- const auto mainQueryAttempt=withTrackQuery(false,qfilter.identity,[&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});
+ // LostAI Reset TRUE (1B5A60 -> 1B27C0: C80 store at 1B282C, then 2255B0 on
+ // the matching racer at 1B283C), one path for every course. 2255B0 runs inside
+ // this racer's own main690 E8 query at the PostWorld cut, so only this query
+ // can lend it: the outer-result binding of exactly this query (124CB0's ground
+ // probe nests under it), and the racer's reset owners (the PostWorld D40/D44
+ // borrow sourceTriggerResetOwners50MB, cables, lights, AI view, world). Bound
+ // for an ORIGINAL AI racer only: 2255B0's player branch from a trigger is not
+ // carried (PORT STAND-IN flagged in course_trigger_actions50ct.h; the
+ // original branches on +58 here, A7). Unbound -> the action owner's preflight
+ // refuses a reached Reset action (logged); nothing else changes.
+ namespace air=native_original_ai_recovery;
+ std::uint8_t* lostAiFlags22C=nullptr;std::uint32_t* lostAiField24C=nullptr;
+ auto lostAiHeightDomain=selectedRuntimeHeightDomain;
+ const auto& lostAiRelative=x.secondaryInputs.targetRelative2F0;
+ const VisualVector49R lostAiTarget{{lostAiRelative.v[0],lostAiRelative.v[1],lostAiRelative.v[2],lostAiRelative.v[3]}};
+ std::optional<UndertrackQueryOwners50EW> lostAiQueries;
+ std::optional<air::Owners> lostAiOwners;
+ if(track.roles.triggerActions&&track.roles.triggers&&track.roles.lights&&
+    s.fields.vehicle58==1u&&sourceAiAudio&&originalRecoveryEnabled&&originalAiEnabled&&
+    originalAiAudio&&originalResetGround&&originalRecoveryWorkspace&&
+    actualRacerSlot<racerCables.size()&&racerCables[actualRacerSlot]&&
+    originalAiAudio->sourceTriggerResetOwners50MB(actualRacerSlot,originalAi.racer60,s,lostAiFlags22C,lostAiField24C)&&
+    lostAiFlags22C&&lostAiField24C){
+  // 216B78: the actual terrain330/water334 owners of this racer's world (the
+  // same rule as the frame children's resets; no water -> the selected domain).
+  const bool heightBound=!track.hasWater()||(actualRacerSlot<nativeWaterRacers.size()&&
+      nativeWaterRacers[actualRacerSlot]&&nativeWaterRacers[actualRacerSlot]->bindResetDomain(
+          selectedRuntimeHeightDomain,terrainOwner.lift1F0,lostAiHeightDomain));
+  if(heightBound){
+   lostAiQueries.emplace(recoveryQueries());
+   // Physical query[0] must be THIS main690 query (checked again at 1B283C).
+   if(lostAiQueries->query[0].type2==&query)
+    lostAiOwners.emplace(air::Owners{*track.roles.lights,racerCables[actualRacerSlot]->visibility50(),
+        *lostAiFlags22C,*lostAiField24C,aiView,lostAiHeightDomain,resetGlobals,resetLifecycle,
+        lostAiTarget,*lostAiQueries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+        originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount});
+  }
+ }
+ struct LostAiResetBinding {
+  Context* self=nullptr;std::size_t slot=0;std::uint32_t main690=0;
+  rr::game::CollisionResultBindingOwner50MB* resultBinding=nullptr;
+  const rr::game::SourceOuterResultLease50MB* outer=nullptr;
+  const void* issuer=nullptr;std::uint64_t generation=0;
+  air::Owners* owners=nullptr;
+ };
+ const auto runMainQuery=[&]{return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainRowLive,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);};
+ const auto mainQueryAttempt=withTrackQuery(false,qfilter.identity,[&](){
+  if(!lostAiOwners)return runMainQuery();
+  // Inside queryRacer: the action owner's QueryBorrow has opened this query's
+  // serial (2A00A0 bracket). Anything else unbinds the reset (refused if reached).
+  const auto& group=*track.roles.triggers;
+  const std::uint64_t generation=aiView.generation();
+  if(!group.queryActive||group.queryCollider!=qfilter.identity||!group.querySerial||!generation||
+     !query.filter||query.filter->identity!=qfilter.identity||!query.resource||initialMetadata.size()!=initialPairs.size()||
+     initialPairs.size()<query.resource->rayCount||
+     (registeredCount&&!registeredIndices)||initial.recordCount>std::size(records)){
+   std::cerr<<"lostai_reset unbound slot="<<actualRacerSlot<<" reason=query_binding_inputs\n";
+   return runMainQuery();
+  }
+  // Host-side outer-result binding for exactly this query. Declaration order:
+  // the lease ends before its owner on every exit (the owner terminates if it
+  // would die borrowed).
+  rr::game::CollisionResultBindingOwner50MB resultBinding;
+  rr::game::SourceOuterResultLease50MB outer;
+  const rr::game::SourceQueryIdentity50MB identity{track.roles.triggerActions.get(),generation,
+      group.querySerial,actualRacerSlot,qfilter.identity};
+  if(!resultBinding.beginOuter(identity,query,queryResult,initialPairs.data(),initialMetadata.data(),
+         initialPairs.size(),outer)||
+     !resultBinding.bindOuterScratch(outer,workspace,destination,registeredIndices,registeredCount,
+         initial.recordSlots,initial.recordCount)){
+   if(resultBinding.borrowed()&&!resultBinding.endOuter(outer))std::terminate();
+   std::cerr<<"lostai_reset unbound slot="<<actualRacerSlot<<" reason=outer_result_binding\n";
+   return runMainQuery();
+  }
+  VehicleLiveQueryResult50EQ attempt{};
+  {
+   LostAiResetBinding context{this,actualRacerSlot,qfilter.identity,&resultBinding,&outer,
+       track.roles.triggerActions.get(),generation,&*lostAiOwners};
+   const course_trigger_actions50CT::LostAiResetSink::Binding sinkBinding{&context,actualRacerSlot,qfilter.identity,
+    // Pure: this racer's reset owners are bound and the outer result is this query's.
+    [](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept{
+     const auto& c=*static_cast<const LostAiResetBinding*>(p);
+     return c.owners&&c.resultBinding&&c.outer&&e.authored&&e.lease&&e.querySerial&&
+         e.racerSlot==c.slot&&e.lease->racerMain690==c.main690&&e.otherCollider==c.main690&&
+         c.resultBinding->outerQueryCurrent(*c.outer,c.self->query);
+    },
+    // 1B283C: 2255B0 for this racer (the action owner already wrote C80).
+    [](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept{
+     auto& c=*static_cast<LostAiResetBinding*>(p);auto& self=*c.self;
+     if(!c.owners||!e.authored)return false;
+     const air::TriggerQuery trigger{*c.resultBinding,*c.outer,c.issuer,c.generation,e.querySerial,
+         e.candidateOrdinal,e.action,c.main690,e.authored->targetNodeIndex};
+     const bool ok=air::resumeTrigger1B27C0(self.s,self.x.bindings,self.x.parameters,self.navigationProgress,
+         self.originalAi,trigger,self.originalRecovery,*c.owners,*self.originalRecoveryWorkspace,
+         self.originalRecoveryDiagnostic);
+     std::cerr<<"lostai_reset slot="<<c.slot<<" trigger="<<(e.trigger+1)<<" action="<<e.action
+         <<" c80="<<e.authored->targetNodeIndex<<" ok="<<ok<<" stage="<<static_cast<unsigned>(self.originalRecovery.stage)
+         <<" pc="<<std::hex<<self.originalRecoveryDiagnostic.sourcePC<<std::dec
+         <<" msg="<<(self.originalRecoveryDiagnostic.message?self.originalRecoveryDiagnostic.message:"")<<'\n';
+     return ok;
+    }};
+   course_trigger_actions50CT::LostAiResetSink::Scope scope(track.roles.triggerActions->lostAiResetSink(),sinkBinding);
+   if(!scope)std::cerr<<"lostai_reset unbound slot="<<actualRacerSlot<<" reason=sink_scope\n";
+   attempt=runMainQuery();
+  }
+  if(!resultBinding.endOuter(outer))std::terminate();   // a nested ground result left borrowed
+  return attempt;
+ });
  // PORT STAND-IN (flagged, I2's host boundary): a PrefixRejected portal
  // boundary abandons the frame through recoverPortalBoundary, every course.
  if(mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&

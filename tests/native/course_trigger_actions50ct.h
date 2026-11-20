@@ -60,6 +60,7 @@ struct ActionEvent {
  std::uint32_t otherCollider=0;std::size_t racerSlot=0;bool mainCollider=false;
  bool entering=false;                                  // exits run only when the trigger's flags1B8 bit0 is set
  const ActionLease* lease=nullptr;                     // null on the 2A0B30 service
+ std::uint64_t querySerial=0;std::size_t candidateOrdinal=0; // the issuing query (0 on the 2A0B30 service)
 };
 // A destination owned elsewhere. preflight is pure (no effects, no dependence on
 // earlier actions); apply performs the action and returns false on failure.
@@ -69,6 +70,63 @@ struct ActionSink {
  bool (*apply)(void*,const ActionEvent&)noexcept=nullptr;
  std::uint32_t sourcePc=0;                             // original address reported in the action result
  explicit operator bool()const noexcept{return context&&preflight&&apply;}
+};
+// LostAI Reset TRUE (1B27C0: C80 store at 1B282C, then 2255B0 on the matching
+// racer at 1B283C). 2255B0 runs on that racer inside its own main690 E8 query,
+// with that racer's live frame, recovery owners and the query's outer-result
+// binding, which only the query issuer holds and only for the length of one
+// query. So the one sink of every course is a slot: bound once into
+// Destinations.lostAiReset at cold, filled by the issuer per racer query
+// (Scope), empty otherwise. The issuer's apply performs
+// native_original_ai_recovery::resumeTrigger1B27C0 (original_ai_physical_recovery.h).
+// PORT STAND-IN (flagged): 2255B0's player branch reached from a trigger (a
+// human racer's main690 entering a Reset LostAI trigger) is not carried: the
+// issuer binds no reset for a human query, so its preflight refuses (the owner
+// logs the refusal). No stock course authors it: MB's UpShaft, the only Reset
+// LostAI trigger, ignores PLAYER.
+class LostAiResetSink final {
+public:
+ struct Binding {
+  void* context=nullptr;
+  std::size_t racerSlot=0;                              // the visited Bank slot of this query
+  std::uint32_t main690=0;                              // that racer's main690 identity
+  bool (*preflight)(void*,const ActionEvent&)noexcept=nullptr; // pure: this racer's reset owners are present
+  bool (*apply)(void*,const ActionEvent&)noexcept=nullptr;     // performs 2255B0 for this racer
+  explicit operator bool()const noexcept{return context&&preflight&&apply&&main690;}
+ };
+ // Lent by the query issuer for exactly one racer query (nested scopes refused).
+ class Scope final {
+  LostAiResetSink* sink_=nullptr;
+ public:
+  Scope(LostAiResetSink& sink,const Binding& binding)noexcept{
+   if(!sink.current_&&binding){sink.current_=&binding;sink_=&sink;}
+  }
+  Scope(const Scope&)=delete;Scope& operator=(const Scope&)=delete;
+  ~Scope(){if(sink_)sink_->current_=nullptr;}
+  explicit operator bool()const noexcept{return sink_;}
+ };
+ LostAiResetSink()=default;LostAiResetSink(const LostAiResetSink&)=delete;LostAiResetSink& operator=(const LostAiResetSink&)=delete;
+ ~LostAiResetSink(){if(current_)std::terminate();}
+ ActionSink sink()noexcept{return {this,&preflightThunk,&applyThunk,0x2255b0u};}
+private:
+ const Binding* current_=nullptr;
+ bool matches(const ActionEvent& e)const noexcept{
+  return current_&&e.lease&&e.racerSlot==current_->racerSlot&&e.lease->racerMain690==current_->main690&&
+   e.otherCollider==current_->main690;
+ }
+ // A secondary collider completes without the C80 store or the reset (1B27C0
+ // scans main690 only); the owner never calls apply for it.
+ static bool preflightThunk(void* p,const ActionEvent& e)noexcept{
+  const auto& self=*static_cast<const LostAiResetSink*>(p);
+  if(!e.entering||!e.authored||e.authored->kind!=src::ActionKind::LostAI||!e.authored->reset)return false;
+  if(!e.mainCollider)return true;
+  return self.matches(e)&&self.current_->preflight(self.current_->context,e);
+ }
+ static bool applyThunk(void* p,const ActionEvent& e)noexcept{
+  auto& self=*static_cast<LostAiResetSink*>(p);
+  if(!e.mainCollider)return true;
+  return self.matches(e)&&self.current_->apply(self.current_->context,e);
+ }
 };
 struct Destinations {
  std::shared_ptr<track_animation_runtime50AN::Owner> animations; // Animation 101170 (absent when the TOB has no [Animations])
@@ -84,13 +142,14 @@ class Owner final {
  std::shared_ptr<const src::Owner> source_;
  std::shared_ptr<g::NativeTriggerGroup50MC> group_;
  Destinations destinations_;
+ LostAiResetSink lostAiReset_; // lent per racer query by the frame (one owner lifetime, outlives every query)
  std::array<RacerIdentities,racers> racers_{};
  std::size_t racerCount_=0;
  struct Geometry {g::BodyMatrix48G world{};std::array<float,3> center{},half{};bool valid=false;};
  std::array<Geometry,colliders> geometry_{};
  const ActionLease* lease_=nullptr;
  const std::thread::id thread_=std::this_thread::get_id();
- bool attempted_=false,sourcePrepared_=false,bindAttempted_=false,ready_=false,servicing_=false,closed_=false,queryBound_=false;
+ bool attempted_=false,sourcePrepared_=false,destinationsBound_=false,bindAttempted_=false,ready_=false,servicing_=false,closed_=false,queryBound_=false;
  Counters counters_{};Status terminal_=Status::Complete;std::string error_;
  static void increment(std::uint64_t& v)noexcept{if(v!=~std::uint64_t{0})++v;}
  bool thread()const noexcept{return thread_==std::this_thread::get_id();}
@@ -111,7 +170,7 @@ class Owner final {
   const auto t=static_cast<std::size_t>(c.triggerCollider-firstTriggerIdentity);const auto k=colliderIndex(c.otherCollider);
   if(t>=source_->liveCount()||t>=group_->triggerCount||k>=group_->colliders.size())return false;
   const auto& trigger=source_->source(t);if(c.actionIndex>=trigger.actions.size())return false;
-  e={t,c.actionIndex,&trigger,&trigger.actions[c.actionIndex],c.otherCollider,k/2,(k&1u)==0u,c.entering,c.entering?lease_:nullptr};
+  e={t,c.actionIndex,&trigger,&trigger.actions[c.actionIndex],c.otherCollider,k/2,(k&1u)==0u,c.entering,c.entering?lease_:nullptr,call.querySerial,call.candidateOrdinal};
   return true;
  }
  bool preflight(const g::SourceTriggerActionCall50MC& call)const noexcept {
@@ -178,6 +237,7 @@ class Owner final {
   return true;
  }
 public:
+ LostAiResetSink& lostAiResetSink()noexcept{return lostAiReset_;}
  // The genuine query issuer keeps ActionLease and the current bank visit alive
  // for this scope. Destruction always expires the borrowed pointers.
  class QueryBorrow final {
@@ -193,21 +253,42 @@ public:
  Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
  ~Owner(){if(lease_||servicing_||(group_&&group_->queryActive)||!thread())std::terminate();}
 
- // Cold: the Track's trigger rows (roles.triggerSource), its one group
+ // Cold, in two halves (the collision world's prepareStorage needs the source
+ // half at step 10; the destinations exist only at the cold contacts).
+ // prepareSource: the Track's trigger rows (roles.triggerSource), its one group
  // (roles.triggers, already sized from the live count by readTriggers274E90),
- // the AI spline's live node count (step 8) and the bound destinations. Writes
- // the per-trigger entry state (2A00A0, 2A0290 defaults) and installs the hooks.
- // No query can run until bindRacerIdentities() and bindQuery().
- bool prepare(std::shared_ptr<const src::Owner> source,std::shared_ptr<g::NativeTriggerGroup50MC> group,
-     std::uint32_t aiNodeCount,Destinations destinations)noexcept {
+ // the AI spline's live node count (step 8) and the animation runtime (null when
+ // the TOB has no [Animations]). Writes the per-trigger entry state (2A00A0,
+ // 2A0290 defaults) and installs the hooks.
+ bool prepareSource(std::shared_ptr<const src::Owner> source,std::shared_ptr<g::NativeTriggerGroup50MC> group,
+     std::uint32_t aiNodeCount,std::shared_ptr<track_animation_runtime50AN::Owner> animations)noexcept {
   if(!thread()||attempted_)return refuse("prepare requires one owner-thread attempt");attempted_=true;
   if(!source||!source->ready()||!group||group->ready)return refuse("trigger source/group not ready");
   const auto live=source->liveCount();
   if(!group->sized||group->triggerCount!=live||group->triggers.size()!=live)return refuse("trigger group not sized to the live trigger count");
   src::Diagnostic sd;
   if(!source->checkTargets(aiNodeCount,sd))return refuse("LostAI target outside the AI spline");
-  if(destinations.animations&&!destinations.animations->ready())return refuse("animation runtime not ready");
+  if(animations&&!animations->ready())return refuse("animation runtime not ready");
+  for(std::size_t i=0;i<live;++i)if(source->source(i).randomTriggerPercent<0||source->source(i).randomTriggerPercent>100)
+   return refuse("RandomTriggerPercent outside 0..100");
   for(std::size_t i=0;i<live;++i){const auto& s=source->source(i);
+   auto& state=group->triggers[i];
+   state.flags29=s.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(s.oneTimeOnly?4u:0u));
+   state.randomTriggerPercent90=s.randomTriggerPercent;state.callbackCount98=s.actionCount;
+   state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
+  }
+  source_=std::move(source);group_=std::move(group);destinations_={};destinations_.animations=std::move(animations);
+  group_->actions=hooks();sourcePrepared_=true;return true;
+ }
+ // bindDestinations: every kind the TOB authors must have its destination; an
+ // unbound kind is refused (logged, see the header comment). Once, after
+ // prepareSource and before bindRacerIdentities; the animation runtime must be
+ // the one prepareSource took.
+ bool bindDestinations(Destinations destinations)noexcept {
+  if(!thread()||!sourcePrepared_||destinationsBound_||bindAttempted_||ready_||closed_)
+   return refuse("trigger destinations bind once, after prepareSource and before the racer identities");
+  if(destinations.animations!=destinations_.animations)return refuse("trigger destinations name a different animation runtime");
+  for(std::size_t i=0;i<source_->liveCount();++i){const auto& s=source_->source(i);
    for(const auto& a:s.actions){
     const bool bound=
      a.kind==src::ActionKind::LostAI?(!a.reset||bool(destinations.lostAiReset)):
@@ -220,20 +301,21 @@ public:
      return refuse("authored trigger action has no bound destination");
     }
    }
-   if(s.randomTriggerPercent<0||s.randomTriggerPercent>100)return refuse("RandomTriggerPercent outside 0..100");
-   auto& state=group->triggers[i];
-   state.flags29=s.startEnabled?3:2;state.flags1B8=static_cast<std::uint8_t>(3u|(s.oneTimeOnly?4u:0u));
-   state.randomTriggerPercent90=s.randomTriggerPercent;state.callbackCount98=s.actionCount;
-   state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
-  source_=std::move(source);group_=std::move(group);destinations_=std::move(destinations);
-  group_->actions=hooks();sourcePrepared_=true;return true;
+  destinations_=std::move(destinations);destinationsBound_=true;return true;
+ }
+ // Both halves in one call (host checks and tests).
+ bool prepare(std::shared_ptr<const src::Owner> source,std::shared_ptr<g::NativeTriggerGroup50MC> group,
+     std::uint32_t aiNodeCount,Destinations destinations)noexcept {
+  auto animations=destinations.animations;
+  return prepareSource(std::move(source),std::move(group),aiNodeCount,std::move(animations))&&
+   bindDestinations(std::move(destinations));
  }
  // Stages the race field's collider identities (humans first, 1AE280) and the
  // 2DC630 ignore lists: PLAYER = the human prefix [0,humans34), AI = the rest.
  bool bindRacerIdentities(const std::array<RacerIdentities,racers>& identities,std::uint32_t humans34,
      const g::OriginalTriggerChance50MC& sharedChance,std::size_t racerCount)noexcept {
-  if(!thread()||bindAttempted_||!sourcePrepared_||ready_||lease_||servicing_)return false;bindAttempted_=true;
+  if(!thread()||bindAttempted_||!sourcePrepared_||!destinationsBound_||ready_||lease_||servicing_)return false;bindAttempted_=true;
   if(!racerCount||racerCount>racers||humans34>racerCount||!sharedChance.bound())return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racerCount;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
@@ -348,7 +430,7 @@ public:
    if(phase!=g::SourceTriggerContactPhase50MC::Idle&&phase!=g::SourceTriggerContactPhase50MC::Complete&&!group_->actionsFailed)return false;
    group_->ready=false;group_->actions={};group_->chance={};
   }
-  ready_=sourcePrepared_=false;closed_=true;destinations_={};group_.reset();source_.reset();return true;
+  ready_=sourcePrepared_=destinationsBound_=false;closed_=true;destinations_={};group_.reset();source_.reset();return true;
  }
 };
 

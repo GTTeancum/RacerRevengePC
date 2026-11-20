@@ -3,7 +3,6 @@
 #include "original_race_display_lifetime50la.h"
 #include "original_race_hud_scope50la.h"
 #include "original_position_stats_adapter50la.h"
-#include "ra_cold_aggregate50la.h"
 #include "../../src/game/original_pause_storage50la.h"
 #include "original_pause_observation50la.h"
 #include "../../src/game/original_race_music_manager50la.h"
@@ -70,11 +69,8 @@ bool Application::suspendResultsBlockingInput50LA(rr::game::OriginalResults10450
     try {
         const auto display=raceDisplayOwner50LA_.lock();
         const auto scope=race.endHud_.lock();
-        ra_cold_aggregate50LA::Diagnostic wd;
-        std::shared_ptr<const original_camera_session50KX::Session> camera;
-        if(race.world74_)camera=race.world74_->borrowRuntimeSourceCamera(race.world74_,wd);
-        else if(race.cameraNativeAdapter34_==&observed)
-            camera=std::shared_ptr<const original_camera_session50KX::Session>(std::shared_ptr<void>{},&observed);
+        // Every course: the race's own issued Camera34 (common rewrite).
+        std::shared_ptr<const original_camera_session50KX::Session> camera=race.borrowRaceCamera34();
         rr::game::OriginalResults104Diagnostic50LA d;
         if(!display||!display->canRetain()||display->application_!=this||display->video_!=videoOwner_||
            !camera||camera.get()!=&observed||!camera->displayInputs_||camera->abandoned_||
@@ -211,11 +207,9 @@ bool Registration::pressResults1C8C30(rr::game::OriginalRaceConstructor50LA& rac
        race.entity_.sessionGeneration!=generation_||race.endHud_.lock().get()!=this||
        !race.anyWorld()||!race.results104_)return false;
     try {
-        // RA: its world join's Session; every other course: the race's Camera34.
-        const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-        std::shared_ptr<const original_camera_session50KX::Session> borrowed;
-        if(world)borrowed=world->borrowRuntimeSourceCamera(world,wd);
-        const auto* camera=world?borrowed.get():race.cameraNativeAdapter34_;
+        // Every course: the race's own issued Camera34 (common rewrite).
+        const auto borrowed=race.borrowRaceCamera34();
+        const auto* camera=borrowed.get();
         if(!camera||camera!=camera_||&camera->actual_.bank!=bank_||
            camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
            camera->actual_.applicationEntities!=race.application_)return false;

@@ -25,7 +25,7 @@
         };
         //Reject mixed legacy snapshots BEFORE installing a pin or any new span.
         if(!s->sharedSpansAbsent(absent))return fail(d,"shared World topology already occurs in racer Bank");
-        for(const auto& binding:*candidates_->staticBindings()){
+        for(const auto& binding:staticBindings()){if(!binding.candidate)return fail(d,"track static binding without its candidate");
             const auto& c=binding.candidate->candidate.collision;
             if(!absent(&c.filter.flagsF8,sizeof(c.filter.flagsF8))||
                !absent(&c.copied40,sizeof(c.copied40))||!absent(&c.copied50,sizeof(c.copied50)))

@@ -53,7 +53,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareCareerSu
     const float offset=out.transition.offsetF21;
     if(!std::isfinite(offset))return stop(Impl::S::source,0x1c6f9c,"Results finite career summary offset");
     using Observation=::original_position_stats_adapter50LA::Owner;
-    const auto operation=p.loadedRosterOperation.lock();const auto generation=p.component.sessionGeneration;
+    const auto* const operation=p.loadedRoster;const auto generation=p.component.sessionGeneration;
     const auto current=[&](){const auto now=race.profile_->stamp();
         return careerRosterCurrentNative(operation,race,p.application,p.domain,generation,observer)&&
             now.generation==out.career.profileGeneration&&now.mode34==out.career.profileMode34&&p.context->live();
@@ -216,7 +216,7 @@ bool OriginalResults10450LA::endDispatchOwnerCurrent1AB520(const OriginalRaceCon
        !p.application->entityAuthority_.canRetire(race.entity_))return false;
     //Reuse the exact load-issued marker and its existing destruction-bound
     //Bank check. This is a native ownership proof, not original B0/phase/finish.
-    const auto operation=p.loadedRosterOperation.lock();
+    const auto* const operation=p.loadedRoster;
     return careerRosterCurrentNative(operation,race,p.application,p.domain,p.component.sessionGeneration,observer);
 }
 

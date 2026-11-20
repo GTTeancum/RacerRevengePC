@@ -94,6 +94,10 @@ class OriginalRaceConstructor50LA final {
     std::optional<std::array<std::uint32_t,4>> endReplayCenterC40_;
 
     void continueEndCaller1A7E40(OriginalRaceEndEntryDiagnostic50LA&)noexcept;
+    // The one native per-racer end-of-race owner (229F20 record, 229F80 replay
+    // posing, 219810 physics readers) the 1A7E40 caller borrows, every course.
+    // Defined in src\game\original_race_end_entry50la.cpp; null = owner unavailable.
+    ra_source_camera50LA::OwnershipBridge* borrowEndRuntimeNative()const noexcept;
     // Saved argument of the exact Root publication that reached1A7DD0.
     // Not latest-frame delta, an elapsed timer, or end admission authority.
     std::optional<std::uint32_t> endEntrySourceF20_;
@@ -197,6 +201,22 @@ class OriginalRaceConstructor50LA final {
         endPhysicsFirstS3_=true;endPhysicsIndexS1_=0;
         endWaitingPlaceScan_.reset();
     }
+    // Race-internal leaves of 1AC8E0 / 1ABD04 for common_race_start50CR::Owner and
+    // common_race_end50CR::Owner (W0 round 2: the VCR, Aural and 10C music owners
+    // befriend only the race). Defined in common_race_start50cr.cpp. A null race78
+    // is the original's beqz skip (ran=false), never a refusal.
+    //   1AC950 103210 on App+0 (Aural restart list); the caller tests App+0 (beqz 1AC948).
+    bool restartAural1AC950(const original_main_entry50KG::Application&,std::uint32_t& pc,const char*& why)noexcept;
+    //   1AC960 1A4AB0(race10C, 1.0).
+    bool restartMusicFade1AC960(OriginalRaceMusicManagerDiagnostic50LA&)noexcept;
+    //   1ACB18 (caller tests 11258==3 and bit4): 287BE0(race78).
+    bool resetRecordVcr1ACB18(bool& ran,OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    //   1ACD70..1ACDE0 (a1 == 0): race78: 287B60, then 287C80(1.0) when 11258==3,
+    //   else race78+B0 bit1 = 1. (1ACD68 1AFD80(B4) is the camera owner's countdown,
+    //   run by the resetCamera(a1) hook: see common_race_start50cr.cpp.)
+    bool restartVcrTail1ACD68(std::uint32_t mode11258,bool& ran,OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    //   1ABD04 (Practice 1ABC1C): 288630(race78) ghost backup.
+    bool backupPracticeVcr288630(bool& ran,OriginalSimpleVCRDiagnostic50LA&)noexcept;
     // Constructor1A65EC establishes a null78 slot. Native absence is NOT
     // loaded-null78. Only the private original load leaf below publishes it.
     std::unique_ptr<OriginalSimpleVCR50LA> vcr78Owner_;

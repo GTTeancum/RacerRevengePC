@@ -18,6 +18,7 @@
 #include "../../src/game/original_results104_storage50la.h"
 #include "../../src/game/original_race_end_entry50la.h"
 #include "../../src/game/original_race_ack_route50pd.h"
+#include "race_music50ie_fixture.h"
 #include <array>
 #include <cstdio>
 #include <optional>
@@ -91,9 +92,13 @@ bool Owner::continue1A7DD0(const ::original_position_stats_adapter50LA::Owner& o
         // per human, no countdown). The replay then plays from race78.
         // PORT STAND-IN (flagged): the VCR channel loop is the replay owner's
         // beginReplay (1ABAE8..1ABB68 shape), as for the Results-waiting replay.
-        if(!hooks.backupRecordActor288630||!(*hooks.backupRecordActor288630)())
-            return refuseToCourse(0x1ABD04u,"practice 288630 record actor backup unavailable");
+        // 1ABD04 288630(race78): race-internal (W0 round 2), through the race leaf.
         auto& r=*race;
+        {
+            bool ran=false;rr::game::OriginalSimpleVCRDiagnostic50LA vd;
+            if(!r.backupPracticeVcr288630(ran,vd))
+                return refuseToCourse(0x1ABD04u,vd.operation?vd.operation:"practice 288630 ghost backup refused");
+        }
         r.flags1B0KnownValue_=std::uint8_t(r.flags1B0KnownValue_|0x10u);
         r.flags1B0KnownMask_=std::uint8_t(r.flags1B0KnownMask_|0x10u);
         Receipt receipt;

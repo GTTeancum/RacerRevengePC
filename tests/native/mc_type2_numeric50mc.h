@@ -1,23 +1,38 @@
 #pragma once
-#include "mc_particle_source50mc.h"
+// TypeID 2 (sparks) derived emission, source 15D938..15DCD4, kept from the MC
+// lane and re-pointed (common rewrite, area E) over the one track emitter
+// owner's own definition type (track_particle_emitters50CR, common_track_emitters50cr.cpp).
+// Every numeric line and source pc is unchanged; only the inputs moved: the
+// Definition is any row carrying the 15AEA0 common fields plus the 15DD00
+// Sparks2 fields (particleGroup1B8, framesPerSet, gravityMultiplier,
+// groundLevel, restitution, emitRate188, movingEmitter200, minRange, maxRange,
+// growth180, initialSize184, particleLife17C, particleFlags198, randomMirrorX/Y).
+// The owner proves the row is a TypeID 2 row before calling.
 #include "../../src/game/original_gc_fire_emission50kg.h"
+#include "../../src/game/water_wake50jc.h"
+#include <array>
+#include <cfenv>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 
 namespace mc_type2_numeric50MC {
-namespace g=rr::game;namespace source=mc_particle_source50MC;
+namespace g=rr::game;
 using Status=g::OriginalGcSprayStatus50KG;
 // Source15D938..15DCD4 derived emission only. The concrete scene scheduler must
 // first execute common15A7A0, the actual19C<=.25 test and attachment visibility
 // gate15D8EC..934. This kernel does not manufacture those admission facts.
 // The actual source2 particles use Group6/type2 even though EMT names say water.
-inline g::OriginalGcSprayReceipt50KG emitAfterCommon(const source::Owner& authored,
- std::size_t definitionIndex,g::OriginalGcParticleManager50KG& manager,std::uint32_t owner,
+template<class Definition>
+inline g::OriginalGcSprayReceipt50KG emitAfterCommon(const Definition& f,
+ g::OriginalGcParticleManager50KG& manager,std::uint32_t owner,
  g::EffectControlState50BC& controls,std::int32_t& currentFrame190,float& carriedSize18C,
  float dt,std::uint32_t& sharedRawRandom)noexcept{
  using Math=g::water_wake_detail50jc::Math;g::OriginalGcSprayReceipt50KG r;
  const auto fail=[&](Status status,std::uint32_t pc){r.status=status;r.sourcePC=pc;return r;};
- if(!authored.ready()||definitionIndex>=authored.definitionCountLive()||!manager.prepared())return fail(Status::unprepared,0x15d938);
- const auto& f=authored.definition(definitionIndex);const auto* row=manager.emitter(owner);const auto* group=manager.group(f.particleGroup1B8);
- if(!row||!group||f.kind!=source::Kind::Sparks2||group->type!=6||row->particleGroup!=f.particleGroup1B8||
+ if(!manager.prepared())return fail(Status::unprepared,0x15d938);
+ const auto* row=manager.emitter(owner);const auto* group=manager.group(f.particleGroup1B8);
+ if(!row||!group||group->type!=6||row->particleGroup!=f.particleGroup1B8||
     row->framesPerSet!=f.framesPerSet||row->gravity!=f.gravityMultiplier||row->bouncePlane!=f.groundLevel||row->bounceFactor!=f.restitution||
     currentFrame190<group->first||currentFrame190>group->last)return fail(Status::storage,0x15dd98);
  if(std::fegetround()!=FE_TONEAREST||!std::isfinite(dt)||dt<0||dt>1)return fail(Status::arithmetic,0x15d880);

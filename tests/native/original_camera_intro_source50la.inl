@@ -48,25 +48,27 @@ bool adoptNativeIntro177750(std::uint32_t& pc)noexcept {
     }
     pc=n.pc=0x177900;
     const auto& authoring=*actual_.taIntroAuthoring;
-    if(authoring.trackId()!="RA"||!nativeTaIssuance_||
-       authoring.providerIdentity()!=nativeTaIssuance_->provider.get())return false;
+    if(!nativeTaIssuance_||authoring.providerIdentity()!=nativeTaIssuance_->provider.get())return false;
     const auto script=authoring.originalScriptBytes();
-    //The exact authenticated98-byte RA member contains NumberOfLines=2.
-    //Read that source scalar, not eventCount as a surrogate for the parser.
+    //Every course: the course's own authenticated scrptLns.ini member opens
+    //with [General] NumberOfLines. Read that source scalar (decimal, bounded
+    //by the line storage), not eventCount as a surrogate for the parser.
     constexpr char prefix[]="[General]\r\nNumberOfLines = ";
     constexpr std::size_t valueOffset=sizeof(prefix)-1;
     pc=n.pc=0x177930;
-    if(script.size!=98u||!script.data||std::memcmp(script.data,prefix,valueOffset)||
-       script.data[valueOffset]!='2'||script.data[valueOffset+1]!='\r'||
-       script.data[valueOffset+2]!='\n')return false;
-    const unsigned lines=script.data[valueOffset]-'0';
+    if(!script.data||script.size<valueOffset+3u||std::memcmp(script.data,prefix,valueOffset))return false;
+    unsigned lines=0;std::size_t at=valueOffset;
+    while(at<script.size&&at<valueOffset+2u&&script.data[at]>='0'&&script.data[at]<='9')
+        lines=lines*10u+unsigned(script.data[at++]-'0');
+    if(at==valueOffset||at+1u>=script.size||script.data[at]!='\r'||script.data[at+1u]!='\n'||
+       lines>taLines_.size())return false;
     if(lines!=authoring.eventCount())return false; //Backing corroboration only.
     for(unsigned i=1;i<=lines;++i){
         pc=n.pc=0x17797c;
         const auto* row=authoring.event(i);
         if(!row||row->eventId!=i)return false;
-        //Exact hash-pinned decimal-prefix reads: RA1,2,3,4→1 and5,6,7→5.
-        //Span is absent and source default0; do not fabricate bytes2..7.
+        //The row's decimal-prefix camera number and span as authored; an
+        //absent span is the source default0. Do not fabricate bytes2..7.
         if(row->cameraNumber&&row->cameraNumber<=count){
             pc=n.pc=0x1779cc;taLines_[row->cameraNumber-1].eventKey=static_cast<std::int8_t>(i);
             pc=n.pc=0x1779e4;taLines_[row->cameraNumber-1].span=row->span;

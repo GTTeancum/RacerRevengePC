@@ -5,6 +5,7 @@
 // Geometry is50ET/50CP.
 #include "authored_runtime_ground50cp_fixture.h"
 #include "track_navigation50eu.h"
+#include "navigation_view50cr.h"
 #include "vehicle_frame49w.h"
 #include <array>
 #include <bit>
@@ -119,7 +120,7 @@ inline bool validPlan(const Plan& plan) noexcept {
 // Common source geometry path; each public entry point separately authenticates
 // its own reached native failure or explicit Ready-boundary host request before
 // entering. Never forge a cut or advance navigation for a host reset.
-inline bool prepareCheckpoint(const TrackNavigation50EU& map,
+inline bool prepareCheckpoint(const NavigationView50CR& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,float lift,const LiveZoneWorld50EN& world,
     Policy policy,const ImpactTransitionResult50C* damageDecision,
@@ -127,9 +128,10 @@ inline bool prepareCheckpoint(const TrackNavigation50EU& map,
     if(state.fields.vehicle58||state.fields.vehicle3C||
        !state.bodies.main.domain.sceneAttached||state.bodies.main.domain.sceneHasParent)
         return detail::fail(d,Error::PlayerDomain);
-    if(!map.gatesPrepared||!map.indicesPrepared||!map.track.count||
-       map.track.count>maxUndertrackNodes50ET||!world.portalHeads||
-       !world.zoneCount||world.zoneCount>256)
+    // The one map view of the common navigation store (every course), bound
+    // to this same live world; its node count is the file's own.
+    if(!map.runtimeValid()||map.role()!=NavigationRole50CR::map||!map.sameWorld(world)||
+       !map.nodeIndex78()||!world.portalHeads||!world.zoneCount||world.zoneCount>256)
         return detail::fail(d,Error::Navigation);
     const auto index=bindings.lifecycle.main190;
     if(!detail::validIndex(index))return detail::fail(d,Error::Scene);
@@ -148,12 +150,12 @@ inline bool prepareCheckpoint(const TrackNavigation50EU& map,
     input.worldPosition[3]=input.localPosition[3]=1.f;
     input.lift7EC=lift;
     Plan candidate{};
-    if(!selectUndertrackReposition50ET(map.track,progress.reset,input,
+    if(!selectUndertrackReposition50ET(map,progress.reset,input,
                                       candidate.selection,d.source))
         return detail::fail(d,Error::Selection);
-    if(candidate.selection.writesC80||candidate.selection.anchorNode>=map.track.count)
+    if(candidate.selection.writesC80||candidate.selection.anchorNode>=map.count())
         return detail::fail(d,Error::Navigation);
-    candidate.nodeIndex78=map.nodeIndex78[candidate.selection.anchorNode];
+    candidate.nodeIndex78=map.nodeIndex78()[candidate.selection.anchorNode];
     if(static_cast<std::size_t>(candidate.nodeIndex78)>=world.zoneCount)
         return detail::fail(d,Error::Navigation);
     // This is50EN's established native ordinal+1 ref translation, not a guest
@@ -193,7 +195,7 @@ inline bool prepareCheckpoint(const TrackNavigation50EU& map,
 // current damage/navigation retention, and subsequent actual ground preflight
 // are shared with recovery. A held input must not generate repeated requests.
 // The source state is read-only and false preserves out.
-inline bool prepareManualCheckpoint(const TrackNavigation50EU& map,
+inline bool prepareManualCheckpoint(const NavigationView50CR& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,float lift,const LiveZoneWorld50EN& world,
     Plan& out,Diagnostic& d) noexcept {
@@ -211,7 +213,7 @@ inline bool prepareManualCheckpoint(const TrackNavigation50EU& map,
 // to a bounded copy of its scene graph. Source input uses refreshed world190
 // and original local190, plus the existing lifecycle shared434650 up vector.
 // All records/spans must be separately backed; output is unchanged on false.
-inline bool prepare(const TrackNavigation50EU& map,
+inline bool prepare(const NavigationView50CR& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,const VehicleFrameDiagnostic49W& cut,
     float lift,const LiveZoneWorld50EN& world,Plan& out,Diagnostic& d) noexcept {
@@ -232,7 +234,7 @@ inline bool prepare(const TrackNavigation50EU& map,
 // Source checkpoint/zone/ground semantics are identical to undertrack recovery,
 // but the NEW vehicle intentionally starts with four zero damage lanes. The old
 // damaged frame is untouched. This is not native wreck/detachment continuation.
-inline bool prepareDamageRecovery(const TrackNavigation50EU& map,
+inline bool prepareDamageRecovery(const NavigationView50CR& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,const ImpactTransitionResult50C& decision,
     const VehicleFrameDiagnostic49W& cut,std::uint32_t thresholdBits,
@@ -268,7 +270,7 @@ inline bool prepareDamageRecovery(const TrackNavigation50EU& map,
 //50EN already preserves its live membership on this failure; this routine never
 // touches those owners or supplies unlink semantics. Ground must still succeed
 // before the host may discard the old session. False preserves out.
-inline bool preparePortalRecovery(const TrackNavigation50EU& map,
+inline bool preparePortalRecovery(const NavigationView50CR& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,const LiveZoneResult50EN& decision,
     float lift,const LiveZoneWorld50EN& world,Plan& out,Diagnostic& d) noexcept {

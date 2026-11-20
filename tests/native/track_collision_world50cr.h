@@ -365,9 +365,18 @@ public:
  }
  // ONE synchronous indexed query of one racer collider under the trigger action lease
  // (2A0B30 dispatch runs from inside the query). op(track_runtime_storage50IG::Storage&)->bool.
- template<class Operation> bool queryRacer(const QueryLease& lease,Operation&& op)noexcept {
+ // bank: the race's racer Bank (native_racer50HN::Bank). The query must run inside the caller's
+ // single visit of lease.slot; for its whole span the Bank's one query fence is up (queryActive_,
+ // queryIssuer_=this: no read, bind, visit or nested query), cleared on every exit after the
+ // trigger lease ends (generalised from mc_query50MC::Binding::query).
+ template<class RacerBank,class Operation> bool queryRacer(RacerBank& bank,const QueryLease& lease,Operation&& op)noexcept {
   if(!queryReady())return false;
+  if(bank.retired_||!bank.sealed_||lease.slot>=bank.count_||bank.queryActive_||bank.queryIssuer_||bank.terminalBlocked_||
+    bank.visitDepth_!=1||bank.currentSlot_!=lease.slot||bank.pendingToken_||bank.retirementVisit_||
+    bank.animationVisit_||bank.animationBlocked_)return false;
   auto borrow=query();if(!borrow)return false;auto* storage=borrow.storage();if(!storage)return false;
+  struct Fence {RacerBank& b;~Fence(){b.queryActive_=false;b.queryIssuer_=nullptr;}};
+  bank.queryActive_=true;bank.queryIssuer_=this;Fence fence{bank};
   if(!actions_){try{return std::invoke(std::forward<Operation>(op),*storage);}catch(...){return false;}}
   ta::ActionLease actual{lease.main690,lease.collider,lease.nodeC80,lease.listener,lease.listenerCount};
   ta::Owner::QueryBorrow scope(*actions_,actual);if(!scope)return false;
@@ -403,6 +412,32 @@ public:
   for(const auto& collider:group->colliders)for(auto id:collider.membersCC)if(id)return false;
   if(removed!=validation.pairs)return false;
   return contactsRetired_=true;
+ }
+ // The same teardown with the racer Bank's one terminal fence (generalised from
+ // mc_query50MC::retireContacts, every course): the Bank is closed to normal admission
+ // (terminalBlocked_, left set) and one bounded internal all-peer sweep (terminalVisit_ for
+ // its span) detaches every racer query row in this world and removes every trigger
+ // membership, stopped peers included; then the contact pairs above. Idempotent.
+ template<class RacerBank> bool retireContacts(RacerBank& bank)noexcept {
+  if(contactsRetired_)return true;
+  if(!thread()||phase_!=Phase::Retiring||!actualIdle()||!storage_||!storage_->get()||structuralBorrows_||
+    !lane_.detached()||bank.terminalVisit_||bank.queryActive_||bank.visitDepth_)return false;
+  auto& s=*storage_->get();
+  bank.terminalBlocked_=true;
+  try{
+   bank.terminalVisit_=true;
+   struct End {RacerBank& b;~End(){b.terminalVisit_=false;}}end{bank};
+   if(!bank.visitAll([&](std::size_t){
+     if(s.queue.count)return false;
+     // Every racer query row in the one world (idempotent across peers; the shared rows
+     // are not banked, so the first peer's sweep detaches them all).
+     if(!s.detachAllRows())return false;
+     if(!removeTriggers())return false;
+     for(std::size_t i=totalCount();i<s.registrations.size();++i){const auto& r=s.registrations[i];if(r.owner||r.slot||r.encodedObject)return false;}
+     return true;
+    }))return false;
+  }catch(...){return false;}
+  return retireContacts();
  }
  Phase phase()const noexcept{return phase_;}const Payload& payload()const noexcept{return payload_;}
  const authored_runtime_ground50cp_fixture::ColdScene* ground()const noexcept{return thread()?scene_.get():nullptr;}

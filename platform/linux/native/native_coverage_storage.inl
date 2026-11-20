@@ -53,7 +53,7 @@
         }
     } coverageLive, coverageSpare;
     U coverageProgram=0,coverageVertex=0,coverageFragment=0,coverageArray=0;
-    I coverageRaCompositionUniform=-1;
+    I coverageCompositionUniform=-1;
     I coveragePayloadUniform=-1,coverageDepthUniform=-1,coverageDestinationUniform=-1;
     bool hasCoverageResources() const noexcept;
     bool checkCoverageSupport(I major,I minor) noexcept;

@@ -151,6 +151,10 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
             std::move(actual382B38),generation,diagnostic);
     });
     if(!prepared)return false;
+    // The same PSM/PST bytes, retained on the manager for the one particle
+    // material owner (continuation: particleMaterials.load(particlePsm, particlePst)).
+    require(owner.retainAtlasMaterialSources(std::move(psm),std::move(pst)),
+        "Track particle PSM/PST retention rejected");
     require(provider->sealed()&&provider->revision()==providerRevision&&owner.material150()&&
         owner.material150()->table382B38()==domain->materials382B38().get(),
         "Track particle construction changed its canonical source ownership");

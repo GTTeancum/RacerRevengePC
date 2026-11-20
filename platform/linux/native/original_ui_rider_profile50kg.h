@@ -70,59 +70,10 @@ public:
     bool initializeAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    // Explicit process-local capture fixture, NOT186EF0 or an earned award.
-    // Only rider7 availability and mode0 remembered selection differ. No saved
-    // profile, career result, progression, or arbitrary rider setter exists.
-    bool initializeGasganoTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
-        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
     // Actual persisted names, not racer localization IDs3C. Copies are owned
     // and survive later profile changes. Failure preserves out.
     bool careerName219D(std::uint32_t career,OriginalPersistedProfileName50KG& out)const noexcept;
     bool playerName10F68(std::uint32_t player,OriginalPersistedProfileName50KG& out)const noexcept;
-    bool gasganoTestProfile() const noexcept;
-    // Explicit native test override, not the retail cheat or earned progression.
-    // Only visible, nonfresh riders with existing native Course owners:3/8/22.
-    // Changes one startup unlock and mode0 remembered rider; no track/save changes.
-    bool initializeVisibleRiderTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,std::uint32_t rider,
-        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    std::uint32_t visibleRiderTestProfile() const noexcept;
-    // Explicit process-local Mawhonic/Brightlands fixture: rider9 available,
-    // mode0 remembers9, and original course prefix availability is5. No earned
-    // medal/progression or saved state is manufactured; RA runtime stays gated.
-    bool initializeMawhonicRylothTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
-        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool mawhonicRylothTestProfile() const noexcept;
-    // Explicit process-local Wan16/MB test profile; no earned progression or save IO.
-    // This profile does not grant native racer/course capability.
-    bool initializeWanMbTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool wanMbTestProfile() const noexcept;
-    // Separate process-local Gasgano7/SC provenance; never the legacy Gasgano
-    // unattended SA fixture. Prefix9/remembered9 are not race capability.
-    bool initializeGasganoScTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool gasganoScTestProfile() const noexcept;
-    // Distinct process-local Tzidik24/TC provenance, not gameplay readiness.
-    bool initializeTzidikTcTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool tzidikTcTestProfile() const noexcept;
-    // Separate Scorch17/RC test provenance, not runtime course readiness.
-    bool initializeScorchRcTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool scorchRcTestProfile() const noexcept;
-    // Separate Sebulba18/TB process-local provenance; no runtime readiness.
-    bool initializeSebulbaTbTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool sebulbaTbTestProfile() const noexcept;
-    bool initializeKraidGbTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
-    bool kraidGbTestProfile() const noexcept;
-    bool initializeYoungAnakinMcTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&,
-        std::uint32_t mcRider=1) noexcept;
     // Native beta progress is a separate versioned user file, never a PS2 card.
     // Load is one-shot at application startup, before any frontend owns snapshots.
     enum class BetaPersistenceStatus {notStarted,ready,loaded,saved,disabledFixture,
@@ -131,7 +82,6 @@ public:
     bool saveNativeBetaProgress() noexcept;
     bool reloadNativeBetaProgressFromMenu() noexcept;
     void bindNativeBetaAutosave(std::shared_ptr<const game::OriginalUiGameSettingsProfile50KG>) noexcept;
-    bool youngAnakinMcTestProfile() const noexcept;
     // Source17DE80 loads actual localized names before1801D0. One explicit
     // startup population, never a menu-entry reset or missing-save fallback.
     bool initializeHallRecordsAtApplicationStartup(const assets::OriginalUiEnglish50KG&,
@@ -364,8 +314,8 @@ private:
     // Represents only proven7E4 bit0; upper seven bits stay unrepresented.
     bool beginPodRace1A66CC(const OriginalUiMainProfile50KG& actualCommon)noexcept;
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
-        OriginalUiRiderProfileDiagnostic50KG&,bool gasganoSc=false,bool tzidikTc=false,bool scorchRc=false,bool sebulbaTb=false,bool kraidGb=false,bool youngAnakinMc=false,std::uint32_t mcRider=1) noexcept;
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
     friend class OriginalUiUnlockSession50PD;
     friend class OriginalUiWinSession50PD;
     // 20B480: grant ONE check (187F40/187FF0/188050/1880D0/188150/1881D0/

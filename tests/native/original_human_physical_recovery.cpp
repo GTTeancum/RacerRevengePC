@@ -3,9 +3,7 @@
 // Existing reset/resume implementations and their six-owner dispatch templates.
 // Moved verbatim from the header; ownership, sequencing and exception contracts are unchanged.
 namespace native_original_human_recovery {
-// Constant-true legacy admission leaves every original guard/effect ordered.
-bool navigationReadyOrdinaryShared50MB(const Owners&) noexcept {return true;}
-bool navigationReadyOrdinaryShared50MB(const Owners50MB& owners) noexcept {
+bool navigationReadyOrdinaryShared50MB(const Owners& owners) noexcept {
     return owners.mapTrack.runtimeValid()&&owners.mapTrack.role()==NavigationRole50CR::map&&
         owners.mapTrack.sameWorld(owners.collisionWorld);
 }
@@ -18,7 +16,7 @@ bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
 // tail runs separately only AFTER this lease has released the visibility world.
 // No allocation, guest execution or replacement controls are used.
 template<class OwnersT>
-    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>)
+    requires std::is_same_v<OwnersT,Owners>
 inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
@@ -197,16 +195,10 @@ bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bin
     Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
 }
-bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
-    Owners50MB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
-}
 
 // The actual228BBC continuation supplies its own saved pre-reset base pose.
 template<class OwnersT>
-    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>)
+    requires std::is_same_v<OwnersT,Owners>
 inline bool resumeOrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     const BaseUndertrackContinuation50X& base,State& state,OwnersT& owners,
@@ -222,16 +214,10 @@ bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
 }
-bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    const BaseUndertrackContinuation50X& base,State& state,Owners50MB& owners,
-    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
-}
 
 // Distinct1A17A4 event call. It never manufactures a base-frame cursor.
 template<class OwnersT>
-    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>)
+    requires std::is_same_v<OwnersT,Owners>
 inline bool resetController2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,State& state,OwnersT& owners,
@@ -242,12 +228,6 @@ inline bool resetController2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,
 bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,State& state,Owners& owners,
-    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
-}
-bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    std::uint64_t serial,State& state,Owners50MB& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
 }

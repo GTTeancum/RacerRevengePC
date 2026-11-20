@@ -10,7 +10,7 @@ namespace original_camera_cycle_audio50KX { class Owner; }
 namespace rr::platform { class GameHost50ER; class VehicleWindowGl50DS; }
 namespace original_results_roster50LA { class Read; }
 namespace original_position_stats_adapter50LA { class Owner; }
-namespace ra_cold_roster50LA { class Operation; }
+namespace common_roster50CR { class Owner; }
 namespace native_racer50HN { class Bank; }
 namespace rr::assets {
 class OriginalStandardMaterialDomain50LA;
@@ -51,14 +51,14 @@ class OriginalResults10450LA final {
     static const ::native_racer50HN::Bank* demandObserverBankIdentity1C16F8(
         const ::original_position_stats_adapter50LA::Owner&)noexcept;
     bool demandRosterCountCurrent1C16F8(const OriginalRaceConstructor50LA&,
-        const ::original_position_stats_adapter50LA::Owner&,const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+        const ::original_position_stats_adapter50LA::Owner&,const ::common_roster50CR::Owner*,
         const ::native_racer50HN::Bank*,std::size_t&)const;
     //Private synchronous custody reads; no cached readiness or new ownership.
-    static bool careerRosterCurrentNative(const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+    static bool careerRosterCurrentNative(const ::common_roster50CR::Owner*,
         const OriginalRaceConstructor50LA&,const std::shared_ptr<OriginalApplicationEntities50LA>&,
         const std::shared_ptr<assets::OriginalStandardMaterialDomain50LA>&,std::uint64_t,
         const ::original_position_stats_adapter50LA::Owner&)noexcept;
-    static bool careerRacerCurrentNative(const std::shared_ptr<::ra_cold_roster50LA::Operation>&,
+    static bool careerRacerCurrentNative(const ::common_roster50CR::Owner*,
         std::uint32_t)noexcept;
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -114,18 +114,6 @@ bool Owner::publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner* o
     row.environment44Published=true;
     return true;
 }
-// Late World+11C adopts the SAME already-produced zone44 value. Never
-// replay publishRaStaticZone2741C0 or overwrite live projection/selection.
-bool Owner::nativeStaticZone2741C0Current(const ::ra_pod_scene50LA::Owner* world,
-    const ::ra_static_model_cold50LA::Owner* models,const assets::World48F& source,
-    const CollectionZone50BX* rows,std::size_t zone,std::uint32_t& pc)const noexcept {
-    if(!nativeSceneRoles270900Current(world,source,rows,pc)||!raStaticOwnerIdle(models)||
-       zone>=10u||!storage_->renderAuthoringReady||storage_->renderAuthoring.size()<=zone||
-       storage_->zoneProjection.size()<=zone)return false;
-    const auto& authored=storage_->renderAuthoring[zone];
-    const auto& actual=storage_->zoneProjection[zone];pc=0x2741c0;
-    return authored.environmentNodeVisible&&actual.environment44Published&&actual.environmentVisible44==1u;
-}
 bool Owner::commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner)noexcept {
     if(!raStaticVisibility(owner))return false;
     auto& s=*storage_;bool found=false;

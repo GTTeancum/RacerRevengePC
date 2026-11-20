@@ -5,6 +5,7 @@
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_camera_session50kx.h"
 #include "../../tests/native/native_ai_session50iv_fixture.h"
+#include "../../tests/native/common_track50cr.h"
 #include <exception>
 #include <limits>
 #include <optional>
@@ -19,8 +20,8 @@ struct OriginalRaceTimingManager50LA::Impl final {
     native_ai50IV::Session* native=nullptr;
     const native_racer50HN::Bank* bank=nullptr;
     const OriginalRaceConstructor50LA* race48=nullptr;
-    const TrackNavigation50EU* map=nullptr;
-    const AiTrackMetadata50IU* metadata=nullptr;
+    // The race's map B8 navigation store (common Track, every course), identity only.
+    const ::common_track50CR::NavigationStorage* map=nullptr;
     bool counted=false,constructed=false,closed=false;
     //Source34 has no existing native counterpart. It is not the native30
     //clock, Race94 countdown or Race98 fade timer; no duplicate clock runs.
@@ -84,8 +85,7 @@ bool OriginalRaceTimingManager50LA::constructed()const noexcept {
 }
 bool OriginalRaceTimingManager50LA::continueNativeAssociation(OriginalRaceConstructor50LA& race,
     native_ai50IV::Session& actualNative,const native_racer50HN::Bank& actualBank,
-    const TrackNavigation50EU& actualMap,const AiTrackMetadata50IU& actualMetadata,
-    std::uint32_t& pc)noexcept {
+    const ::common_track50CR::NavigationView& actualMap,std::uint32_t& pc)noexcept {
     pc=0x1a7754;if(!impl_)return false;auto& p=*impl_;
     if(!p.componentCurrent()||!p.constructed||race.timingB4_.get()!=this||
        race.application_!=p.application||race.entity_.sessionGeneration!=p.component.sessionGeneration||
@@ -127,16 +127,18 @@ bool OriginalRaceTimingManager50LA::continueNativeAssociation(OriginalRaceConstr
         actual.manager.time30=0.f;p.scalar34=0.f;
         actual.finished44.count54=0;actual.retired40.activeCount50=*p.count4C;
         actual.retired40.bound=true; //Native custody, not a source field.
-        p.map=&actualMap;p.metadata=&actualMetadata;p.cut=Impl::Cut::map;
+        p.map=actualMap.storage();p.cut=Impl::Cut::map;
     }
-    if(p.map!=&actualMap||p.metadata!=&actualMetadata||p.race48!=&race)return false;
+    if(!p.map||p.map!=actualMap.storage()||actualMap.role()!=::common_track50CR::NavigationRole::map||
+       p.race48!=&race)return false;
     if(p.cut==Impl::Cut::map){
         pc=0x1afb98;
-        if(!actualMetadata.bound||actualMap.track.count<2u)return false;
+        const auto* metadata=actualMap.metadata();const auto* nodes=actualMap.nodes();
+        if(!actualMap.runtimeValid()||!metadata||!nodes||actualMap.count()<2u)return false;
         //Actual retained MAP B8 scalar source; pure arithmetic shared with
         //legacy native initialization. Failure retains constructor/list effects.
-        if(calculateOriginalAiTrackLength38(actualMetadata.nodes[1].distanceToFinish60,
-            actualMap.track.nodes[0].position,actualMap.track.nodes[1].position,
+        if(calculateOriginalAiTrackLength38(metadata[1].distanceToFinish60,
+            nodes[0].position,nodes[1].position,
             actual.trackLength38)!=OriginalAiFinishStatus::Complete)return false;
         p.cut=Impl::Cut::nativeReady;
     }
@@ -208,7 +210,7 @@ bool OriginalRaceTimingManager50LA::retireNativeDetached(std::uint32_t& pc)noexc
     }
     //Native detached-count withdrawal only. Borrowed Bank/Setup may already
     //have retired: do NOT dereference/reset them or fabricate1AF8C0 array frees.
-    p.native=nullptr;p.bank=nullptr;p.race48=nullptr;p.map=nullptr;p.metadata=nullptr;
+    p.native=nullptr;p.bank=nullptr;p.race48=nullptr;p.map=nullptr;
     p.closed=true;return true;
 }
 

@@ -25,10 +25,12 @@ int main(int argc,char** argv) {
         if(accepted!=expected)throw std::runtime_error(std::string("unexpected mode admission: ")+mode+" "+route);
         ++checked;
     };
-    for(const char* route:{"main-rider-course-ta","main-dud04-course-ga","main-ben02-course-ga",
-                          "main-alder10-course-ma","main-ody11-course-ma","main-rider-course-sa"})check("0",route,true);
-    check("0","main-occo20-course-sa",false);
-    check("0","",false);check("invalid","main-dud04-course-ga",false);
-    check("1","main-rider-course-sa",true);check("1","",true);
+    // Common rewrite B-C21: one free-play route for every course and pod (the course is
+    // picked on the Course screen, RR_TEST_COURSE); the per-course routes are refused.
+    for(const char* route:{"main-rider-course","main-rider-course-ta"})check("0",route,true);
+    for(const char* retired:{"main-dud04-course-ga","main-ben02-course-ga","main-alder10-course-ma",
+                            "main-ody11-course-ma","main-rider-course-sa","main-occo20-course-sa"})check("0",retired,false);
+    check("0","",false);check("invalid","main-rider-course",false);
+    check("1","main-rider-course",true);check("1","",true);
     std::printf("capture mode admission: %u cases passed\n",checked);
 }

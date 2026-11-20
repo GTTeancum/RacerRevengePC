@@ -170,12 +170,8 @@ private:
     bool readEndRetirementCD4(const ResultsRecordIdentity&,std::uint32_t&,Diagnostic&)const noexcept;
     bool readEndPlaceCCC(const ResultsRecordIdentity&,std::int32_t&,Diagnostic&)const noexcept;
     struct RadarObservation {
-        const rr::game::TrackNavigation50EU* map=nullptr;
-        rr::game::TrackNavigationView50EU mbMap{};
-        rr::game::TrackNavigationView50TC tcMap{};
-        rr::game::TrackNavigationView50TB tbMap{};
-        rr::game::TrackNavigationView50GB gbMap{};
-        rr::game::TrackNavigationView50MC mcMap{};
+        // The race's one map view (the camera's actualRadarMap), every course.
+        common_track50CR::NavigationView map{};
         std::array<float,3> center{};
         float headingE4=0;
         std::array<std::array<float,3>,8> racerCenters{};
@@ -192,30 +188,13 @@ private:
         rr::game::OriginalPositionStatsNumbers50LA observation;
         if(!capture(observation,d))return false;
         const auto& c=*camera_;
-        const bool mb=c.actual_.actualRadarMapMb.gatesPrepared();
-        const bool tc=c.actual_.actualRadarMapTc.gatesPrepared();
-        const bool tb=c.actual_.actualRadarMapTb.gatesPrepared();
-        const bool gb=c.actual_.actualRadarMapGb.gatesPrepared();
-        const bool mc=c.actual_.actualRadarMapMc.gatesPrepared();
-        if(mc?(gb||tb||tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapMc.runtimeValid()||
-               c.actual_.actualRadarMapMc.role()!=rr::game::NavigationRole50MC::Map||c.actual_.actualRadarMapMc.count()!=173u):
-           gb?(tb||tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapGb.runtimeValid()||
-               c.actual_.actualRadarMapGb.role()!=rr::game::NavigationRole50GB::Map):
-           tb?(tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTb.runtimeValid()||
-               c.actual_.actualRadarMapTb.role()!=rr::game::NavigationRole50TB::Map):
-           tc?(mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTc.runtimeValid()||
-               c.actual_.actualRadarMapTc.role()!=rr::game::NavigationRole50TC::Map):
-           mb?(c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapMb.runtimeValid()||
-               c.actual_.actualRadarMapMb.role()!=rr::game::NavigationRole50MB::Map):
-              (!c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapB8->gatesPrepared)){
+        // One rule for every course: the camera's map view is the race's
+        // map role, prepared and runtime-valid (1924C0 reads App+B8).
+        const auto& map=c.actual_.actualRadarMap;
+        if(!map.runtimeValid()||map.role()!=common_track50CR::NavigationRole::map){
             d.status=Status::owner;return false;}
         try {
-            RadarObservation next;next.map=c.actual_.actualRadarMapB8;
-            if(tb)next.tbMap=c.actual_.actualRadarMapTb;
-            if(gb)next.gbMap=c.actual_.actualRadarMapGb;
-            if(mc)next.mcMap=c.actual_.actualRadarMapMc;
-            if(tc)next.tcMap=c.actual_.actualRadarMapTc;
-            if(mb)next.mbMap=c.actual_.actualRadarMapMb;
+            RadarObservation next;next.map=map;
             next.publication=observation.cameraPublication;
             if(observation.subtype11258==3){
                 std::uint8_t flags29=0;

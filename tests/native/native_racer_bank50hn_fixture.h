@@ -32,10 +32,7 @@ namespace track_animation_binding50AN { class Binding; }
 namespace track_animation_world50AN { class World; }
 namespace native_racer_contact50HW { class SnapshotAccess; }
 namespace roster_pod_contact50PC { class SlotAccess; }
-namespace mc_collision_world50MC { class Owner; }
-namespace gb_query50GB { class Binding; }
-namespace mc_query50MC { class Binding; }
-namespace gb_collision_world50GB { class Owner; }
+namespace track_collision_world50CR { class Owner; } // the one per-racer query bracket (queryRacer)
 namespace racer_cold_visibility50CR { class Retirement; } // W0 round 2: one retirement for every course
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
@@ -94,7 +91,7 @@ public:
         ReadHandle()=default;
     };
     template<class T> ReadHandle<T> bindRead(const T& value) const {
-        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||queryActive_||terminalBlocked_)
             throw std::runtime_error("racer read binding requires a sealed idle bank");
         const auto address=reinterpret_cast<std::uintptr_t>(&value);
         for(const auto& span:spans_){
@@ -111,7 +108,7 @@ public:
         throw std::runtime_error("racer read field is not within one registered owner span");
     }
     template<class T> T read(std::size_t index,const ReadHandle<T>& handle) const {
-        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||mcQueryActive_||gbQueryActive_||mcTerminalBlocked_||gbTerminalBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||animationBlocked_||queryActive_||terminalBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
             throw std::runtime_error("invalid or leased native racer scalar read");
         T value;
         // Slot0 may have advanced since its last save. Every nonzero slot is
@@ -154,7 +151,7 @@ public:
     // even if the callback throws. No allocation occurs after seal().
     template<class F> decltype(auto) visit(std::size_t index,F&& operation) {
         if(retired_||!sealed_||index>=count_||visiting_||pendingToken_||
-           mcQueryActive_||gbQueryActive_||(mcTerminalBlocked_&&!mcTerminalVisit_)||(gbTerminalBlocked_&&!gbTerminalVisit_)||
+           queryActive_||(terminalBlocked_&&!terminalVisit_)||
            (animationBlocked_&&!animationVisit_))
             throw std::runtime_error("invalid or nested native racer visit");
         if(!index){
@@ -188,7 +185,7 @@ public:
     template<class F> bool visitMany(const std::size_t* order,
         std::size_t visitCount,F&& operation) {
         if(retired_||!sealed_||visiting_||pendingToken_||visitCount>count_||
-           mcQueryActive_||gbQueryActive_||(mcTerminalBlocked_&&!mcTerminalVisit_)||(gbTerminalBlocked_&&!gbTerminalVisit_)||
+           queryActive_||(terminalBlocked_&&!terminalVisit_)||
            (animationBlocked_&&!animationVisit_))
             throw std::runtime_error("invalid or nested native racer batch visit");
         for(std::size_t position=0;position<visitCount;++position)
@@ -244,7 +241,7 @@ public:
     // and registration spans before releasing the actual RA lifetime owner.
     bool retireNativeBacking()noexcept {
         if(retired_)return true;
-        if(visiting_||readBlocked_||visitDepth_||retirementVisit_||animationVisit_||mcTerminalVisit_||gbTerminalVisit_||pendingToken_||sourceIssuer_||nativeFifoPins_||animationIssuer_||mcQueryIssuer_||gbQueryIssuer_||mcQueryActive_||gbQueryActive_||
+        if(visiting_||readBlocked_||visitDepth_||retirementVisit_||animationVisit_||terminalVisit_||pendingToken_||sourceIssuer_||nativeFifoPins_||animationIssuer_||queryIssuer_||queryActive_||
            (raWorldLifetime_&&!raWorldLifetime_->canRetire()))return false;
         retired_=true;sealed_=false;
         for(auto& slot:slots_)std::vector<unsigned char>().swap(slot.bytes);
@@ -255,20 +252,18 @@ public:
     std::size_t bytesPerRacer()const noexcept{return bytes_;}
 private:
     friend class ::track_animation_binding50AN::Binding;
-    friend class ::mc_query50MC::Binding;
-    const ::mc_query50MC::Binding* mcQueryIssuer_=nullptr;
-    bool mcQueryActive_=false,mcTerminalBlocked_=false,mcTerminalVisit_=false;
-    friend class ::gb_query50GB::Binding;
-    const ::gb_query50GB::Binding* gbQueryIssuer_=nullptr;
-    bool gbQueryActive_=false,gbTerminalBlocked_=false,gbTerminalVisit_=false;
-    // Only the concrete GB Binding may gate a global pose publication and
-    // temporarily enter visitAll while blocked. No generic readiness setter or
-    // selected-slot receipt is added. A retained issuer pins backing lifetime
-    // until its four moving memberships have retired in every actual arena.
+    // ONE racer query fence for every course (W0-RULINGS area C item 5; replaces the MC and GB
+    // Binding pairs). Only the one collision world's per-racer query bracket
+    // (track_collision_world50CR::Owner::queryRacer) writes these: queryActive_/queryIssuer_ for
+    // the span of one synchronous indexed query inside the caller's single visit of that racer
+    // (no read, bind, visit or nested query while set). terminalBlocked_/terminalVisit_ are the
+    // terminal all-peer contact sweep's gate: while blocked only that sweep may enter visitAll.
+    friend class ::track_collision_world50CR::Owner;
+    const ::track_collision_world50CR::Owner* queryIssuer_=nullptr;
+    bool queryActive_=false,terminalBlocked_=false,terminalVisit_=false;
+    // retireNativeBacking refuses while an issuer or an active query is set.
     //Declared before span/snapshot owners so backing retires after them even
-    //during normal destruction. Binding close clears only the issuer; later
-    //actual Bank retirement releases the concrete aggregate retain.
-    // Distinct MC global publication fence. Actual animation graph/motion/RNG
+    //during normal destruction. Actual animation graph/motion/RNG
     // memory remains explicitly excluded from per-racer mutable Bank spans.
     // ONE track-animation publication fence (track_animation_binding50an.h, every course
     // whose collision world banks its animation lane); replaces the GB and MC copies.

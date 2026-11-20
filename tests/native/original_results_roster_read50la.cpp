@@ -102,3 +102,22 @@ bool Read::loadedRosterRacerCurrent(const common_roster50CR::Owner* roster,
     return row&&row->racer60==racer60;
 }
 }
+
+namespace rr::game {
+// Results104 career pages (W0 round 2, area A): the load-time roster pin over the
+// race's one common roster, the same rule on every course. The race's counted
+// World (nativeIntroWorldEntity), its Application and the live observed Bank
+// are the load-time owners.
+bool OriginalResults10450LA::careerRosterCurrentNative(const ::common_roster50CR::Owner* roster,
+    const OriginalRaceConstructor50LA& race,const std::shared_ptr<OriginalApplicationEntities50LA>& application,
+    const std::shared_ptr<assets::OriginalStandardMaterialDomain50LA>& domain,std::uint64_t generation,
+    const ::original_position_stats_adapter50LA::Owner& observer)noexcept {
+    using Read=::original_results_roster50LA::Read;
+    return application&&domain&&generation&&race.application_==application&&
+        Read::loadedRosterCurrent(roster,race,Read::observerBankIdentity(observer));
+}
+bool OriginalResults10450LA::careerRacerCurrentNative(const ::common_roster50CR::Owner* roster,
+    std::uint32_t racer60)noexcept {
+    return ::original_results_roster50LA::Read::loadedRosterRacerCurrent(roster,0,racer60);
+}
+}

@@ -14,7 +14,11 @@ void operator delete(void*p)noexcept{std::free(p);}void operator delete(void*p,s
 using namespace rr::game;namespace a=rr::assets;namespace p=rr::platform;
 int main(){
     std::array<p::AudioVoice50HD,128>voices{};p::AudioMixer50HD mixer;require(mixer.initialize(voices.data(),voices.size(),48000),"mixer initialize");material_audio50HI::Provider provider;std::string error;
-    require(provider.prepare("work/native/project/disc","work/native/project/disc/AUDIO",mixer,64,error),error.c_str());
+    // The one course AUB prepare (05.12): TA's own tracks\ta.aub from TRACKS/TA.RES.
+    std::vector<std::uint8_t> aub;{std::ifstream rf("work/native/project/disc/TRACKS/TA.RES",std::ios::binary);
+        std::vector<std::uint8_t> rawRes((std::istreambuf_iterator<char>(rf)),{});a::ResArchive48C res;a::DecodeError48C rd;
+        require(a::decodeResource48C(rawRes,res,rd)&&a::extractResMember48C(res,"tracks\\ta.aub",aub,rd),"actual TA AUB");}
+    require(provider.prepareTrack(aub,"TA","work/native/project/disc/AUDIO",mixer,64,error),error.c_str());
     require(provider.bank().ready==13&&provider.bank().missing==0&&provider.bank().unsupported==0&&provider.bank().invalid==0,"13 actual decoded material clips");
     require(provider.catalog().collision[0]=="sfx/race/pod_coll.vag"&&provider.catalog().collision[3]==provider.catalog().collision[0]&&provider.catalog().collision[4]=="sfx/race/rockhit1.vag"&&provider.catalog().drive[7]=="sfx/race/rckscrp4.vag","actual material source rows");
     for(auto&v:provider.catalog().parameters.drive)require(v.sampleSpeed==100&&v.minVolume==0&&v.minSpeed==1&&v.maxSpeed==60&&v.resonantSpeed==100&&v.frequencySlope==.75f,"actual six drive parameters");
@@ -50,6 +54,6 @@ int main(){
     input.vehicle220Present=true;input.listenerDistance=540;require(updateMaterialAudio50HI(provider.catalog().parameters,input,state,dest,rawRng,command,3,count)==AudioEventStatus50HE::Complete&&count==0&&rawRng==1,"original 540-unit audibility guard");
     input.listenerDistance=52;rawRng=1;count=123;require(updateMaterialAudio50HI(provider.catalog().parameters,input,state,dest,rawRng,command,3,count)==AudioEventStatus50HE::Complete&&rawRng==expectedRng&&count==2&&command[0].gain==.6f&&command[1].gain==.59f,"actual offset listener source gate, final raw volume overwrites spatial attenuation");
     require(allocations==0,"all watched hot calls allocated zero times");
-    material_audio50HI::Provider missing;std::array<p::AudioVoice50HD,128>missingVoices{};p::AudioMixer50HD missingMixer;require(missingMixer.initialize(missingVoices.data(),missingVoices.size(),48000),"missing mixer");require(missing.prepare("work/native/project/disc","/tmp/rr-50hi-absent-audio-input",missingMixer,64,error),"missing audio preparation records absence");input.listenerDistance=0;rawRng=1;auto negative=missing.update(input,rawRng);require(missing.bank().missing==13&&negative.okay()&&negative.commandCount==2&&negative.results[0]==material_audio50HI::ApplyResult::Unavailable&&!missingMixer.active(64),"missing clips explicitly unavailable, no replacement");
+    material_audio50HI::Provider missing;std::array<p::AudioVoice50HD,128>missingVoices{};p::AudioMixer50HD missingMixer;require(missingMixer.initialize(missingVoices.data(),missingVoices.size(),48000),"missing mixer");require(missing.prepareTrack(aub,"TA","work/scratch/rr-50hi-absent-audio-input",missingMixer,64,error),"missing audio preparation records absence");input.listenerDistance=0;rawRng=1;auto negative=missing.update(input,rawRng);require(missing.bank().missing==13&&negative.okay()&&negative.commandCount==2&&negative.results[0]==material_audio50HI::ApplyResult::Unavailable&&!missingMixer.active(64),"missing clips explicitly unavailable, no replacement");
     std::cout<<"{\"checks\":"<<checks<<",\"actual_pcm_ready\":13,\"material_sound_rows\":16,\"retained_collider_bindings\":"<<bindingCount<<",\"hot_allocations\":"<<allocations<<",\"mixed_nonzero_samples\":"<<nonzero<<",\"guest_execution\":false,\"scope\":\"focused material subscriber; not full D40/spatial audio or full-game regression\"}\n";
 }

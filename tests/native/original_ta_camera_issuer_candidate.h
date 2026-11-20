@@ -167,9 +167,28 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         // Publication only after all fallible native allocation. Weak ownership
         // cannot extend root Rig/particle lifetime or create an Application cycle.
         nativeTaCameraSession50LA_=session;
-        common_race_log50CR::load(common_race_log50CR::Step::cameraSession1A95B0,true,cuts,"issued");
+        // 1A95B0 -> 174A30 (+174FA4) here, so the controller exists when the
+        // factory returns (one controller per human, race+1B0 low2; zero humans
+        // build none). 174E48..174EC4: the World's count unless 174EA8 zeroes it
+        // from launch data. A surviving count builds the cut owners from the
+        // retained intro authoring; a zero count builds the controller alone.
+        const auto effectiveCuts=session->launchZeroesCuts174EA8()?0u:cuts;
+        bool built=true;
+        if(effectiveCuts)built=bool(session->actual_.taIntroAuthoring)&&constructNativeTaIntroCamera50LA();
+        else if(session->actual_.humanCount34==1u){
+            const auto fresh=freshNativeTaCameraSession50LA();
+            built=fresh&&fresh==session&&session->constructCountedControllerWithoutCuts174A30();
+        }
+        if(!built){
+            // The Session (and any partly built controller) retires with this
+            // last owner; the Application keeps no issued Session.
+            nativeTaCameraSession50LA_.reset();
+            return d::refuse(effectiveCuts?"174A30/174FA4 cut controller construction rejected":
+                "174A30 zero-cut controller construction rejected");
+        }
+        common_race_log50CR::load(common_race_log50CR::Step::cameraSession1A95B0,true,effectiveCuts,"issued");
         return session;
-    }catch(...){return d::refuse("native allocation failed");}
+    }catch(...){nativeTaCameraSession50LA_.reset();return d::refuse("native allocation failed");}
 }
 inline std::shared_ptr<original_camera_session50KX::Session> Application::freshNativeTaCameraSession50LA()const noexcept {
     namespace d=ta_camera_issuer_detail;

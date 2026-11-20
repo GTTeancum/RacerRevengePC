@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::game {
@@ -41,6 +42,14 @@ public:
         rr::game::OriginalTrackParticleCold50LA* actual4A0)noexcept=0;
     // 210804/22C21C: this track's Race70 water object, or nullptr for NONE.
     virtual const void* water3FC()const noexcept=0;
+    // The zone borrow above is still held by `borrower` with these 4C0[0]/4C4[0]
+    // node identities (the fresh 165E90 lane re-checks it before every step).
+    virtual bool zonesHeldBy(const ra_source_camera50LA::OwnershipBridge& borrower,
+        const void* visibilityNode,const void* collisionNode)const noexcept=0;
+    // The counted World4A0 particle owner (1AA57C), or nullptr when the track has none.
+    virtual rr::game::OriginalTrackParticleCold50LA* particles4A0()const noexcept=0;
+    // The Application's particle directory (36B530) the wreck effects read, or nullptr.
+    virtual const std::string* particleDirectory36B530()const noexcept=0;
 };
 
 // 212ABC: the original keeps one pair of exclusion lists per racer (Q1):

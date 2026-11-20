@@ -228,8 +228,11 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                         bool action=false;
                         if(!input.matchesNativeCategory2Code1277D0(3,event,action))
                             return stop(Impl::S::owner,0x1c8d84,"Results source action3 mapping unavailable");
+                        // PORT STAND-IN (flagged, existing, W0 round 2): the 1C8D94 row's
+                        // deactivate/Profile leaves before 1C8DF0 1AC8E0(race,0)
+                        // (common_race_start50CR::callerResultsReplay) are not represented.
                         if(action)return stop(Impl::S::incomplete,0x1c8d94,
-                            "Results action3 Profile/restart1AC8E0 route unavailable");
+                            "Results action3 Profile/restart 1AC8E0 (caller 1C8DF0) route unavailable");
                         if(!input.matchesNativeCategory2Code1277D0(2,event,action))
                             return stop(Impl::S::owner,0x1c8e20,"Results source action2 mapping unavailable");
                         if(action){
@@ -537,8 +540,11 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                     bool action=false;
                     if(!input.matchesNativeCategory2Code1277D0(3,event,action))
                         return stop(Impl::S::owner,0x1c971c,"Results tournament action3 mapping unavailable");
+                    // PORT STAND-IN (flagged, existing, W0 round 2): the 1C972C row's leaves
+                    // before 1C9774 1AC8E0(race,0) (common_race_start50CR::
+                    // callerResultsTournamentReplay1C9774) are not represented.
                     if(action)return stop(Impl::S::incomplete,0x1c972c,
-                        "Results tournament restart1AC8E0 route unavailable");
+                        "Results tournament restart 1AC8E0 (caller 1C9774) route unavailable");
                     if(!input.matchesNativeCategory2Code1277D0(2,event,action))
                         return stop(Impl::S::owner,0x1c97c0,"Results tournament action2 mapping unavailable");
                     if(action){

@@ -92,6 +92,18 @@ inline bool sizeNativeTriggerGroup50MC(NativeTriggerGroup50MC& group,std::size_t
  }catch(...){return false;}
  group.triggerCount=count;group.sized=true;return true;
 }
+// Trigger manager +0x80 (2DCC70), reached from Scene::Reset 2702E0 on every
+// race restart / replay loop: for every live trigger it clears bit3 (0x8,
+// "fired") of flags1B8 and preserves every other bit (store at 2DCCAC). No
+// flags29, contacts, ignore lists, callback state, C80 or query membership is
+// touched. Returns the number of triggers visited (0 for an unsized group).
+inline std::size_t raceResetNativeTriggerGroup2DCC70(NativeTriggerGroup50MC& group)noexcept {
+ if(!group.sized)return 0;
+ const std::size_t n=group.triggerCount<group.triggers.size()?group.triggerCount:group.triggers.size();
+ for(std::size_t i=0;i<n;++i)
+  group.triggers[i].flags1B8=static_cast<std::uint8_t>(group.triggers[i].flags1B8&0xf7u);
+ return n;
+}
 inline std::size_t nativeTriggerCollider50MC(const NativeTriggerGroup50MC& group,std::uint32_t id)noexcept {
  for(std::size_t i=0;i<group.colliders.size();++i)if(group.colliders[i].identity==id)return i;
  return group.colliders.size();

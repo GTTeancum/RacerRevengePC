@@ -124,8 +124,8 @@ inline bool bindMoveQuery(std::span<const g::Type2StaticCandidate49X> track) {
     auto& q=moveQuery();q=MoveQuery{};const auto& w=world();
     if(!w.bound)return false;
     for(const auto& t:track){const auto& c=t.candidate.collision;
-        if(c.hasResponseCallbackE8||t.gate||t.nativeTriggers||t.nativeTriggersTC||t.nativeTriggersTB||
-           t.nativeTriggersMC||t.nativeTriggersGB)continue;
+        if(c.hasResponseCallbackE8||t.gate||
+           t.nativeTriggersMC)continue;
         g::Type3Candidate48P m{};m.collision=c;m.shapeType=t.shapeType;m.compound=t.compound;
         m.hasMaterialScene=t.candidate.hasMaterialScene;m.sceneName=t.candidate.sceneName;m.sceneNameBytes=t.candidate.sceneNameBytes;
         q.mirror.push_back(m);}
@@ -322,8 +322,8 @@ inline bool detect(const g::Type2ResourceView49X& e0,const g::BodyMatrix48G& mod
         if(i>=track.size())return false;
         const auto& t=track[i];const auto& c=t.candidate.collision;
         if(c.typeTag!=w.collisionTypeTag){if(c.typeTag==w.groupTypeTag)++st.skippedGroups;return true;}
-        if(c.hasResponseCallbackE8||t.gate||t.nativeTriggers||t.nativeTriggersTC||t.nativeTriggersTB||
-           t.nativeTriggersMC||t.nativeTriggersGB){
+        if(c.hasResponseCallbackE8||t.gate||
+           t.nativeTriggersMC){
             // STAND-IN (item b, still skipped): the original 121920 calls the
             // trigger's E8 2A00A0 itself. Count pieces that reach one (coarse
             // sphere only; the 120E70 filter and 108E90 narrowphase are not run).

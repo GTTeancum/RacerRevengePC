@@ -240,6 +240,13 @@ void OriginalRaceConstructor50LA::continueEndEntryPrefix1A7DD0(
     if(endDispatchReturned_)return; //d already says callerReturned (replay started).
 }
 
+// PORT STAND-IN (flagged, area A): the RA aggregate that held the one end-runtime
+// OwnershipBridge (world74_->runtimeQueries_) is retired; until area C publishes the
+// race's one bridge on the common path (fix-A.txt), every course reads "owner
+// unavailable" at the 1A7E40 per-racer cuts, as every non-RA course did before.
+ra_source_camera50LA::OwnershipBridge* OriginalRaceConstructor50LA::borrowEndRuntimeNative()const noexcept {
+    return nullptr;
+}
 void OriginalRaceConstructor50LA::continueEndCaller1A7E40(
     OriginalRaceEndEntryDiagnostic50LA& d)noexcept {
     ra_source_camera50LA::OwnershipBridge* endRuntime=nullptr;

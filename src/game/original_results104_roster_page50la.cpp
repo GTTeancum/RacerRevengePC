@@ -60,11 +60,9 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
     // Exact successful-load identity, never merely same Application/count.
     // Lock lives only through this synchronous preparation. The marker itself
     // is weak and cannot extend World74 or partial-load cleanup lifetime.
-    const auto operation=p.loadedRosterOperation.lock();
+    const auto* const operation=p.loadedRoster;
     const auto operationCurrent=[&](){
-        return ::original_results_roster50LA::Read::loadedOperationOwnerFieldsCurrent(
-            operation,::original_results_roster50LA::Read::raceWorldIdentity(race),p.application,p.domain,generation)&&
-            ::original_results_roster50LA::Read::loadedOperationBankCurrent(operation,::original_results_roster50LA::Read::observerBankIdentity(observer));
+        return ::original_results_roster50LA::Read::loadedRosterCurrent(operation,race,::original_results_roster50LA::Read::observerBankIdentity(observer));
     };
     if(!operationCurrent()||
        !Read::captureRows(observer,p.application.get(),materials,generation,rows)||
@@ -125,7 +123,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::prepareRosterPa
         for(;manager<rows.count;++manager)if(rows.rows[manager].placeCCC==std::int32_t(rank+1))break;
         if(manager==rows.count){p.stop(d,Impl::S::source,0x1c2a94,"Results rank has no real manager row");return out.prefix;}
         const auto& row=rows.rows[manager];
-        if(!::original_results_roster50LA::Read::loadedOperationRacerCurrent(operation,manager,row.racer60)){
+        if(!::original_results_roster50LA::Read::loadedRosterRacerCurrent(operation,manager,row.racer60)){
             p.stop(d,Impl::S::owner,0x1c2ac0,"Results current racer differs from loaded portrait rig identity");
             return out.prefix;
         }
@@ -208,12 +206,11 @@ const ::native_racer50HN::Bank* OriginalResults10450LA::demandObserverBankIdenti
 }
 bool OriginalResults10450LA::demandRosterCountCurrent1C16F8(
     const OriginalRaceConstructor50LA& race,const ::original_position_stats_adapter50LA::Owner& observer,
-    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,
+    const ::common_roster50CR::Owner* operation,
     const ::native_racer50HN::Bank* bank,std::size_t& count)const {
     const auto& p=*impl_; //Same already-admitted caller; no allocation or new weak lock.
-    if(!(::original_results_roster50LA::Read::loadedOperationOwnerFieldsCurrent(
-        operation,::original_results_roster50LA::Read::raceWorldIdentity(race),p.application,p.domain,p.component.sessionGeneration)&&::original_results_roster50LA::Read::observerCurrent(observer)&&
-        ::original_results_roster50LA::Read::loadedOperationBankCurrent(operation,bank))||!bank)return false;
+    if(!(p.application&&p.domain&&p.component.sessionGeneration&&::original_results_roster50LA::Read::loadedRosterCurrent(operation,race,bank)&&
+        ::original_results_roster50LA::Read::observerCurrent(observer))||!bank)return false;
     count=::original_results_roster50LA::Read::bankCount(*bank); //Exactly once at EACH reached1C16F8 condition, after all original tests.
     return true;
 }

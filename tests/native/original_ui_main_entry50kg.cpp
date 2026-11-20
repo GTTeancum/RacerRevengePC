@@ -311,13 +311,6 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             if(std::getenv(retired))throw std::runtime_error(std::string(retired)+
                 " is retired (common rewrite B-C21): race the course through the free-play Course route "
                 "(run_windows_takeover.py --route main-rider-course --course CODE --seed-save ...)");
-        // PORT STAND-IN (flagged, R11): the startup code after this section (rider profile
-        // initialisers and provenance checks, :500-580) still reads these names; they are
-        // constant false here, so those branches are dead. Their owners delete them
-        // (work\scratch\common-rewrite\writer-notes\r11.txt); then these constants go.
-        constexpr std::uint32_t visibleRiderTest=0,mcSelectedRider=1;
-        constexpr bool wanMbTest=false,gasganoScTest=false,tzidikTcTest=false,scorchRcTest=false,
-            sebulbaTbTest=false,kraidGbTest=false,youngAnakinMcTest=false,gasganoTest=false,mawhonicRylothTest=false;
         if(!enabled)return;
         const char* root=std::getenv("RR_ORIGINAL_UI_ROOT");
         require(root && *root,"RR_ORIGINAL_MAIN_MENU requires explicit RR_ORIGINAL_UI_ROOT");
@@ -371,18 +364,7 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
             const auto physics=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics);
-            require(youngAnakinMcTest?
-                riderProfile->initializeYoungAnakinMcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic,mcSelectedRider):kraidGbTest?
-                riderProfile->initializeKraidGbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):sebulbaTbTest?
-                riderProfile->initializeSebulbaTbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):scorchRcTest?
-                riderProfile->initializeScorchRcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):tzidikTcTest?
-                riderProfile->initializeTzidikTcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoScTest?
-                riderProfile->initializeGasganoScTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):wanMbTest?
-                riderProfile->initializeWanMbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):visibleRiderTest?
-                riderProfile->initializeVisibleRiderTestProfileAtApplicationStartup(profile,physics,visibleRiderTest,riderProfileDiagnostic):mawhonicRylothTest?
-                riderProfile->initializeMawhonicRylothTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoTest?
-                riderProfile->initializeGasganoTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):
-                riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
+            require(riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
                 "Rider startup profile initialization rejected");
             riderProfile->bindNativeBetaAutosave(gameSettingsProfile);
             // Original17DE80/1801D0 fresh-profile record producer. Populate
@@ -393,31 +375,6 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             require(rr::assets::readOriginalUiEnglish50KG(*recordLocalization,recordEnglish,recordLocalizationDiagnostic)&&
                 riderProfile->initializeHallRecordsAtApplicationStartup(recordEnglish,riderProfileDiagnostic),
                 "Original fresh Hall record initialization rejected");
-            require(riderProfile->gasganoTestProfile()==gasganoTest&&
-                riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest&&
-                riderProfile->visibleRiderTestProfile()==(youngAnakinMcTest?0u:visibleRiderTest)&&
-                riderProfile->wanMbTestProfile()==wanMbTest&&
-                riderProfile->gasganoScTestProfile()==gasganoScTest&&
-                riderProfile->tzidikTcTestProfile()==tzidikTcTest&&
-                riderProfile->scorchRcTestProfile()==scorchRcTest&&
-                riderProfile->sebulbaTbTestProfile()==sebulbaTbTest&&
-                riderProfile->kraidGbTestProfile()==kraidGbTest&&riderProfile->youngAnakinMcTestProfile()==youngAnakinMcTest,"Rider test profile provenance differs");
-            if(youngAnakinMcTest)std::cerr<<"TEST UNLOCK OVERRIDE: MC rider="<<mcSelectedRider<<" initially remembered; original course prefix10 and MC slot10 (course6/planet5). Process-local human testing only; no earned progression or save write. Actual MC gameplay owners remain mandatory.\n";
-            if(kraidGbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Kraid23 initially remembered; original course prefix8 and GB slot8 (course9/planet1). Process-local human testing only; no earned progression or save write. GB gameplay capability remains separately gated.\n";
-            if(sebulbaTbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Sebulba18 initially remembered; original course prefix6 and TB slot6 (course1/planet0). Process-local human testing only; no earned progression or save write. TB gameplay capability remains separately gated.\n";
-            if(scorchRcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Scorch17 initially remembered; original course prefix12 and RC slot12 (course3/planet2). Process-local human testing only; no earned progression or save write. RC gameplay capability remains separately gated.\n";
-            if(tzidikTcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Tzidik24 initially remembered; original course prefix13 and TC slot13 (course2/planet0). Process-local human testing only; no earned progression or save write. TC gameplay capability remains separately gated.\n";
-            if(gasganoScTest)std::cerr<<"TEST UNLOCK OVERRIDE: Gasgano7 initially remembered; original course prefix9 and SC slot9 (course12/planet4). "
-                "Process-local human testing only; no earned progression or save write. SC gameplay capability remains separately gated.\n";
-            if(wanMbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Wan16 initially remembered; original course prefix7 and MB slot7. "
-                "Process-local testing only; no earned progression or save write. Real Wan/MB cold-loader checks remain mandatory.\n";
-            if(visibleRiderTest&&!youngAnakinMcTest)std::cerr<<"TEST UNLOCK OVERRIDE: rider="<<visibleRiderTest
-                <<" available and initially remembered for this process only. Native test patch, not retail cheat execution; "
-                "no earned unlock, career progress, saved-profile import or save write. All gameplay loader gates remain active.\n";
-            if(mawhonicRylothTest)std::cerr<<"TEST PROFILE: Mawhonic9 available and initially remembered; original course prefix availability5 for Brightlands, process-local only. "
-                "No earned unlock, qualification, career progress or save write is claimed. RA race admission remains subject to genuine runtime readiness.\n";
-            if(gasganoTest)std::cerr<<"TEST PROFILE: Gasgano available and initially remembered for this process only; "
-                "no earned unlock, qualification, saved-profile import or save write is claimed.\n";
         }
         // Restore preferences before the real sound-mode owner and all later
         // frontend/race borrowers observe this application's canonical fields.
@@ -439,7 +396,7 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN: "<<(youngAnakinMcTest?"explicit Young Anakin/MC human test profile":kraidGbTest?"explicit Kraid/GB human test profile":sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"native profile (loaded or fresh)")
+        std::cerr<<"ORIGINAL MAIN: native profile (loaded or fresh)"
             <<"/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "

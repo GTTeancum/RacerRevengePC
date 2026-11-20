@@ -1,273 +1,54 @@
 #pragma once
-#include "gb_particle_authoring50gb.h"
-#include "gb_particle_attachments50gb.h"
-#include "gb_trigger_authoring50gb.h"
-#include "../../src/game/native_trigger_group50gb.h"
+// TypeID 11 (firework) derived emission, source 15F3C0..15FBC8, kept from the GB
+// lane and re-pointed (common rewrite, area E) over the one track emitter owner's
+// own definition type (track_particle_emitters50CR, common_track_emitters50cr.cpp).
+// Every numeric line and source pc is unchanged. The GB Instance wrapper (its
+// 62..67 attachment pins, descriptor pins, atlas pins and trigger-group coupling)
+// is gone: that lifecycle (registration, StartOn, trigger TurnOn, common 15A7A0,
+// completion gate source, fail latch) now lives in the owner, for every course.
+//
+// Definition: any row carrying the 15AEA0 common fields plus the 15FC10 Type11
+// fields (minStreamLength200, maxStreamLength204, particleSeparation208,
+// tailLife20C, tailThickness210, headThickness214, superbrightHead218,
+// movingEmitter21C, minRange, maxRange). The owner proves the row is TypeID 11.
+// A failed receipt keeps the completed source/RNG/particle prefix; the caller
+// latches it (never retries).
 #include "../../src/game/original_gc_pod_sparks50kg.h"
-#include "../../src/game/original_track_particle_cold50la.h"
+#include "../../src/game/original_gc_particle_manager50kg.h"
+#include "../../src/game/water_wake50jc.h"
 #include <algorithm>
 #include <cfenv>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <limits>
-#include <memory>
-#include <thread>
 
-namespace gb_particle_runtime50GB {class Owner;}
-namespace gb_trigger_actions50GB {class Owner;}
 namespace gb_type11_numeric50GB {
-namespace g=rr::game;namespace authored=gb_particle_authoring50GB;
-namespace triggers=gb_trigger_authoring50GB;
+namespace g=rr::game;
 using Status=g::OriginalGcSprayStatus50KG;
 using Receipt=g::OriginalGcSprayReceipt50KG;
-struct Observation {
- std::size_t attachmentIndex=0;std::uint32_t emitterNumber=0,managerOwnerId=0;
- std::size_t registryPayloadBefore=0,registryPayloadGrowth=0;
- std::int32_t firstFrame=0,lastFrame=0,currentFrame=0;
- float remainingDelay=0,carriedSize=0;std::uint32_t remainingOnBits=0;
- g::EffectControlState50BC controls{};
- bool numericBound=false,schedulingEnabled=false,actionCompleted=false,failed=false,quiesced=false;
- Receipt stoppedAt{};
-};
-// Independently reviewable numerical/control storage for ONE authentic GB
-// Type11 association. This is not a complete runtime owner or readiness gate.
-// Every mutation is private to the actual enclosing GB runtime/ActionOwner.
-// There is no public update, target handle, graph/visibility receipt or callback.
-class Instance final {
- friend class ::gb_particle_runtime50GB::Owner;
- friend class ::gb_trigger_actions50GB::Owner;
- using Math=g::water_wake_detail50jc::Math;
- // Computed only by the enclosing runtime from its privately retained concrete
- // graph/publication owner. It is not an original 16-bit portal-tag receipt.
- enum class PlacementCompletion : std::uint8_t {Unavailable,Stale,Current};
- std::shared_ptr<const authored::Owner> source_;
- std::shared_ptr<gb_particle_attachments50GB::Owner> graphs_;
- std::shared_ptr<const triggers::Owner> triggerSource_;
- std::shared_ptr<g::OriginalTrackParticleCold50LA> cold_;
- const authored::Descriptor* descriptor_=nullptr;
- const authored::Attachment* association_=nullptr;
- const authored::Definition* definition_=nullptr;
- g::OriginalGcParticleManager50KG* manager_=nullptr;
- g::OriginalGcCommonAttachment50KG attachment_{};
- std::uint32_t* raw_=nullptr;g::OriginalGcPodSparksGlobals50KG* globals_=nullptr;
- const ::gb_trigger_actions50GB::Owner* actions_=nullptr;
- g::NativeTriggerGroup50GB* group_=nullptr;
- g::EffectControlState50BC controls_{};
- std::size_t attachmentIndex_=0,registryBefore_=0,registryGrowth_=0;
- std::uint32_t managerOwnerId_=0,duration1E4_=0;
- std::int32_t firstFrame_=0,lastFrame_=0,currentFrame_=0;
- float delay1DC_=0,carriedSize18C_=0;
- std::uint64_t generation_=0,actionGeneration_=0,completedQuery_=0;
- const std::thread::id thread_=std::this_thread::get_id();
- bool attempted_=false,bound_=false,enabled_=false,actionBound_=false,actionCompleted_=false;
- bool visiting_=false,failed_=false,quiesced_=false,closed_=false;
- Receipt stoppedAt_{};
- static float word(std::uint32_t x)noexcept {float f;std::memcpy(&f,&x,4);return f;}
- static void put(std::uint32_t& out,float f)noexcept {std::memcpy(&out,&f,4);}
- static Receipt result(Status s,std::uint32_t pc)noexcept {Receipt r;r.status=s;r.sourcePC=pc;return r;}
- static float root(Math& m,float x,std::uint32_t pc)noexcept {m.read(x,pc);volatile float r=std::sqrt(x);return m.read(r,pc);}
- bool thread()const noexcept{return thread_==std::this_thread::get_id();}
- Receipt fail(Status s,std::uint32_t pc)noexcept {failed_=true;stoppedAt_=result(s,pc);return stoppedAt_;}
- bool sourceCurrent()const noexcept {
-  return thread()&&bound_&&!closed_&&source_&&source_->ready()&&cold_&&cold_->prepared()&&
-   graphs_&&graphs_->sourceGraphReady()&&graphs_->authoringOwner()==source_.get()&&
-   graphs_->coldSource()==source_->sourceOwner()&&
-   manager_&&cold_->particles()==manager_&&raw_&&globals_&&generation_&&descriptor_&&association_&&definition_&&
-   attachmentIndex_>=62&&attachmentIndex_<67&&association_==&source_->attachment(attachmentIndex_)&&
-   descriptor_==&source_->descriptor(association_->descriptor)&&
-   definition_==&source_->definition(descriptor_->definitionIndex)&&
-   managerOwnerId_&&manager_->emitter(managerOwnerId_);
- }
- bool graphCurrent()const noexcept {
-  if(!sourceCurrent()||!attachment_.graph||attachment_.graph!=graphs_->graph(attachmentIndex_)||
-     graphs_->placement(attachmentIndex_)!=association_->worldInstance||
-     attachment_.node!=static_cast<g::SceneNodeIndex49P>(0)||
-     attachment_.offset50!=descriptor_->offset)return false;
-  const auto& graph=*attachment_.graph;
-  if(!graph.nodes||graph.count!=1||!g::validateSceneGraph49P(graph)||
-     graph.nodes[0].parent180!=g::SceneNodeIndex49P::none)return false;
-  // GB's five targets are the same authentic static startgate placement.
-  // The exact concrete graph owner is retained, with graph access private.
-  const auto* placed=association_->worldInstance;if(!placed)return false;
-  for(unsigned k=0;k<16;++k){const auto expected=static_cast<float>(placed->matrix[k]);
-   if(!std::isfinite(expected)||std::memcmp(&expected,&graph.nodes[0].localC0.v[k],4))return false;}
-  return true;
- }
- bool atlasMatches(const authored::Owner& source,const g::OriginalGcParticleManager50KG& manager)const noexcept {
-  const auto& a=source.atlas();
-  if(manager.frame(130)||manager.group(10)||!manager.atlasTextureMapName()||*manager.atlasTextureMapName()!=a.textureMap)return false;
-  for(std::size_t i=0;i<a.groups.size();++i){const auto* actual=manager.group(static_cast<std::int32_t>(i));const auto& expected=a.groups[i];
-   if(!actual||actual->type!=expected.type||actual->first!=expected.first||actual->last!=expected.last)return false;}
-  for(std::size_t i=0;i<a.frames.size();++i){const auto* actual=manager.frame(static_cast<std::int32_t>(i));
-   if(!actual||actual->sourceUv!=a.frames[i].sourceUv)return false;}
-  return true;
- }
- // Called in descriptor/instance order by the genuine runtime, after its
- // concrete graph owner has authenticated the real PSG root and placement.
- // This registers a real numeric emitter; it grants no update/query readiness.
- Receipt initialize(std::shared_ptr<const authored::Owner> source,std::size_t actualAttachment,
-  std::shared_ptr<gb_particle_attachments50GB::Owner> actualGraphs,
-  std::shared_ptr<g::OriginalTrackParticleCold50LA> actualCold,
-  std::uint32_t& actualRaw,
-  g::OriginalGcPodSparksGlobals50KG& actualSharedGlobals,std::uint64_t generation,
-  std::size_t remainingPayloadBytes)noexcept {
-  if(!thread())return result(Status::unprepared,0x15f1e0u);
-  if(attempted_)return fail(Status::alreadyPrepared,0x15f1e0u);attempted_=true;
-  if(!source||!source->ready()||!actualGraphs||!actualGraphs->sourceGraphReady()||
-     actualGraphs->authoringOwner()!=source.get()||actualGraphs->coldSource()!=source->sourceOwner()||
-     !actualCold||!actualCold->prepared()||!generation||
-     actualAttachment<62||actualAttachment>=67||remainingPayloadBytes>32u*1024u*1024u||
-     remainingPayloadBytes<sizeof(Instance)||std::fegetround()!=FE_TONEAREST)return fail(Status::unprepared,0x15f1e0u);
-  const auto& a=source->attachment(actualAttachment);const auto& desc=source->descriptor(a.descriptor);
-  const auto& f=source->definition(desc.definitionIndex);auto* manager=actualCold->particles();
-  if(a.descriptor!=actualAttachment-55||a.instanceOrdinal!=0||a.worldIndex!=0||
-     a.worldInstance!=&source->sourceOwner()->world().instances[0]||desc.ordinal!=a.descriptor+1||
-     desc.kind!=authored::Kind::Sparks11||desc.instances!=1||desc.firstAttachment!=actualAttachment||
-     desc.effectiveStartOn!=0||desc.definitionIndex!=(actualAttachment<64?2u:3u)||
-     !f.parsed||f.kind!=authored::Kind::Sparks11||f.timing.mode1D8!=1||!manager||!atlasMatches(*source,*manager)||
-     actualGraphs->placement(actualAttachment)!=a.worldInstance||!actualGraphs->graph(actualAttachment))
-   return fail(Status::assetIdentity,0x15fc10u);
-  source_=std::move(source);graphs_=std::move(actualGraphs);cold_=std::move(actualCold);
-  descriptor_=&desc;association_=&a;definition_=&f;attachmentIndex_=actualAttachment;
-  attachment_={graphs_->graph(actualAttachment),static_cast<g::SceneNodeIndex49P>(0),desc.offset};
-  manager_=manager;raw_=&actualRaw;
-  globals_=&actualSharedGlobals;generation_=generation;
-  controls_={};controls_.flags1D4=1;controls_.position30[3]=controls_.previous40[3]=controls_.velocity60[3]=0x3f800000u;
-  for(unsigned k=0;k<3;++k)put(controls_.velocity60[k],f.velocity60[k]);
-  delay1DC_=f.timing.delayTime1E0;put(duration1E4_,f.timing.maxTimeOn1EC);carriedSize18C_=0;
-  const auto* group=manager_->group(f.particleGroup1B8);
-  if(!group||group->first!=(desc.definitionIndex==2?104:129)||group->last!=group->first)
-   return fail(Status::authoredData,0x15fd6cu);
-  firstFrame_=currentFrame_=group->first;lastFrame_=group->last;
-  g::OriginalGcParticleEmitterState50KG row{};row.particleGroup=f.particleGroup1B8;
-  row.framesPerSet=f.framesPerSet;row.inverseFramesPerSet=f.inverseFramesPerSet;
-  row.gravity=f.gravityMultiplier;row.bouncePlane=f.groundLevel;row.bounceFactor=f.restitution;
-  // Existing registerEmitter mutates a std::vector and exposes no reserve
-  // API. This post-allocation observation CANNOT enforce a hard shared heap
-  // cap, nor measure transient old-plus-new vector storage. Runtime admission
-  // is held until the enclosing owner establishes that reservation before
-  // calling this method. Retain every attempted prefix for ordered cleanup.
-  registryBefore_=manager_->emitterStoragePayloadBytes();managerOwnerId_=manager_->registerEmitter(row);
-  if(!managerOwnerId_)return fail(Status::allocation,0x15fd6cu);
-  bound_=true;const auto now=manager_->emitterStoragePayloadBytes();registryGrowth_=now>registryBefore_?now-registryBefore_:0;
-  if(registryGrowth_>remainingPayloadBytes-sizeof(Instance))return fail(Status::capacity,0x15fd6cu);
-  if(!graphCurrent())return fail(Status::storage,0x15f220u);
-  // Attached source load does not transform position. Constructor position
-  // and previous remain (0,0,0,1); the first common visit still copies/skips.
-  // Source constructor carried-size zero; false wrapper StartOn calls Stop84
-  // and then disable18. Detached scheduling records that activity explicitly.
-  g::stopEffect50BC(controls_);enabled_=false;return result(Status::complete,0x27dbe0u);
- }
- bool bindActionSource(const ::gb_trigger_actions50GB::Owner& actions,g::NativeTriggerGroup50GB& group,
-  std::shared_ptr<const triggers::Owner> source)noexcept {
-  if(!sourceCurrent()||!graphCurrent()||failed_||quiesced_||visiting_||actionBound_||!source||!source->ready()||
-     source->coldSource()!=source_->sourceOwner()||group.ready||group.queryActive||group.actionsFailed||
-     group.actions.context!=static_cast<const void*>(&actions)||!group.actions.preflight||!group.actions.resume||
-     group.contact.phase!=g::SourceTriggerContactPhase50GB::Idle)return false;
-  const auto index=descriptor_->ordinal-8;const auto& trigger=source->source(triggers::particles);
-  const auto& action=trigger.actions[index];const auto& state=group.triggers[triggers::particles];
-  if(index>=5||trigger.sourceOrdinal!=18||trigger.actionCount!=5||!trigger.oneTimeOnly||
-     action.kind!=triggers::Action::Particles||action.emitterNumber!=descriptor_->ordinal||action.instanceNumber!=1||
-     action.emitterIndex!=association_->descriptor||action.instanceIndex!=0||!action.turnOn||
-     !state.collider.identity||state.callbackCount98!=5||state.collider.highWaterD0)return false;
-  triggerSource_=std::move(source);actions_=&actions;group_=&group;actionGeneration_=generation_;actionBound_=true;return true;
- }
- bool matchesAction(const ::gb_trigger_actions50GB::Owner& actions,const triggers::Owner& source,
-  const triggers::ActionSource& action,const g::SourceTriggerActionCall50GB& call,bool reached)const noexcept {
-  if(!sourceCurrent()||!graphCurrent()||failed_||quiesced_||visiting_||!actionBound_||actions_!=&actions||
-     actionGeneration_!=generation_||!triggerSource_||triggerSource_.get()!=&source||!source.ready()||
-     source.coldSource()!=source_->sourceOwner()||!group_||!g::validNativeTriggerGroup50GB(*group_)||
-     group_->actions.context!=static_cast<const void*>(&actions)||!group_->queryActive||!group_->querySerial||
-     call.querySerial!=group_->querySerial||call.source.otherCollider!=group_->queryCollider||
-     !call.source.entering||call.source.sourceSite!=0x2a0eccu||call.source.actionIndex>=5||
-     call.source.actionIndex!=descriptor_->ordinal-8||actionCompleted_)return false;
-  const auto& state=group_->triggers[triggers::particles];const auto& original=source.source(triggers::particles).actions[call.source.actionIndex];
-  if(&action!=&original||!action.original||action.kind!=triggers::Action::Particles||!action.turnOn||
-     action.emitterNumber!=descriptor_->ordinal||action.instanceNumber!=1||action.emitterIndex!=association_->descriptor||
-     action.instanceIndex!=association_->instanceOrdinal||state.collider.identity!=call.source.triggerCollider||
-     g::nativeTriggerCollider50GB(*group_,call.source.otherCollider)>=group_->colliders.size()||
-     !g::nativeTriggerPairAllowed50GB(*group_,triggers::particles,call.source.otherCollider))return false;
-  const auto& c=group_->contact;using P=g::SourceTriggerContactPhase50GB;
-  if(!reached)return c.phase==P::Idle||c.phase==P::Complete;
-  // E8 passes the traversal position within the actual query index span.
-  // It is not the aggregate owner-table index (615+17). Authenticate the
-  // exact live cursor and collider below; the enclosing query owner retains
-  // the actual candidate/index mapping throughout this dispatch.
-  return c.phase==P::Actions&&c.group==group_&&c.hooks==&group_->actions&&
-   c.querySerial==call.querySerial&&c.candidateOrdinal==call.candidateOrdinal&&c.triggerIndex==triggers::particles&&
-   c.triggerCollider==call.source.triggerCollider&&c.otherCollider==call.source.otherCollider&&
-   c.colliderIndex==g::nativeTriggerCollider50GB(*group_,call.source.otherCollider)&&
-   c.actionCount==5&&c.nextAction==call.source.actionIndex&&(state.flags1B8&0x18u)==0x18u;
- }
- bool preflightSourceAction(const ::gb_trigger_actions50GB::Owner& actions,const triggers::Owner& source,
-  const triggers::ActionSource& action,const g::SourceTriggerActionCall50GB& call)const noexcept {
-  return matchesAction(actions,source,action,call,false);
- }
- g::SourceTriggerActionResult50GB activateSourceAction(const ::gb_trigger_actions50GB::Owner& actions,
-  const triggers::Owner& source,const triggers::ActionSource& action,const g::SourceTriggerActionCall50GB& call)noexcept {
-  using S=g::SourceTriggerActionStatus50GB;
-  if(!matchesAction(actions,source,action,call,true)){
-   if(thread()&&bound_)fail(Status::unprepared,0x15a500u);
-   return {S::InvalidBinding,0x15a500u,0};}
-  // All fallible checks precede these admitted mode-1 scalar operations.
-  // No emission, RNG, allocation, graph update or provider callback occurs.
-  delay1DC_=definition_->timing.delayTime1E0; //15AD68
-  put(duration1E4_,definition_->timing.maxTimeOn1EC); //15AD78..80
-  g::startEffect50BC(controls_); //15ACE0: started bit, timer19C=0
-  enabled_=true; // Approved detached scheduling projection of enable20.
-  completedQuery_=call.querySerial;actionCompleted_=true;
-  return {S::Complete,0x15a544u,0};
- }
- static g::OriginalGcCommonEmitterDispatch50KG commonDispatch(Instance& self)noexcept {
-  return {&self,[](void* p,g::EffectControlState50BC& c){auto& s=*static_cast<Instance*>(p);
-    if(&c!=&s.controls_||!s.definition_||s.definition_->timing.mode1D8!=1)return false;g::startEffect50BC(c);return true;},
-   [](void* p,g::EffectControlState50BC& c){auto& s=*static_cast<Instance*>(p);
-    if(&c!=&s.controls_||!s.definition_||s.definition_->timing.mode1D8!=1)return false;g::stopEffect50BC(c);return true;}};
- }
- Receipt advance(float dt,bool actualApplicationPaused,PlacementCompletion completion)noexcept {
-  if(!thread())return result(Status::unprepared,0x15f380u);
-  if(failed_)return stoppedAt_;
-  if(!sourceCurrent()||!graphCurrent()||quiesced_||visiting_||
-     (group_&&(group_->queryActive||group_->actionsFailed)))return fail(Status::unprepared,0x15f380u);
-  // Authentic initially disabled instances are not scheduled at all.
-  if(!enabled_)return result(Status::complete,0x27dbe0u);
-  visiting_=true;struct End{bool& v;~End(){v=false;}}end{visiting_};
-  const auto calls=commonDispatch(*this);
-  auto common=g::advanceOriginalGcCommonEmitter50KG(controls_,definition_->timing,delay1DC_,duration1E4_,
-    true,dt,actualApplicationPaused,*raw_,&calls,&attachment_);
-  if(!common.okay()){failed_=true;stoppedAt_=common;return common;}
-  if(common.commonSkipped)return common;
-  return afterCommon(dt,completion);
- }
- Receipt afterCommon(float dt,PlacementCompletion completion)noexcept;
- bool unbindActionSource(const ::gb_trigger_actions50GB::Owner& actions)noexcept {
-  if(!thread()||visiting_||actions_!=&actions||!group_||group_->queryActive)return false;
-  const auto p=group_->contact.phase;
-  if(p!=g::SourceTriggerContactPhase50GB::Idle&&p!=g::SourceTriggerContactPhase50GB::Complete&&!group_->actionsFailed)return false;
-  actions_=nullptr;group_=nullptr;triggerSource_.reset();actionBound_=false;return true;
- }
- bool quiesce()noexcept {if(!thread()||visiting_||(group_&&group_->queryActive))return false;quiesced_=true;return true;}
- bool retireAfterPool()noexcept {
-  if(!thread()||visiting_||!quiesced_||actionBound_||(cold_&&!cold_->closed()))return false;
-  attachment_={};manager_=nullptr;raw_=nullptr;globals_=nullptr;descriptor_=nullptr;association_=nullptr;definition_=nullptr;
-  graphs_.reset();source_.reset();cold_.reset();bound_=false;closed_=true;return true;
- }
-public:
- Instance()=default;Instance(const Instance&)=delete;Instance& operator=(const Instance&)=delete;
- Instance(Instance&&)=delete;Instance& operator=(Instance&&)=delete;
- ~Instance(){if(!thread()||visiting_||actionBound_||(cold_&&!cold_->closed()))std::terminate();}
- Observation observation()const noexcept {
-  if(!thread())return {};return {attachmentIndex_,descriptor_?descriptor_->ordinal:0,managerOwnerId_,
-   registryBefore_,registryGrowth_,
-   firstFrame_,lastFrame_,currentFrame_,delay1DC_,carriedSize18C_,duration1E4_,controls_,
-   bound_,enabled_,actionCompleted_,failed_,quiesced_,stoppedAt_};
- }
-};
+// Computed only by the enclosing owner from its completion source for an attached
+// placement (an unattached placement has no 15F3F0 attachment gate: Current).
+// It is not an original 16-bit portal-tag receipt.
+enum class PlacementCompletion : std::uint8_t {Unavailable,Stale,Current};
+namespace detail {
+using Math=g::water_wake_detail50jc::Math;
+inline float word(std::uint32_t x)noexcept {float f;std::memcpy(&f,&x,4);return f;}
+inline float root(Math& m,float x,std::uint32_t pc)noexcept {m.read(x,pc);volatile float r=std::sqrt(x);return m.read(r,pc);}
+}
 
-inline Receipt Instance::afterCommon(float dt,PlacementCompletion completion)noexcept {
-    const auto& f=*definition_;auto& manager=*manager_;auto& raw=*raw_;auto& globals=*globals_;
-    auto r=result(Status::complete,0x15fbc8);Math m;
-    auto fail=[&](Status s,std::uint32_t pc){r.status=s;r.sourcePC=pc;failed_=true;stoppedAt_=r;return r;};
+// Exact 15F3C0 onward, only AFTER one genuine 15A7A0 returned zero (commonSkipped
+// false). currentFrame_/firstFrame_/lastFrame_ are the placement's 190/1B0/1B4,
+// carriedSize18C_ its 18C, managerOwnerId_ its registered manager row; globals is
+// the process BSS 84D0/433980 shared by every ordinary emitter.
+template<class Definition>
+inline Receipt afterCommon(const Definition& f,g::OriginalGcParticleManager50KG& manager,
+ std::uint32_t managerOwnerId_,g::EffectControlState50BC& controls_,std::int32_t& currentFrame_,
+ std::int32_t firstFrame_,std::int32_t lastFrame_,float& carriedSize18C_,float dt,
+ PlacementCompletion completion,std::uint32_t& raw,g::OriginalGcPodSparksGlobals50KG& globals)noexcept {
+    using detail::Math;using detail::word;using detail::root;
+    Receipt r;r.status=Status::complete;r.sourcePC=0x15fbc8;Math m;
+    auto fail=[&](Status s,std::uint32_t pc){r.status=s;r.sourcePC=pc;return r;};
     auto arithmetic=[&](){return fail(Status::arithmetic,m.badPC);};
     if(std::fegetround()!=FE_TONEAREST)return fail(Status::arithmetic,0x15f3c0);
     m.read(dt,0x15f450);if(m.badPC)return arithmetic();
@@ -275,8 +56,8 @@ inline Receipt Instance::afterCommon(float dt,PlacementCompletion completion)noe
     auto& c=controls_;
     const auto timer=m.read(word(c.word19C),0x15f3c0);if(m.badPC)return arithmetic();
     if(timer>.25f){std::memcpy(c.previous40,c.position30,16);return r;}
-    // The approved native completed-placement gate belongs to the real GB
-    // graph/visual owner. It is checked AFTER the source timer shortcut.
+    // The approved native completed-placement gate belongs to the owner's
+    // completion source. It is checked AFTER the source timer shortcut.
     // This private scalar input is not a public original-tag authority.
     if(completion==PlacementCompletion::Unavailable)return fail(Status::unprepared,0x15f3f0);
     if(completion==PlacementCompletion::Stale){

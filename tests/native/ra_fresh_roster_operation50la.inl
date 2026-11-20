@@ -9,16 +9,16 @@ inline bool Operation::constructorArenaCurrent()const noexcept {
         (!owner->operationIdentity_||owner->operationIdentity_==this);
 }
 inline std::shared_ptr<Operation> Operation::bindConstructorOnly(
-    std::shared_ptr<ra_cold_aggregate50LA::Owner> aggregate,
+    std::shared_ptr<ra_source_camera50LA::OwnershipBridge> runtime,
     const original_main_entry50KG::Application& app,
-    const std::shared_ptr<FreshExecutionArena>& fresh,Diagnostic& d,
+    const std::shared_ptr<FreshExecutionArena>& fresh,std::uint64_t generation,Diagnostic& d,
     std::shared_ptr<RuntimeOwners> owners)noexcept {
     d={};d.stage="distinct source constructor arena";
-    if(!fresh||!fresh->currentNative()||fresh->operationIdentity_||!aggregate||
-       !aggregate->runtimeQueries_||aggregate->runtimeQueries_->rosterResources_!=fresh->resources_||
+    if(!fresh||!fresh->currentNative()||fresh->operationIdentity_||!runtime||
+       runtime->rosterResources_!=fresh->resources_||fresh->borrowedBridge_.lock()!=runtime||
        !app.state||fresh->live_.state.borrowedNoise50KG!=&app.state->sharedNoise308030){
         d.failure="source construction requires its actual independently allocated arena";return {};}
-    auto out=bindImpl(std::move(aggregate),app,fresh->bank_,fresh->arena(),{},d,std::move(owners),fresh);
+    auto out=bindImpl(std::move(runtime),app,fresh->bank_,fresh->arena(),{},d,std::move(owners),fresh,generation);
     if(!out)return {};
     if(!fresh->bindOperationNative(out)){
         // Native-only admission has made no model effects, but the real Bank
@@ -149,75 +149,19 @@ inline bool OwnershipBridge::stageConstructorPod694(std::size_t slot,
     return true;
 }
 }
-namespace ra_cold_aggregate50LA {
-inline bool Owner::prepareConstructorRosterStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
-    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,Diagnostic& d)noexcept try {
-    d={};
-    if(!app||!app->application10()||!fresh||fresh->thread_!=std::this_thread::get_id()||fresh->nativeClosed_||
-       fresh->lanesRegistered_||fresh->sealed_||fresh->operationIdentity_||!fresh->resources_||
-       runtimeStorageAttempted_||runtimeQueries_||registryAttempted_||terminal_||closed_||
-       (worldApplication_&&worldApplication_!=app)||(collisionApplication_&&collisionApplication_!=app))
-        return fail(d,"fresh constructor storage requires new exact native backing");
-    auto& terrain=fresh->terrain_;auto& recovery=fresh->recovery_;auto& movement=fresh->movement_;
-    const auto& ids=recovery.globals;
-    if(terrain.prepared||terrain.receipt.archiveBytes||fresh->terrainLive_.initialized||
-       recovery.storagePrepared||recovery.sourcePrepared||!ids.terrainIdentity348||
-       ids.terrainIdentity348!=fresh->terrainBindings_.identity||!ids.identity[0]||!ids.identity[1]||
-       ids.identity[0]==ids.identity[1]||ids.identity[0]==ids.terrainIdentity348||ids.identity[1]==ids.terrainIdentity348||
-       movement.filter.identity!=ids.identity[1])return fail(d,"fresh constructor namespace differs");
-    if(!enter(d,Stage::runtimeQueryStorage,runtimeStorageAttempted_,prefix_.staticCandidates))return false;
-    collisionApplication_=app;
-    runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
-    fresh->borrowedBridge_=runtimeQueries_; // Before any later fallible borrowed-arena effect.
-    auto& runtime=*runtimeQueries_;runtime.rosterResources_=fresh->resources_;
-    std::string error;
-    if(!runtime.allocateSource348NamespaceBeforeBank(terrain,fresh->terrainLive_,fresh->terrainBindings_,error))
-        return fail(d,"source348 namespace allocation refused; native prefix retained");
-    const auto& retained=*fresh->resources_;
-    if(!retained.wreckBacking_||!retained.wreckBacking_->prepare(app,{},retained.rigs_,retained.rawRes_,retained.racerCount_,error))
-        return fail(d,"fresh source wreck reservations refused; partial owners retained");
-    const auto* reservations=retained.wreckBacking_->reservations();
-    if(!reservations)return fail(d,"fresh source wreck reservation identities missing");
-    ra_source_camera50LA::RuntimeQueryCapacityInputs input;
-    for(std::size_t slot=0;slot<retained.racerCount_;++slot)input.collisionRoster.push_back(retained.collisions_[slot].get());
-    input.recovery=&recovery;input.humanCount=retained.humanCount_;
-    for(const auto& row:*reservations)input.wreck.push_back({row.queries,row.assets,row.identities});
-    runtime.rosterTerrain_=&terrain;runtime.rosterMovement_=&movement;
-    runtime.rosterAuxiliaryIds_={ids.terrainIdentity348,ids.identity[0],ids.identity[1]};
-    if(!runtime.constructSharedRosterStorage(app,candidates_,input,d.runtimeQueries))
-        return fail(d,"fresh constructor shared storage refused; actual partial owners retained");
-    // Native capacity only. Do not call the legacy prepareStorage adapter,
-    // which also authors later212984 filter contents before this source route.
-    const auto count=runtime.storage_.get()->count.membership;
-    recovery.podFilter.identityLists[0].identities.resize(3);
-    for(unsigned n=0;n<2;++n){recovery.links[n].resize(count);recovery.entries[n].resize(count);}
-    recovery.storagePrepared=true; // Existing native capacity ledger, not sourcePrepared.
-    prefix_.runtimeQueryStorage=true;return true;
-}catch(...){return fail(d,"constructor storage allocation stopped; actual prefix retained");}
-inline bool Owner::bindConstructorQueryOwners(
-    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,Diagnostic& d)noexcept {
-    d={};
-    if(!fresh||!runtimeQueries_||!enter(d,Stage::runtimeQueryOwners,runtimeQueriesAttempted_,
-       prefix_.runtimeQueryStorage&&!registryAttempted_))return false;
-    if(!runtimeQueries_->bindConstructorActual(fresh,d.runtimeQueries))
-        return fail(d,"constructor query custody refused; partial backing retained");
-    prefix_.runtimeQueryOwners=true; // Native owner custody only; no query constructor.
-    return true;
-}
-}
 namespace ra_cold_roster50LA {
 inline bool Operation::completeConstructorModelResources(Diagnostic& d)noexcept {
     d={};d.stage="actual constructor model resources";
     const auto fresh=constructorArena_.lock();
+    // Common rewrite (area C): the RA static-world material namespace gate is the bridge's bound
+    // Track (its static world owns the one material namespace, single_pass_world50LM).
     if(!fresh||!constructorSlotsCurrent(*fresh)||constructorResourcesAttempted_||
-       runtime().cameraAttempted_||!aggregate_->prefix_.staticWorld||!aggregate_->world_||
-       aggregate_->worldImagesAttempted_||!aggregate_->constructorMaterialNamespaceCurrent(*domain_))return false;
+       runtime().cameraAttempted_||!runtime().track_||!runtime().track_->roles.staticWorld)return false;
     constructorResourcesAttempted_=true;
     try {
         const auto& provider=domain_->archiveProvider3E1A70();
         const auto& directory=application_->materialDirectory36B970();
         need(directory=="textures\\"&&provider&&provider->sealed()&&
-            aggregate_->constructorMaterialNamespaceCurrent(*domain_)&&
             !domain_->materials382B38()->coldCollectorCurrent(domain_->coldCollector14D440()),
             "constructor source material namespace differs");
         using Rig=native_racer50HW::Rig;
@@ -243,7 +187,7 @@ inline bool Operation::completeConstructorModelResources(Diagnostic& d)noexcept 
             });
         }
         rr::assets::OriginalStandardMaterialDiagnostic50LA materialDiagnostic;
-        need(aggregate_->constructorMaterialNamespaceCurrent(*domain_)&&provider->sealed()&&
+        need(provider->sealed()&&
             domain_->appendOriginalSources(modelMaterials_,modelTextures_,materialDiagnostic),
             "constructor material source corpus append refused");
         constructorResourcesComplete_=true;return true;
@@ -252,88 +196,7 @@ inline bool Operation::completeConstructorModelResources(Diagnostic& d)noexcept 
     }catch(...){terminal_=true;d.failure="source model resource exception; prefix retained";return false;}
 }
 }
-namespace ra_cold_aggregate50LA {
-inline bool Owner::constructRetainedRuntimeSourceCamera(
-    const original_main_entry50KG::Application& app,const ra_source_camera50LA::CameraRuntimeOwners& actual,
-    const std::vector<std::uint8_t>& cam,original_camera_session50KX::DisplayInputs& display,
-    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,Diagnostic& d)noexcept {
-    d={};d.stage=Stage::sourceCamera;
-    if(!fresh||!fresh->currentNative()||&actual.bank!=&fresh->bank_||!runtimeQueries_||terminal_||closed_)
-        return fail(d,"constructor-only camera requires its exact fresh arena");
-    auto& runtime=*runtimeQueries_;
-    const auto base=runtime.bankLifetime_.lock();
-    if(!base||base->identity!=&actual.bank||!runtime.cameraBankCurrent())
-        return fail(d,"constructor-only camera Bank lifetime differs");
-    const auto pin=std::static_pointer_cast<ra_source_camera50LA::OwnershipBridge::BankPin>(base);
-    const auto op=pin->rosterOperation;
-    if(pin->owner.get()!=&runtime||!op||!op->constructorSlotsCurrent(*fresh)||
-       !op->constructorResourcesComplete_||op->application_!=&app||
-       &actual.arena!=&op->arena_.live.state||&actual.bindings!=&op->arena_.live.bindings||
-       &actual.ai!=&op->arena_.ai||&actual.poseHistory!=&op->arena_.history||
-       &actual.launchKind11258!=&op->arena_.launchKind11258||actual.humanCount34!=op->arena_.humanCount)
-        return fail(d,"constructor-only camera retained resources/arena differ");
-    const ra_source_camera50LA::CameraCallerOwners owners{
-        actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,
-        actual.racerTiming,actual.all8Manager,actual.hostRace,actual.sharedRandom,
-        actual.attachedGlobals,actual.applicationClock,actual.preferences,
-        actual.launchKind11258,actual.configuration34,actual.application350,
-        actual.blur,actual.poseHistory,actual.boost,actual.cycleAudio,actual.racer60,
-        actual.humanCount34,actual.race94,actual.humanHeld,
-        op->resources_->rigs_,op->cables_,op->right_,op->left_,op->chariot_,
-        &op->bottomRight_,&op->bottomLeft_,actual.raceHud,actual.deathDebris,
-        actual.startMusicContext,actual.startMusicRequest,actual.recordManager40,
-        actual.introAudio,actual.introAuthoring,actual.introMusicFadeRequest,actual.nativeHumanPlayer0};
-    const auto world=mintConstructorRacerWorldBorrow(op->aggregate_);
-    if(!world)return fail(d,"constructor-only Racer World source owner unavailable at native admission");
-    return constructRuntimeSourceCamera(app,owners,cam,display,fresh,world,d);
-}
-}
 
-namespace ra_cold_aggregate50LA {
-inline std::shared_ptr<const g::OriginalRacerWorldBorrow50LA>
-Owner::mintConstructorRacerWorldBorrow(const std::shared_ptr<Owner>& self)noexcept {
-    // Native admission only: a refusal here claims no Racer constructor PC.
-    // Never synthesize NULL from absence, height data, or a legacy readiness bit.
-    if(self.get()!=this||nativeScbThread_!=std::this_thread::get_id()||terminal_||closed_||
-       nativeScbRevoked_||!worldColdConstructed_||!worldReset270550Complete_||!worldApplication_||
-       !collisionApplication_||collisionApplication_!=worldApplication_||
-       worldApplication_->attachmentLock423F58()||
-       !worldEntity_.sessionGeneration||worldEntity_.reference00!=1u||
-       worldEntity_.objectKey!=key(&worldEntity_)||
-       worldEntity_.kind!=g::OriginalWreckComponentKind50LA::entity141300||
-       !worldWater3FC_||*worldWater3FC_||!worldWater400_||*worldWater400_||
-       !nativeWaterNone274570_||nativeWaterNone274570_->returned2745CC!=1u||
-       !nativeWaterNone274570_->returned274800||*nativeWaterNone274570_->returned274800!=1u||
-       constructorRacerWorldBorrows_==std::numeric_limits<std::size_t>::max())return {};
-    try {
-        return std::shared_ptr<const g::OriginalRacerWorldBorrow50LA>(
-            new g::OriginalRacerWorldBorrow50LA(std::static_pointer_cast<const void>(self),
-                worldEntity_,worldWater3FC_,worldWater400_,worldColdConstructed_,worldReset270550Complete_,
-                terminal_,closed_,nativeScbRevoked_,nativeWaterNone274570_->returned2745CC,
-                nativeWaterNone274570_->returned274800,worldApplication_->objectCount423F60(),
-                constructorRacerWorldBorrows_,nativeScbThread_,*this,
-                +[](const void* context,const void*& visibility,const void*& collision)noexcept {
-                    const auto& owner=*static_cast<const Owner*>(context);
-                    if(owner.nativeScbThread_!=std::this_thread::get_id()||owner.closed_||owner.terminal_||
-                       !owner.topologyConstructed_||owner.topologyClosed_||!owner.sourceTopologyCurrent(true)||
-                       !owner.identitiesCurrent()||!owner.sceneApplication_||owner.sceneApplication_->attachmentLock423F58())return false;
-                    const auto* v=(*owner.sourceVisibility4C0_)[0];
-                    const auto* c=(*owner.sourceCollision4C4_)[0];
-                    if(v!=&owner.visibility4C0_[0]||c!=&owner.collision4C4_[0]||!v->attached||!c->attached||
-                       v->entity.reference00!=1u||c->entity.reference00!=1u||
-                       v->entity.kind!=g::OriginalWreckComponentKind50LA::searchNode27F120||
-                       c->entity.kind!=g::OriginalWreckComponentKind50LA::searchNode27F120||
-                       v->entity.objectKey!=key(&v->entity)||c->entity.objectKey!=key(&c->entity)||
-                       v->entity.parent1C!=&owner.container4BC_||c->entity.parent1C!=&owner.container4BC_||
-                       v->entity.sessionGeneration!=owner.sceneGeneration_||c->entity.sessionGeneration!=owner.sceneGeneration_||
-                       v->collectionBacking!=owner.visibilityRows_||c->collectionBacking!=owner.collisionRows_||
-                       owner.visibilityRows_==owner.collisionRows_||v->ordinal48||c->ordinal48)return false;
-                    //Exact1AE0E0/1AE0F8 incoming argument values, not native zone ordinals.
-                    visibility=v;collision=c;return true;
-                }));
-    }catch(...){return {};}
-}
-}
 
 // Append after both FreshExecutionArena and Operation definitions are complete.
 namespace ra_source_camera50LA {
@@ -350,7 +213,7 @@ inline bool OwnershipBridge::registerConstructorWorldOwners(
        &actual_->secondary!=&fresh->secondary_||&actual_->mainFilter!=&fresh->mainFilter_||
        &actual_->secondaryFilter!=&fresh->secondaryFilter_||&actual_->terrain!=&fresh->terrain_||
        &actual_->terrainLive!=&fresh->terrainLive_||actual_->recovery!=&fresh->recovery_||
-       actual_->movement!=&fresh->movement_||!candidates_||!candidates_->staticBindings())
+       actual_->movement!=&fresh->movement_||staticBindings().empty())
         return fail(d,"constructor-only shared Bank owner identity refused");
     auto& bank=fresh->bank_;auto* s=storage_.get();
     if(!s||!s->sharedRoster_||s->sharedRoster_->retired||
@@ -374,7 +237,7 @@ inline bool OwnershipBridge::registerConstructorWorldOwners(
     };
     const auto sharedAbsent=[&]()noexcept {
         if(!s->sharedSpansAbsent(absent))return false;
-        for(const auto& binding:*candidates_->staticBindings()){
+        for(const auto& binding:staticBindings()){
             if(!binding.candidate)return false;
             const auto& c=binding.candidate->candidate.collision;
             if(!absent(&c.filter.flagsF8,sizeof(c.filter.flagsF8))||
@@ -397,14 +260,6 @@ inline bool OwnershipBridge::registerConstructorWorldOwners(
     }catch(...){return fail(d,"constructor shared Bank enrollment failed; actual pin/spans retained");}
 }
 }
-namespace ra_cold_aggregate50LA {
-inline bool Owner::registerConstructorQueryWorldOwners(
-    const std::shared_ptr<ra_cold_roster50LA::FreshExecutionArena>& fresh,Diagnostic& d)noexcept {
-    if(!fresh||!runtimeQueries_||
-       !enter(d,Stage::runtimeQueryWorldOwners,runtimeRegistrationAttempted_,
-           prefix_.runtimeQueryOwners&&!registryAttempted_))return false;
-    if(!runtimeQueries_->registerConstructorWorldOwners(fresh,runtimeQueries_,d.runtimeQueries))
-        return fail(d,"constructor-only shared Bank publication refused; partial ownership retained");
-    prefix_.runtimeQueryWorldOwners=true;return true;
-}
-}
+// Common rewrite (area C): the RA aggregate composition members that lived here
+// (prepareConstructorRosterStorage, bindConstructorQueryOwners, constructRetainedRuntimeSourceCamera,
+// mintConstructorRacerWorldBorrow, registerConstructorQueryWorldOwners) are retired with the RA world.

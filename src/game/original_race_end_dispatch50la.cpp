@@ -4,6 +4,7 @@
 #include "../../tests/native/original_race_hud_scope50la.h"
 #include "../../tests/native/original_position_stats_adapter50la.h"
 #include "../../tests/native/native_common_results50pd.h"
+#include "../../tests/native/common_race_start50cr.h"
 #include <array>
 #include <optional>
 #include <thread>
@@ -451,9 +452,17 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
                 flags1B0KnownValue_=std::uint8_t(flags1B0KnownValue_|8u);
                 flags1B0KnownMask_=std::uint8_t(flags1B0KnownMask_|8u);
                 const char* why=nullptr;auto& hook=native_common_results50PD::state().beginReplay;
+                // common_race_start line for this 1AC8E0 call (caller 1ABAD8, a1=0).
+                common_race_log50CR::RaceStart line;line.restart=true;line.a1=0;
+                line.caller=common_race_start50CR::callerResultsWaiting1ABAD8;
                 if(!hook||!hook(why)){
+                    line.ok=false;line.refusedPc=0x1ac998u;
+                    line.reason=why?why:"Native common-race replay start unavailable";
+                    try{common_race_log50CR::raceStart(line);}catch(...){}
                     stop(S::incomplete,scan.stoppedPC,why?why:"Native common-race replay start unavailable");return;
                 }
+                line.ok=true;
+                try{common_race_log50CR::raceStart(line);}catch(...){}
                 native_common_results50PD::state().replayActive=true;
                 endDispatchReturned_=true;
                 stop(S::callerReturned,0x1abe48,"Common race: Results replay started from race78");return;

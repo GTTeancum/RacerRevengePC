@@ -40,6 +40,11 @@ class OriginalSimpleVCR50LA final {
     bool enableEndChannelsAndBackup1ABA68(const OriginalRaceConstructor50LA&,
         std::int32_t& indexS0,OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool reset287BE0(OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // 287B60: clears +B0 bits 5, 1, 2, 3, 7 (ANDI t2,zero,1 yields zero) in that
+    // order, then tail-jumps 287BE0. Reached by the race's 1AC8E0 VCR tail (1ACDA0/1ACDC0).
+    bool clear287B60(OriginalSimpleVCRDiagnostic50LA&)noexcept;
+    // 1ACDC8..1ACDE0: race78+B0 bit1 = 1 (record), after 287B60, when 11258 != 3.
+    bool setRecordBit1ACDE0(OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool copyBackup288630(OriginalSimpleVCRDiagnostic50LA&)noexcept;
     bool closeDetached2875A0(OriginalSimpleVCRDiagnostic50LA&)noexcept;
     // 2878F0: one float channel (class 0). source/destination are 32-bit

@@ -80,14 +80,13 @@ OriginalResults10450LA::NameEntryCpuPrefix OriginalResults10450LA::prepareNameEn
 
         Read::Record row;
         const auto* materials=p.domain->materials382B38().get();const auto generation=out.session;
-        const auto operation=p.loadedRosterOperation.lock();
+        const auto* const operation=p.loadedRoster;
         const auto current=[&](){
-            return profileCurrent()&&Read::loadedOperationOwnerFieldsCurrent(operation,Read::raceWorldIdentity(race),
-                p.application,p.domain,generation)&&Read::loadedOperationBankCurrent(operation,Read::observerBankIdentity(observer));
+            return profileCurrent()&&generation&&Read::loadedRosterCurrent(operation,race,Read::observerBankIdentity(observer));
         };
         if(!current()||!Read::captureRecord(observer,p.application.get(),materials,generation,0,row)||
            row.bank!=Read::observerBankIdentity(observer)||row.vehicle58!=0u||
-           !Read::loadedOperationRacerCurrent(operation,0,row.racer60)||!current())
+           !Read::loadedRosterRacerCurrent(operation,0,row.racer60)||!current())
             return stop(Impl::S::owner,0x1c9fd4,"Results first-human current loaded Bank/rig identity absent");
         out.managerIndex=0;out.publication=row.publication;
         const auto samePublication=[&](){return current()&&Read::recordCurrent(observer,row);};

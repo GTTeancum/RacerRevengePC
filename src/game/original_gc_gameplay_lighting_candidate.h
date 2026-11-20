@@ -16,6 +16,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -24,7 +25,7 @@ namespace rr::platform { class VehicleWindowGl50DS; struct VehicleWindowDiagnost
 namespace rr::game { struct OriginalWreckComponent50LA; struct OriginalCameraViewportFields; struct OriginalCameraSceneOwner; struct OriginalRendererDispatchFields; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::game::original_world_environment50KG {struct SpatialBounds;class Owner;}
-namespace ra_pod_scene50LA { class Owner; }
+namespace rr::game::original_light_flash50CR { struct TrackFlare50CR; }
 namespace mb_source_trigger50MB { class Owner; }
 // The one cold-unwind caller (replaces the four per-course Retirement classes;
 // its owner folds tc/tb/gb/mc_cold_visibility50xx.h into it).
@@ -106,6 +107,7 @@ struct LightTally {
     std::uint32_t local=0;              // emitting local lights retained for selection
     std::uint32_t omittedNonEmitting=0; // non-emitting ObjectPoints (flare-only, never light)
     std::uint32_t flashers=0;           // HasFlasher=T rows
+    std::uint32_t flares=0;             // HasLightFlare=T rows (trackFlares())
     std::uint32_t timedFlashers=0;      // emitting flashers serviced by 147650
     std::uint32_t missingSlots=0;       // LightN absent: 157D00 failed, prior block kept (2773CC)
     std::uint32_t zoneColorOverrides=0; // DirectionalLightColorForZoneN keys (278370)
@@ -262,82 +264,20 @@ public:
 // authored lights, and a separate4C0 visibility namespace. It never borrows collision
 //4C4 membership or resets OriginalUiLightManagerLifetime50KG.
 class Owner final {
-    //Out-of-line access to the SAME World fields. Keep its enormous private
-    //definition out of this lighting implementation TU; no snapshot or new gate.
-    static std::optional<original_world_environment50KG::Owner*>& podEnvironment3A4(::ra_pod_scene50LA::Owner&)noexcept;
-    static const std::optional<original_world_environment50KG::Owner*>& podEnvironment3A4(const ::ra_pod_scene50LA::Owner&)noexcept;
-    static const std::shared_ptr<OriginalApplicationEntities50LA>& podApplication(const ::ra_pod_scene50LA::Owner&)noexcept;
-    static bool podColdConstructed(const ::ra_pod_scene50LA::Owner&)noexcept;
-    static bool podTopologyClosed(const ::ra_pod_scene50LA::Owner&)noexcept;
-    static const std::shared_ptr<Owner>& podLighting(const ::ra_pod_scene50LA::Owner&)noexcept;
-    static bool podFlareIdentityCurrent(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
-    static std::optional<std::size_t> podFlareZoneIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
-    static std::optional<std::size_t> podFlareAuthoredIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
-
     friend class ::mb_source_trigger50MB::Owner;
     friend class ::racer_cold_visibility50CR::Retirement;
-    friend class ::ra_pod_scene50LA::Owner;
-    //Actual RA source flare identity in the SAME canonical visibility domain.
-    //Private World producer only; no public admission/ready flag.
-    bool bindRaFlareIdentity(const ::ra_pod_scene50LA::Owner*,OriginalWreckComponent50LA&,
-        const std::uint8_t&,const std::uint8_t&,std::uint32_t&,std::uint32_t&)noexcept;
-    bool registerRaFlarePrimary(const ::ra_pod_scene50LA::Owner*,OriginalNativeListMethodCustody50LA*,
-        const OriginalWreckComponent50LA&,std::uint32_t,std::uint32_t&,std::uint32_t&)noexcept;
-    bool raFlareIdentityCurrent(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
-        std::uint32_t,const OriginalNativeListMethodCustody50LA*,std::uint32_t)const noexcept;
-    bool releaseRaFlarePrimary(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
-        std::uint32_t,std::uint32_t&)noexcept;
-    bool releaseRaFlareIdentity(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&,
-        std::uint32_t,std::uint32_t&)noexcept;
-    bool raFlareDomainIdle(const ::ra_pod_scene50LA::Owner*,const OriginalWreckComponent50LA&)const noexcept;
-    bool nativeRaRemainingInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,std::size_t,RaRemainingLightInputs&,std::uint32_t&)const noexcept;
-    bool nativeRaLocalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,std::size_t,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
-    bool nativeRaFirstLocalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
-    bool nativeRaDirectionalInputs(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,RaDirectionalLightInputs&,std::uint32_t&)const noexcept;
-    bool nativeRaLightIdentity(const ::ra_pod_scene50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,std::size_t,RaAuthoredLightIdentity&,std::uint32_t&)const noexcept;
-    const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
-    const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
+    // Common rewrite (area E): the RA World (ra_pod_scene50LA) light/flare/scene-role
+    // producers are retired with that chain; track light flares are value rows
+    // (trackFlares(), every course) and the scene's zones are lent to the one
+    // pod-load bridge against the race's common Track (below).
+    // The 4C0 zone rows lent to the pod-load / wreck-chain bridge (165E90 wreck
+    // zones, 272A78 retained zone rows) for THIS race's Track. One lender at a time.
+    const CollectionZone50BX* retainSceneZones272A78(const ::common_track50CR::Track*,std::size_t&) noexcept;
     // Same canonical namespace under the retained scene owner, not a camera lease.
-    ResetVisibilityWorld50EY* nativeWreckVisibility165E90(const ::ra_pod_scene50LA::Owner*,
+    ResetVisibilityWorld50EY* nativeWreckVisibility165E90(const ::common_track50CR::Track*,
         const CollectionZone50BX*) noexcept;
-    bool canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) const noexcept;
-    // Same retained RA EnvironmentInfo/light/ambient/visibility backend only.
-    // Private actual scene caller; no parallel decoder or collection lease.
-    const char* nativeRaEcosystemSelector1AA410(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
-    const char* nativeRaWaterSelector274570(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
-    const std::string* nativeRaSkySelector274AE0(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
-    const std::string* nativeRaParticleSelector1B4DC0(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
-    //Actual World publication alias to SAME prewarmed environment ownership.
-    //The fresh World constructor must first issue its known-null270598 store.
-    bool publishNativeEnvironment3A4(::ra_pod_scene50LA::Owner&,
-        const assets::World48F&,std::uint32_t&)noexcept;
-    bool withdrawNativeEnvironment3A4(::ra_pod_scene50LA::Owner&)noexcept;
-    bool nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::uint32_t&)const noexcept;
-    const AuthoredRenderZone* nativeRaZoneExclusions272B08(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,std::size_t,std::uint32_t&)const noexcept;
-    const PortalGeometry50EO* nativeRaPortal230450(const ::ra_pod_scene50LA::Owner*,
-        const assets::World48F&,const CollectionZone50BX*,const OriginalApplicationEntities50LA*,
-        std::size_t,std::uint32_t&)const noexcept;
-    OriginalNativeListMethodCustody50LA* adoptRaVisibilityList(
-        const ::ra_pod_scene50LA::Owner*,const assets::World48F&,const CollectionZone50BX*,
-        const OriginalApplicationEntities50LA*,std::size_t,std::uint32_t&)noexcept;
-    bool raVisibilityListCustodyCurrent(const ::ra_pod_scene50LA::Owner*,
-        const OriginalNativeListMethodCustody50LA*)const noexcept;
-    bool retainRaVisibilityListNode(const ::ra_pod_scene50LA::Owner*,
-        OriginalNativeListMethodCustody50LA*,std::uint32_t&)noexcept;
-    bool releaseRaVisibilityListReference(const ::ra_pod_scene50LA::Owner*,
-        OriginalNativeListMethodCustody50LA*,bool nodeAlias)noexcept;
-    bool releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) noexcept;
+    bool canReleaseSceneZones272A78(const ::common_track50CR::Track*) const noexcept;
+    bool releaseSceneZones272A78(const ::common_track50CR::Track*) noexcept;
     friend class ::original_cable_selection50LA::Binding;
     // Private114D00 callback lookup: the viewing lease remains unchanged.
     // Only the source bridge's canonical Bank visit may supply the callback
@@ -368,9 +308,6 @@ class Owner final {
     void endRaStaticAccess(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool releaseRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
-    bool nativeStaticZone2741C0Current(const ::ra_pod_scene50LA::Owner*,
-        const ::ra_static_model_cold50LA::Owner*,const assets::World48F&,
-        const CollectionZone50BX*,std::size_t,std::uint32_t&)const noexcept;
     bool publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner*,std::uint32_t actualZone) noexcept;
     ResetVisibilityWorld50EY* raStaticVisibility(const ::ra_static_model_cold50LA::Owner*) noexcept;
     LiveZoneWorkspace50EN* raStaticWorkspace(const ::ra_static_model_cold50LA::Owner*) noexcept;
@@ -511,6 +448,11 @@ public:
     // Host bytes this owner retains (payload ledgers).
     std::size_t retainedPayloadBytes() const noexcept;
     const assets::World48F* world() const noexcept;
+    // The track's light flares (one row per LightN authoring HasLightFlare,
+    // 2778D8..2779DC), read at 05.13 for every course; empty before prepare or when
+    // no light authors a flare. Count and order are fixed after prepare. Drawn by
+    // the renderer's one shared flare pass (area F). Value rows only.
+    std::span<const original_light_flash50CR::TrackFlare50CR> trackFlares() const noexcept;
     // Global ambient+50 (148F90..148FFC): the last numeric-order ambient
     // registration, or the current flash/restore value while an authored
     // ambient flash runs (2754E0). Not the selected zone60. Every course.

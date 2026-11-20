@@ -2,8 +2,8 @@
 // Included only inside VehicleWindowGl50DS::Storage. Original projected pod
 // shadows (src/game/original_projected_shadow50ps.h): one 256x256 caster
 // target per racer, one receiver pass over the listed static instances of
-// whichever world publication this renderer owns (legacy track spans or the
-// RA surface plan). Replaces the retired native footprint shadow.
+// the one track world (its spans' worldInstance, every course). Replaces the
+// retired native footprint shadow.
     struct ShadowTarget50PS { U framebuffer=0,color=0; };
     std::array<ShadowTarget50PS,game::maxProjectedShadows50PS> shadowTargets{};
     U shadowCasterProgram=0,shadowCasterVertexShader=0,shadowCasterFragmentShader=0;
@@ -12,7 +12,6 @@
     I shadowReceiverMatrixUniform=-1,shadowReceiverTextureUniform=-1,shadowReceiverImageUniform=-1;
     I shadowReceiverLightUniform=-1,shadowReceiverFacingUniform=-1,shadowReceiverAlphaUniform=-1;
     U shadowCableVertexArray=0,shadowCableVertexBuffer=0;
-    U shadowRaArray=0,shadowRaNormals=0;
     // Cold per-instance receiver table (world space) and the world's portals,
     // built once at create.
     std::vector<game::ShadowReceiverStatic50PS> shadowReceiverStatics;

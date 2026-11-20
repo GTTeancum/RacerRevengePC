@@ -195,23 +195,10 @@ bool Owner::selectRaStaticMethod44(CameraVisibilityLease& lease,OriginalApplicat
             const auto identity=word&~1u;
             if(!identity||(identity&3u))return fail(d,Status::registration,0x27eb5c);
             const auto ref=identity>>2u;
-            if(const auto* flareEntry=s.findRaFlare(ref)){
-                //Actual source SearchableGameObject, never a model index.
-                //Ordinary native typed flare rendering is a separate joined
-                //consumer; this original callback route remains unjoined.
-                const auto& f=*flareEntry;
-                if(!f.world||f.world!=s.sceneOwner||!f.type32||!f.flags33||
-                   !podFlareIdentityCurrent(*f.world,f.entity))
-                    return fail(d,Status::identity,0x27eb60u);
-                const auto flareZone=podFlareZoneIndex(*f.world,f.entity);
-                if(!flareZone||(*flareZone!=1u&&*flareZone!=7u)||
-                   &method!=&s.selectedMethods[*flareZone*2u])return fail(d,Status::identity,0x27eb60u);
-                if(!(*f.flags33&1u)||(*f.flags33&4u))continue;
-                if(*f.type32==method.type2C)return fail(d,Status::identity,0x27eba8u);
-                if(*f.type32!=method.type2D)continue;
-                if(!(f.entity->flags29&1u))continue;
-                return fail(d,Status::phase,0x27ec18u); //No fabricated14B2C0 callback return.
-            }
+            // Common rewrite (area E): no flare identity is registered in this
+            // namespace any more; every track light flare is drawn by the renderer's
+            // one shared flare pass from Owner::trackFlares() (the RA-only Light3
+            // flare-identity route through ra_pod_scene50LA is retired).
             if(ref<s.racerCount+2u||ref-s.racerCount-2u>=s.staticSelection.size())
                 return fail(d,Status::identity,0x27eb60); // No invented searchable object.
             auto& binding=s.staticSelection[ref-s.racerCount-2u];

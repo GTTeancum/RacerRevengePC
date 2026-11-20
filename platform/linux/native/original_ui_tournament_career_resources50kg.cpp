@@ -47,10 +47,7 @@ bool sameCourse(const game::OriginalUiCourseRememberedProfile50KG& a,
         a.entrants714==b.entrants714&&a.laps718==b.laps718&&a.packed1125E==b.packed1125E&&
         a.cardFlag100BC==b.cardFlag100BC&&a.availability11018==b.availability11018&&
         a.planet0Primary79C==b.planet0Primary79C&&a.planet0Secondary7A0==b.planet0Secondary7A0&&
-        a.courseOrder100C4==b.courseOrder100C4&&a.mawhonicRylothTest==b.mawhonicRylothTest&&
-        a.wanMbTest==b.wanMbTest&&a.sebulbaTbTest==b.sebulbaTbTest&&a.scorchRcTest==b.scorchRcTest&&
-        a.tzidikTcTest==b.tzidikTcTest&&a.gasganoScTest==b.gasganoScTest&&a.kraidGbTest==b.kraidGbTest&&
-        a.youngAnakinMcTest==b.youngAnakinMcTest;
+        a.courseOrder100C4==b.courseOrder100C4;
 }
 // Compare actual binary32 payloads, including signed zero. Padding is not data.
 bool sameFloat(float a,float b) noexcept {

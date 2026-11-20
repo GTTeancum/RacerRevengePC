@@ -178,7 +178,7 @@ bool OriginalRaceConstructor50LA::loadingCameraSourceNullSuffixCurrent()const no
     // PORT STAND-IN (flagged): port mapping of the World+3EC field; path uncalled today.
     return resultsFeedbackThread_==std::this_thread::get_id()&&common_race_world50CR::introWorldEntity(*this)&&
         worldInitStep_==WorldInitStep::camera&&world74_&&world74_->counted&&world74_->prefixComplete&&
-        !(world74_->track&&world74_->track->roles.fog)&&!nativeTaController48_&&
+        !(world74_->track&&world74_->track->roles.fog)&&!nativeController48_&&
         fields48_==std::array<std::uint32_t,4>{};
 }
 }

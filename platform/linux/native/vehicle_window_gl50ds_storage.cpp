@@ -628,7 +628,7 @@ bool VehicleWindowGl50DS::Storage::hasGlResources() const noexcept {
         if(hasCoverageResources()||uiCoverage.owns())return true;
         if(hasRaceHudResources() || hasRaceStartOverlayResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
-        if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources() || hasWaterResources()) return true;
+        if (hasGameplayBlurResources() || hasFxaaResources() || hasDebrisResources() || hasEffectResources() || hasWaterResources() || hasTrackFlareResources()) return true;
         if (hasShadowResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
@@ -814,7 +814,7 @@ uniform mat4 worldViewProjection;
 out vec3 trackWorldNormal;
 out vec3 trackWorldPosition;
 out vec4 trackSourceColor;
-noperspective out vec4 rcSourceColor;
+noperspective out vec4 gsSourceColor;
 out vec2 trackSourceUv;
 void main() {
     gl_Position = vec4(rrPosition, 1.0) * worldViewProjection;
@@ -825,7 +825,7 @@ void main() {
         (worldFogRange.y - worldFogRange.x), 0.0, 1.0) : 0.0;
     trackWorldNormal = rrWorldNormal;
     trackSourceColor = rrColor;
-    rcSourceColor = rrColor;
+    gsSourceColor = rrColor;
     trackSourceUv = environmentMap != 0 ? rrProjectedUv.xy : projectionPass == 1 ? rrProjectedUv.xy :
         (projectionPass == 2 ? rrProjectedUv.zw : rrUv);
     trackSourceUv += trackUvTranslation.xy;
@@ -838,13 +838,13 @@ uniform int worldFogEnabled;
 uniform vec4 worldFogColor;
 in vec3 trackWorldNormal;
 in vec4 trackSourceColor;
-noperspective in vec4 rcSourceColor;
+noperspective in vec4 gsSourceColor;
 in vec2 trackSourceUv;
 uniform int gsAlphaPass;
 uniform int gsAlphaPayload;
 uniform int environmentMap;
 uniform vec4 environmentAmbient;
-out float rcCenterDepth;
+out float gsCenterDepth;
 uniform float vertexColorScale;
 uniform int useTexture;
 uniform int discardZeroAlpha;
@@ -860,12 +860,12 @@ void main() {
     if(gsAlphaPass!=0){
         // GS byte source colour: texel x vertex byte / 128 (prelit vertex
         // bytes, or the ambient row for the environment-map program).
-        vec4 vertexByte=environmentMap!=0?environmentAmbient:clamp(rcSourceColor*255.0,0.0,255.0);
+        vec4 vertexByte=environmentMap!=0?environmentAmbient:clamp(gsSourceColor*255.0,0.0,255.0);
         vec4 source=floor(clamp(texture(image,trackSourceUv)*255.0*vertexByte/128.0,0.0,255.0));
         if(discardZeroAlpha==2&&source.a<=sourceAlphaReference)discard;
         // Explicit existing native radial-fog presentation, not GS raster parity.
         if(worldFogEnabled!=0)source.rgb=floor(mix(source.rgb,worldFogColor.rgb*255.0,trackFogAmount));
-        rcCenterDepth=gl_FragCoord.z;
+        gsCenterDepth=gl_FragCoord.z;
         if(gsAlphaPayload==2){
             // Fixed-function GS A=Cs,B=0,D=Cd (see drawDestinationAlphaRange).
             // Pass 1 (C=As): this fragment's own floor(Cs*As/128), added by
@@ -946,7 +946,7 @@ void main() {
         shaderGl.bindAttribLocation(trackProgram, 3, "rrWorldNormal");
         shaderGl.bindAttribLocation(trackProgram, 4, "rrProjectedUv");
         shaderGl.bindFragDataLocation(trackProgram, vehicleGlColorOutput50CZ, "viewerOutput");
-        shaderGl.bindFragDataLocation(trackProgram,1,"rcCenterDepth");
+        shaderGl.bindFragDataLocation(trackProgram,1,"gsCenterDepth");
         shaderGl.linkProgram(trackProgram);
         I linked = 0;
         shaderGl.getProgramiv(trackProgram, 0x8B82, &linked); // GL_LINK_STATUS
@@ -1977,7 +1977,8 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createOriginalShadows()) return false;
+            !createTargets() || !createGameplayBlur() || !createFxaa() || !createDebris(input.debris) || !createEffects(input.effects) || !createWater(input.water) || !createCoverageProgram() || !createOriginalShadows() ||
+            !createTrackFlares()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         if(request.enableGameplayDisplayWallTiming)hooks.timingObserver=observePlayerTiming;
@@ -2150,6 +2151,7 @@ bool VehicleWindowGl50DS::Storage::cleanup(VehicleWindowDiagnostic50DS& d) noexc
         if(!deleteFxaaNames(d))goto incomplete;
         if(!deleteDebrisNames(d))goto incomplete;
         if(!deleteEffectNames(d))goto incomplete;
+        if(!deleteTrackFlareNames(d))goto incomplete;
         if(!deleteWaterNames(d))goto incomplete;
         if(!deleteShadowNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {

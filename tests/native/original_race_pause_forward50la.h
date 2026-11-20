@@ -37,10 +37,8 @@ inline bool OriginalRaceConstructor50LA::adjustPauseAudio1BD7C0(
     }
     // Effects alone reaches Race74->World4D8 after Race110 and114.
     // World4D8 is owned by this real World, not a made-up seventh Race child.
-    // 149p: any course's counted world; RA keeps its same-world authority.
-    if(row==0&&(world74_?(!world74_->worldColdConstructed_||world74_->topologyClosed_||
-       world74_->worldApplication_!=application_||world74_->worldAudio_!=raceAudio_||
-       world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration):!anyWorld()))return false;
+    // Every course: the race's one counted World (common rewrite).
+    if(row==0&&!nativeIntroWorldEntity())return false;
     const auto observed=profile.volume11020;
     // Shared native transport preflights same-profile configuration, actual
     // registered group slots, epoch/thread, voice gains/leases and aggregate
@@ -94,12 +92,9 @@ inline bool OriginalRaceConstructor50LA::pauseWorld1ACF50(bool requested)noexcep
     if(!counted_||rolledBack_||!application_||!raceAudio_||application_->attachmentLock423F58()||
        raceAudio_->coldApplication_!=application_||raceAudio_->coldSession_!=entity_.sessionGeneration)
         return false;
-    // 149p: every course's race (one race class). The RA world keeps its
-    // stronger same-world authority; any other course's counted world slot
-    // reaches the same race-audio World4D8 group.
-    if(world74_?(!world74_->worldColdConstructed_||world74_->worldApplication_!=application_||
-        world74_->worldAudio_!=raceAudio_||world74_->worldEntity_.sessionGeneration!=entity_.sessionGeneration):
-       !anyWorld())return false;
+    // Every course: the race's one counted World reaches the race-audio
+    // World4D8 group (common rewrite).
+    if(!nativeIntroWorldEntity())return false;
     //1ACF50..64 loads race74, then world4D8 and tailcalls that actual slot50.
     // It never calls base142040 on the race or walks its six group children.
     return raceAudio_->pauseColdGroup2356A0(RaceAudioGroup50IC::World4D8,requested);

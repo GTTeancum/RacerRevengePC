@@ -25,10 +25,14 @@
 #include <cstdio>
 #include <functional>
 #include <xmmintrin.h>
+#include <span>
+#include <utility>
+#include <vector>
 #include "terrain_interactive_loop50du.h"
 #include "original_race_f8_native_bars50la.h"
 #include "original_position_stats_adapter50la.h"
 #include "track_atm50cr.h"                              // R5: the one ATM owner (track.roles.atm)
+#include "track_particle_emitters50cr.h"                // R7: the one trackside emitter owner (track.roles.emitters)
 #include "../../src/game/native_trigger_group50mc.h"   // R5: the one trigger group (track.roles.triggers)
 #include "original_results_native_frame50la.h"
 #include "original_results_roster_read50la.h"
@@ -74,6 +78,7 @@ ReplayFrameTiming50PD replayFrameTiming50PD;
 std::uint64_t replayFrames50PD=0;bool replayCameraReported50PD=false;std::uint32_t replayRecordLogged50PD=0,replayResultsPC50PD=0xffffffffu; //Results replay log cadence.
 // Start overlay display log cadence: one line per lit change, per overlay owner.
 const void* startOverlayLogOwner50HU=nullptr;std::uint32_t startOverlayLoggedLit50HU=0xffffffffu;
+const char* f8LayoutReported50CR=nullptr; // 1994B0 refusal log cadence (one line per reason)
 const char* replayDrawReported50PD=nullptr;bool replayDrawLogged50PD=false;unsigned replayF8Reported50PD=0;
 // Always-on hitch recorder: four clock reads per frame. A frame slower than
 // 100 ms writes one line splitting its wall time at the existing phase
@@ -299,6 +304,80 @@ void Context::run() {
   if(!sourceCameraSession||!observer.bind(*sourceCameraSession,originalAiSession,observed)){
    d.operation="1A7DD0 end dispatch observer (camera view0 + AI manager) unavailable";return false;}
   return raceEnd.continue1A7DD0(observer,raceStartHooks,d);
+ };
+ // Common rewrite (W0 AREA H item 6, R7 #3): the one trackside emitter owner
+ // (track.roles.emitters, present when the TOB authors emitters), advanced
+ // once per world step right after the particle manager service, on every
+ // course. Each placement's Completion comes from the last completed gameplay
+ // image: current when every track span published from its static world
+ // instance was submitted, stale otherwise (also before the first completed
+ // image and for an instance with no static span), unavailable only when a
+ // completed-frame publication is lost after one existed. The span map
+ // is host memory built once per (owner, cold span array); no game memory.
+ struct EmitterCompletionMap50CR {
+  const void* owner=nullptr;const void* spans=nullptr;std::uint32_t spanCount=0;
+  std::vector<std::uint32_t> first,indices;std::vector<std::uint8_t> submitted;
+  std::vector<track_particle_emitters50CR::Completion> completed;
+ } emitterCompletion50CR;
+ bool emitterImageSeen50CR=false; // a completed gameplay image has published span visibility
+ const auto advanceTrackEmitters=[&](){
+  auto* emitters=track.roles.emitters.get();
+  if(!emitters)return;
+  // round3-E 2: never while the Application is paused (11C); the placements
+  // and the 161180 manager advance stay frozen with the paused world.
+  if(originalMainApplication.animationPaused())return;
+  require50DU(emitters->ready(),"track particle emitters lost their prepared state");
+  using Completion=track_particle_emitters50CR::Completion;
+  auto& m=emitterCompletion50CR;
+  const auto& cold=renderRequest.track;
+  const std::size_t placements=emitters->attachedCount();
+  if(m.owner!=emitters||m.spans!=cold.spans||m.spanCount!=cold.spanCount||m.completed.size()!=placements){
+   m=EmitterCompletionMap50CR{};
+   std::vector<std::pair<std::uint32_t,std::uint32_t>> byInstance; // (world instance, span index)
+   if(cold.spans){
+    byInstance.reserve(cold.spanCount);
+    for(std::uint32_t i=0;i<cold.spanCount;++i)
+     if(cold.spans[i].worldInstance!=0xffffffffu)byInstance.emplace_back(cold.spans[i].worldInstance,i);
+    std::sort(byInstance.begin(),byInstance.end());
+   }
+   m.first.assign(placements+1u,0u);
+   for(std::size_t p=0;p<placements;++p){
+    const auto* attachment=emitters->attachment(p);
+    require50DU(attachment!=nullptr,"track particle emitter placement row missing");
+    // Unattached placements (worldInstance null, worldIndex SIZE_MAX) have no
+    // spans; their entry is ignored by the owner.
+    if(!attachment->worldInstance||attachment->worldIndex>=std::numeric_limits<std::uint32_t>::max()){
+     m.first[p+1u]=static_cast<std::uint32_t>(m.indices.size());continue;}
+    const auto key=static_cast<std::uint32_t>(attachment->worldIndex);
+    const auto range=std::equal_range(byInstance.begin(),byInstance.end(),std::pair<std::uint32_t,std::uint32_t>{key,0u},
+        [](const auto& x,const auto& y){return x.first<y.first;});
+    for(auto it=range.first;it!=range.second;++it)m.indices.push_back(it->second);
+    require50DU(m.indices.size()<=std::numeric_limits<std::uint32_t>::max(),"track particle emitter span map overflow");
+    m.first[p+1u]=static_cast<std::uint32_t>(m.indices.size());
+   }
+   m.submitted.assign(m.indices.size(),0u);
+   m.completed.assign(placements,Completion::stale);
+   m.owner=emitters;m.spans=cold.spans;m.spanCount=cold.spanCount;
+  }
+  // Completed-frame publication: before the first completed gameplay image
+  // every placement is stale (not drawn yet); once an image has published,
+  // a lost publication is unavailable (the owner latches that as failed).
+  platform::VehicleWindowTrackVisibilityReceipt50DS receipt;platform::VehicleWindowDiagnostic50DS visibility;
+  const bool published=renderer.completedTrackSpanVisibility(m.indices.empty()?nullptr:m.indices.data(),
+      m.indices.empty()?nullptr:m.submitted.data(),static_cast<std::uint32_t>(m.indices.size()),receipt,visibility)&&
+      receipt.completedGameplayGeneration!=0;
+  if(published)emitterImageSeen50CR=true;
+  for(std::size_t p=0;p<placements;++p){
+   const auto begin=m.first[p],end=m.first[p+1u];
+   if(!published){m.completed[p]=emitterImageSeen50CR?Completion::unavailable:Completion::stale;continue;}
+   // An attached placement whose instance has no static span is never drawn: stale.
+   bool all=begin!=end;
+   for(auto i=begin;all&&i<end;++i)all=m.submitted[i]!=0u;
+   m.completed[p]=all?Completion::current:Completion::stale;
+  }
+  common_track50CR::Diagnostic d;
+  require50DU(emitters->advance(.016f,std::span<const Completion>(m.completed.data(),m.completed.size()),d),
+      d.reason.empty()?"track particle emitter advance rejected":d.reason.c_str());
  };
  std::uint32_t resultsInputStopPC50LA=0; //Native diagnostic suppression, not source/input state.
  resetRaceFrameSession50AU(); // measurement only; one recorder per race session
@@ -1211,7 +1290,7 @@ void Context::run() {
    // Native ALL8 restart is a full teardown/rebuild. Checkpoint restoration
    // remains unavailable for the genuine AI bank and source camera lifecycle.
    if(originalCameraEnabled&&hostInput.checkpointRequested){
-    std::cerr<<"Native whole-race checkpoint restore unavailable; use F5 or Restart Race.\n";
+    std::cerr<<"Native whole-race checkpoint restore unavailable; use the Pause RESTART row.\n";
     hostInput.checkpointRequested=false;
    }
    // Common rewrite (I4, PLAN 2.6, F01/F02/F04): no restart tears the session
@@ -1277,8 +1356,6 @@ void Context::run() {
     // HUD/live-audio admission uses it; no rejected host command is restored.
     using MenuResult=platform::HostSessionMenu50IF::Result;
     enum class CountedRowKind:std::uint8_t{main,course};
-    const bool originalPauseShown=sourcePauseObservation.hostOpen()&&sessionMenu.open()&&
-        sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause;
     auto action=MenuResult::None;
     // Common rewrite (I4, PLAN 2.8): the Pause rows that leave the race, the
     // same on every course and pod. Row 1 RESTART: 1BD934 1BE830 (closed by
@@ -1325,7 +1402,7 @@ void Context::run() {
     using CountedRow=original_pause_observation50LA::Owner::CountedInput::Row;
     original_pause_observation50LA::Owner::CountedInput counted;
     bool countedOwnsPoll=false;
-    if(!originalPauseShown&&!sessionMenu.open()&&sourcePauseObservation.countedBound()){
+    if(!sessionMenu.open()&&sourcePauseObservation.countedBound()){
      auto& keys=hostInput.keys;
      if(testPauseQuitStage148==1u&&captureRun.unattended()&&sourcePauseObservation.countedOpen()){
       // Test only (149p): one key per poll on the open original Pause: Down
@@ -1376,67 +1453,24 @@ void Context::run() {
       forceSceneRender=true;continue; // the next iteration departs (or shows the record page)
      }
     }
-    if(countedOwnsPoll){}
-    else if(!originalPauseShown)action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
-        nativeMenuCommand);
-    else{
-     // Original Pause rows: 0 CONTINUE, 1 RESTART RACE, 2..4 HUD, 5..8
-     // volumes, 9 QUIT TO MAIN MENU, 10 QUIT. Same native owners as the
-     // host HUD/audio pages and the same session actions as its rows.
-     auto in=sessionMenu.pollOriginalPause(hostInput);
-     if(testPauseQuitStage148==1u&&captureRun.unattended()){
-      // Test only (148r): Down until the target row, then Confirm, as a player would.
-      for(unsigned guard=0;guard<16u&&sourcePauseObservation.hostSelection()!=testPauseRow149();++guard)
-       sourcePauseObservation.moveHostSelection(true);
-      // The held test throttle (W) also reads as menu Up here; a player releases it.
-      in.up=in.down=in.left=in.right=false;
-      in.confirm=sourcePauseObservation.hostSelection()==testPauseRow149();in.back=false;testPauseQuitStage148=2u;
-      std::cerr<<"test_pause_quit owner=host row="<<sourcePauseObservation.hostSelection()<<" confirm="<<in.confirm<<'\n';
-     }
-     if(in.up!=in.down)sourcePauseObservation.moveHostSelection(in.down);
-     const auto row=sourcePauseObservation.hostSelection();
-     if(in.left!=in.right&&row>=2&&row<=4&&nativeHudAvailable){
-      require50DU(originalMainApplication.animationPaused()&&sourceCameraSession->adjustNativeHumanHud(
-          controlPresets,originalMainApplication.animationClock(),
-          originalMainApplication.profile->playerBits1125C,nativeHud,row-2,in.right),
-          "original Pause HUD preference owner rejected");
-      require50DU(nativeHudCurrent(),"original Pause HUD preference observation failed after commit");
-      sessionMenu.observeNativeHud(&nativeHud);
-      sourcePauseObservation.hostSettingFeedback(true,in.right);
-     }
-     if(in.left!=in.right&&row>=5&&row<=8&&nativeAudioAvailable){
-      require50DU(originalMainApplication.animationPaused()&&nativeAudioGroups->adjustNativePauseAudio(
-          *nativeAudioProfile,originalMainApplication.entities(),*nativeAudioMixer,
-          originalMainApplication.animationClock(),nativeAudio,row-5,in.right),
-          "original Pause live audio owner rejected");
-      require50DU(nativeAudioCurrent(),"original Pause live audio observation failed after commit");
-      sessionMenu.observeNativeRaceAudio(&nativeAudio);
-      sourcePauseObservation.hostSettingFeedback(true,in.right);
-     }
-     const bool canResume=!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready;
-     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
-     else if(in.confirm&&(row==1||row==9||row==10)){
-      // The same Pause rows as the counted owner (PLAN 2.8), drawn by the
-      // host Pause page of a race without a counted Pause binding.
-      sessionMenu.closeExternal();originalMainApplication.setExplicitAnimationPause(false);
-      composePacket(false,input);sampleController();
-      if(row==1)restartInPlace1AC8E0(common_race_start50CR::callerPauseRestart1BD934,1u,"pause_row1_host");
-      else if(row==9){if(pauseLeaveRow(CountedRowKind::main,"host")){returnOriginalMainRequested=true;break;}}
-      else pauseLeaveRow(CountedRowKind::course,"host");
-      forceSceneRender=true;continue;
-     }
-    }
-    // Every-track original Pause follows the host Pause page's lifetime.
-    {
-     const bool wanted=sourcePauseObservation.hostBound()&&sessionMenu.open()&&
-         sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause;
-     if(wanted&&!sourcePauseObservation.hostOpen()){
-      if(!sourcePauseObservation.openHost()){
-       std::cerr<<"original_pause_host open_rejected; host menu retained\n";
-       sourcePauseObservation.unbind();
+    if(!countedOwnsPoll){
+     // Common rewrite (PLAN 2.8, W0 AREA H item 6): the host Pause page rows
+     // of a race without a counted Pause binding are deleted. With no counted
+     // race bound there is no original Pause to open: Start (Escape, the
+     // pause request or pad Start) is refused, logged and ignored for this
+     // poll; it never opens a host stand-in of the original Pause.
+     if(!sessionMenu.open()){
+      auto& keys=hostInput.keys;
+      const auto& pad=keys.controllers[0];
+      const bool padStart=usePhysicalGameController&&keys.gameControllersEnabled&&pad.connected&&
+          pad.instanceId>=0&&pad.pressed[6]!=0;
+      if(keys.pressed[41]!=0||hostInput.pauseRequested||padStart){
+       common_race_log50CR::pauseRefused(0x1A87A0u,"race has no counted Pause binding; Start ignored");
+       keys.pressed[41]=0;hostInput.pauseRequested=false;
+       sessionMenu.observeController(input,false); // drop this poll's menu pad edges (Start)
       }
-     }else if(!wanted&&sourcePauseObservation.hostOpen()&&!sourcePauseObservation.countedOpen())
-      sourcePauseObservation.closeHost();
+     }
+     action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,nativeMenuCommand);
     }
     // Only accepted explicit native menu commands map to Application11C.
     // Focus/minimize/recovery/controller-loss suppression never writes it.
@@ -1480,12 +1514,14 @@ void Context::run() {
     selectedAudioSettings=sessionMenu.selectedAudioSettings();
     selectedTrack=sessionMenu.selectedTrack();
     if(action==platform::HostSessionMenu50IF::Result::Restart){
-     // Host menu "Restart Race": the same in-place 1AC8E0 as the Pause row
-     // (PLAN 2.6); never a session rebuild.
+     // Host menu "Restart Race": the in-place 1AC8E0 (PLAN 2.6); never a
+     // session rebuild. PORT STAND-IN: host entries emulating the original
+     // race-input restart (1A87A0 jal 1A8958, 1AC8E0 a1=0); Pause row 1 keeps
+     // 1BD934 a1=1.
      if(sessionMenu.open())sessionMenu.closeExternal();
      originalMainApplication.setExplicitAnimationPause(false);
      composePacket(false,input);sampleController();
-     restartInPlace1AC8E0(common_race_start50CR::callerPauseRestart1BD934,1u,"host_menu_restart");
+     restartInPlace1AC8E0(common_race_start50CR::callerRaceInput1A8958,0u,"host_menu_restart");
      forceSceneRender=true;continue;
     }
     if(action==platform::HostSessionMenu50IF::Result::ReturnOriginalMain||
@@ -1818,7 +1854,7 @@ void Context::run() {
        const auto frame=++sourceCameraTick;
        const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
        replayTiming.lap(6);
-       advanceWorldAnimations();advanceWater();advanceTrackParticles();
+       advanceWorldAnimations();advanceWater();advanceTrackParticles();advanceTrackEmitters();
        replayTiming.lap(7);
        const auto cameraChild=scene.status==sourceCamera::Status::sceneChildComplete?
            sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::replayPose):scene;
@@ -2001,7 +2037,7 @@ void Context::run() {
       heldLap50DU("held_scene_child");
       advanceWorldAnimations();
       advanceWater();
-      advanceTrackParticles();
+      advanceTrackParticles();advanceTrackEmitters();
       heldLap50DU("held_world_animation");
       if(sourceCameraSession->willUseFollowPose())
        require50DU(racerBank.visit(0,[&](){return refreshAnimatedCandidates();}),
@@ -2127,7 +2163,7 @@ void Context::run() {
                  sourceCamera::Status::sceneChildComplete,"original scene missed racer-prefix cut");
              advanceWorldAnimations();
              advanceWater();
-             advanceTrackParticles();
+             advanceTrackParticles();advanceTrackEmitters();
              }
              {SimulationScope timing(phaseTiming.enabled,simulationTotals[8]);
              advanceOriginalAiManager(.016f,&schedule);}
@@ -2265,11 +2301,22 @@ void Context::run() {
          std::cerr<<"track_animation_race_reset course="<<(trackAnimations?trackAnimations->label():std::string("-"))
              <<" rows="<<rows<<" common_triggers="<<triggers<<" at="<<site<<'\n';
          return true;};
-        common.restartWorld=[sceneReset2702E0](const char*& reason){
-         // TA's world has no RA trigger list or physics index: its native
-         // world restart is the particle/animation clear below, then 2702E0.
-         reason=nullptr;native_wreck_effects50PD::reset();return sceneReset2702E0("1A81A4",reason);};
-        common.beginReplay=[this,unwreckReplayRacers229F80,sceneReset2702E0](const char*& reason){
+        // 161F60 (World+4A0 particles, when present): 1A824C in the 1A8158
+        // replay loop and 1AC978 in 1AC8E0. The one trackside emitter owner
+        // runs the manager's own 161F60 removal, then puts every placement
+        // back to its authored start state (every course; null = no manager).
+        auto particlesRestart161F60=[this](const char*& reason)->bool{
+         if(!track.roles.emitters)return true;
+         common_track50CR::Diagnostic d;
+         if(!track.roles.emitters->restart161F60(d)){reason="161F60 track particle emitter restart rejected";return false;}
+         return true;};
+        common.restartWorld=[sceneReset2702E0,particlesRestart161F60](const char*& reason){
+         // The native world restart is the particle clear (161F60, wreck
+         // effects) and the animation/trigger reset 2702E0.
+         reason=nullptr;native_wreck_effects50PD::reset();
+         if(!particlesRestart161F60(reason))return false;
+         return sceneReset2702E0("1A81A4",reason);};
+        common.beginReplay=[this,unwreckReplayRacers229F80,sceneReset2702E0,particlesRestart161F60](const char*& reason){
          replayFrames50PD=0;replayCameraReported50PD=false;
          // The original race no longer opens its Pause once finished
          // (1A7CDC). Retire the host Pause drawing so Results' own 14D440
@@ -2290,6 +2337,7 @@ void Context::run() {
           std::cerr<<"race_replay tv_camera present="<<sourceCameraSession->replayTvPresent()<<'\n';
           // 1AC8E0's particle reset 161F60, then every racer 3C = 1 and 229F80.
           native_wreck_effects50PD::reset();
+          if(!particlesRestart161F60(reason))return false;
           if(!sceneReset2702E0("1AC980",reason))return false;
           unwreckReplayRacers229F80("1AB520");
          }
@@ -3263,7 +3311,7 @@ void Context::run() {
       std::cerr<<"particle render source boundary="<<static_cast<unsigned>(result)<<'\n';
      require50DU(result==OriginalGcParticleRenderStatus50KG::complete,
          "actual particle camera/light draw rejected");
-     renderFrame.gcParticles=particleRender.draw();
+     renderFrame.particles=particleRender.draw();
     }
     platform::GameplayBlurFrame50DS sourceBlurFrame{};
     if(sourceCameraSession){
@@ -3276,7 +3324,7 @@ void Context::run() {
      renderFrame.gameplayBlur=&sourceBlurFrame;
     }
     if(nativeSelectedLights){
-     renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
+     renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeSelectedLights;
      renderFrame.selectedLights=&drawLights[0];
     }
     // The one track-animation window: project the rows that moved (original 241280 draws from
@@ -3442,7 +3490,7 @@ void Context::run() {
        require50DU(drawLights[racer].ready()&&drawLights[racer].racerSlot()==racer,
            "retained opponent batch has no matching light publication");
        auto& submitted=opponents[nextRacePresentation.submittedOpponents-1u];
-       submitted.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
+       submitted.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeSelectedLights;
        submitted.selectedLights=&drawLights[racer];
       }
      };
@@ -3539,6 +3587,18 @@ void Context::run() {
       std::cerr<<"race_replay results_frame prepared=1\n";}
     }
     if(commonResultsDraw){
+     // W0 round 2: the F8 frame owner calls the race F8's slot44 1994B0
+     // layout (198CF0 over the 115990 gameplay viewport) once per F8 frame,
+     // on every race where the F8 renderer runs. A refusal is logged once per
+     // reason; the F8 batch below still reports its own admission.
+     {
+      OriginalRaceF8Diagnostic50LA layout;
+      if(!originalMainApplication.layoutConsumedF81994B0(layout)&&layout.operation!=f8LayoutReported50CR){
+       f8LayoutReported50CR=layout.operation;
+       std::cerr<<"f8_layout_1994B0 refused pc="<<std::hex<<layout.sourcePC<<std::dec
+           <<" operation="<<(layout.operation?layout.operation:"")<<'\n';
+      }
+     }
      OriginalRaceF8Diagnostic50LA f8;
      const bool prepared=sourceCameraSession&&sourceCameraSession->prepareNativeF8Frame50LA(renderFrame,nativeF8Frame,f8);
      if(!prepared&&!replayF8Reported50PD++)std::cerr<<"F8_NATIVE_FRAME_REJECT source_pc="<<f8.sourcePC
@@ -3712,7 +3772,7 @@ void Context::run() {
     // threshold must not complete an interval containing readback latency.
     if(captureWindowImage){
      requireOriginalAiFleetReady();discardTrackBaseline();
-     renderer.logRaCapturePixelProvenance();
+     renderer.logCapturePixelProvenance();
     }
 #else
     const bool captureWindowImage=false;
@@ -3895,7 +3955,9 @@ void Context::run() {
     // Test only (restart test): the second race of the run is the same race
     // restarted in place through 1AC8E0 (PLAN 2.6), never a session rebuild.
     if(captureRun.takeNativeRestartRequest()&&
-       restartInPlace1AC8E0(common_race_start50CR::callerPauseRestart1BD934,1u,"capture_restart_test")){
+       // PORT STAND-IN: host entries emulating the original race-input restart
+       // (1A8958, 1AC8E0 a1=0); Pause row 1 keeps 1BD934 a1=1.
+       restartInPlace1AC8E0(common_race_start50CR::callerRaceInput1A8958,0u,"capture_restart_test")){
      forceSceneRender=true;continue;
     }
     break;

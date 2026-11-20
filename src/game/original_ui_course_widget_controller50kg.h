@@ -9,14 +9,6 @@ struct OriginalUiCourseWidgetProfile50KG {
     std::uint32_t mode34=0,course700=0,subtype70C=0;
     std::uint8_t flags100BC=0,flags11018=0,flags1125C=0;
     std::array<std::uint8_t,13> courseRecords100C4{};
-    bool mawhonicRylothTest=false;
-    bool wanMbTest=false;
-    bool sebulbaTbTest=false;
-    bool scorchRcTest=false; // Startup provenance only.
-    bool tzidikTcTest=false; // Distinct startup provenance; no launch capability.
-    bool gasganoScTest=false;
-    bool kraidGbTest=false; // Appended startup provenance only; old field ordering retained.
-    bool youngAnakinMcTest=false; // Process-local request only; authentic owners remain mandatory.
     // Mode-2 observations from the SAME selected live profile; never mode-0 remembered values.
     std::uint32_t career100C0=0xffffffffu,courseSlot14E4=0,tier14E8=0;
     std::uint8_t progress219C=0;

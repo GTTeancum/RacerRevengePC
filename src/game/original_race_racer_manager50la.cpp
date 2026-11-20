@@ -125,7 +125,7 @@ bool OriginalRaceRacerManager50LA::associateNativeRoster(OriginalRaceConstructor
 }
 bool OriginalRaceRacerManager50LA::continueRestart1AEA70(OriginalRaceConstructor50LA& race,
     native_racer50HN::Bank& bank,VehicleFrameState49W& frame,AiRuntimeState50IV& ai,
-    const std::uint32_t& humans,const TrackNavigation50EU* actualMap,
+    const std::uint32_t& humans,const ::common_track50CR::NavigationView& actualMap,
     std::uint32_t actualA2,std::uint32_t& pc)noexcept {
     pc=0x1aea70;if(!impl_)return false;auto& p=*impl_;
     // The lexical caller already proved live World/Camera/Bank custody. Do
@@ -224,6 +224,6 @@ bool Registration::restartRacerScalars1AEA70(rr::game::OriginalRaceConstructor50
        &camera_->actual_.bank!=bank_)return false;
     return race.racerB0_->continueRestart1AEA70(race,camera_->actual_.bank,
         camera_->actual_.arena,camera_->actual_.ai,camera_->actual_.humanCount34,
-        camera_->actual_.actualRadarMapB8,actualA2,pc);
+        camera_->actual_.actualRadarMap,actualA2,pc);
 }
 }

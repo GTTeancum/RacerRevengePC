@@ -28,14 +28,14 @@ bool lighting(const CameraViewOutput49F& camera,
     std::array<float,4> ambient;
     const auto* lights=selected.component(0);
     if(selected.ownerIdentity()!=reinterpret_cast<std::uintptr_t>(&owner)||
-       !owner.currentGcGlobalAmbient50(ambient)||!lights||ambient!=std::array<float,4>{{40,40,45,64}})
+       !owner.currentSourceGlobalAmbient50(ambient)||!lights)
         return false;
-    // GC has one directional registration; selected zone ambient is NOT used.
-    //149310 consumes global+50 and the actual last directional. The native GC
-    // selected publication carries that same registered direction/color.
-    if(lights->diffuse[0]!=std::array<float,4>{{85,85,80,0}})return false;
-    for(unsigned i=1;i<3;++i)for(unsigned c=0;c<3;++c)
-        if(lights->diffuse[i][c]!=0)return false;
+    // Selected zone ambient is NOT used: 149310 consumes the track's global+50
+    // ambient and the actual last directional registration, which the native
+    // selected publication carries in slot 0 (the one sun slot of every track).
+    // Common rewrite (area E): the values are the track's own authored lights on
+    // every course (the GC 40,40,45 / 85,85,80 value pins are retired).
+    for(unsigned c=0;c<4;++c)if(!std::isfinite(ambient[c])||!std::isfinite(lights->diffuse[0][c]))return false;
     V toward{{lights->directions[0][0],lights->directions[1][0],lights->directions[2][0]}};
     V back{{-camera.sceneAfter.look.x,-camera.sceneAfter.look.y,-camera.sceneAfter.look.z}};
     V up{{camera.sceneAfter.up.x,camera.sceneAfter.up.y,camera.sceneAfter.up.z}};
@@ -68,14 +68,21 @@ struct OriginalGcParticleRenderOwner50KG::Storage {
     std::array<float,originalGcParticleCapacity50KG> depths{};
     OriginalGcParticleDraw50KG draw;
     std::uint64_t serial=0;
+    std::uint16_t frameCount=0;   // actual atlas frames (prepare)
     bool ready=false;
 };
 OriginalGcParticleRenderOwner50KG::OriginalGcParticleRenderOwner50KG() noexcept=default;
 OriginalGcParticleRenderOwner50KG::~OriginalGcParticleRenderOwner50KG()=default;
 S OriginalGcParticleRenderOwner50KG::prepare(const OriginalGcParticleManager50KG& manager) noexcept {
     if(storage_)return S::alreadyPrepared;
-    if(!manager.gcFogAuthoringPrepared()||!manager.frame(128)||manager.frame(129))return S::manager;
-    try{auto next=std::make_unique<Storage>();next->manager=&manager;storage_=std::move(next);return S::complete;}
+    // The actual atlas frame count of this track's PRT (1617A0 NumFrames), counted
+    // from the prepared manager on every course (the GC 129-frame pin is retired).
+    // 4096 = the manager's own native atlas storage bound (prepareTrackAtlas160E00).
+    if(!manager.prepared())return S::manager;
+    std::uint16_t frames=0;
+    while(frames<4096u&&manager.frame(frames))++frames;
+    if(!frames||frames>=4096u)return S::manager;
+    try{auto next=std::make_unique<Storage>();next->manager=&manager;next->frameCount=frames;storage_=std::move(next);return S::complete;}
     catch(...){return S::allocation;}
 }
 S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
@@ -107,7 +114,8 @@ S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
         v=add(v,mul(sourceScreen[12+col],core.combined[row*4+3]));
         if(!std::isfinite(v)||v!=viewport.combinedScreen250[row*4+col])return S::camera;
     }
-    if(fog.color30!=0xff97a0b1u||!std::isfinite(fog.start34)||!std::isfinite(fog.end38)||
+    // The track's own [Fog] colour and range (273C30) on every course.
+    if(!std::isfinite(fog.start34)||!std::isfinite(fog.end38)||
        fog.end38<=fog.start34||core.sceneAfter.nearPlane!=1||core.sceneAfter.farPlane!=fog.end38)return S::fog;
     OriginalUiMainParticleCamera50KG camera;
     camera.sourceScreen140=viewport.screen140;camera.combinedSourceScreen250=viewport.combinedScreen250;
@@ -158,14 +166,19 @@ S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
         //No arbitrary clamp or alpha wrap substitute on unsupported source data.
         if(!std::isfinite(brightness)||brightness<0||brightness>255)return S::unsupportedBrightness;
         packet.sourceBrightness=brightness;packet.normalizedUv=manager.frame(p.frame)->sourceUv;
-        for(auto& uv:packet.normalizedUv){uv[0]=div(uv[0],128);uv[1]=div(uv[1],1024);}
+        // PORT STAND-IN (flagged): pixel UVs are normalised by the 128x1024 extent of
+        // the stock atlas texture (demoprt.tga, every stock course); the texture's own
+        // extent is not carried to this owner yet. A frame outside it is refused.
+        for(auto& uv:packet.normalizedUv){
+            if(!(uv[0]>=0&&uv[0]<=128&&uv[1]>=0&&uv[1]<=1024))return S::frame;
+            uv[0]=div(uv[0],128);uv[1]=div(uv[1],1024);}
         if(p.flags&0x4000u){const auto old=packet.normalizedUv;
             packet.normalizedUv[0][0]=old[1][0];packet.normalizedUv[1][0]=old[0][0];
             packet.normalizedUv[2][0]=old[3][0];packet.normalizedUv[3][0]=old[2][0];
             if(p.flags&0x8000u){packet.normalizedUv[0][1]=old[2][1];packet.normalizedUv[1][1]=old[3][1];
                 packet.normalizedUv[2][1]=old[0][1];packet.normalizedUv[3][1]=old[1][1];}}
         OriginalUiMainParticleQuad50KG quad;
-        if(projectOriginalParticleQuad50KG(packet,state,camera,constants,129,255,quad)!=OriginalUiMainParticleGeometryStatus50KG::complete)
+        if(projectOriginalParticleQuad50KG(packet,state,camera,constants,s.frameCount,255,quad)!=OriginalUiMainParticleGeometryStatus50KG::complete)
             return S::arithmetic;
         if(!quad.visible){runState=2;continue;}
         //A source-alpha factor above1 needs a different framebuffer contract.
@@ -182,7 +195,7 @@ S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
     }
     draw.vertices=s.vertices.data();draw.fogFactors=s.fogFactors.data();draw.runs=s.runs.data();
     draw.sourceParticleCount=static_cast<std::uint32_t>(count);draw.sourceCombined=core.combined;
-    draw.fogColor={{div(151,255),div(160,255),div(177,255)}};
+    draw.fogColor={{div(float((fog.color30>>16)&0xffu),255),div(float((fog.color30>>8)&0xffu),255),div(float(fog.color30&0xffu),255)}};
     draw.cameraSceneKey=viewport.sceneKey;draw.cameraSessionGeneration=viewport.sessionGeneration;draw.generation=++s.serial;
     s.draw=draw;s.ready=true;return S::complete;
 }

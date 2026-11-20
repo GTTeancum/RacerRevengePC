@@ -50,6 +50,14 @@ void rosterRefused(std::size_t slot,std::uint32_t racer60,bool human,const Diagn
     try{log::roster(slot,racer60,Source::stock,human,false,d.reason);}catch(...){}
 }
 std::filesystem::path podsRoot(){return runtime_asset_paths50LB::resolve("work/native/project/disc/PODS");}
+std::filesystem::path discRoot(){return runtime_asset_paths50LB::resolve("work/native/project/disc");}
+// Shipped AUDIO/UIACCEPT.INI digest: a receipt (B-P01, PLAN 4.2), never a gate.
+// The one place it is defined; the rig (1E7C74 reader) reads whatever file the disc holds.
+constexpr std::string_view stockUiAcceptSha256="245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b";
+// Host read of one disc file for a receipt: false when unreadable (logged as differs).
+bool receiptBytes(const std::filesystem::path& path,std::vector<std::uint8_t>& out)noexcept {
+    try{out=runtime_startup50fl::readBytes(path);return true;}catch(...){out.clear();return false;}
+}
 
 // Human/AI order of a field (1AE280): every human row before every AI row,
 // humans34 == number of human rows, no racer twice, count 1..8.
@@ -241,6 +249,8 @@ void Owner::logPodReceipts(std::size_t slot)const {
         log::podReceipt(r->racer60,"archive",log::Receipt::none);
         log::podReceipt(r->racer60,"phy",log::Receipt::none);
         log::podReceipt(r->racer60,"sounds.ini",log::Receipt::none);
+        log::podReceipt(r->racer60,"UIACCEPT.INI",log::Receipt::none);
+        log::podReceipt(r->racer60,"ANN.INI",log::Receipt::none);   // add-on pods: generic lines only
         return;
     }
     const auto same=[](const char* a,const char* b){return a&&b&&std::string_view(a)==std::string_view(b);};
@@ -249,6 +259,17 @@ void Owner::logPodReceipts(std::size_t slot)const {
     log::podReceipt(r->racer60,"phy",same(actual->phySha256,stock->phySha256)?log::Receipt::match:log::Receipt::differs);
     log::podReceipt(r->racer60,"sounds.ini",same(identities::speechCountsSha256(*actual),
         identities::stockSpeechCountsSha256(*stock))?log::Receipt::match:log::Receipt::differs);
+    // The shared UI speech file the 1E7C74 first-event table reads, and this pod's
+    // named announcer INI (2C4B30): each file's bytes and SHA-256 against the
+    // stock identity. Read from the disc here, so the receipt works after build()
+    // alone (R11 host data check) as well as after loadAll.
+    namespace d=pod_materials50ed_fixture::detail;
+    std::vector<std::uint8_t> bytes;
+    const bool ui=receiptBytes(discRoot()/"AUDIO"/"UIACCEPT.INI",bytes)&&d::sha256(bytes)==stockUiAcceptSha256;
+    log::podReceipt(r->racer60,"UIACCEPT.INI",ui?log::Receipt::match:log::Receipt::differs);
+    const bool ann=receiptBytes(identities::announcerPath(discRoot(),*stock),bytes)&&
+        bytes.size()==stock->announcerBytes&&same(d::sha256(bytes).c_str(),stock->announcerSha256);
+    log::podReceipt(r->racer60,"ANN.INI",ann?log::Receipt::match:log::Receipt::differs);
 }
 
 void Owner::release()noexcept {

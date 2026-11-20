@@ -7,7 +7,7 @@
 #include "../../tests/native/original_ui_source_timing50lh.h"
 #include <optional>
 #include <limits>
-namespace ra_cold_roster50LA { class Operation; }
+namespace common_roster50CR { class Owner; }
 namespace rr::game {
 struct OriginalResults10450LA::Impl final {
     using D=OriginalResults104Diagnostic50LA;
@@ -255,7 +255,9 @@ struct OriginalResults10450LA::Impl final {
     // neither partial loading nor retained Results extends RA/Bank lifetime.
     // A synchronous callback must lock it and recheck its destruction-bound
     // Bank registration; locking Operation alone does not keep Bank alive.
-    std::weak_ptr<ra_cold_roster50LA::Operation> loadedRosterOperation;
+    // The race's one roster borrowed by the successful load (every course);
+    // identity only, re-validated by Read::loadedRosterCurrent at each use.
+    const common_roster50CR::Owner* loadedRoster=nullptr;
     explicit Impl(std::shared_ptr<OriginalApplicationEntities50LA>,std::uint64_t);
     bool detached()const noexcept;
     bool stop(D&,S,std::uint32_t,const char*)noexcept;

@@ -378,25 +378,11 @@ struct Owner::Storage {
     std::unique_ptr<AnimationLane> animations;
     bool staticBusy()const noexcept{return activeParticleLight||staticAccess||(staticOwner&&!staticRegistrationComplete)||
         (animations&&animations->busy());}
-    struct RaFlareIdentity {
-        const ::ra_pod_scene50LA::Owner* world=nullptr;
-        const OriginalWreckComponent50LA* entity=nullptr;
-        const std::uint8_t* type32=nullptr;const std::uint8_t* flags33=nullptr;
-        std::uint32_t object=0;
-    } raFlare; //First metadata/Entity identity remains at the original address.
-    std::array<RaFlareIdentity,14> raFlareTail{};
-    std::size_t raFlareCount=0; //Actual owned source-order domain, at most15.
-    RaFlareIdentity& raFlareAt(std::size_t i)noexcept{return i?raFlareTail[i-1u]:raFlare;}
-    const RaFlareIdentity& raFlareAt(std::size_t i)const noexcept{return i?raFlareTail[i-1u]:raFlare;}
-    const RaFlareIdentity* findRaFlare(std::uint32_t object)const noexcept {
-        for(std::size_t i=0;i<raFlareCount;++i)if(raFlareAt(i).object==object)return &raFlareAt(i);
-        return nullptr;
-    }
-    const RaFlareIdentity* findRaFlare(const OriginalWreckComponent50LA* entity)const noexcept {
-        for(std::size_t i=0;i<raFlareCount;++i)if(raFlareAt(i).entity==entity)return &raFlareAt(i);
-        return nullptr;
-    }
-    std::size_t animationBase()const noexcept{return racerCount+1u+staticModels.size()+raFlareCount;}
+    // The track's light flares (TrackFlare50CR rows), one per LightN authoring
+    // HasLightFlare, in numeric LightN order. Capacity reserved ONCE from
+    // NumberOfLights by readLights2783D0; every append is bounds-checked.
+    std::vector<original_light_flash50CR::TrackFlare50CR> flares;
+    std::size_t animationBase()const noexcept{return racerCount+1u+staticModels.size();}
     std::size_t identityCount()const noexcept{return animationBase()+(animations?animations->rows.size():0u);}
     bool disjointStaticBacking(const std::uint32_t* field)const noexcept {
         if(animations&&(!disjointResetField(field,animations.get(),sizeof(*animations))||
@@ -415,7 +401,7 @@ struct Owner::Storage {
     }
     std::span<CollectionTree50BX> methods{};
     std::span<CollectionZone50BX> zones{};
-    const ::ra_pod_scene50LA::Owner* sceneOwner=nullptr;
+    const ::common_track50CR::Track* sceneTrack=nullptr; // retainSceneZones272A78 lender (pod-load bridge)
     // Stable fields beside the SAME4C0 identities/registries. Constructor27F120
     // does not initialize these: disengaged optional means unproduced, not a
     // claimed source zero. No raw stamp addresses are exported to wreck/draw.
@@ -578,6 +564,7 @@ bool Owner::Storage::readLights2783D0(Diagnostic& d) {
     // the common_track50CR "lights" block ceiling, an allocation guard only.
     if(numberOfLights>maximumLights)return fail(d,Status::bounds,0x2783dc);
     localLights.clear();localLights.reserve(numberOfLights);localLightCount=0;
+    flares.clear();flares.reserve(numberOfLights);
     // [Environment] AmbientColorFlash* (270E9C: MinIdleTime enables the flash).
     if(environment&&field(*environment,"ambientcolorflashminidletime")){
         original_light_flash50CR::AmbientTimings t{};light::Vec3 flash{};
@@ -637,6 +624,49 @@ bool Owner::Storage::readLights2783D0(Diagnostic& d) {
         if(!poseSource::readFreshPose(*b,static_cast<std::uint32_t>(world.zones.size()),pose,poseDiagnostic))
             return fail(d,Status::sourceFields,poseDiagnostic.sourcePC);
         if(pose.initialZone!=zone)return fail(d,Status::sourceFields,0x277500);
+        // 2778D8..2779DC HasLightFlare: the light's flare row (every light type the
+        // reader reaches here, every course). Value data for the one flare pass.
+        {
+            bool hasFlare=false;
+            if(!flag(*b,"haslightflare",false,hasFlare))return fail(d,Status::sourceFields,0x2778d8);
+            if(hasFlare){
+                original_light_flash50CR::TrackFlare50CR row{};
+                // 27792C "undef" default: an absent LightFlareColorRGB is refused (26FA60
+                // cannot read it); three signed integer tokens, alpha lane 255 (26FC10).
+                light::Vec3 flareRgb{};
+                if(!triple(*b,"lightflarecolorrgb",flareRgb))return fail(d,Status::sourceFields,0x277938);
+                // 278000..278024 CVT.W.S (truncation toward zero) of A,R,G,B; 278038 packs
+                // A<<24|R<<16|G<<8|B in 32-bit two's complement; 23D750 halves each byte
+                // lane and publishes alpha 64 on the flare strip (+70).
+                std::int32_t lanes[4]{255,0,0,0};
+                for(unsigned c=0;c<3;++c){
+                    if(!std::isfinite(flareRgb[c])||flareRgb[c]<-255.f||flareRgb[c]>255.f)
+                        return fail(d,Status::sourceFields,0x278000);
+                    lanes[c+1]=static_cast<std::int32_t>(flareRgb[c]);
+                }
+                const std::uint32_t packed=(static_cast<std::uint32_t>(lanes[0])<<24)|
+                    (static_cast<std::uint32_t>(lanes[1])<<16)|(static_cast<std::uint32_t>(lanes[2])<<8)|
+                    static_cast<std::uint32_t>(lanes[3]);
+                row.color[0]=static_cast<float>(((packed>>16)&255u)>>1);
+                row.color[1]=static_cast<float>(((packed>>8)&255u)>>1);
+                row.color[2]=static_cast<float>((packed&255u)>>1);
+                row.color[3]=64.f;
+                row.size=1.f;   // 277974 default 0x3F800000
+                if(field(*b,"lightflaresize")&&(!scalar(*b,"lightflaresize",row.size)||!std::isfinite(row.size)))
+                    return fail(d,Status::sourceFields,0x277974);
+                const auto* texture=field(*b,"lightflaretexturemapname");
+                const std::string name=texture?texture->value:std::string("none");
+                // 277994 reads into the 64-byte +A4 buffer; 2779A0..2779B4 refuses a dotted name.
+                if(name.size()>=sizeof(row.texture)||name.find('.')!=std::string::npos)
+                    return fail(d,Status::sourceFields,0x2779b4);
+                std::memcpy(row.texture,name.c_str(),name.size()+1u);
+                for(unsigned c=0;c<3;++c)row.position[c]=pose.positionA0[c];
+                row.position[3]=1.f;
+                row.zone=zone;row.light=sourceOrdinal;
+                if(flares.size()>=flares.capacity())return fail(d,Status::bounds,0x27803c);
+                flares.push_back(row);++tally.flares;
+            }
+        }
         if(textField(*b,"type","Directional")){
             // PORT STAND-IN (flagged): the native selection has one sun slot;
             // a second Directional, or a non-emitting/finite/zoned sun, is refused.
@@ -859,7 +889,7 @@ Owner::~Owner(){
     if(storage_&&storage_->activeParticleLight)std::terminate();
     if(storage_)for(std::uint32_t slot=0;slot<storage_->racerCount;++slot)
         if(storage_->vehicles[slot].sourceResetBound)std::terminate();
-    if(storage_&&(storage_->raFlareCount||storage_->staticOwner||storage_->sceneOwner||
+    if(storage_&&(storage_->staticOwner||storage_->sceneTrack||
         (storage_->animations&&storage_->animations->claimed())))std::terminate();
     if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
     if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
@@ -1637,37 +1667,33 @@ bool Owner::currentSourceGlobalAmbient50(std::array<float,4>& out) const noexcep
 #include "original_ra_zone_draw50la.inl"
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
-const CollectionZone50BX* Owner::retainSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner,
+const CollectionZone50BX* Owner::retainSceneZones272A78(const ::common_track50CR::Track* track,
     std::size_t& count)noexcept {
     count=0;
-    if(!owner||!storage_||invalidated_||storage_->sceneOwner||
+    if(!track||!storage_||invalidated_||storage_->sceneTrack||
        storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return nullptr;
     auto& s=*storage_;
     if(s.visibility.lifecycle.storage.views.zones!=s.zones.data())return nullptr;
-    s.sceneOwner=owner;count=s.world.zones.size();return s.zones.data();
+    s.sceneTrack=track;count=s.world.zones.size();return s.zones.data();
 }
-ResetVisibilityWorld50EY* Owner::nativeWreckVisibility165E90(const ::ra_pod_scene50LA::Owner* owner,
+ResetVisibilityWorld50EY* Owner::nativeWreckVisibility165E90(const ::common_track50CR::Track* track,
     const CollectionZone50BX* rows)noexcept {
-    if(!owner||!storage_||invalidated_||storage_->sceneOwner!=owner||
+    if(!track||!storage_||invalidated_||storage_->sceneTrack!=track||
        rows!=storage_->zones.data()||storage_->visibility.lifecycle.storage.views.zones!=rows||
        storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return nullptr;
     return &storage_->visibility;
 }
-bool Owner::canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
-    return storage_&&owner&&storage_->sceneOwner==owner&&!storage_->activeLease&&
+bool Owner::canReleaseSceneZones272A78(const ::common_track50CR::Track* track)const noexcept {
+    return storage_&&track&&storage_->sceneTrack==track&&!storage_->activeLease&&
        !storage_->activeCamera&&!storage_->activeReset&&!storage_->resetPending();
 }
-bool Owner::releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)noexcept {
-    if(!canReleaseSceneZones272A78(owner)||storage_->raFlareCount)return false;
-    storage_->sceneOwner=nullptr;return true;
+bool Owner::releaseSceneZones272A78(const ::common_track50CR::Track* track)noexcept {
+    if(!canReleaseSceneZones272A78(track))return false;
+    storage_->sceneTrack=nullptr;return true;
 }
-}
-
-namespace rr::game::original_gc_gameplay_lighting_candidate {
-const original_world_environment50KG::SpatialBounds* Owner::sceneBounds534(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
-    return storage_&&owner&&storage_->sceneOwner==owner&&storage_->environment3A4&&
-        podEnvironment3A4(*owner)&&*podEnvironment3A4(*owner)==storage_->environment3A4.get()?
-        (*podEnvironment3A4(*owner))->spatialBounds534():nullptr;
+std::span<const original_light_flash50CR::TrackFlare50CR> Owner::trackFlares()const noexcept {
+    if(!storage_||invalidated_)return {};
+    return {storage_->flares.data(),storage_->flares.size()};
 }
 }
 
@@ -1842,4 +1868,3 @@ std::size_t Owner::retainedPayloadBytes()const noexcept {
 }
 }
 
-#include "original_ra_scene_roles270900.inl"

@@ -16,13 +16,13 @@ namespace rr::platform {
 class HostSessionMenu50IF final {
 public:
     enum class Result : std::uint8_t { None, StartPrepared, Restart, Quit, ReturnOriginalMain, HudPrevious, HudNext, RaceAudioPrevious, RaceAudioNext, RaceAudioDefaults };
-    enum class Page : std::uint8_t { Closed, Main, Pause, Controls, Restart, Leave, Exit, Audio, Tracks, IncompleteGC, Hud, RaceAudio };
+    enum class Page : std::uint8_t { Closed, Main, Pause, Controls, Restart, Leave, Exit, Audio, Tracks, Hud, RaceAudio };
 
     explicit HostSessionMenu50IF(bool startAtMenu, bool race, std::uint32_t loadedRacer60,
         bool racerSelectionAvailable = false, bool audioOptionsAvailable = false,
         const game::RaceAudioSettings50IC& loadedAudio = game::freshOriginalAudioSettings50IC(),
         const game::RaceAudioSettings50IC& selectedAudio = game::freshOriginalAudioSettings50IC(),
-        HostTrack50IM loadedTrack = HostTrack50IM::TA, HostTrack50IM selectedTrack = HostTrack50IM::TA,
+        HostTrack50IM loadedTrack = HostTrack50IM{}, HostTrack50IM selectedTrack = HostTrack50IM{},
         const HostTrackAdmission50IM& trackAdmission = {},
         bool nativeAllAiRestart = false, bool returnOriginalMain = false, bool nativeHumanRace = false) noexcept
         : page_(startAtMenu ? Page::Main : Page::Closed),
@@ -33,7 +33,7 @@ public:
           nativeAllAiRestart_(nativeAllAiRestart), returnOriginalMain_(nativeAllAiRestart&&returnOriginalMain),
           nativeHumanRace_(nativeAllAiRestart&&nativeHumanRace) {
         audioChoice_ = audioChoice_ && audioOptions_.valid();
-        if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) {
+        if (nativeAllAiRestart_) {
             // Whole-world ALL8 restarts keep the loaded track/racer/audio.
             // Original Main is a separate application destination, never the
             // old host track menu or a mutation of the live source race.
@@ -155,7 +155,7 @@ public:
         controllerEdges_={}; // A menu edge is consumed at most once.
         const bool back = key[41] != 0;
         if (input.menuRequested) {
-            if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) { change(Page::Pause); return Result::None; }
+            if (nativeAllAiRestart_) { change(Page::Pause); return Result::None; }
             staleSession_ = started_;
             change(Page::Main);
             return Result::None;
@@ -174,7 +174,6 @@ public:
         if (back) {
             if (page_ == Page::Main) confirm(Page::Exit);
             else if (page_ == Page::Tracks) { returnPage_ = Page::Main; change(Page::Main); }
-            else if (page_ == Page::IncompleteGC) { returnPage_ = Page::Main; change(Page::Tracks); }
             else change(returnPage_);
             return Result::None;
         }
@@ -183,23 +182,11 @@ public:
             return Result::None;
         }
         const bool up = key[82] || key[26], down = key[81] || key[22];
-        if (page_ == Page::IncompleteGC) {
-            // Five explanatory rows are not actions. Cancel is always first.
-            if (up != down) { selected_ = selected_ == 5u ? 6u : 5u; ++revision_; return Result::None; }
-            if (up && down) return Result::None;
-            if (key[40] || key[88] || key[44]) {
-                returnPage_ = Page::Main;
-                if (selected_ == 6u && hostTrackAdmitted50IM(HostTrack50IM::GC, trackAdmission_)) {
-                    selectedTrack_ = HostTrack50IM::GC; change(Page::Main);
-                } else change(Page::Tracks);
-            }
-            return Result::None;
-        }
         const std::uint32_t count = page_ == Page::Main ? 4u + unsigned(racerChoice_) + unsigned(audioChoice_) :
             page_ == Page::Pause ? (nativeAllAiRestart_ ? 4u+unsigned(returnOriginalMain_)+unsigned(hudAvailable_)+unsigned(nativeAudioAvailable_) :
-                loadedTrack_ == HostTrack50IM::GA ? 3u : 5u + unsigned(audioChoice_)) : page_ == Page::Audio ? 6u :
+                5u + unsigned(audioChoice_)) : page_ == Page::Audio ? 6u :
             page_ == Page::Hud ? 4u : page_ == Page::RaceAudio ? 6u :
-            page_ == Page::Tracks ? 2u + unsigned(trackAdmission_.gcIncompleteWorld) : 2u;
+            2u;
         if (up != down) {
             selected_ = up ? (selected_ + count - 1u) % count : (selected_ + 1u) % count;
             ++revision_;
@@ -259,12 +246,8 @@ public:
         }
         if (!key[40] && !key[88] && !key[44]) return Result::None;
         if (page_ == Page::Tracks) {
-            if (selected_ == 0) { selectedTrack_ = HostTrack50IM::TA; change(Page::Main); }
-            else if (trackAdmission_.gcIncompleteWorld && selected_ == 1) {
-                if (hostTrackAdmitted50IM(HostTrack50IM::GC, trackAdmission_)) {
-                    returnPage_ = Page::Tracks; change(Page::IncompleteGC); selected_ = 5;
-                } else ++revision_; // Acknowledge unavailable choice without changing selection.
-            } else change(Page::Main);
+            if (selected_ == 0) { selectedTrack_ = loadedTrack_; change(Page::Main); }
+            else change(Page::Main);
             return Result::None;
         }
         if (page_ == Page::Main) {
@@ -300,10 +283,6 @@ public:
                 else if (selected_ == 2u+unsigned(returnOriginalMain_)) { returnPage_ = Page::Pause; change(Page::Controls); }
                 else if (hudAvailable_ && selected_ == 3u+unsigned(returnOriginalMain_)) { returnPage_=Page::Pause;change(Page::Hud); }
                 else if (nativeAudioAvailable_ && selected_ == 3u+unsigned(returnOriginalMain_)+unsigned(hudAvailable_)) { returnPage_=Page::Pause;change(Page::RaceAudio); }
-                else confirm(Page::Exit);
-            }
-            else if (loadedTrack_ == HostTrack50IM::GA) {
-                if (selected_ == 1) { returnPage_ = Page::Pause; change(Page::Controls); }
                 else confirm(Page::Exit);
             }
             else if (selected_ == 1) confirm(Page::Restart);
@@ -390,30 +369,6 @@ public:
             }
             return out;
         }
-        if (loadedTrack_ == HostTrack50IM::GA && !nativeHumanRace_) {
-            out.title = "GA NATIVE PREVIEW";
-            out.subtitle = canResume ? "INCOMPLETE TRACK. ALL 8 RACERS USE ORIGINAL AI." : "SESSION STOPPED. EXIT TO START FRESH.";
-            if (page_ == Page::Controls) {
-                out.title = "GA PREVIEW CONTROLS";
-                out.rows[0] = "ALL 8 RACERS USE ORIGINAL AI";
-                out.rows[1] = "CAMERA RACER 0 ALSO USES ORIGINAL AI";
-                out.rows[2] = "ESC        PAUSE / RESUME";
-                out.rows[3] = "UP / DOWN  MENU SELECTION; ENTER CONFIRMS";
-                out.rows[4] = "F5 / RESTART AND BACKSPACE / CHECKPOINT DISABLED";
-                out.rows[5] = "NO MANUAL DRIVING OR TRACK LAUNCH";
-                out.rows[6] = "EXIT AND RELAUNCH FOR A FRESH PREVIEW";
-                out.rows[7] = "BACK"; out.rowCount = 8; out.selectedRow = 7;
-                out.footer = humanPhysical_ ? "A OR Y RETURNS TO THE MENU" : "ENTER OR ESC RETURNS TO THE MENU";
-            } else if (page_ == Page::Exit) {
-                out.title = "EXIT GA PREVIEW";
-                out.subtitle = "CURRENT SESSION PROGRESS WILL BE LOST";
-                out.rows[0] = "CANCEL"; out.rows[1] = "EXIT"; out.rowCount = 2;
-            } else {
-                out.rows[0] = canResume ? "RESUME" : "RESUME UNAVAILABLE";
-                out.rows[1] = "CONTROLS"; out.rows[2] = "EXIT"; out.rowCount = 3;
-            }
-            return out;
-        }
         if (page_ == Page::Main) {
             out.title = "RACER REVENGE";
             out.subtitle = staleSession_ ? (race_ ? "START A NEW RACE" : "START A NEW DRIVE") :
@@ -428,8 +383,10 @@ public:
             }
             out.rows[row++] = "CONTROLS";
             if (audioChoice_) out.rows[row++] = "AUDIO OPTIONS (NEXT SESSION)";
-            out.rows[row++] = selectedTrack_ == HostTrack50IM::GC ? "TRACK: GC EXPERIMENTAL INCOMPLETE" :
-                selectedTrack_ == HostTrack50IM::GA ? "TRACK: GA CANDIDATE (NO MENU LAUNCH)" : "TRACK: TA";
+            // The selection's own course code (host harness key, W0-HANDOFF 3.1); no course is special.
+            const char* code=hostTrackCode50IM(selectedTrack_);
+            std::snprintf(trackRow_,sizeof trackRow_,"TRACK: %s",code?code:"UNAVAILABLE");
+            out.rows[row++] = trackRow_;
             out.rows[row++] = "EXIT"; out.rowCount = row;
         } else if (page_ == Page::Pause) {
             out.title = "PAUSED";
@@ -445,22 +402,11 @@ public:
             audioOptions_.view(out);
         } else if (page_ == Page::Tracks) {
             out.title = "TRACK SELECTION";
-            out.subtitle = trackAdmission_.gcIncompleteWorld ? "GC IS EXPERIMENTAL AND INCOMPLETE" : "AVAILABLE TRACK";
-            out.rows[0] = selectedTrack_ == HostTrack50IM::TA ? "TA (SELECTED)" : "TA";
-            if (trackAdmission_.gcIncompleteWorld) {
-                out.rows[1] = !trackAdmission_.gcMode2 ? "GC UNAVAILABLE: REQUIRES MODE 2" :
-                    selectedTrack_ == HostTrack50IM::GC ? "GC EXPERIMENTAL INCOMPLETE (SELECTED)" : "GC EXPERIMENTAL INCOMPLETE";
-                out.rows[2] = "BACK"; out.rowCount = 3;
-            } else { out.rows[1] = "BACK"; out.rowCount = 2; }
-        } else if (page_ == Page::IncompleteGC) {
-            out.title = "GC EXPERIMENTAL INCOMPLETE";
-            out.subtitle = "MODE 2 ONLY. THESE PARTS ARE MISSING:";
-            out.rows[0] = "GATE / LOSTAI TRIGGER DETECTION";
-            out.rows[1] = "OPENING TRIGGER ACTIVATION";
-            out.rows[2] = "AUTHORED LOSTAI BRANCH ACTIONS";
-            out.rows[3] = "GATE SOUND";
-            out.rows[4] = "MODE1 RECORD CONFIGURATION";
-            out.rows[5] = "CANCEL"; out.rows[6] = "SELECT GC FOR NEXT SESSION"; out.rowCount = 7;
+            out.subtitle = "AVAILABLE TRACK";
+            const char* loadedCode=hostTrackCode50IM(loadedTrack_);
+            std::snprintf(trackRow_,sizeof trackRow_,"%s%s",loadedCode?loadedCode:"UNAVAILABLE",selectedTrack_==loadedTrack_?" (SELECTED)":"");
+            out.rows[0] = trackRow_;
+            out.rows[1] = "BACK"; out.rowCount = 2;
         } else if (page_ == Page::Controls) {
             out.title = "CONTROLS";
             out.subtitle = humanPhysical_ ? "SDL GAMEPAD  SELECTED ORIGINAL LAYOUT" :
@@ -515,7 +461,7 @@ private:
     bool race_ = true, started_ = false, staleSession_ = false, racerChoice_ = false;
     bool audioChoice_ = false;
     HostAudioOptions50IK audioOptions_;
-    HostTrack50IM loadedTrack_ = HostTrack50IM::TA, selectedTrack_ = HostTrack50IM::TA;
+    HostTrack50IM loadedTrack_ = HostTrack50IM{}, selectedTrack_ = HostTrack50IM{};
     HostTrackAdmission50IM trackAdmission_{};
     bool nativeAllAiRestart_=false,returnOriginalMain_=false,nativeHumanRace_=false;
     bool hudAvailable_=false,hudLayoutChanged_=false;
@@ -523,6 +469,7 @@ private:
     bool nativeAudioAvailable_=false;
     std::array<std::uint32_t,4> nativeAudioValues_{};
     mutable char nativeAudioRows_[4][maxVehicleWindowMenuText50DS+1]{};
+    mutable char trackRow_[maxVehicleWindowMenuText50DS+1]{};
     std::uint32_t humanPreset_=4;
     bool humanTwinEngine_=true,humanPhysical_=false,humanManualResetBound_=false;
     std::array<bool,7> controllerEdges_{};

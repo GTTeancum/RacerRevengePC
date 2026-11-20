@@ -35,6 +35,12 @@
 #include "gc_gate_audio50in_fixture.h"
 #include "original_native_ta_root_audio50la.h"
 #include "original_position_stats_prestage50la.h"
+#include "source_grid50ig_fixture.h"           // 2A2880 grid geometry over the one map view (race start hook)
+#include "native_racer_grid50hn_fixture.h"     // groundGridPose
+#include "original_subtype3_record_owner50la.h" // 1ACB18 record actor (race start hook)
+#include "../../src/game/lap_progress50gf.h"
+#include "track_environment_uv50cr.h"           // track.environmentUv producer (area E)
+#include "track_particle_emitters50cr.h"       // roles.emitters placements (A9)
 #include "../../src/game/original_track_fog50cr.h"
 #include <fstream>
 #include <iomanip>
@@ -273,7 +279,6 @@ void Context::run() {
  auto& mainContactFrames=this->mainContactFrames;
  auto& mainCrossedPortals=this->mainCrossedPortals;
  auto& mainMembership=this->mainMembership;
- auto& materialAudio=this->materialAudio;
  auto& materialOwner=this->materialOwner;
  auto& mode1=this->mode1;
  auto& mode1Effects=this->mode1Effects;
@@ -459,7 +464,10 @@ void Context::run() {
  auto& sourceTimeStatsAdapter=this->sourceTimeStatsAdapter;
  auto& sourceTimeStatsDisplayReported=this->sourceTimeStatsDisplayReported;
  auto& sourceTimeStatsRendering=this->sourceTimeStatsRendering;
- auto& sourceTrackFog=this->sourceTrackFog;
+ // W0 area B item 4: the camera session (DisplayInputs::trackFog3EC), the loop and
+ // the renderer borrow the track's one fog role (World3EC, 05.05), not a session copy.
+ require50DU(track.roles.fog&&track.roles.fog->cameraFields3EC(),"track fog role (05.05 273C30) not prepared");
+ auto& sourceTrackFog=*track.roles.fog->cameraFields3EC();
  auto& sourceVideo=this->sourceVideo;
  auto& specularGpuTextures50LA=this->specularGpuTextures50LA;
  auto& speechCounts=this->speechCounts;
@@ -488,7 +496,6 @@ void Context::run() {
  auto& trackAdmission=this->trackAdmission;
  auto& trackGpuTextures=this->trackGpuTextures;
  auto& trackMaterialDiagnostic=this->trackMaterialDiagnostic;
- auto& trackMaterialOwner=this->trackMaterialOwner;
  auto& trackMaterialRequest=this->trackMaterialRequest;
  auto& trackMesh=this->trackMesh;
  auto& trackNormals=this->trackNormals;
@@ -627,7 +634,9 @@ void Context::run() {
    // the count is zeroed and no cut child is built. A Free Play counted race
    // therefore has no authored intro: no cut/controller authoring here.
    // 174EA8: subtype 2/3 always zero the cut count (Time Trial is counted, 148r).
-   const bool introCutsAuthored=nativeOrdinaryLaunch11258==1u&&(dynamicProfile.game34==2u||cameraStartup350!=0);
+   // A course whose TOB authors no cut (World+3E4 == 0) has no intro either (fix-B).
+   const bool introCutsAuthored=nativeOrdinaryLaunch11258==1u&&(dynamicProfile.game34==2u||cameraStartup350!=0)&&
+       consumedStage.race()&&consumedStage.race()->world74()&&consumedStage.race()->world74()->cutCount3E4()!=0u;
    if(!introAuthoring&&introCutsAuthored&&(consumedStage.race()||sourceConsumedIntroActivation)){
     introAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
     require50DU(bool(introAuthoring),"actual selected-track intro authoring custody rejected");
@@ -731,26 +740,32 @@ void Context::run() {
     }
    });
   }
-  // A9: water attachments exist only when the track's data names water (2745D4).
-  // The renderer spans that carry the water's attached world instances are
-  // matched once from the one static world's spans.
-  if(track.hasWater()&&roles.water){
+  // A9: the ground-effects owner's attached placements (roles.emitters, 05.06),
+  // every course: the renderer spans that carry each placement's world instance
+  // are matched once from the one static world's spans. Unattached placements
+  // (worldInstance == nullptr) have no span and are skipped.
+  if(roles.emitters){
    const auto* spans=staticWorld->spans();require50DU(spans,"common track: static world spans missing");
-   const auto attached=roles.water->attachmentWorldInstances();
-   std::vector<bool> matched(attached.size(),false);
-   for(std::size_t index=0;index<spans->size();++index)for(std::size_t fire=0;fire<attached.size();++fire)
-    if((*spans)[index].worldInstanceIndex==attached[fire]){
+   const std::size_t placements=roles.emitters->attachedCount();
+   std::vector<bool> matched(placements,false),attached(placements,false);
+   for(std::size_t fire=0;fire<placements;++fire){
+    const auto* a=roles.emitters->attachment(fire);
+    if(!a||!a->worldInstance)continue;
+    attached[fire]=true;
+    for(std::size_t index=0;index<spans->size();++index)if((*spans)[index].worldInstanceIndex==a->worldIndex){
      require50DU(index<=std::numeric_limits<std::uint32_t>::max()&&fire<=std::numeric_limits<std::uint8_t>::max(),
-         "water attachment span index overflow");
+         "ground-effect attachment span index overflow");
      nativeFireSpanIds.push_back(static_cast<std::uint32_t>(index));nativeFireSpanOwner.push_back(static_cast<std::uint8_t>(fire));
      matched[fire]=true;
     }
-   for(bool actual:matched)require50DU(actual,"water attachment has no actual renderer spans");
+   }
+   for(std::size_t fire=0;fire<placements;++fire)
+    require50DU(!attached[fire]||matched[fire],"ground-effect attachment has no actual renderer spans");
    nativeFireSpanDrawn.resize(nativeFireSpanIds.size());
   }
   // ATM (authored animated textures), particle Window and numeric renderer,
   // fog: one owner each in track.roles (05.05 fog, 05.06 particles, 05.14 ATM),
-  // read by the renderer through request.track (R8). No per-course owner.
+  // read by the renderer through request.commonTrack (R8). No per-course owner.
   // Original Main owns a separate mixer/device/WAV. The retained cold race
   // bank cannot open output during Main, even if RR_AUDIO is enabled.
   auto activateRaceAudio=[&](){
@@ -994,7 +1009,15 @@ void Context::run() {
    std::shared_ptr<const common_track50CR::Track> requestTrack=consumedStage.track();
    if(requestTrack)require50DU(requestTrack.get()==&track,"consumed stage holds a different Track than this race");
    else requestTrack=std::shared_ptr<const common_track50CR::Track>(std::shared_ptr<const void>{},&track);
-   renderRequest.track.track=std::move(requestTrack);
+   renderRequest.commonTrack=std::move(requestTrack);
+  }
+  // Environment-mapped passes (EnvironmentMapCompressed): the track's one
+  // producer over roles.staticWorld + roles.lights, every course (null = none).
+  {
+   std::string environmentError;
+   renderRequest.track.environmentUv=track_environment_uv50CR::make(track,gameplayBinderTemplates,
+       originalMainApplication.materialRuntime,environmentError);
+   require50DU(renderRequest.track.environmentUv||environmentError.empty(),environmentError.c_str());
   }
   renderRequest.track.mesh=staticWorld->mesh();
   // Authored fog RGB and gameplay ranges are source-backed. The native shader
@@ -1289,9 +1312,9 @@ void Context::run() {
   if(particleMaterials.loaded()){
    require50DU(particleMaterials.createGpu(textureRequest,textureDiagnostic),
        "original particle atlas GPU publication rejected");
-   renderRequest.gcParticleCpuTextures=particleMaterials.bank();
-   renderRequest.gcParticleTextures=particleMaterials.gpu();
-   renderRequest.gcParticleMaterial=particleMaterials.material();
+   renderRequest.particleCpuTextures=particleMaterials.bank();
+   renderRequest.particleTextures=particleMaterials.gpu();
+   renderRequest.particleMaterial=particleMaterials.material();
   }
   if(!sourceDisplayLifetime->create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
@@ -1518,9 +1541,20 @@ void Context::run() {
    }
    if(sourceConsumedPauseActivation&&consumedStage.race()){
     // The spectator Pause observes the launch's own Track (R9: bindRace takes
-    // the launch's course and profile, no fixed identity).
+    // the launch's course and profile, no fixed identity). Its title is the
+    // launch's own track-ID title (constructor 17EA08 order, as the loader).
+    constexpr std::size_t spectatorTitles[]={106,111,115,117,110,114,118,108,107,112,116,109,119};
+    rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection spectatorCourse;
+    // A registry (add-on) course has a named title, not a track-ID one: the
+    // spectator bind has no named form yet (fix-H.txt, area A).
+    rr::game::dlc50DL::AddonCourseLoad spectatorRow;
+    const bool spectatorRegistry=trackSession->registry&&rr::game::dlc50DL::addonCourseLoadByCode(trackSession->world->code,spectatorRow);
+    const bool spectatorTitled=!spectatorRegistry&&originalMainApplication.riderProfile&&
+        originalMainApplication.riderProfile->courseRaceSnapshot(spectatorCourse)&&
+        spectatorCourse.course<std::size(spectatorTitles);
+    require50DU(spectatorTitled,"ALL8 spectator Pause title: the launch's course has no track-ID title");
     require50DU(sourcePauseObservation.bind(originalMainApplication,sourcePause.storage())&&
-        sourcePauseObservation.bindRace(sourceCameraSession,consumedStage.track()),
+        sourcePauseObservation.bindRace(sourceCameraSession,consumedStage.track(),spectatorTitles[spectatorCourse.course]),
         "actual Pause camera/source observation bind rejected");
     require50DU(renderer.bindOriginalPauseDerived(sourcePause.drawing(),rendererDiagnostic),
         "actual Pause GPU binding rejected");
@@ -1601,34 +1635,9 @@ void Context::run() {
     require50DU(racerBank.visit(0,[&](){return lapOwner.bindOriginalHud(sourceRaceHud,0,
         originalAiHumanCount,dynamicConsumerFlags11050);}),"actual human nonnull lap HUD binding rejected");
    }
-   // 1AED30 (race load 1A72DC, right after the racer manager 1AA510): every
-   // racer's body may only move vertically and pitch/roll until GO:
-   // 167A30(racer340, 0,1,0) translation, 167A40(racer340, 1,0,1) rotation.
-   if(sourceCameraSession){
-    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-     auto& body=x.parameters.bodies.main.body;
-     body.translationEnabled[0]=false;body.translationEnabled[1]=true;body.translationEnabled[2]=false;
-     body.rotationEnabled[0]=true;body.rotationEnabled[1]=false;body.rotationEnabled[2]=true;});
-    std::cerr<<"race_start_lock 1AED30 racers="<<racerBank.count()<<'\n';
-   }
-   // 1A8C40 / 197040 / 1A8C78: the race's PodRaceStartOverlay, every course,
-   // human and all-AI alike (1A8A40 builds it unconditionally).
-   if(sourceCameraSession){
-    OriginalRaceStartOverlayDiagnostic50HU startDiagnostic;
-    const bool startLoaded=sourceCameraSession->loadStartOverlay(
-        originalMainApplication.appStart(originalMainApplication.assetRoot),
-        original_main_entry50KG::readArchive(originalMainApplication.assetRoot,rr::assets::OriginalUiArchiveId50KG::overlays),
-        originalMainApplication.materialRuntime,startDiagnostic);
-    if(!startLoaded)std::cerr<<"race_start_overlay load_rejected error="<<static_cast<unsigned>(startDiagnostic.error)
-        <<" pc="<<std::hex<<startDiagnostic.sourcePC<<" material_pc="<<startDiagnostic.material.sourcePC<<std::dec
-        <<" texture="<<startDiagnostic.texture<<'\n';
-    require50DU(startLoaded,"original PodRaceStartOverlay 197040 load rejected");
-    platform::VehicleWindowDiagnostic50DS startRenderDiagnostic;
-    const bool startBound=renderer.bindOriginalRaceStartOverlay(sourceCameraSession->startOverlay(),startRenderDiagnostic);
-    require50DU(!startRenderDiagnostic.cleanupIncomplete,"failed start overlay GPU setup needs renderer retirement");
-    std::cerr<<"race_start_overlay gpu_bind="<<startBound<<" operation="
-        <<(startRenderDiagnostic.operation?startRenderDiagnostic.operation:"none")<<'\n';
-   }
+   // 1AED30 start lock and the 197040 PodRaceStartOverlay load run in the one
+   // race start (raceStart.begin(fresh) below, hooks lockStart1AED30 /
+   // showStartOverlay197040), not here.
 
    // The human Results104 root of the counted race, every course (the original
    // has one race class; 1A7DD0..1AB520 read no track id). A rejection is
@@ -2036,15 +2045,68 @@ void Context::run() {
   };
   // ---- One race start (1A6AA0 fresh tail / 1AC8E0 restart) and one end
   // dispatch (1A7DD0) for every counted race (PLAN 2.6/2.7). The port-side
-  // owners of the per-step actions live here; each hook performs exactly one
-  // original step and reports refusal. A hook left empty is a step whose port
-  // owner does not exist yet: R9 logs it as refused, never skips it silently.
+  // owners of the per-step actions live here (W0 round 2, RACE-START STEPS);
+  // each hook performs exactly one original step for every racer and reports
+  // refusal, which R9 logs. Nothing here names a course or a pod.
   const auto resetRacerTiming216690=[&](std::size_t slot,std::uint32_t mode11258)noexcept->bool{
-   // 216690 timing portion: CB0/CB8/CC0 reset, best lap CB4 kept when 11258==3.
+   // 216690 (from 1AEA70 per racer), whole body:
+   //  21669C..2166F4 CC8 = 0, CD8 bits 1/0/2 = 0, CCC = 0, CB0/CB8/CBC/CD0/CD4 = 0;
+   //  216708..216724 CB4 = 0 unless App2DC+11258 == 3; 216730..216754 CC0[100] = 0;
+   //  216758 217420: +7D0/+7D4/+7D8/+7DC = 0, +D3C/+D38 = 0.
+   // PORT STAND-IN: 216760..216780 (+74 = 0, +7C = 0, racer+240 vtable+20) are
+   // not ported: no port field of the racer state carries those offsets.
+   try{
+    if(slot>=racerBank.count()||!racerBank.active(slot)||slot>=std::size(originalAiSession.rank))return false;
+    common_lap50CR::Diagnostic lapDiagnostic{};
+    // The lap owner's own copy of CC8/CD8 (R4: its 1AEA70 per-racer reset).
+    if(laps.prepared()&&!laps.resetRacer(slot,lapDiagnostic)){
+     std::cerr<<"race_start_216690 slot="<<slot<<" lap_reset_refused="<<(lapDiagnostic.reason?lapDiagnostic.reason:"unknown")<<'\n';
+     return false;
+    }
+    racerBank.visit(slot,[&](){
+     lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
+     rr::game::initializePlayerLapRaceFields50GF(lapContinuity.state);              // CC8, CD8 bits 0..2
+     s.fields.impactFlagsCD8=static_cast<std::uint8_t>((s.fields.impactFlagsCD8&~7u)|(lapContinuity.state.vehicleCD8&7u));
+     rr::game::initializeLapTimingFields50ID(lapContinuity.timing,mode11258);       // CB0..CD4, CC0, CB4 rule
+     s.fields.damage7D0=0.f;s.fields.damage7D4=0.f;s.fields.damage7D8=0.f;s.fields.damage7DC=0.f; // 217420
+     s.impactSupplement.environmentalD38=0.f;s.impactSupplement.environmentalD3C=0.f;
+    });
+    // CCC (place) and CD4 (retirement) as the AI manager's rank rows mirror them.
+    originalAiSession.rank[slot].placeCCC=0;originalAiSession.rank[slot].retirementCD4=0;
+    return true;
+   }catch(...){return false;}
+  };
+  const auto placeOnGrid2A2880=[&](std::size_t slot)noexcept->bool{
+   // 1AEA70 per racer: rank = slot - humans34 for an AI racer (racer+58 == 1),
+   // slot + manager38 (the AI count) for a human; 2A2880(raceB8 map, rank) then
+   // 2169C0 places the racer at that pose. The 2A2880 geometry is the one map
+   // view's (source_grid50IG), grounded with the racer's own PHY lift.
+   // PORT STAND-IN: no live (mid-race) 2169C0 placement owner is reachable from
+   // this scope (native_racer50HN::placeColdGrid refuses a moved body, and the
+   // racer's query rows / rebase models live in the continuation): the step is
+   // refused after the pose is computed (fix-H.txt, area H).
    try{
     if(slot>=racerBank.count()||!racerBank.active(slot))return false;
-    racerBank.visit(slot,[&](){rr::game::initializeLapTimingFields50ID(lapContinuity.timing,mode11258);});
-    return true;
+    bool ok=false;std::uint32_t rank=0;rr::game::BodyMatrix48G grounded{};
+    racerBank.visit(slot,[&](){
+     const auto humans=static_cast<std::size_t>(originalAiHumanCount);
+     const bool ai=s.fields.vehicle58==1u;
+     if(ai?slot<humans:slot>=humans)return;
+     rank=static_cast<std::uint32_t>(ai?slot-humans:slot+(racerBank.count()-humans));
+     rr::game::GridCenterResult50AC grid{};
+     if(rank>7u||!source_grid50IG::prepare(mapView,rank,grid))return;
+     const float lift=x.parameters.visual.verticalLimit7EC;
+     rr::game::BodyMatrix48G requested=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
+     for(unsigned axis=0;axis<3;++axis){
+      const float at=std::bit_cast<float>(grid.position[axis]);
+      requested.v[12+axis]=axis==1?at+lift:at;
+     }
+     ok=native_racer50HN::groundGridPose(ground,requested,lift,groundStack.data(),groundStack.size(),grounded);
+    });
+    std::cerr<<"race_start_grid pc=2A2880 slot="<<slot<<" rank="<<rank<<" pose_ok="<<ok;
+    if(ok)std::cerr<<" x="<<grounded.v[12]<<" y="<<grounded.v[13]<<" z="<<grounded.v[14];
+    std::cerr<<" live_placement_2169C0=absent\n";
+    return false;
    }catch(...){return false;}
   };
   const auto lockStart1AED30=[&]()noexcept->bool{
@@ -2055,21 +2117,60 @@ void Context::run() {
      auto& body=x.parameters.bodies.main.body;
      body.translationEnabled[0]=false;body.translationEnabled[1]=true;body.translationEnabled[2]=false;
      body.rotationEnabled[0]=true;body.rotationEnabled[1]=false;body.rotationEnabled[2]=true;});
+    std::cerr<<"race_start_lock 1AED30 racers="<<racerBank.count()<<'\n';
     return true;
    }catch(...){return false;}
   };
   const auto showStartOverlay197040=[&]()noexcept->bool{
-   // 1983A0 (age 0.75, once-flags cleared) on the race's one start overlay.
-   return sourceCameraSession&&sourceCameraSession->resetStartOverlay1983A0();
+   // Fresh: 1A8C40 / 197040 / 1A8C78, the race's PodRaceStartOverlay (raceD4),
+   // human and all-AI alike (1A8A40 builds it unconditionally). Restart
+   // (1ACDF0): 1983A0(raceD4), age 0.75 and once-flags cleared on that overlay.
+   if(!sourceCameraSession)return false;
+   if(sourceCameraSession->startOverlay())return sourceCameraSession->resetStartOverlay1983A0();
+   try{
+    OriginalRaceStartOverlayDiagnostic50HU startDiagnostic;
+    const bool startLoaded=sourceCameraSession->loadStartOverlay(
+        originalMainApplication.appStart(originalMainApplication.assetRoot),
+        original_main_entry50KG::readArchive(originalMainApplication.assetRoot,rr::assets::OriginalUiArchiveId50KG::overlays),
+        originalMainApplication.materialRuntime,startDiagnostic);
+    if(!startLoaded){
+     std::cerr<<"race_start_overlay load_rejected error="<<static_cast<unsigned>(startDiagnostic.error)
+         <<" pc="<<std::hex<<startDiagnostic.sourcePC<<" material_pc="<<startDiagnostic.material.sourcePC<<std::dec
+         <<" texture="<<startDiagnostic.texture<<'\n';
+     return false;
+    }
+    platform::VehicleWindowDiagnostic50DS startRenderDiagnostic;
+    const bool startBound=renderer.bindOriginalRaceStartOverlay(sourceCameraSession->startOverlay(),startRenderDiagnostic);
+    std::cerr<<"race_start_overlay gpu_bind="<<startBound<<" operation="
+        <<(startRenderDiagnostic.operation?startRenderDiagnostic.operation:"none")
+        <<" cleanup_incomplete="<<startRenderDiagnostic.cleanupIncomplete<<'\n';
+    return !startRenderDiagnostic.cleanupIncomplete;
+   }catch(...){return false;}
+  };
+  const auto restartRecordActor=[&]()noexcept->bool{
+   // 1ACB18 (11258 == 3, race78, race1B0 bit4 clear; R9 checks): B0+40 vtable+18
+   // = 141520 on the Time Trial record actor (flags29 bits 0/1 clear, vtable+28).
+   return nativeRecordActor&&nativeRecordActor->restart1ACB18();
+  };
+  const auto resetCamera=[&](std::uint32_t a1)noexcept->bool{
+   // 1ACBA0 per human 1AF330 / 1750A0, plus 175430(race48) when a1 != 0 (area B).
+   return sourceCameraSession&&sourceCameraSession->rebindRacerCameras1ACBA0(a1);
+  };
+  const auto readBestLapCB4=[&](std::size_t slot,float& bestLapCB4)noexcept->bool{
+   try{
+    if(slot>=racerBank.count()||!racerBank.active(slot))return false;
+    racerBank.visit(slot,[&](){bestLapCB4=lapContinuity.timing.bestLapCB4;});
+    return true;
+   }catch(...){return false;}
   };
   common_race_start50CR::Hooks raceStartHooks{};
   raceStartHooks.resetRacerTiming216690.emplace(resetRacerTiming216690);
+  raceStartHooks.placeOnGrid2A2880.emplace(placeOnGrid2A2880);
   raceStartHooks.lockStart1AED30.emplace(lockStart1AED30);
   raceStartHooks.showStartOverlay197040.emplace(showStartOverlay197040);
-  // Not filled (no port owner reachable from this scope yet; R9 refuses and
-  // logs the step): resetRacerDamage217420, placeOnGrid2A2880,
-  // resetVcrChannels (race-internal VCR78, reached by R9 through the race
-  // friend), backupRecordActor288630, resetCamera.
+  raceStartHooks.restartRecordActor.emplace(restartRecordActor);
+  raceStartHooks.resetCamera.emplace(resetCamera);
+  raceStartHooks.readBestLapCB4.emplace(readBestLapCB4);
   struct RaceFlowBinding final {
    common_race_start50CR::Owner& start;common_race_end50CR::Owner& end;bool bound=false;
    ~RaceFlowBinding(){if(bound){end.unbind();start.unbind();}}
@@ -2085,11 +2186,20 @@ void Context::run() {
    require50DU(raceEnd.bind(countedRace,endLaunch,raceStart),"common race end bind rejected");
    raceFlowBinding.bound=true;
    require50DU(originalMainApplication.bindRaceStart50CR(this->raceStartOwner),"Application race start binding rejected");
-   // Fresh race: only the shared tail (2A2880, 1AED30, 197040, race94).
+   // Fresh race: only the shared tail (1AED30, 197040, race94; the cold load
+   // placed every racer, so no 2A2880 here). Every fresh hook is filled: a
+   // refusal is a failed load step (the 197040 overlay load), as before.
    common_race_start50CR::Receipt freshReceipt{};
    const common_race_start50CR::Request fresh{common_race_start50CR::Reason::fresh,0u,
        common_race_start50CR::callerFresh1A6AA0,nativeOrdinaryLaunch11258};
-   raceStart.begin(fresh,raceStartHooks,freshReceipt);
+   const bool freshStarted=raceStart.begin(fresh,raceStartHooks,freshReceipt);
+   require50DU(freshStarted||!sourceCameraSession,
+       freshReceipt.reason?freshReceipt.reason:"common race start (fresh 1A6AA0 tail) refused");
+  }else if(sourceCameraSession){
+   // PORT STAND-IN: a launch with no counted race (direct start) has no
+   // race start owner to bind; the same two fresh hooks run directly.
+   require50DU(lockStart1AED30(),"1AED30 start lock refused");
+   require50DU(showStartOverlay197040(),"original PodRaceStartOverlay 197040 load rejected");
   }
   // Original 1A78DC: last step, after 2AED60 camera fade and 232EC0 flush.
   rr::platform::loading_progress50DU::step(.1f,0x1a78dc);
@@ -2357,7 +2467,7 @@ void Context::run() {
    .engineDamageCompletions=engineDamageCompletions,
    .engineDamage=engineDamage,
    .speechEvents=speechEvents,
-   .materialAudio=materialAudio,
+   .materialAudio=track.roles.audio,
    .originalAiAudio=originalAiAudio,
    .sourceTrackFog=sourceTrackFog,
    .cameraFraming=cameraFraming,

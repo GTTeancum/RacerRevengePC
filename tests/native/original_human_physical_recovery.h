@@ -37,33 +37,11 @@ struct Diagnostic {
     visibility::Diagnostic visibility{};
     ResetGroundDiagnostic50IZ ground{};
 };
+// Common rewrite: the ONE human recovery owner set for every course, over the
+// map view of the one navigation store (retained by value; it cannot be
+// reseated inside this owner). Keep the same immutable selection across an
+// unfinished State; State itself remains the original bank-safe scalar continuation.
 struct Owners {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Genuine19EBA0 reset fields share the existing human audio state.
-    // D44 is the actual session pool's human row, never a fresh zero scratch.
-    OriginalHumanEngineResetOwner50LB& controllerD40;
-    UndertrackPlayerPrefix50ET& playerPrefix;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigation50EU& mapTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// The selected final view is retained by value and cannot be reseated inside
-// this owner. Keep the same immutable selection across an unfinished State;
-// State itself remains the original bank-safe scalar continuation.
-struct Owners50MB {
     visibility::Owner& visibility;
     std::uint32_t& cables254Field50;
     // Genuine19EBA0 reset fields share the existing human audio state.
@@ -88,9 +66,7 @@ struct Owners50MB {
 };
 
 namespace ordinary_navigation_detail50MB=native_original_ai_recovery::ordinary_navigation_detail50MB;
-// Constant-true legacy admission leaves every original guard/effect ordered.
-bool navigationReadyOrdinaryShared50MB(const Owners&) noexcept;
-bool navigationReadyOrdinaryShared50MB(const Owners50MB& owners) noexcept;
+bool navigationReadyOrdinaryShared50MB(const Owners& owners) noexcept;
 
 bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept;
 // Serial inside the actual human arena. Source-completed slices survive
@@ -102,10 +78,6 @@ bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bin
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
     Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
-bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
-    Owners50MB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
 
 // The actual228BBC continuation supplies its own saved pre-reset base pose.
 
@@ -113,20 +85,12 @@ bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     const BaseUndertrackContinuation50X& base,State& state,Owners& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
-bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    const BaseUndertrackContinuation50X& base,State& state,Owners50MB& owners,
-    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
 
 // Distinct1A17A4 event call. It never manufactures a base-frame cursor.
 
 bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,State& state,Owners& owners,
-    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
-bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
-    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    std::uint64_t serial,State& state,Owners50MB& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept;
 
 } // namespace native_original_human_recovery

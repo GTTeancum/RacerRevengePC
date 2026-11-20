@@ -15,6 +15,7 @@
 #include "stock_course_receipts50cr.h"
 #include "original_ui_main_entry50kg.h"
 #include "native_ta_particle_cold50la_fixture.h"
+#include "track_particle_emitters50cr.h"
 #include "material_alpha50gx_fixture.h"
 #include "course_world_texture50st.h"
 #include "single_pass_world50lm.h"            // R3: single_pass_world50LM::Owner (roles.staticWorld)
@@ -27,10 +28,10 @@
 #include "../../src/assets/track_height_descriptor50jb.h"
 #include "../../src/assets/material_texture_assets50ea.h"
 #include "../../src/assets/original_ui_material50kg.h"
-#include "../../src/assets/original_particle_emitters50pe.h"
 #include "../../src/game/original_track_particle_cold50la.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
+#include "../../platform/linux/native/original_ui_main_session50kg.h"
 #include <exception>
 #include <memory>
 #include <string>
@@ -80,36 +81,48 @@ bool prepareParticles1B4DC0(Track& t,const LoadInputs& in,Diagnostic& d)noexcept
     constexpr auto step=log::Step::particles1B4DC0;
     d.value=0;
     try{
-        if(t.roles.particles)return refuse(d,step,0x1B4DC0u,"particle manager already published");
+        if(t.roles.particles||t.roles.emitters)return refuse(d,step,0x1B4DC0u,"particle manager already published");
+        if(!in.application)return refuse(d,step,0x1B4DC0u,"particle manager needs the Application's material domain (none in this load)");
         if(!in.materials382B38||!in.generation)return refuse(d,step,0x1B4DC0u,"particle manager needs the race's 382B38 table and generation");
         auto owner=std::make_shared<rr::game::OriginalTrackParticleCold50LA>();
         rr::game::OriginalTrackParticleColdDiagnostic50LA pd;
-        if(!native_ta_particle_cold50LA::prepare(*owner,t,in.application,in.materials382B38,in.generation,pd))
+        if(!native_ta_particle_cold50LA::prepare(*owner,t,*in.application,in.materials382B38,in.generation,pd))
             return refuse(d,step,pd.sourcePC?pd.sourcePC:0x1B4DC0u,
                 "track particle manager rejected status="+std::to_string(static_cast<unsigned>(pd.status)));
         const auto capacity=static_cast<std::uint64_t>(owner->capacity130());
         t.roles.particles=std::move(owner);
         d.value=capacity;
-        // The TOB [ParticleEmitters] table (27DE00/27C600/27C7B0) through the one
-        // common reader: its count is recorded here. PORT STAND-IN (flagged): no
-        // common 274370 emitter runtime consumes the rows yet (W0 request r7
-        // item 3); the per-course emitter lanes it replaces are retired.
-        std::string reason;
+        // 274370 over the TOB [ParticleEmitters] table (27DE00/27C600/27C7B0): the
+        // ONE ground-effects owner (track_particle_emitters50cr.h). It reads the rows,
+        // EMT definitions and SoulTree placements, reserves the 15AEA0 registry in the
+        // manager above and emits by each row's TypeID. It is published whenever the
+        // manager exists, also with zero rows, so the one manager advance (161180)
+        // runs every frame on every course. It logs particles.emitters/.attachments/
+        // .definitions itself.
         {
-            namespace pe=rr::assets::particle_emitters50PE;
-            auto table=std::make_unique<pe::Table>();
-            if(pe::read(t.documents.tobDocument,std::string(t.code()).c_str(),*table)){
-                t.counts.particleEmitters=static_cast<std::uint32_t>(table->live);
-                trackDataNamed(t,"particles.emitters",t.identity.tobMember,table->live);
-                trackDataNamed(t,"particles.attachments_authored",t.identity.tobMember,table->attachedCount);
-            }else reason="emitter table refused by the common reader (no emitter runtime consumes it)";
+            const auto& process=in.application->state;
+            if(!process||!process->clock101A50)return refuse(d,step,0x27DE00u,"ground effects need the Application process and its 101A50 clock");
+            track_particle_emitters50CR::Inputs inputs;
+            inputs.manager=t.roles.particles;inputs.process=process;inputs.clock=process->clock101A50;
+            // PORT STAND-IN (flagged): LoadInputs carries no process particle-globals
+            // pointer this round (w0-requestsound3-E.txt 1); the owner keeps its own
+            // TypeID 11 speed scale until it does.
+            inputs.globals=nullptr;
+            inputs.generation=in.generation;
+            auto emitters=std::make_shared<track_particle_emitters50CR::Owner>();
+            Diagnostic ed;
+            if(!emitters->prepare(t,inputs,ed))
+                return refuse(d,step,ed.pc?ed.pc:0x27DE00u,"ground effects: "+ed.reason);
+            t.counts.particleEmitters=static_cast<std::uint32_t>(emitters->emitterCount());
+            t.counts.particleAttachments=static_cast<std::uint32_t>(emitters->attachedCount());
+            t.roles.emitters=std::move(emitters);
         }
         const auto* name=native_ta_particle_cold50LA::particleTextureMapName(t.documents.world);
         trackDataNamed(t,"particles.manager_capacity",name?*name:std::string_view{},capacity);
         trackDataNamed(t,"particles.depth_buckets",name?*name:std::string_view{},
             static_cast<std::uint64_t>(t.roles.particles->depthBucketCount118()));
         trackData(t,log::Role::particles,name?*name:std::string_view{},t.counts.particleEmitters);
-        log::load(step,true,capacity,reason);
+        log::load(step,true,capacity);
         return true;
     }catch(const std::exception& e){return refuse(d,step,0x1B4DC0u,what(e));}
      catch(...){return refuse(d,step,0x1B4DC0u,"particle manager exception");}
@@ -131,7 +144,8 @@ bool readMaterials274160(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
         if(!selections||!materials||!bank)return refuse(d,step,0x274160u,"static world material tables unavailable");
         // The APPSTART DefaultMT template the 2476A0 rule inherits from (the one
         // application-lifetime APPSTART owner; never replaced on a race restart).
-        const auto appStart=in.application.appStart(runtime_asset_paths50LB::resolve("work/native/project/disc"));
+        if(!in.application)return refuse(d,step,0x2476A0u,"material rule needs the Application's APPSTART DefaultMT template (none in this load)");
+        const auto appStart=in.application->appStart(runtime_asset_paths50LB::resolve("work/native/project/disc"));
         if(!appStart)return refuse(d,step,0x2476A0u,"APPSTART archive unavailable for the DefaultMT template");
         rr::assets::OriginalUiMaterialTemplates50KG templates;rr::assets::OriginalUiMaterialDiagnostic50KG md;
         if(!templates.load(*appStart,md))return refuse(d,step,0x2476A0u,"APPSTART DefaultMT template rejected");
@@ -139,7 +153,7 @@ bool readMaterials274160(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
         for(std::size_t i=0;i<selections->size();++i){
             const auto& selection=(*selections)[i];
             material_alpha50gx_fixture::Policy policy;
-            if(!world->alpha(i,templates,in.application.materialRuntime,policy))
+            if(!world->alpha(i,templates,in.application->materialRuntime,policy))
                 return refuse(d,step,0x2476A0u,"material pass outside the one material rule: selection="+std::to_string(i)+
                     " material="+selection.materialName+" pass="+std::to_string(selection.pass)+"/"+
                     std::to_string(selection.passCount)+" program="+selection.program);

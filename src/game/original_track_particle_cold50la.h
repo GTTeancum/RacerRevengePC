@@ -128,6 +128,24 @@ public:
     const std::int32_t& depthBucketCount118() const noexcept{return depthBucketCount118_;}
     bool depthGlobalWritten() const noexcept{return depthGlobalWritten_;}
     bool closed() const noexcept{return closed_;}
+    // Common rewrite (area E, W0 round 2 R7 owner gaps): the PSM/PST atlas members
+    // the 05.06 loader read from the SAME archive closure as the PRT above
+    // (1617A0 names all three from the SCB ParticleTextureMapName). Retained once,
+    // after prepareNativeTrack succeeded, for the one particle material owner
+    // (gc_particle_materials50kg_fixture). Host memory; nothing is written elsewhere.
+    bool retainAtlasMaterialSources(std::vector<std::uint8_t> psm,std::vector<std::uint8_t> pst) noexcept {
+        if(!prepared()||atlasSourcesRetained_||psm.empty()||pst.empty())return false;
+        particlePsm_=std::move(psm);particlePst_=std::move(pst);atlasSourcesRetained_=true;return true;
+    }
+    const std::vector<std::uint8_t>& particlePsm() const noexcept{return particlePsm_;}
+    const std::vector<std::uint8_t>& particlePst() const noexcept{return particlePst_;}
+    // 1AC8E0 restart, World+4A0 particles: the manager's own 161F60 removal for the
+    // one ground-effects owner (track_particle_emitters50CR::Owner::restart161F60).
+    // `pc` receives the original address reached. Refused when not prepared.
+    bool restartRemoval161F60(std::uint32_t& pc) noexcept {
+        pc=0x161f60u;
+        return prepared()&&particles_->removeRestartParticles161F60(pc);
+    }
 
     // Fresh detached owning-reference cleanup only. Real borrowers must be closed
     // first. Refuse foreign references/links or an attachment lock before any
@@ -1297,5 +1315,7 @@ private:
     std::int32_t capacity130_=0,depthBucketCount118_=0;
     bool attempted_=false,entityConstructed_=false,depthGlobalWritten_=false;
     bool prepared_=false,closed_=false;
+    std::vector<std::uint8_t> particlePsm_,particlePst_; // area E: retainAtlasMaterialSources
+    bool atlasSourcesRetained_=false;
 };
 }

@@ -24,6 +24,7 @@
 #include "single_pass_world50lm.h"
 #include "track_static_model_params50cr.h"   // 271A00 rows (I2 applies them to the standard models)
 #include "track_atm50cr.h"
+#include "track_particle_emitters50cr.h"  // Roles::emitters teardown (quiesce, closeAfterPool)
 #include "mc_world_semantics50mc.h"
 #include "course_archive_receipt50ci.h"
 #include "native_course_archive_release50pd.h"
@@ -38,6 +39,10 @@
 #include "../../src/assets/original_standard_texture_resource50la.h"
 #include "../../src/assets/original_standard_material_domain50la.h"
 #include "../../src/assets/track_height_descriptor50jb.h"
+#include "../../src/assets/original_ui_archive50kg.h"
+#include "../../src/assets/original_ui_material_application50la.h"
+#include "../../src/game/original_application_entities50la.h"
+#include "../../src/game/vehicle_animation49t.h"
 #include <charconv>
 #include <cstdio>
 #include <fstream>
@@ -464,12 +469,21 @@ bool Load::run(Track& track,const Identity& identity,const std::shared_ptr<Provi
     const std::shared_ptr<a::OriginalStandardTextureResolver50LA>& resolver,const LoadInputs& inputs,Diagnostic& d)noexcept{
     reached_=log::Step::archive12CEA0;pc_=0x12CEA0u;d={};
     if(track.loaded_||track.archive.opened())return refuse(d,log::Step::archive12CEA0,0x12CEA0u,"track already loaded");
-    if(inputs.world.track.get()!=&track)return refuse(d,log::Step::archive12CEA0,0x1A6D80u,"the race World does not hold this Track");
+    // A race passes all three (I2: &application, race, race->world74()); only the host data
+    // check (runHostDataCheck, never a race) passes none.
+    if(!inputs.hostDataCheck){
+        if(!inputs.application||!inputs.race||!inputs.world)
+            return refuse(d,log::Step::archive12CEA0,0x1A6D80u,"load inputs name no Application, race or World");
+        if(inputs.world->track.get()!=&track)return refuse(d,log::Step::archive12CEA0,0x1A6D80u,"the race World does not hold this Track");
+    }
     try{track.identity=identity;}catch(...){return refuse(d,log::Step::archive12CEA0,0x187330u,"identity copy failed");}
     if(!track.archive.open(identity,provider,resolver,d)){pc_=d.pc;return false;}
-    // 1A9F68..1A9FA8 saves the model directory before the load; 1AA400.. restores it.
+    // 1A9F68..1A9FA8 saves the model directory before the load; 1AA400.. restores it. The
+    // host data check has no Application, so it has no model directory to save or restore
+    // (Application-publishing part; no reader reads it).
     std::string savedModelDirectory;
-    try{savedModelDirectory=inputs.application.modelDirectory36B860_;}catch(...){return refuse(d,log::Step::trackLoad1A9EE0,0x1A9F68u,"model directory save failed");}
+    if(!inputs.hostDataCheck)
+        try{savedModelDirectory=inputs.application->modelDirectory36B860_;}catch(...){return refuse(d,log::Step::trackLoad1A9EE0,0x1A9F68u,"model directory save failed");}
     using Reader=bool(*)(Track&,const LoadInputs&,Diagnostic&)noexcept;
     struct Sub {log::Step step;Reader read;};
     static constexpr Sub chain[]={
@@ -494,14 +508,15 @@ bool Load::run(Track& track,const Identity& identity,const std::shared_ptr<Provi
         Diagnostic step;step.step=sub.step;step.pc=pc_;
         const bool ok=sub.read(track,inputs,step);
         if(!ok){
-            try{inputs.application.modelDirectory36B860_=savedModelDirectory;}catch(...){}
+            if(!inputs.hostDataCheck)try{inputs.application->modelDirectory36B860_=savedModelDirectory;}catch(...){}
             d=std::move(step);if(!d.refused)d.refuse(sub.step,pc_,d.reason.empty()?"refused":d.reason);
             pc_=d.pc;
             try{log::load(log::Step::trackLoad1A9EE0,false,0,std::string(log::stepRow(sub.step).number)+" "+d.reason,nullptr,d.pc);}catch(...){}
             return false;
         }
     }
-    try{inputs.application.modelDirectory36B860_=savedModelDirectory;}catch(...){return refuse(d,log::Step::tail1AA400,0x1AA400u,"model directory restore failed");}
+    if(!inputs.hostDataCheck)
+        try{inputs.application->modelDirectory36B860_=savedModelDirectory;}catch(...){return refuse(d,log::Step::tail1AA400,0x1AA400u,"model directory restore failed");}
     track.loaded_=true;reached_=log::Step::tail1AA400;pc_=0x1AA508u;
     d={};d.step=log::Step::trackLoad1A9EE0;d.pc=0x1AA508u;d.value=track.archive.memberCount();
     return pass(d,log::Step::trackLoad1A9EE0,d.value);
@@ -520,23 +535,33 @@ template<class T> bool releaseRole(std::shared_ptr<T>& role,const char* name,boo
 }
 bool Track::release()noexcept{
     bool all=true;
-    // Reverse role order (Roles declaration), teardown step 18. The storage role aliases the
-    // collision world, so it goes first of the pair; the collision world closes itself.
+    // Reverse role order, teardown step 18.
     releaseRole(roles.navigation,"navigation",all);
     releaseRole(roles.sounds,"sounds",all);
     releaseRole(roles.audio,"aub",all);
     releaseRole(roles.water,"water",all);
     releaseRole(roles.waterResources,"water_resources",all);
+    // The ground-effects owner emits into the particle manager: it stops emitting and
+    // releases its placements before the manager (its pool) goes (W0 round 2, r7 #3).
+    if(roles.emitters){
+        bool released=false;
+        if(roles.emitters.use_count()==1){
+            const bool quiet=roles.emitters->quiesce();
+            released=quiet&&roles.emitters->closeAfterPool();
+            if(released)roles.emitters.reset();
+        }
+        log::teardownRole("particles.emitters",released);
+        if(!released)all=false;
+    }
     releaseRole(roles.particles,"particles",all);
-    releaseRole(roles.atm,"atm",all);
-    releaseRole(roles.uvAnimation,"uv_animation",all);
-    releaseRole(roles.animation,"animation",all);
-    releaseRole(roles.triggers,"triggers",all);
-    releaseRole(roles.triggerSource,"trigger_source",all);
     releaseRole(roles.sky,"sky",all);
     releaseRole(roles.lights,"lights",all);
     releaseRole(roles.fog,"fog",all);
     releaseRole(roles.staticWorld,"static_world",all);
+    // The trigger action owner is borrowed by the collision world (StorageRequest.actions),
+    // which closes it at its retirement: the role reference goes first (W0 round 2, r3 #3 /
+    // r5 #2), released=1 meaning the Track no longer holds it.
+    if(roles.triggerActions){roles.triggerActions.reset();log::teardownRole("trigger_actions",true);}
     // The storage role is an alias of the collision world (same control block): dropping
     // the alias releases nothing by itself; the collision world's close() below decides.
     if(roles.storage){roles.storage.reset();log::teardownRole("storage",true);}
@@ -552,6 +577,14 @@ bool Track::release()noexcept{
         log::teardownRole("collisions",closed);
         if(!closed)all=false;
     }
+    // R5 order after the action owner closed: the group, its rows, then ATM (its GPU side was
+    // closed by I3 first), UV animation, animation (the collision world's animation lane
+    // borrowed it until its close above).
+    releaseRole(roles.triggers,"triggers",all);
+    releaseRole(roles.triggerSource,"trigger_source",all);
+    releaseRole(roles.atm,"atm",all);
+    releaseRole(roles.uvAnimation,"uv_animation",all);
+    releaseRole(roles.animation,"animation",all);
     if(!all){log::teardownRole("archive",false);return false;}
     if(archive.opened()&&!archive.release())return false;
     loaded_=false;
@@ -593,6 +626,66 @@ void Track::logTrackData()const{
     log::trackDataNamed("archive_sha256",code,archive.sha256(),1u,hash!=nullptr,hash&&hash->sha256==archive.sha256()?1u:0u);
 }
 
+
+// ---------------------------------------------------------------- host data check (PLAN 4.3)
+// W0 round 2 (r11 #1): the entry R11's track_check.cpp calls. No Application, race or World:
+// a check-local standard material domain builds the archive provider / texture resolver pair
+// through prepareFreshNativeService (the 12CBA0 fresh file capacity included, so the race
+// mount lease and its 1316A0 release behave as in a race), then the SAME Load::run with
+// hostDataCheck=true, step 08 readNavigation2A1260 on the check's one libm state, and
+// logTrackData. bindNavigation1ACF70 needs the collision world's live storage (after the
+// roster, step 10) and is not part of the check.
+bool runHostDataCheck(Track& track,const Identity& identity,Diagnostic& d)noexcept{
+    d={};
+    constexpr auto step=log::Step::archive12CEA0;
+    try{
+        // PORT STAND-IN: host data check only. The domain is prepared through its public
+        // standalone route (prepareFresh: prepareFreshNativeService, APPSTART custody, tables)
+        // because prepareFreshNativeService itself is reachable only from the Application; the
+        // race's Application runs the 17CAB8/17CAD4/17CAE8 order instead. Never used in a race.
+        const auto* appStartIdentity=a::originalUiArchiveIdentity50KG(a::OriginalUiArchiveId50KG::appStart);
+        if(!appStartIdentity||!appStartIdentity->discPath)return refuse(d,step,0x12CBA0u,"host check: APPSTART catalog row missing");
+        Bytes appStartBytes;std::string why;
+        if(!readHostFile(std::string("work/native/project/disc/")+appStartIdentity->discPath,appStartBytes,appStartIdentity->bytes,why))
+            return refuse(d,step,0x12CBA0u,"host check: APPSTART read: "+why);
+        auto appStart=std::make_shared<a::OriginalUiArchive50KG>();a::OriginalUiArchiveDiagnostic50KG ad;
+        if(!appStart->loadOwned(a::OriginalUiArchiveId50KG::appStart,std::move(appStartBytes),ad))
+            return refuse(d,step,0x12CBA0u,"host check: APPSTART authentication rejected status="+std::to_string(unsigned(ad.status)));
+        auto materialApplication=std::make_shared<a::OriginalUiMaterialApplication50LA>();a::OriginalUiMaterialDiagnostic50KG ud;
+        if(!materialApplication->prepareFreshApplication(appStart,ud))
+            return refuse(d,step,0x12CBA0u,"host check: APPSTART material application rejected");
+        auto domain=std::make_shared<a::OriginalStandardMaterialDomain50LA>();a::OriginalStandardMaterialDiagnostic50LA md;
+        if(!domain->prepareFresh(materialApplication,md))
+            return refuse(d,step,0x12CBA0u,"host check: standard material domain rejected status="+std::to_string(unsigned(md.status)));
+        const auto provider=domain->archiveProvider3E1A70();const auto resolver=domain->resolver3E1A70();
+        if(!provider||!resolver)return refuse(d,step,0x12CBA0u,"host check: provider/resolver pair unavailable");
+        // The check's ONE shared animation state; its libm is the one serial libm owner of
+        // both 05.14 and step 08, as s.animationShared is in a race.
+        auto shared=std::make_unique<rr::game::VehicleAnimationShared49T>();
+        LoadInputs inputs;
+        inputs.hostDataCheck=true;
+        inputs.entities=std::make_shared<rr::game::OriginalApplicationEntities50LA>();
+        inputs.materials382B38=domain->materials382B38();
+        // PORT STAND-IN: host data check only. No race field exists; the full field (1AD520
+        // admits 1..8) so every per-racer size takes its race maximum. Generation 1 = one session.
+        inputs.racers=8u;
+        inputs.generation=1u;
+        inputs.audioRoot=runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO").string();
+        inputs.animationShared=shared.get();
+        Load load;
+        if(!load.run(track,identity,provider,resolver,inputs,d))return false;
+        Diagnostic navigation;
+        if(!readNavigation2A1260(track,shared->libm,navigation)){
+            d=std::move(navigation);
+            if(!d.refused)d.refuse(log::Step::navigation2A1260,log::stepRow(log::Step::navigation2A1260).pc,d.reason.empty()?"refused":d.reason);
+            return false;
+        }
+        track.logTrackData();
+        return true;
+    }catch(const std::exception& e){return refuse(d,step,0x12CBA0u,std::string("host check: ")+e.what());}
+    catch(...){return refuse(d,step,0x12CBA0u,"host check allocation failed");}
+}
+
 } // namespace common_track50CR
 
 // ---------------------------------------------------------------- collision world lifetime
@@ -606,7 +699,7 @@ bool Application::loadConsumedRaceTrack1A9EE0(rr::game::OriginalRaceConstructor5
     const common_track50CR::Identity& identity,const common_track50CR::LoadInputs& inputs,common_track50CR::Diagnostic& d)const noexcept{
     namespace ct=common_track50CR;
     d={};
-    if(&inputs.race!=&race||&inputs.application!=this){
+    if(inputs.hostDataCheck||inputs.race!=&race||inputs.application!=this){
         d.refuse(ct::log::Step::trackLoad1A9EE0,0x1A6D80u,"load inputs name another race or Application");
         ct::log::load(ct::log::Step::trackLoad1A9EE0,false,0,d.reason,nullptr,0x1A6D80u);return false;}
     std::shared_ptr<rr::assets::OriginalStandardArchiveProvider50LA> provider;

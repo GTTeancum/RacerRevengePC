@@ -225,23 +225,8 @@ bool Owner::prepareNativeRaStaticDraw(const CameraVisibilityLease& lease,
                     const auto ref=(word&~1u)>>2u;
                     if(!(word&~1u)||((word&~1u)&3u)||ref<s.racerCount+2u)
                         return fail(d,Status::identity,0x27eb60u);
-                    if(const auto* flareEntry=s.findRaFlare(ref)){
-                        const auto& flare=*flareEntry;
-                        if(!flare.world||flare.world!=s.sceneOwner||!flare.entity||!flare.type32||!flare.flags33||
-                           !podFlareIdentityCurrent(*flare.world,flare.entity)||
-                           podFlareZoneIndex(*flare.world,flare.entity)!=std::optional<std::size_t>(zone)||
-                           *flare.type32!=s.selectedMethods[zone*2u].type2D)
-                            return fail(d,Status::identity,0x27ec18u);
-                        // Distinct native typed projection of the real SearchableGameObject.
-                        // No retail27EC18 callback/stamp receipt, no model relabelling.
-                        if((*flare.flags33&1u)&&!(*flare.flags33&4u)&&(flare.entity->flags29&1u)){
-                            NativeRaStaticDraw50LA record{};record.zone=zone;record.scissor=scissor;
-                            record.viewport={{viewport.x1E0,viewport.y1E4,viewport.width1E8,viewport.height1EC}};
-                            record.kind=NativeRaStaticDraw50LA::Kind::lightFlare;record.flareIdentity=flare.entity;
-                            next.push_back(record);
-                        }
-                        continue;
-                    }
+                    // Light flares are no longer registered here: the renderer's one
+                    // shared flare pass draws Owner::trackFlares() on every course.
                     if(!model(ref-s.racerCount-2u,zone,scissor))return false;
                 }
             }

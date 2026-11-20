@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 
 namespace rr::game::original_light_flash50CR {
 namespace detail {
@@ -133,4 +134,29 @@ inline bool advancePoint(PointState& state,float delta,const std::array<float,4>
  }
  state=next;output=color;return true;
 }
+// One track light flare (common rewrite, W0 round 2 area E/F contract): one row
+// per SCB LightN that authors HasLightFlare (2778D8), read by the ONE light
+// reader (2783D0) at 05.13 for every course, drawn by the renderer's one shared
+// flare pass (area F). Trivially copyable value row; it confers no draw,
+// visibility or entity authority. Source of every field:
+//   position  the light's Position (descriptor +14, the 278068 borrow), w = 1
+//   color     the flare strip's GS byte colour 23D750 publishes (strip +70): the
+//             LightFlareColorRGB lanes CVT.W.S-converted (278000..278024), packed
+//             A<<24|R<<16|G<<8|B (278038) and halved per byte, alpha 64
+//             ({127,127,127,64} for 255,255,255)
+//   size      LightFlareSize (+A0, 277974, default 1.0)
+//   zone      the light's InitialZone, SCB ZoneN numbering (1-based; 0 = not
+//             zone-gated, never produced by the reader: InitialZone defaults to 1)
+//   light     the SCB LightN ordinal that authored it (diagnostics)
+//   texture   LightFlareTextureMapName (+A4, 277994, default "none"), NUL-terminated;
+//             a dotted name is refused by the reader (2779B4)
+struct TrackFlare50CR {
+ float position[4];
+ float color[4];
+ float size;
+ std::uint32_t zone;
+ std::uint32_t light;
+ char texture[64];
+};
+static_assert(std::is_trivially_copyable_v<TrackFlare50CR>);
 }

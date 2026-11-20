@@ -15,9 +15,11 @@ template<class T> bool span(const T* p,std::size_t count,Span& s) noexcept {
 }
 bool overlap(Span a,Span b) noexcept {return a.first<b.last&&b.first<a.last;}
 struct Guard {
-    Span writes[32]{};std::size_t count=0;
+    // 26 live/query spans + gate + the one trigger group (struct, 4 heap
+    // stores, chance raw/shared/clock) = 35; 40 keeps the proof complete.
+    Span writes[40]{};std::size_t count=0;
     template<class T> bool write(T* p,std::size_t n) noexcept {
-        Span s;if(count==32||!span(p,n,s))return false;
+        Span s;if(count==40||!span(p,n,s))return false;
         for(std::size_t i=0;i<count;++i)if(overlap(s,writes[i]))return false;
         writes[count++]=s;return true;
     }
@@ -40,8 +42,7 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
     const Type2StaticQuery49X& source,const Type2StaticCandidate49X* owners,std::size_t ownerCount,
     const std::size_t* indices,std::size_t count,const Type2StaticInitial49X& initial,
     const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
-    Type2StaticResult49X& result,Type2StaticQuery49X* sourcePublication=nullptr,
-    const SourceTriggerActionHooks50MB* sourceHooks=nullptr) noexcept {
+    Type2StaticResult49X& result) noexcept {
     Guard g;auto& life=live.lifecycle;auto& world=live.world;
     auto& membership=live.registrationE0;auto& work=live.workspace;
     if(!g.write(&life,1)||!g.write(&membership,1)||!g.write(&work,1)||
@@ -60,48 +61,36 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.write(w.stack,w.stackCapacity)||!g.write(w.trace,w.traceCapacity)||
        !g.write(d.pairs,d.pairCapacity)||!g.write(d.metadata,d.metadataCapacity)||
        !g.write(d.records,d.recordCapacity)||!g.write(d.effects,d.effectCapacity)||!g.write(&result,1))return false;
-    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;NativeTriggerGroup50TC* tcOwner=nullptr;NativeTriggerGroup50TB* tbOwner=nullptr;NativeTriggerGroup50MC* mcOwner=nullptr;NativeTriggerGroup50GB* gbOwner=nullptr;
+    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50MC* mcOwner=nullptr;
     if(!span(owners,ownerCount,ownerSpan)||!span(indices,count,indexSpan))return false;
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return false;
         const auto& owner=owners[indices[i]];
         // Apply the same shape ownership rule before the live membership
         // prefix can mutate buffers or hand this owner to indexed50CC.
-        if(((owner.nativeTriggers||owner.nativeTriggersTC||owner.nativeTriggersMC||owner.nativeTriggersTB||owner.nativeTriggersGB)&&owner.shapeType!=5&&owner.shapeType!=6)||
-           (!owner.nativeTriggers&&!owner.nativeTriggersTC&&!owner.nativeTriggersMC&&!owner.nativeTriggersTB&&!owner.nativeTriggersGB&&owner.nativeTriggerIndex!=0))return false;
-        if(owner.nativeTriggersGB&&owner.shapeType!=5)return false;
-        if(owner.raOriginalTriggerSegments&&
-           (owner.shapeType!=5||owner.gate||owner.nativeTriggersTC||owner.nativeTriggersMC||owner.nativeTriggersTB||owner.nativeTriggersGB||!owner.nativeTriggers||owner.nativeTriggerIndex>=2))return false;
+        if((owner.nativeTriggersMC&&owner.shapeType!=5&&owner.shapeType!=6)||
+           (!owner.nativeTriggersMC&&owner.nativeTriggerIndex!=0))return false;
         if(owner.shapeType==5||owner.shapeType==6){
-            if((owner.shapeType==6&&owner.gate)||(unsigned(bool(owner.gate))+unsigned(bool(owner.nativeTriggers))+unsigned(bool(owner.nativeTriggersTC))+unsigned(bool(owner.nativeTriggersMC))+unsigned(bool(owner.nativeTriggersTB))+unsigned(bool(owner.nativeTriggersGB))!=1u))return false;
+            if((owner.shapeType==6&&owner.gate)||(unsigned(bool(owner.gate))+unsigned(bool(owner.nativeTriggersMC))!=1u))return false;
             if(owner.gate){
-                if(mcOwner||gbOwner||tbOwner||tcOwner||triggerOwner||(gateOwner&&gateOwner!=owner.gate))return false;
+                if(mcOwner||(gateOwner&&gateOwner!=owner.gate))return false;
                 gateOwner=owner.gate;
-            }else if(owner.nativeTriggersTC){
-                if(mcOwner||gbOwner||tbOwner||gateOwner||triggerOwner||(tcOwner&&tcOwner!=owner.nativeTriggersTC))return false;
-                tcOwner=owner.nativeTriggersTC;
-            }else if(owner.nativeTriggersMC){
-                if(tbOwner||gbOwner||tcOwner||gateOwner||triggerOwner||(mcOwner&&mcOwner!=owner.nativeTriggersMC))return false;
-                mcOwner=owner.nativeTriggersMC;
-            }else if(owner.nativeTriggersTB){
-                if(mcOwner||gbOwner||tcOwner||gateOwner||triggerOwner||(tbOwner&&tbOwner!=owner.nativeTriggersTB))return false;
-                tbOwner=owner.nativeTriggersTB;
-            }else if(owner.nativeTriggersGB){
-                if(mcOwner||tbOwner||tcOwner||gateOwner||triggerOwner||(gbOwner&&gbOwner!=owner.nativeTriggersGB))return false;
-                gbOwner=owner.nativeTriggersGB;
             }else{
-                if(mcOwner||gbOwner||tbOwner||tcOwner||gateOwner||(triggerOwner&&triggerOwner!=owner.nativeTriggers))return false;
-                triggerOwner=owner.nativeTriggers;
+                if(gateOwner||(mcOwner&&mcOwner!=owner.nativeTriggersMC))return false;
+                mcOwner=owner.nativeTriggersMC;
             }
         }
     }
     if(gateOwner&&!g.write(gateOwner,1))return false;
-    if(triggerOwner&&(!g.write(triggerOwner,1)||!(sourceHooks?validSourceTriggerGroup50MB(*triggerOwner,*sourceHooks):validNativeTriggerGroup50GA(*triggerOwner))))return false;
-    if(tcOwner&&(!g.write(tcOwner,1)||sourceHooks||!validNativeTriggerGroup50TC(*tcOwner)))return false;
-    if(tbOwner&&(!g.write(tbOwner,1)||sourceHooks||!validNativeTriggerGroup50TB(*tbOwner)))return false;
-    if(mcOwner&&(!g.write(mcOwner,1)||sourceHooks||!validNativeTriggerGroup50MC(*mcOwner)||mcOwner->chance.raw!=&frame.noiseOwner().sharedRandomState||!g.write(mcOwner->chance.raw,1)||!g.write(mcOwner->chance.shared,1)||!g.write(mcOwner->chance.clock,1)))return false;
-    if(gbOwner&&(!g.write(gbOwner,1)||sourceHooks||!validNativeTriggerGroup50GB(*gbOwner)))return false;
-    if(sourcePublication&&(!sourceHooks||sourcePublication!=&source||!g.write(sourcePublication,1)))return false;
+    // The one trigger group: its struct and its four heap stores (sized once
+    // from the live trigger count) are written by the E8 dispatch.
+    if(mcOwner&&(!g.write(mcOwner,1)||!validNativeTriggerGroup50MC(*mcOwner)||
+       !g.write(mcOwner->triggers.data(),mcOwner->triggers.size())||
+       !g.write(mcOwner->ignoreCollider.data(),mcOwner->ignoreCollider.size())||
+       !g.write(mcOwner->ignoreColliders.data(),mcOwner->ignoreColliders.size())||
+       !g.write(mcOwner->ignoreColliderCount.data(),mcOwner->ignoreColliderCount.size())||
+       mcOwner->chance.raw!=&frame.noiseOwner().sharedRandomState||!g.write(mcOwner->chance.raw,1)||
+       !g.write(mcOwner->chance.shared,1)||!g.write(mcOwner->chance.clock,1)))return false;
     bool frameRead=false;
     if(mcOwner&&mcOwner->chance.raw==&frame.noise.sharedRandomState){
         const auto* begin=reinterpret_cast<const unsigned char*>(&frame);
@@ -110,13 +99,11 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
         frameRead=g.read(begin,offset)&&g.read(raw+sizeof(std::uint32_t),sizeof(frame)-offset-sizeof(std::uint32_t));
     }else frameRead=g.read(&frame,1);
     if(!frameRead||!g.read(&bindings,1)||!g.read(&admission,1)||!g.read(&live,1)||
-       (!sourcePublication&&!g.read(&source,1))||!g.read(&initial,1)||!g.read(&w,1)||!g.read(&d,1)||
+       !g.read(&source,1)||!g.read(&initial,1)||!g.read(&w,1)||!g.read(&d,1)||
        !g.read(&world,1)||!g.read(world.portalHeads,world.zoneCount)||!g.read(world.portals,world.portalCount)||
        !g.read(owners,ownerCount)||!g.read(indices,count)||!g.read(source.resource,1)||
        !g.read(source.filter,1)||!g.read(initial.pairs,initial.pairSlots)||
        !g.read(initial.metadata,initial.pairSlots)||!g.read(initial.recordSlots,initial.recordCount))return false;
-    if(tcOwner&&!nativeTriggerQueryBound50TC(*tcOwner,source.filter->identity))return false;
-    if(tbOwner&&!nativeTriggerQueryBound50TB(*tbOwner,source.filter->identity))return false;
     if(mcOwner&&!nativeTriggerQueryBound50MC(*mcOwner,source.filter->identity))return false;
     if(!g.read(source.resource->nodes,source.resource->nodeCount)||
        !g.read(source.resource->rays,source.resource->rayCount)||!g.filter(*source.filter))return false;
@@ -166,26 +153,10 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
             if(!source.nativeGatePolicy||(owner.shapeType==6&&!validNativeTriggerBox50MA(owner.nativeTriggerBox)))return false;
             if(owner.gate){
                 if(owner.gate!=gateOwner||!owner.gate->callbacks.activateAnimation)return false;
-            }else if(owner.nativeTriggersTC){
-                if(owner.nativeTriggersTC!=tcOwner||!tcOwner||owner.nativeTriggerIndex>=tcOwner->triggers.size()||
-                   candidate.collision.filter.identity!=tcOwner->triggers[owner.nativeTriggerIndex].collider.identity||
-                   !nativeTriggerQueryBound50TC(*tcOwner,source.filter->identity))return false;
-            }else if(owner.nativeTriggersMC){
-                if(owner.nativeTriggersMC!=mcOwner||!mcOwner||owner.nativeTriggerIndex>=mcOwner->triggers.size()||
-                   candidate.collision.filter.identity!=mcOwner->triggers[owner.nativeTriggerIndex].collider.identity||
-                   !nativeTriggerQueryBound50MC(*mcOwner,source.filter->identity))return false;
-            }else if(owner.nativeTriggersTB){
-                if(owner.nativeTriggersTB!=tbOwner||!tbOwner||owner.nativeTriggerIndex>=tbOwner->triggers.size()||
-                   candidate.collision.filter.identity!=tbOwner->triggers[owner.nativeTriggerIndex].collider.identity||
-                   !nativeTriggerQueryBound50TB(*tbOwner,source.filter->identity))return false;
-            }else if(owner.nativeTriggersGB){
-                if(owner.shapeType!=5||owner.nativeTriggersGB!=gbOwner||!gbOwner||owner.nativeTriggerIndex>=gbOwner->triggers.size()||
-                   candidate.collision.filter.identity!=gbOwner->triggers[owner.nativeTriggerIndex].collider.identity||
-                   !nativeTriggerQueryBound50GB(*gbOwner,source.filter->identity))return false;
-            }else if(owner.nativeTriggers!=triggerOwner||!triggerOwner||
-                owner.nativeTriggerIndex>=triggerOwner->triggers.size()||
-                candidate.collision.filter.identity!=triggerOwner->triggers[owner.nativeTriggerIndex].collider.identity||
-                nativeTriggerCollider50GA(*triggerOwner,source.filter->identity)==triggerOwner->colliders.size())return false;
+            }else if(owner.nativeTriggersMC!=mcOwner||!mcOwner||owner.nativeTriggerIndex>=mcOwner->triggerCount||
+                owner.nativeTriggerIndex>=mcOwner->triggers.size()||
+                candidate.collision.filter.identity!=mcOwner->triggers[owner.nativeTriggerIndex].collider.identity||
+                !nativeTriggerQueryBound50MC(*mcOwner,source.filter->identity))return false;
         }else return false;
     }
     return true;
@@ -196,11 +167,10 @@ VehicleLiveQueryResult50EQ query(bool secondary,const VehicleFrameState49W& fram
     const VehicleLiveQueryContext50EQ& live,const Type2StaticQuery49X& source,
     const Type2StaticCandidate49X* owners,std::size_t ownerCount,const std::size_t* indices,
     std::size_t count,const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,
-    const Type2StaticDestination49X& d,Type2StaticResult49X& result,Type2StaticQuery49X* sourcePublication=nullptr,
-    const SourceTriggerActionHooks50MB* sourceHooks=nullptr) noexcept {
+    const Type2StaticDestination49X& d,Type2StaticResult49X& result) noexcept {
     using S=Type2StaticStatus49X;using L=VehicleLiveQueryStatus50EQ;
     VehicleLiveQueryResult50EQ outcome{};
-    if(!storage(frame,bindings,admission,live,source,owners,ownerCount,indices,count,initial,w,d,result,sourcePublication,sourceHooks))return outcome;
+    if(!storage(frame,bindings,admission,live,source,owners,ownerCount,indices,count,initial,w,d,result))return outcome;
     if(frame.phase!=VehicleFramePhase49W::PostWorld)return outcome;
     if((secondary&&(frame.bodies.main.substepIndex!=0||!frame.bodies.vehicle838))||
        !admission.springPresent||!admission.queryPresent||!admission.queryEnabled||admission.pairsPresent||
@@ -262,24 +232,12 @@ VehicleLiveQueryResult50EQ query(bool secondary,const VehicleFrameState49W& fram
        std::memcmp(&membership.bounds.cachedRadius,&prepared.radius,sizeof prepared.radius)){
         outcome.status=L::ReceiptRejected;return outcome;
     }
-    if(sourcePublication){
-        *sourcePublication=preparedQuery;outcome.queryStatus=S::Complete;outcome.status=L::Complete;return outcome;
-    }
     // The collected owner list stays in its original order even after transfer.
     outcome.queryStatus=produceIndexedStaticType2Contacts50CC(preparedQuery,owners,ownerCount,indices,count,initial,w,d,result);
     outcome.status=outcome.queryStatus==S::Complete?L::Complete:L::QueryRejected;
     return outcome;
 }
 } // namespace
-
-VehicleLiveQueryResult50EQ prepareSourceLiveQuery50MB(bool secondary,const VehicleFrameState49W& frame,
-    const VehicleFrameBindings49W& bindings,const MainStaticDetectorAdmission50H& admission,
-    const VehicleLiveQueryContext50EQ& live,Type2StaticQuery49X& queryOwner,
-    const Type2StaticCandidate49X* owners,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
-    const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
-    Type2StaticResult49X& result,const SourceTriggerActionHooks50MB& hooks) noexcept {
-    return query(secondary,frame,bindings,admission,live,queryOwner,owners,ownerCount,indices,count,initial,w,d,result,&queryOwner,&hooks);
-}
 
 SecondaryQuerySceneStatus50J prepareSecondaryLiveQueryScene50EQ(
     VehicleFrameState49W& s,const VehicleFrameBindings49W& b,

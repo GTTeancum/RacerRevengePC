@@ -2251,6 +2251,11 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.traceRendererStage("cables",stageStart);
         if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
+        // The one track light-flare pass (every course whose lights author
+        // HasLightFlare): world-list StripOptFog additive strips, after the
+        // transparent world, before the pod passes. Exact render-list slot
+        // relative to the transparent world is not recovered (see the pass).
+        if (!s.drawTrackFlares()) return false;
         s.traceRendererStage("transparent_world",stageStart);
         // Original order of the pod passes is the material drain order: 14D440
         // rebuilds the passes in material-registry (APPSTART Mat_Stbl) order

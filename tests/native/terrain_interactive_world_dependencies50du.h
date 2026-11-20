@@ -105,7 +105,6 @@
 #include "original_ui_main_entry50kg.h"
 #include "original_race_tuning50la.h" // Inactive same-source C0 ownership.
 #include "original_tunnel_track50la.h" // Inactive genuine spline Entity ownership.
-#include "original_world_cold_prefix50la.h" // Inactive same-scene world constructor prefix.
 #include "original_race_constructor50la.h" // Inactive consumed-launch race constructor ownership.
 #include "original_race_load_prefix50la.h" // Inactive actual early load-owner join.
 #include "original_pause_cold_driver50la.h" // Same-Application two-phase Pause resources.

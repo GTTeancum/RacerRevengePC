@@ -1,7 +1,10 @@
 #pragma once
 // Concrete original-AI 2255B0 ->virtual78/216A30 continuation, reached from
-// its two original callers: 16EAA0 (AI state-5 scalar reset) and 228BBC (the
-// base frame's negative main190 local Y, the same cut the Player uses).
+// its three original callers: 16EAA0 (AI state-5 scalar reset), 228BBC (the
+// base frame's negative main190 local Y, the same cut the Player uses) and
+// 1B27C0 (the LostAI trigger action with Reset TRUE, inside the racer's own
+// main690 E8 query at PostWorld; folded in from the retired MB source-trigger
+// reset, common rewrite area D). One owner set for every course.
 // No player override, camera reset, checkpoint, crash or damage-reset route.
 #include "../../src/game/ai_runtime50iv.h"
 #include "../../src/game/undertrack_reset50ew.h"
@@ -10,6 +13,7 @@
 #include "../../src/game/pod_scene_rebase50fb.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "original_ai_reset_ground_bridge.h"
+#include "../../src/game/collision_result_binding50mb.h"
 #include <array>
 #include <bit>
 #include <cstdio>
@@ -27,13 +31,18 @@ enum class Stage : std::uint8_t {
     Ground,GroundDiagnostic,FinishPhysics,FinishVisibility,Complete
 };
 // Which original call site owns the current 2255B0 continuation.
-enum class Caller : std::uint8_t {None,Scalar16EAA0,Base228BBC};
+enum class Caller : std::uint8_t {None,Scalar16EAA0,Base228BBC,Trigger1B27C0};
 struct State {
     Stage stage=Stage::Idle;
     Caller caller=Caller::None;
     std::uint64_t scalarResetSerial=0,completed=0;
     // 228BBC: the base cursor serial (BaseUndertrackContinuation50X::serial).
     std::uint64_t baseSerial=0;
+    // 1B27C0: the trigger query that issued this reset (issuer, serial,
+    // candidate, action). A different query starts a fresh continuation.
+    const void* triggerIssuer=nullptr;
+    std::uint64_t triggerGeneration=0,triggerSerial=0;
+    std::size_t triggerCandidate=0,triggerAction=0;
     std::uint32_t rosterSlot=0,racer60=0;
     // Continuation's originalC80 input survives its source225640 store. This
     // is not an alternate progress authority; all other progression is live.
@@ -93,35 +102,11 @@ struct Diagnostic {
     visibility::Diagnostic visibility{};
     ResetGroundDiagnostic50IZ ground{};
 };
+// Common rewrite: the ONE recovery owner set for every course. The AI track is
+// the AI view of the one navigation store, retained by value; it cannot be
+// reseated inside this owner. Keep the same immutable selection across an
+// unfinished State; State itself remains the original bank-safe scalar continuation.
 struct Owners {
-    visibility::Owner& visibility;
-    std::uint32_t& cables254Field50;
-    // Real sourceD40 presence is required for this admitted ALL8/native-audio
-    // path. No controller1A0240/player prefix is called. D44 belongs to the
-    // actual session PodRaceAudioManager row, not a bank-local temporary.
-    std::uint8_t& aiEmitterD40Flags22C;
-    std::uint32_t& materialD44Field24C;
-    const TrackNavigation50EU& aiTrack;
-    const UndertrackPhysicsDomain50EW& height;
-    const SecondaryActivationGlobals49V& activation;
-    const ResetLifecycleGlobals50AT& lifecycle;
-    const VisualVector49R& targetRelative2F0;
-    const UndertrackQueryOwners50EW& queries;
-    ZoneLifecycle50CL& collisionLifecycle;
-    LiveZoneWorld50EN& collisionWorld;
-    LiveZoneWorkspace50EN& collisionWorkspace;
-    original_ai_reset_ground_bridge::GroundBridge& ground;
-    Models& models;
-    const ResetEffectBindings50BK& effects;
-    EffectOwner50BE* effectOwners=nullptr;
-    std::size_t effectOwnerCount=0;
-};
-// Common rewrite (R4): the ONE recovery owner set for every course. The AI
-// track is the AI view of the one navigation store, retained by value; it
-// cannot be reseated inside this owner. (Owners50MB keeps its name; it is no
-// longer one course's.) Keep the same immutable selection across an unfinished State;
-// State itself remains the original bank-safe scalar continuation.
-struct Owners50MB {
     visibility::Owner& visibility;
     std::uint32_t& cables254Field50;
     // Real sourceD40 presence is required for this admitted ALL8/native-audio
@@ -145,35 +130,33 @@ struct Owners50MB {
     std::size_t effectOwnerCount=0;
 };
 
-// Exact-type navigation access adapters. Legacy calls retain their original
-// fixed owner and table-binding order; MB calls use only issued strong views.
+// 1B27C0 caller only: the live trigger query that is running the LostAI
+// action. The reset's 124CB0 ground probe runs nested inside that query, so the
+// issuer lends its outer-result binding (the query's result/pair storage stays
+// protected while the probe borrows the shared scratch). Valid for one query.
+struct TriggerQuery {
+    CollisionResultBindingOwner50MB& resultBinding;
+    const SourceOuterResultLease50MB& outerResult;
+    const void* issuer=nullptr;            // the trigger action owner (identity only)
+    std::uint64_t generation=0,querySerial=0;
+    std::size_t candidateOrdinal=0,actionIndex=0;
+    std::uint32_t collider690=0,targetNode=0;
+};
+
+// Navigation access adapters over the one common view.
 namespace ordinary_navigation_detail50MB {
-inline bool indicesPrepared(const TrackNavigation50EU& t) noexcept {return t.indicesPrepared;}
 inline bool indicesPrepared(const NavigationView50CR& t) noexcept {return t.indicesPrepared();}
 
-inline bool gatesPrepared(const TrackNavigation50EU& t) noexcept {return t.gatesPrepared;}
 inline bool gatesPrepared(const NavigationView50CR& t) noexcept {return t.gatesPrepared();}
 
-inline std::uint32_t count(const TrackNavigation50EU& t) noexcept {return t.track.count;}
 inline std::uint32_t count(const NavigationView50CR& t) noexcept {return t.count();}
 
-inline const UndertrackNode50ET& node(const TrackNavigation50EU& t,std::uint32_t index) noexcept {
-    return t.track.nodes[index];
-}
 inline const UndertrackNode50ET& node(const NavigationView50CR& t,std::uint32_t index) noexcept {
     return t.nodes()[index];
 }
 
-inline const UndertrackTrack50ET& track(const TrackNavigation50EU& t) noexcept {return t.track;}
 inline const NavigationView50CR& track(const NavigationView50CR& t) noexcept {return t;}
 
-inline bool bindPlacement(const UndertrackSelection50ET& selection,const TrackNavigation50EU& navigation,
-    const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
-    UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
-    UndertrackTableBindings50ET tables{};
-    return undertrackBindings50EU(navigation,visibilityRows,collisionRows,count,tables)&&
-        bindUndertrackPlacement50ET(selection,tables,placement,diagnostic);
-}
 inline bool bindPlacement(const UndertrackSelection50ET& selection,const NavigationView50CR& navigation,
     const std::uint32_t* visibilityRows,const std::uint32_t* collisionRows,std::size_t count,
     UndertrackPlacement50ET& placement,UndertrackDiagnostic50ET& diagnostic) noexcept {
@@ -181,9 +164,7 @@ inline bool bindPlacement(const UndertrackSelection50ET& selection,const Navigat
 }
 
 } // namespace ordinary_navigation_detail50MB
-// Constant-true legacy admission leaves every original guard/effect ordered.
-inline bool navigationReadyOrdinaryShared50MB(const Owners&) noexcept {return true;}
-inline bool navigationReadyOrdinaryShared50MB(const Owners50MB& owners) noexcept {
+inline bool navigationReadyOrdinaryShared50MB(const Owners& owners) noexcept {
     return owners.aiTrack.runtimeValid()&&owners.aiTrack.role()==NavigationRole50CR::ai&&
         owners.aiTrack.sameWorld(owners.collisionWorld);
 }
@@ -196,7 +177,7 @@ inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
 // slices/cursors survive failures. No earlier AI navigation/packing/repair/
 //16E830 or completed reset slice is replayed. No allocation or guest execution.
 template<class OwnersT>
-concept AiRecoveryOwners50UT=std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>;
+concept AiRecoveryOwners50UT=std::is_same_v<OwnersT,Owners>;
 template<AiRecoveryOwners50UT OwnersT>
 inline bool registered694Bound50UT(const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,const OwnersT& owners) noexcept {
@@ -222,17 +203,29 @@ inline void rekey50UT(State& state,Caller caller,const AiRuntimeState50IV& ai) n
 template<AiRecoveryOwners50UT OwnersT>
 inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    State& state,OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    State& state,OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic,
+    const TriggerQuery* trigger=nullptr) noexcept {
     const bool base=state.caller==Caller::Base228BBC;
-    if(!base&&state.caller!=Caller::Scalar16EAA0)
+    const bool fromTrigger=state.caller==Caller::Trigger1B27C0;
+    if(!base&&!fromTrigger&&state.caller!=Caller::Scalar16EAA0)
         return fail(diagnostic,0x2255b0u,"AI 2255B0 has no original caller");
+    if(fromTrigger!=(trigger!=nullptr))
+        return fail(diagnostic,0x2255b0u,"AI 2255B0 trigger caller requires its live trigger query");
     const auto domain=base?UndertrackResetDomain50EW::PlayerPostPackedBytes50S: // 228BBC domain (see 50EW)
+        fromTrigger?UndertrackResetDomain50EW::SourceTriggerAiPostWorld:
         UndertrackResetDomain50EW::OriginalAiPostPlayer;
     if(state.stage==Stage::Complete)return true;
     visibility::ResetVisibilityLease lease;
     // 228BBC follows this racer's 228844 graphics call (post-graphics lease);
-    // 16EAA0 precedes it (PostPlayer lease, publication left to 228844).
-    const bool borrowed=base?
+    // 16EAA0 precedes it (PostPlayer lease, publication left to 228844);
+    // 1B27C0 runs inside the racer's PostWorld query (lease keyed by that query).
+    bool borrowed=false;
+    if(fromTrigger){
+        const visibility::SourceTriggerVisibilityIdentity50MB identity{trigger->issuer,trigger->generation,
+            trigger->querySerial,trigger->candidateOrdinal,trigger->actionIndex,state.racer60};
+        borrowed=owners.visibility.beginSourceTriggerResetVisibility50MB(state.rosterSlot,frame,bindings,parameters,
+            &owners.cables254Field50,identity,lease,diagnostic.visibility);
+    }else borrowed=base?
         owners.visibility.beginPlayerResetVisibility(state.rosterSlot,frame,bindings,parameters,
             &owners.cables254Field50,lease,diagnostic.visibility):
         owners.visibility.beginAiResetVisibility(state.rosterSlot,frame,bindings,parameters,
@@ -338,7 +331,11 @@ inline bool run2255B0Ai50UT(VehicleFrameState49W& frame,const VehicleFrameBindin
         }
         SpringVector4_48N start{},end{};std::memcpy(start.v,state.probe.start,16);
         std::memcpy(end.v,state.probe.end,16);
-        if(owners.ground.query(state.placement.vehicleC34,start,end,state.ground)!=ResetGroundStatus50IZ::Complete){
+        const auto groundStatus=fromTrigger?
+            owners.ground.querySourceBound50MB(state.placement.vehicleC34,start,end,state.ground,
+                trigger->resultBinding,trigger->outerResult):
+            owners.ground.query(state.placement.vehicleC34,start,end,state.ground);
+        if(groundStatus!=ResetGroundStatus50IZ::Complete){
             diagnostic.ground=owners.ground.diagnostic().query;
             return fail(diagnostic,diagnostic.ground.sourcePC,"actual reset124CB0 ground query rejected");
         }
@@ -441,11 +438,50 @@ inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
     Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
 }
-inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+// Caller 1B27C0 (LostAI action, Reset TRUE). The action owner has already
+// stored C80 = TargetNodeIndex (1B282C) for this racer; 1B283C then calls
+// 2255B0, which runs inside the same main690 E8 query at PostWorld, under the
+// issuer's outer-result binding. Only an original AI reaches this entry (the
+// issuer refuses a human: PORT STAND-IN, see course_trigger_actions50ct.h
+// LostAiResetSink). Durable continuation: a blocked slice resumes on the same
+// query identity; a different query cannot replace an unfinished reset.
+inline bool resumeTrigger1B27C0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
-    AiRuntimeState50IV& ai,AiRuntimeReceipt50IV& receipt,State& state,
-    Owners50MB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,ai,receipt,state,owners,workspace,diagnostic);
+    const AiRuntimeState50IV& ai,const TriggerQuery& trigger,State& state,
+    Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    diagnostic={};
+    if(!navigationReadyOrdinaryShared50MB(owners))
+        return fail(diagnostic,0x225620u,"trigger ai reset requires the final same-world AI navigation view");
+    if(!trigger.issuer||!trigger.generation||!trigger.querySerial||!trigger.collider690||!ai.initialized||!ai.racer60||
+       frame.phase!=VehicleFramePhase49W::PostWorld||frame.fields.vehicle58!=1u||
+       !frame.fields.nativeAiOwnersBound50IV||frame.fields.vehicle3C||
+       frame.bodies.main.phase!=MainBodyPhase49K::AwaitingWorldPreparation||
+       frame.bodies.phase!=CoupledBodyPhase49M::AwaitingWorldPreparation||
+       !owners.queries.query[0].type2||!owners.queries.query[0].type2->filter||
+       owners.queries.query[0].type2->filter->identity!=trigger.collider690||
+       !trigger.resultBinding.outerQueryCurrent(trigger.outerResult,*owners.queries.query[0].type2))
+        return fail(diagnostic,0x1b283cu,"trigger LostAI reset is not at the actual main690 E8 PostWorld boundary");
+    if(!registered694Bound50UT(bindings,parameters,owners))
+        return fail(diagnostic,0x21699cu,"actual registered694 continuation binding is missing");
+    const bool same=state.caller==Caller::Trigger1B27C0&&state.triggerIssuer==trigger.issuer&&
+        state.triggerGeneration==trigger.generation&&state.triggerSerial==trigger.querySerial&&
+        state.triggerCandidate==trigger.candidateOrdinal&&state.triggerAction==trigger.actionIndex;
+    if(!same){
+        if(state.stage!=Stage::Idle&&state.stage!=Stage::Complete)
+            return fail(diagnostic,0x1b283cu,"a different trigger event cannot replace an unfinished AI 2255B0");
+        if(progress.reset.vehicleC80!=trigger.targetNode)
+            return fail(diagnostic,0x1b282cu,"actual once-only target C80 write is absent");
+        rekey50UT(state,Caller::Trigger1B27C0,ai);
+        state.triggerIssuer=trigger.issuer;state.triggerGeneration=trigger.generation;
+        state.triggerSerial=trigger.querySerial;state.triggerCandidate=trigger.candidateOrdinal;
+        state.triggerAction=trigger.actionIndex;
+    }
+    if(state.rosterSlot!=ai.managerIndexFE0||state.racer60!=ai.racer60)
+        return fail(diagnostic,0x1b283cu,"trigger reset belongs to another racer");
+    if(!run2255B0Ai50UT(frame,bindings,parameters,progress,state,owners,workspace,diagnostic,&trigger))return false;
+    diagnostic.sourcePC=0;
+    diagnostic.message="trigger LostAI 2255B0 returned in the same PostWorld collision query";
+    return true;
 }
 
 } // namespace native_original_ai_recovery

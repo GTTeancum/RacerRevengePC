@@ -44,7 +44,10 @@
 #include "track_atm50cr.h"
 #include "positional_sound_rows50sr.h"
 #include "racer_cold_visibility50cr.h"
+#include "gc_gate_audio50in_fixture.h" // triggerAudio (the PodSound voice) is reset here
+#include "track_source_fixture.h" // trackSource (publication context member)
 #include "selected_grid_navigation50ig.h"
+#include "native_racer_grid50hn_fixture.h" // groundGridPose/placeColdGrid (record actor rank0, native_racer_grid50hn.inc)
 #include "source_grid50ig_fixture.h"
 #include "native_water_runtime50jc_fixture.h"
 #include "water_resources50jc_fixture.h"
@@ -62,7 +65,7 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "gc_particle_materials50kg_fixture.h"
-#include "track_normals50hk_fixture.h"
+#include "native_gc_other_particle_children50kg_fixture.h" // the water racer's particle children (bindCold)
 #include "original_position_stats_prestage50la.h"
 #include "../../src/game/original_static_model_params50ps.h"
 #include <fstream>
@@ -1035,8 +1038,9 @@ SessionExit50DU Context::run() {
  auto observeOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   requireOriginalAiFleetAtBoundary(schedule);
   for(std::size_t slot=0;slot<racerBank.count();++slot){
-   // One map view for every course (common_track50CR::NavigationView, sized from m<code>.spl).
-   originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mapView,selectedOriginalAiMapMetadata);
+   // One map view for every course (common_track50CR::NavigationView, sized from m<code>.spl);
+   // its AI metadata is a view over the same navigation storage (R4), not a second store.
+   originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mapView,rr::game::metadataView50CR(mapView));
   }
  };
  // Manager passes only consume their current arena and stable shared owners.
@@ -1440,12 +1444,41 @@ SessionExit50DU Context::run() {
  // collision world's query fence, the Bank registries, the lap tracker's view
  // of the track, then the Bank's native backing. Role owners themselves are
  // released once, by the Track (common_track50CR::Track::release, R3).
- bool coldPrefixClosed=false;
+ // Set by the cold contacts once the navigation store is bound to the live
+ // collision world (1ACF70); its membership close is the one bank guard above; closeColdPrefix
+ // below unbinds the trigger action owner it bound.
+ bool coldNavigationBound=false;
+ bool coldPrefixClosed=false,coldRegistriesClosed=false;
  auto closeColdPrefix=[&]()noexcept->bool {try{
   if(coldPrefixClosed)return true;
   // Fence the one collision world (its trigger/query service stops; 1B2870 retire order).
   if(track.roles.collision&&!track.roles.collision->beginRetirement())return false;
-  if(!closeBankRegistries())return false;
+  // Once the cold contacts bound the one trigger action owner (destinations,
+  // racer identities), it is unbound here on every exit, failure included (the
+  // old MB cold closer). Its query bracket belongs to the collision world, so
+  // beginRetirement above is the unbind (unbindQuery); a direct unbindQuery would
+  // desynchronise that bracket. Confirm the owner left service before the Bank
+  // registries go; Track::release closes it after retireContacts.
+  if(coldNavigationBound){
+   const auto* actions=track.roles.triggerActions.get();
+   if(!track.roles.collision||!actions||actions->ready()||!actions->queryIdle())return false;
+   coldNavigationBound=false;
+  }
+  // The Bank registries visit every slot, so they close before the terminal sweep
+  // below raises the Bank's terminal fence (which stays set and refuses visits).
+  if(!coldRegistriesClosed){if(!closeBankRegistries())return false;coldRegistriesClosed=true;}
+  // One terminal all-peer contact sweep of the one collision world over the racer
+  // Bank (the retired MC/GB query owners' retireContacts, every course): detaches
+  // every racer query row, removes every trigger membership, clears the contact
+  // pairs. Without a sealed field there is no peer to sweep; Track::release runs
+  // the Bank-less retireContacts.
+  if(track.roles.collision&&racerBank.count()){
+   if(!track.roles.collision->retireContacts(racerBank))return false;
+   // The sweep removed (and verified) every trigger membership of every peer; the
+   // Bank now refuses visits (terminal fence) and its backing retires below, so the
+   // serial membership closer has nothing left to visit.
+   membershipCleanupDone=true;
+  }
   if(!lapOwner.releaseTrack())return false;
   laps.release();
   if(!racerBank.retireNativeBacking())return false;
@@ -1456,9 +1489,6 @@ SessionExit50DU Context::run() {
   ~ColdPrefixGuard()noexcept {if(armed&&!close()){
    std::fputs("race Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
  } coldPrefixGuard{closeColdPrefix};
- // Set by the cold contacts once the navigation store is bound to the live
- // collision world (1ACF70); its membership close is the one bank guard above.
- bool coldNavigationBound=false;
  if(raceEnabled){
   std::array<native_racer_contact50HW::Binding,raceRacerCapacity> contactBindings{};
   // The actual Tournament profile and authenticated field authorize ranks;
@@ -1882,8 +1912,8 @@ SessionExit50DU Context::run() {
        "track water named but its water/particle owners are absent");
    auto& water=*track.roles.water;
    auto& particles=*track.roles.particles->particles();
-   require50DU(water.activate(s.noiseOwner().sharedRandomState,sessionRandom,applicationClock),
-       "actual water gameplay population rejected");
+   // No water activation: the fog population the retired GC water session ran here
+   // (populateColdFog, 160520) is done at cold inside 05.06 by the ground-effects owner.
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(!nativeWaterRacers[slot],"native water racer construction repeated");
     nativeWaterRacers[slot]=std::make_unique<native_gc_water_racer50KG::Owner>();
@@ -1892,10 +1922,16 @@ SessionExit50DU Context::run() {
     require50DU(nativeParticleChildren[slot].bindCold(nativeParticleAuthoring,nativeEffects,nativeEffectCount,
         x.bindings.visual.bottomLeft1C4!=SceneNodeIndex49P::none,particles).okay(),
         "actual stopped particle child ownership rejected");
+    // The racer's own particle\podSpray.emt, read from that racer's POD archive
+    // (the archive the roster loaded through 2129C0); a missing member refuses.
+    require50DU(racerRigs[slot]!=nullptr,"water racer spray requires the slot's loaded pod");
+    const auto podSprayEmt=coldRacerStage50DU(racerRigs[slot]->podId,"particle\\podSpray.emt",
+        [&](){return racerRigs[slot]->originalMember("particle\\podSpray.emt");});
+    require50DU(!podSprayEmt.empty(),"racer pod particle\\podSpray.emt is empty");
     require50DU(nativeWaterRacers[slot]->constructSprays(water,particles,
         0xf5000001u+static_cast<std::uint32_t>(slot),0xf3000001u,
         0xf4000001u+static_cast<std::uint32_t>(slot),
-        nativeWaterApplication.initialStep434630,track.roles.waterResources->podSprayEmt(),s.noiseOwner().sharedRandomState).okay(),
+        nativeWaterApplication.initialStep434630,podSprayEmt,s.noiseOwner().sharedRandomState).okay(),
         "actual two-spray constructor rejected");
     require50DU(nativeWaterRacers[slot]->finishConstructor(s,x.bindings,x.diagnostic).okay(),
         "actual BE0/terrain water constructor join rejected");
@@ -2193,17 +2229,12 @@ SessionExit50DU Context::run() {
      "race track static world (mesh/normals) unavailable");
  rr::assets::Mesh48B trackMesh=*track.roles.staticWorld->mesh();
  namespace trackTextures=track_materials50fa_fixture;
- // PORT STAND-IN: an unloaded legacy material owner kept only because the W0
- // publication context still carries trackMaterialOwner; the static world above
- // is the one material owner (single-pass decoder).
- auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
  // Course data route for every course: the stock source rows are receipts in the
  // readers (stock_course_receipts50cr.h), never a selector.
  // PORT STAND-IN: trackSource stays only because the W0 publication context
  // carries it; it is the data route (Track::course) for every course.
  const auto trackSource=track_source_fixture::Track::course;
  trackTextures::Request trackMaterialRequest{};
- trackMaterialRequest.track=trackSource;
  trackMaterialRequest.root=trackSession->visualRoot;
  trackMaterialRequest.exportReport=trackSession->visualReport;
  trackMaterialRequest.choice={1,1,trackSession->originalStaticCandidates?rr::assets::MaterialTextureRequirement50EA::required:
@@ -2308,7 +2339,8 @@ SessionExit50DU Context::run() {
  // only after cleanup, without replacing the application's Video identity.
 
  track_animation_window50AN::Owner trackAnimationWindow; // the common track-animation window
- track_uv_animation50uv_fixture::Owner trackUvAnimation; // every course (29A310/29A490 data rule)
+ // The track's one UV-animation owner (05.14 29B1D0, 29A310/29A490 data rule, every course).
+ require50DU(static_cast<bool>(track.roles.uvAnimation),"race track uv animation role (29B1D0) missing");
  gameplay_binder_window_candidate_fixture::Owner gameplayBinder;
  // One particle material/render owner over the one 1B4DC0 particle manager.
  gc_particle_materials50kg_fixture::Owner particleMaterials;
@@ -2445,6 +2477,10 @@ SessionExit50DU Context::run() {
       "track particle pool service is unavailable");
   std::uint32_t actualPause11C=0;
   require50DU(sourceApplicationClock.readPause11C(actualPause11C),"track particle Application pause owner unavailable");
+  // With the ground-effects owner published, its advance (run by the loop right
+  // after this call, never while paused) runs the manager's 161180 advance and
+  // each fog row's 160160 phase, so 161180 runs exactly once per world step.
+  if(track.roles.emitters)return;
   auto& particles=*track.roles.particles->particles();
   require50DU(particles.advance(.016f,actualPause11C!=0).okay(),"track particle manager advance rejected");
   require50DU(particles.advanceFogPhases(.016f)==OriginalGcParticleStatus50KG::complete,
@@ -3054,6 +3090,7 @@ SessionExit50DU Context::run() {
   .roster=roster,
   .raceStart=raceStart,
   .raceEnd=raceEnd,
+  .raceStartOwner=this->raceStartOwner,
   .acceptedRacePresentation=acceptedRacePresentation,
   .accountParticleRegistryCall=interactive_frame50DU::BorrowedCall<void()>{accountParticleRegistry},
   .activateColdRace=activateColdRace,
@@ -3187,7 +3224,7 @@ SessionExit50DU Context::run() {
   .mainContactFrames=mainContactFrames,
   .mainCrossedPortals=mainCrossedPortals,
   .mainMembership=mainMembership,
-  .materialAudio=materialAudio,
+  .materialAudio=track.roles.audio,
   .materialOwner=materialOwner,
   .mode1=mode1,
   .mode1Effects=mode1Effects,
@@ -3402,14 +3439,13 @@ SessionExit50DU Context::run() {
   .trackAdmission=trackAdmission,
   .trackGpuTextures=trackGpuTextures,
   .trackMaterialDiagnostic=trackMaterialDiagnostic,
-  .trackMaterialOwner=trackMaterialOwner,
   .trackMaterialRequest=trackMaterialRequest,
   .trackMesh=trackMesh,
   .trackNormals=trackNormals,
   .trackSession=trackSession,
   .trackSource=trackSource,
   .trackTextureBytes=trackTextureBytes,
-  .trackUvAnimation=trackUvAnimation,
+  .trackUvAnimation=*track.roles.uvAnimation,
   .updateOpponentAudioCall=interactive_frame50DU::BorrowedCall<void()>{updateOpponentAudio},
   .updateOriginalAiPackingCall=interactive_frame50DU::BorrowedCall<void()>{updateOriginalAiPacking},
   .usePhysicalGameController=usePhysicalGameController,

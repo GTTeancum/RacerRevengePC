@@ -176,123 +176,6 @@ void Context::run() const {
 }
 }
 
-// Same retained Operation/Bank reader phases. This provider already owns the
-// canonical roster implementation imports; Application/Profile work stays out
-// of these method bodies and returns through declaration-only private calls.
-namespace original_results_roster50LA {
-ra_cold_aggregate50LA::Prefix Read::completedOwnerPrefixes(
-    const std::shared_ptr<ra_cold_aggregate50LA::Owner>& world)noexcept {
-    return world->completedPrefixes();
-}
-bool Read::currentBank(std::size_t& count)const {
-    auto& op=*operation_;
-        // registered() checks the destruction-bound Bank pin before any Bank
-        // dereference. Holding Operation is not itself a Bank lifetime lease.
-        if(op.terminal_||op.closed_||!op.aggregate_||!op.resources_||!op.bank_||
-           op.aggregate_->terminal_||op.aggregate_->closed_||!op.aggregate_->runtimeQueries_||
-           op.aggregate_->prefix_.staticWorldImages||op.aggregate_->prefix_.staticWorldDrawPlan||
-           !op.registered()||!applicationCurrent(op.aggregate_,op.application_,op.entities_,op.generation_,op.domain_))return false;
-        if(!humanProfileCurrent(op.arena_.humanCount,op.resources_->humanCount_))return false;
-        ra_cold_aggregate50LA::Diagnostic diagnostic;
-        const auto actual=op.aggregate_->retainedRosterForHandoff(*op.bank_,diagnostic);
-        if(actual!=operation_)return false;
-        const auto n=op.bank_->count();
-        if(!n||n>8u||(humanRacer60_&&n!=8u)||op.resources_->racerCount_!=n||op.nextSlot_!=n||
-           launchEntrantsDiffer(n))return false;
-        const auto managerIndex=op.bank_->bindRead(op.arena_.ai.managerIndexFE0);
-        const auto id=op.bank_->bindRead(op.arena_.ai.racer60);
-        const auto role=op.bank_->bindRead(op.arena_.live.state.fields.vehicle58);
-        const auto bound=op.bank_->bindRead(op.arena_.live.state.fields.nativeAiOwnersBound50IV);
-        const auto ready=op.bank_->bindRead(op.arena_.live.state.phase);
-        const auto initialized=op.bank_->bindRead(op.arena_.ai.initialized);
-        for(std::size_t slot=0;slot<n;++slot){
-            if(!op.bank_->active(slot)||!op.completed_[slot]||op.bank_->completedSteps(slot)!=0u||
-               !op.resources_->rigs_[slot]||!op.resources_->collisions_[slot])return false;
-            const auto* source=rr::game::original_racer_selection50IJ::findAnyByPodId(
-                op.resources_->rigs_[slot]->podId);
-            // Revalidate the actual whole field before every lookup/final
-            // commit; these comparisons publish or retain no future ID list.
-            if(!source||op.bank_->read(slot,ready)!=rr::game::VehicleFramePhase49W::Ready||
-               (humanRacer60_&&(*humanRacer60_)[slot]!=source->racer60))return false;
-            if(humanRacer60_&&slot==0u){
-                // The genuine human lane has no initialized AI identity.
-                // Never read its AI racer60/managerIndex as a player substitute.
-                if(op.bank_->read(slot,role)!=0u||op.bank_->read(slot,bound)||
-                   op.bank_->read(slot,initialized))return false;
-            }else if(op.bank_->read(slot,managerIndex)!=slot||
-               op.bank_->read(slot,id)!=source->racer60||op.bank_->read(slot,role)!=1u||
-               !op.bank_->read(slot,bound)||!op.bank_->read(slot,initialized))return false;
-        }
-        if(finalHumanProfileChanged())return false;
-        count=n;return true;
-}
-
-bool Read::racer60At1AF330(std::int32_t index,std::uint32_t& actual60)const noexcept {
-    actual60=0;
-    try {
-        std::size_t count=0;
-        // The actual getter rejects negative and index>=manager30. Count and
-        // racer60 are read at the reached occurrence, not copied for later use.
-        if(!current(count)||index<0||static_cast<std::size_t>(index)>=count)return false;
-        const auto slot=static_cast<std::size_t>(index);
-        if(humanRacer60_){
-            const auto value=(*humanRacer60_)[slot];
-            std::size_t after=0;
-            if(!current(after)||after!=count||(*humanRacer60_)[slot]!=value)return false;
-            actual60=value;return true;
-        }
-        if(!operation_)return false;
-        auto& op=*operation_;auto& bank=*op.bank_;
-        const auto role=bank.bindRead(op.arena_.live.state.fields.vehicle58);
-        const auto bound=bank.bindRead(op.arena_.live.state.fields.nativeAiOwnersBound50IV);
-        const auto ready=bank.bindRead(op.arena_.live.state.phase);
-        const auto initialized=bank.bindRead(op.arena_.ai.initialized);
-        const auto managerIndex=bank.bindRead(op.arena_.ai.managerIndexFE0);
-        const auto id=bank.bindRead(op.arena_.ai.racer60);
-        const auto* source=rr::game::original_racer_selection50IJ::findAnyByPodId(
-            op.resources_->rigs_[slot]->podId);
-        if(!source||bank.read(slot,role)!=1u||!bank.read(slot,bound)||
-           bank.read(slot,ready)!=rr::game::VehicleFramePhase49W::Ready||
-           !bank.read(slot,initialized)||bank.read(slot,managerIndex)!=slot)return false;
-        const auto value=bank.read(slot,id);
-        if(value!=source->racer60)return false;
-        std::size_t after=0;
-        if(!current(after)||after!=count)return false;
-        actual60=value;return true;
-    }catch(...){return false;}
-}
-} // namespace original_results_roster50LA
-
-//Opaque Results ownership reads live beside the existing Read backend and
-//already-complete Operation. No new pin, prepared state or cached count.
-namespace original_results_roster50LA {
-bool Read::loadedOperationOwnerFieldsCurrent(const std::shared_ptr<ra_cold_roster50LA::Operation>& operation,
-    const std::shared_ptr<ra_cold_aggregate50LA::Owner>& aggregate,
-    const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& application,
-    const std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA>& domain,
-    const std::uint64_t& generation)noexcept {
-    // The common race has neither an RA roster Operation nor the RA world;
-    // its loaded rows come from the live race list (Read::current).
-    if(!operation)return !aggregate&&application&&domain&&generation;
-    return operation->aggregate_==aggregate&&operation->entities_==application&&
-        operation->domain_==domain&&operation->generation_==generation;
-}
-bool Read::loadedOperationBankCurrent(const std::shared_ptr<ra_cold_roster50LA::Operation>& operation,
-    const native_racer50HN::Bank* bank)noexcept {
-    //Original caller's left-hand owner match proves operation nonNULL, or the
-    //common race (no Operation), whose rows are read from this live Bank.
-    if(!operation)return bank!=nullptr;
-    return operation->resultsRuntimeBankCurrent(bank);
-}
-bool Read::loadedOperationRacerCurrent(const std::shared_ptr<ra_cold_roster50LA::Operation>& operation,
-    std::size_t index,std::uint32_t racer60)noexcept {
-    //Same already-pinned/current row-loop call site, no extra admission/reordering.
-    //The common race's row identity was read from its live list this frame.
-    if(!operation)return index<8u&&racer60!=0xffffffffu;
-    return operation->resultsRacerIdentityCurrent(index,racer60);
-}
-}
-
 namespace original_position_stats_adapter50LA {
 bool Owner::resultsRowsCurrent(const rr::game::OriginalApplicationEntities50LA* application,
     const rr::assets::OriginalStandardMaterialTable50LA* materials,std::uint64_t generation,
@@ -392,8 +275,6 @@ std::size_t Read::bankCount(const native_racer50HN::Bank& bank)noexcept {return 
 }
 
 namespace original_results_roster50LA {
-const std::shared_ptr<ra_cold_aggregate50LA::Owner>& Read::raceWorldIdentity(
-    const rr::game::OriginalRaceConstructor50LA& race)noexcept {return race.world74_;}
 Read::ProfileStamp Read::profileStamp(const rr::game::OriginalRaceConstructor50LA& race)noexcept {
     const auto actual=race.profile_->stamp();return {actual.generation,actual.mode34};
 }
@@ -569,34 +450,11 @@ bool Read::RootAccess::borrowLocalizationText(rr::assets::OriginalApplicationLoc
 }
 bool Read::profileInitialized(const rr::game::OriginalRaceConstructor50LA& race)noexcept {return race.profile_->initialized();}
 std::uint32_t Read::profileMode(const rr::platform::OriginalUiMainProfile50KG& profile)noexcept {return profile.mode34;}
-// The common human race has its one human (the only route that loads it).
-std::uint32_t Read::operationHumanCount(const std::shared_ptr<ra_cold_roster50LA::Operation>& operation)noexcept {return operation?operation->arena_.humanCount:1u;}
 }
 namespace rr::game {
 bool OriginalResults10450LA::liveResultsRaceAuthorityCurrent(const OriginalRaceConstructor50LA& race,
     const std::shared_ptr<OriginalApplicationEntities50LA>& application)noexcept {
     return application->entityAuthority_.canRetire(race.entity_);
-}
-}
-
-namespace rr::game {
-bool OriginalResults10450LA::careerRosterCurrentNative(
-    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,
-    const OriginalRaceConstructor50LA& race,const std::shared_ptr<OriginalApplicationEntities50LA>& application,
-    const std::shared_ptr<assets::OriginalStandardMaterialDomain50LA>& domain,std::uint64_t generation,
-    const ::original_position_stats_adapter50LA::Owner& observer)noexcept {
-    // The common race (no RA roster Operation): its own counted world and
-    // the live observed Bank are the load-time owners.
-    if(!operation)return !race.world74_&&race.anyWorld()&&race.application_==application&&
-        application&&domain&&generation&&observer.resultsBankIdentity()!=nullptr;
-    return operation->aggregate_==race.world74_&&operation->entities_==application&&
-        operation->domain_==domain&&operation->generation_==generation&&
-        operation->resultsRuntimeBankCurrent(observer.resultsBankIdentity());
-}
-bool OriginalResults10450LA::careerRacerCurrentNative(
-    const std::shared_ptr<::ra_cold_roster50LA::Operation>& operation,std::uint32_t racer60)noexcept {
-    if(!operation)return racer60!=0xffffffffu; // common race: row read from its live list
-    return operation->resultsRacerIdentityCurrent(0,racer60);
 }
 }
 

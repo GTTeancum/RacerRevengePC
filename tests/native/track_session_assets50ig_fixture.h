@@ -87,7 +87,7 @@ inline constexpr SessionAssets retainedTA{
     &worlds[0],
     "work/native/project/disc/TRACKS/TA.RES",
     "tracks\\mta.spl", "tracks\\ata.spl",
-    "work/impactAuthoring49Y/ta.tun",
+    "tracks\\ta.tun",
     "podboxm.col-explicit37-authored-placements-forward",
     "chariotm.col-explicit37-authored-placements-forward",
     "evidence/visual49G",
@@ -95,7 +95,10 @@ inline constexpr SessionAssets retainedTA{
     "evidence/visual49G/export-placed-normal/export-report.json",
     "evidence/sky50GW",4,1,37,
     "b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",3334562,
-    false,false,true,true
+    // Common rewrite: the same original-disc row shape as every course (archive
+    // tuning, the track's own static candidates); the development TA inputs
+    // (work/impactAuthoring49Y/ta.tun, corpus candidates) are retired.
+    true,true,true,true
 };
 // These are actual transferred original source paths/counts. Selecting GC
 // starts strict cold admission in main; it is NOT a gameplay-validation claim.

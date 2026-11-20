@@ -129,7 +129,7 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
         // every course alike). Absent roles (no water, no sky) stay empty.
         const auto& roles=request.commonTrack->roles;
         next->trackRoleLeases={roles.staticWorld,roles.sky,roles.fog,roles.waterResources,roles.water,
-            roles.atm,roles.uvAnimation,roles.animation,roles.particles};
+            roles.atm,roles.uvAnimation,roles.animation,roles.particles,roles.emitters,roles.lights};
         next->retainedTrackMesh=request.track.mesh; // the static world's mesh (validateCommonTrack)
     }
     next->diagnostic = &d;

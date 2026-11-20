@@ -128,13 +128,6 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     //17E348 initializes the complete7E8 word. No synthetic full7E4 byte.
     bool bit0_7E4=false;
     std::uint32_t word7E8=0;
-    std::uint32_t testRider=0; // Legacy fixture identity remains unchanged.
-    bool gasganoScTest=false;
-    bool tzidikTcTest=false;
-    bool sebulbaTbTest=false;
-    bool kraidGbTest=false;
-    bool youngAnakinMcTest=false;
-    bool scorchRcTest=false; // Distinct immutable native startup provenance.
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
     // The source180164 LH view of this profile's thirteen constructor words
@@ -252,95 +245,12 @@ bool OriginalUiRiderProfileOwner50KG::beginPodRace1A66CC(
 bool OriginalUiRiderProfileOwner50KG::initializeAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d);
-}
-bool OriginalUiRiderProfileOwner50KG::initializeGasganoTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),7,d);
-}
-bool OriginalUiRiderProfileOwner50KG::initializeVisibleRiderTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t rider,Diagnostic& d) noexcept {
-    if(rider!=3&&rider!=8&&rider!=22&&rider!=14&&rider!=21&&rider!=25&&rider!=26){d={};return fail(d,Error::range,0x17F970);}
-    return initializeStartupProfile(std::move(common),std::move(archive),rider,d);
-}
-std::uint32_t OriginalUiRiderProfileOwner50KG::visibleRiderTestProfile() const noexcept {
-    return storage_&&(storage_->testRider==3||storage_->testRider==8||storage_->testRider==22||storage_->testRider==14||storage_->testRider==21||storage_->testRider==25||storage_->testRider==26)?storage_->testRider:0;
-}
-bool OriginalUiRiderProfileOwner50KG::gasganoTestProfile() const noexcept {
-    return storage_&&storage_->testRider==7;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeMawhonicRylothTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),9,d);
-}
-bool OriginalUiRiderProfileOwner50KG::mawhonicRylothTestProfile() const noexcept {
-    return storage_&&storage_->testRider==9;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeWanMbTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),16,d);
-}
-bool OriginalUiRiderProfileOwner50KG::wanMbTestProfile() const noexcept {
-    return storage_&&storage_->testRider==16;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeGasganoScTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,true);
-}
-bool OriginalUiRiderProfileOwner50KG::gasganoScTestProfile() const noexcept {
-    return storage_&&storage_->gasganoScTest;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeTzidikTcTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,true);
-}
-bool OriginalUiRiderProfileOwner50KG::tzidikTcTestProfile() const noexcept {
-    return storage_&&storage_->tzidikTcTest;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeScorchRcTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,true);
-}
-bool OriginalUiRiderProfileOwner50KG::scorchRcTestProfile() const noexcept {
-    return storage_&&storage_->scorchRcTest;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeSebulbaTbTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,false,true);
-}
-bool OriginalUiRiderProfileOwner50KG::sebulbaTbTestProfile() const noexcept {
-    return storage_&&storage_->sebulbaTbTest;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeKraidGbTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,false,false,true);
-}
-bool OriginalUiRiderProfileOwner50KG::kraidGbTestProfile() const noexcept {
-    return storage_&&storage_->kraidGbTest;
-}
-bool OriginalUiRiderProfileOwner50KG::initializeYoungAnakinMcTestProfileAtApplicationStartup(
-    std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d,std::uint32_t mcRider) noexcept {
-    if(mcRider!=1&&mcRider!=14&&mcRider!=21&&mcRider!=25&&mcRider!=26){d={};return fail(d,Error::range,0x17F970);}
-    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,false,false,false,true,mcRider);
-}
-bool OriginalUiRiderProfileOwner50KG::youngAnakinMcTestProfile() const noexcept {
-    return storage_&&storage_->youngAnakinMcTest;
+    return initializeStartupProfile(std::move(common),std::move(archive),d);
 }
 bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t testRider,Diagnostic& d,bool gasganoSc,bool tzidikTc,bool scorchRc,bool sebulbaTb,bool kraidGb,bool youngAnakinMc,std::uint32_t mcRider) noexcept {
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
     d={};if(storage_)return fail(d,Error::alreadyInitialized,0x17F970);
-    if((youngAnakinMc&&(kraidGb||sebulbaTb||scorchRc||tzidikTc||gasganoSc||testRider!=0))||(kraidGb&&(sebulbaTb||scorchRc||tzidikTc||gasganoSc||testRider!=0))||(sebulbaTb&&(scorchRc||tzidikTc||gasganoSc||testRider!=0))||(scorchRc&&(tzidikTc||gasganoSc||testRider!=0))||(tzidikTc&&(gasganoSc||testRider!=0))||(gasganoSc&&testRider!=0)||(testRider!=0&&testRider!=3&&testRider!=7&&testRider!=8&&testRider!=9&&testRider!=16&&testRider!=22&&testRider!=14&&testRider!=21&&testRider!=25&&testRider!=26))return fail(d,Error::range,0x17F970);
     if(!common||!common->known)return fail(d,Error::commonProfile,0x17F970);
     if(!archive||!archive->loaded()||!archive->identity()||
        archive->identity()->id!=assets::OriginalUiArchiveId50KG::podPhysics)
@@ -406,39 +316,10 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         next->unlock10FAC.fill(0);next->hidden0730.fill(0);
         for(const auto rider:{2u,4u,10u,11u,12u,15u,19u,20u})next->unlock10FAC[rider]=1;
         for(const auto rider:{1u,14u,21u,25u,26u})next->hidden0730[rider]=1;
-        // Explicit isolated test setup for the requested racer capture.
-        // This does not execute187F40 or fabricate a qualification/result.
-        if(testRider){next->unlock10FAC[testRider]=1;next->testRider=testRider;
-            // Only this explicitly requested process-local test identity is revealed.
-            if(testRider==14||testRider==21||testRider==25||testRider==26)next->hidden0730[testRider]=0;}
-        if(gasganoSc){next->unlock10FAC[7]=1;next->gasganoScTest=true;}
-        if(tzidikTc){next->unlock10FAC[24]=1;next->tzidikTcTest=true;}
-        if(scorchRc){next->unlock10FAC[17]=1;next->scorchRcTest=true;}
-        if(sebulbaTb){next->unlock10FAC[18]=1;next->sebulbaTbTest=true;}
-        if(kraidGb){next->unlock10FAC[23]=1;next->kraidGbTest=true;}
-        if(youngAnakinMc){next->unlock10FAC[mcRider]=1;next->hidden0730[mcRider]=0;next->youngAnakinMcTest=true;}
-        // Only the explicitly selected MC test identity is revealed. Other
-        // original hidden bonuses retain their actual reset visibility.
         //186678..186684, after unlock reset. Mode stays in the shared owner.
         next->remembered.fill(19);
-        // Test profile enters through the original remembered-selection search.
-        // No visible locked neighbors are skipped or hidden by navigation.
-        if(testRider)next->remembered[0]=testRider;
-        if(gasganoSc)next->remembered[0]=7;
-        if(tzidikTc)next->remembered[0]=24;
-        if(scorchRc)next->remembered[0]=17;
-        if(sebulbaTb)next->remembered[0]=18;
-        if(kraidGb)next->remembered[0]=23;
-        if(youngAnakinMc)next->remembered[0]=mcRider;
         // Original constructor/reset fields, same retained fresh profile.
         next->rememberedCourse={{1,3,8,1,1,8,3}}; //186688..1866A8
-        if(testRider==16)next->rememberedCourse[0]=7; // explicit native MB test override
-        if(youngAnakinMc)next->rememberedCourse[0]=10; // exact MC authored slot
-        if(kraidGb)next->rememberedCourse[0]=8; // exact GB authored slot
-        if(sebulbaTb)next->rememberedCourse[0]=6; // exact TB authored slot
-        if(scorchRc)next->rememberedCourse[0]=12; // exact RC authored slot
-        if(tzidikTc)next->rememberedCourse[0]=13; // exact TC authored slot
-        if(gasganoSc)next->rememberedCourse[0]=9; // exact SC authored slot, not course ID
         next->packed1125D=0x98;next->packed1125E=0x12;
         next->comparison100C0=0xffffffffu; //17E17C
         // saveProfile owns constructor-known100BC bits0/1; no duplicate bool.
@@ -466,24 +347,6 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
         next->planetColors={{{0xc2a684,0x80674a},{0x8cc46e,0x628036},{0xc0b5a5,0x8c8479},
             {0xf4f1a2,0xa8a66f},{0xce766d,0xffbab2},{0xb26a36,0xe5a373}}};
-        // Commit fixture-only shared availability after every fallible preparation.
-        // The source course order and career matrix stay untouched.
-        if(testRider==9)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|5u);
-        if(testRider==16)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|7u);
-        if(gasganoSc)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|9u);
-        if(tzidikTc)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|13u);
-        if(scorchRc)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|12u);
-        if(sebulbaTb)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|6u);
-        if(kraidGb)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|8u);
-        if(youngAnakinMc)next->common->availability11018=
-            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|10u);
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x17F970);}
 }
@@ -796,9 +659,7 @@ bool OriginalUiRiderProfileOwner50KG::recordInsertionIdentityCurrent(
     return stage.profileIdentity_&&stage.profileIdentity_.get()==s.hallProfileIdentity.get()&&
         stage.profileGeneration()==s.generation&&stage.profileMode34()==s.common->mode34&&
         stage.course()==std::uint32_t(s.packed1125F&15u)&&
-        s.generation!=std::numeric_limits<std::uint64_t>::max()&&
-        !s.testRider&&!s.gasganoScTest&&!s.tzidikTcTest&&!s.scorchRcTest&&
-        !s.sebulbaTbTest&&!s.kraidGbTest&&!s.youngAnakinMcTest;
+        s.generation!=std::numeric_limits<std::uint64_t>::max();
 }
 bool OriginalUiRiderProfileOwner50KG::prepareHallRecordProvenance1AC440(
     const game::OriginalRaceRecordInsertionStage50KG& stage,
@@ -1174,7 +1035,7 @@ bool OriginalUiRiderProfileOwner50KG::coursePlanetColors(std::uint32_t planet,Or
 }
 bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRememberedProfile50KG& out)const noexcept{
     if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
-    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;p.mawhonicRylothTest=s.testRider==9;p.wanMbTest=s.testRider==16;p.gasganoScTest=s.gasganoScTest;p.tzidikTcTest=s.tzidikTcTest;p.scorchRcTest=s.scorchRcTest;p.sebulbaTbTest=s.sebulbaTbTest;p.kraidGbTest=s.kraidGbTest;p.youngAnakinMcTest=s.youngAnakinMcTest;
+    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
     p.packed1125E=s.packed1125E;p.cardFlag100BC=s.saveProfile.dirty100BCBit0();p.availability11018=s.common->availability11018;
@@ -1800,8 +1661,6 @@ bool OriginalUiRiderProfileOwner50KG::installNativeReadOwners(
        !hallRecordsReady()||!storage_->saveProfile.namesReady()||storage_->tournamentResultArmed||
        storage_->comparison100C0>=27||(storage_->packed1125F&15u)>=13)return false;
     auto& s=*storage_;auto& live=s.saveProfile;const auto& stage=read->projection();
-    if(s.testRider||s.gasganoScTest||s.tzidikTcTest||s.scorchRcTest||
-       s.sebulbaTbTest||s.kraidGbTest||s.youngAnakinMcTest)return false;
     for(const auto course:s.courseOrder100C4)if(course>=13)return false;
     const auto& before=stage.settingsBefore();
     if(settings.known!=before.known||settings.savedGroup6E8!=before.savedGroup6E8||
@@ -1874,10 +1733,6 @@ bool OriginalUiRiderProfileOwner50KG::prepareNativeReadMetadata(
        storage_->comparison100C0>=27||(storage_->packed1125F&15u)>=13||
        common.flags11054!=read->projection().flags11054Before())return false;
     const auto& s=*storage_;
-    // Test-profile authority cannot be relabeled as an imported original save.
-    // Reject this unsupported coexistence; do not silently clear route guards.
-    if(s.testRider||s.gasganoScTest||s.tzidikTcTest||s.scorchRcTest||
-       s.sebulbaTbTest||s.kraidGbTest||s.youngAnakinMcTest)return false;
     for(const auto course:s.courseOrder100C4)if(course>=13)return false;
     // Metadata now retains the genuine full-read/stage join, not merely a
     // structurally parsed arbitrary envelope. Output is still temporary only.
@@ -1925,7 +1780,6 @@ void OriginalUiRiderProfileOwner50KG::cancelTournamentResultForRace(const game::
 void OriginalUiRiderProfileOwner50KG::loadNativeBetaProgressAtStartup() noexcept {
  if(!storage_||storage_->betaStatus!=BetaPersistenceStatus::notStarted)return;
  auto& s=*storage_;using Status=BetaPersistenceStatus;using R=native_beta50kg::Result;
- if(s.testRider||s.gasganoScTest||s.tzidikTcTest||s.scorchRcTest||s.sebulbaTbTest||s.kraidGbTest||s.youngAnakinMcTest){s.betaStatus=Status::disabledFixture;return;}
  try {
   const auto directory=s.betaPath.empty()?native_beta50kg::defaultDirectory():s.betaPath.parent_path();if(directory.empty()){s.betaStatus=Status::unavailable;return;}
   std::error_code ec;std::filesystem::create_directories(directory,ec);if(ec){s.betaStatus=Status::readError;return;}

@@ -18,8 +18,8 @@
         auto* policy=s->nativeDetectorPolicy_.get();
         if(!policy||!policy->live_||!policy->registered_||policy->sharedWorld_!=s||policy->sharedRetired_||
            policy->sharedCount_!=bank.count_)return false;
-        const auto* bindings=candidates_->staticBindings();const auto rows=bank.count_*storage::Storage::rosterRoles;
-        if(!bindings||bindings->size()!=s->count.terrain||s->candidates.size()!=s->count.terrain||
+        const auto bindings=staticBindings();const auto rows=bank.count_*storage::Storage::rosterRoles;
+        if(bindings.empty()||bindings.size()!=s->count.terrain||s->candidates.size()!=s->count.terrain||
            s->count.terrain+rows>s->count.objects||s->count.objects>s->objects.size()||
            s->count.objects>s->source.size()||s->collectionInput.objects!=s->objects.data()||
            rows>storage::Storage::maximumRoster*storage::Storage::rosterRoles)return false;
@@ -85,7 +85,7 @@
             for(std::size_t previous=0;previous<row.reservedRef-1u;++previous)
                 if(s->objects[previous].identity==row.identity)return false;
         }
-        for(std::size_t i=0;i<s->count.terrain;++i){const auto* candidate=(*bindings)[i].candidate;
+        for(std::size_t i=0;i<s->count.terrain;++i){const auto* candidate=bindings[i].candidate;
             if(!candidate||s->candidates[i]!=candidate||
                s->objects[i].identity!=candidate->candidate.collision.filter.identity)return false;
             const auto& c=candidate->candidate.collision;

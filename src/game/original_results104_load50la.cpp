@@ -34,7 +34,7 @@ bool OriginalResults10450LA::load1BEEB0(original_results_roster50LA::Read& roste
             return p.stop(d,Impl::S::owner,0x1c1580,"Results final same-owner/resource extent validation");
         // Native identity only, published at the existing successful commit.
         // Failure retains no new Operation custody and no load receipt changes.
-        p.loadedRosterOperation=roster.operation_;
+        p.loadedRoster=roster.roster_;
         p.loadComplete=true;d.sourcePC=0x1c15ac;d.retainedPrimitives=p.references.associatedCount();return true;
     }catch(...){return p.stop(d,Impl::S::allocation,d.sourcePC?d.sourcePC:0x1beeb0,
         "Results partial native allocation retained; no full source destructor receipt");}

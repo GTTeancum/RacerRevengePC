@@ -106,6 +106,15 @@ public:
             published_=true;return true;
         }catch(const std::exception& e){error=e.what();return false;}
     }
+    // 1ACB18 restart (Time Trial, 11258==3, race1B0 bit4 clear): B0+40 vtable+18 =
+    // 141520 on this record actor, the same disable the constructor runs at 1AEA24
+    // (flags29 bits 0/1 cleared, then vtable+28). Refused before publication or after close.
+    bool restart1ACB18()noexcept {
+        if(!published_||closed_||!application_||!manager_||!manager_->ownsRecord(entity_,generation_))return false;
+        g::OriginalWreckComponent50LA* objects[]={&entity_};
+        const g::OriginalWreckComponentDomain50LA domain{generation_,objects,1};
+        return g::setOriginalWreckBaseActivity50LA(domain,entity_,false).status==g::OriginalWreckComponentStatus50LA::complete;
+    }
     bool radarObservation(std::uint64_t generation,std::uint8_t& flags29,
         std::array<float,3>& worldPosition)const noexcept {
         if(!published_||closed_||generation!=generation_||!application_||!rig_||!body_||

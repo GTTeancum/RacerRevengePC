@@ -16,8 +16,8 @@
     bool resolveSharedSelected(const SharedOwnerLease& lease,const std::uint32_t* source,
         std::int32_t count,SharedSelectedList& destination)const noexcept {
         if(!sharedLeaseCurrent(lease)||count<0)return false;
-        const auto& s=*storage_.get();const auto* bindings=candidates_->staticBindings();
-        if(!bindings||bindings->size()!=s.count.terrain||s.candidates.size()!=s.count.terrain||
+        const auto& s=*storage_.get();const auto bindings=staticBindings();
+        if(bindings.empty()||bindings.size()!=s.count.terrain||s.candidates.size()!=s.count.terrain||
            (source!=s.mergedIds.data()&&source!=s.secondIds.data()&&source!=s.firstIds.data())||
            static_cast<std::size_t>(count)>storage::sourceSelectionCapacity||
            static_cast<std::size_t>(count)>(source==s.mergedIds.data()?s.mergedIds.size():source==s.secondIds.data()?s.secondIds.size():s.firstIds.size()))return false;
@@ -28,7 +28,7 @@
         //A reserved row/ref without genuine descriptor/membership is not a hole
         //we can fill on behalf of the source collector.
         for(std::size_t i=0;i<s.count.terrain;++i){
-            if(!(*bindings)[i].candidate||s.candidates[i]!=(*bindings)[i].candidate||
+            if(!bindings[i].candidate||s.candidates[i]!=bindings[i].candidate||
                !s.candidates[i]->candidate.collision.filter.identity||
                s.objects[i].identity!=s.candidates[i]->candidate.collision.filter.identity)return false;
             for(std::size_t j=0;j<i;++j)if(s.objects[j].identity==s.objects[i].identity)return false;

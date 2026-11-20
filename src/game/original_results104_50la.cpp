@@ -108,7 +108,7 @@ bool OriginalResults10450LA::Impl::closeResources(D& d)noexcept {
     updateCpu.reset();pulse394.reset();direction398.reset(); //Native retirement, not source phase reset.
     // Preserve first-activation provenance as history; the closed owner cannot
     // activate again or reinterpret retired words as a fresh visual start.
-    loadedRosterOperation.reset(); //Weak provenance only; no RA owner release.
+    loadedRoster=nullptr; //Identity only; no roster release.
     //Full1BEC40 order. Cursor advances only AFTER each actual free; a failed
     //renderer24 resumes that leaf, not its already-completed renderer20(1).
     const auto drain=[&](std::uint32_t a,std::uint32_t b){

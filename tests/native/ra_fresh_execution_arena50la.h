@@ -1,7 +1,7 @@
 #pragma once
 #include "ra_cold_roster_arena50la.h"
 #include "ra_cold_roster_resources50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "ra_source_camera_ownership50la.h"
 #include "original_ui_main_entry50kg.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "terrain_probe_authoring50fq_fixture.h"
@@ -23,7 +23,6 @@ class FreshExecutionArena final {
     friend class Operation;
     friend class ::ra_native_session50LA::Join;
     friend class ::original_camera_session50KX::Session;
-    friend class ::ra_cold_aggregate50LA::Owner;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     const std::thread::id thread_=std::this_thread::get_id();
     const std::shared_ptr<const Resources> resources_;
@@ -114,33 +113,12 @@ class FreshExecutionArena final {
         out->secondaryFilter_.identityLists[0].identities.resize(3);
         return out;
     }catch(...){return {};}
-    // Output custody is published before the first aggregate/Bridge mutation.
-    // False retains the caller-owned arena and the aggregate's partial graph;
-    // caller must close Operation/aggregate before withdrawing this backing.
-    static bool createConstructorArenaNative(const std::filesystem::path& root,
-        std::shared_ptr<const Resources> resources,const g::AuthoredSelectionContext49N& selection,
-        std::uint32_t actualLaunchKind,g::CollisionNormalModeOwner50JA& actualNormalMode,
-        const original_main_entry50KG::Application& application,
-        const terrain_probe_authoring50fq_fixture::SourceBindings& actualNamespace,
-        const undertrack_owners50ew_fixture::SourceGlobals& recoveryNamespace,
-        const std::shared_ptr<ra_cold_aggregate50LA::Owner>& aggregate,
-        std::shared_ptr<FreshExecutionArena>& retainedArena,
-        ra_cold_aggregate50LA::Diagnostic& aggregateDiagnostic)noexcept {
-        aggregateDiagnostic={};
-        if(retainedArena||!aggregate)return false;
-        retainedArena=admitNative(root,std::move(resources),selection,actualLaunchKind,actualNormalMode,
-            application,actualNamespace,recoveryNamespace);
-        if(!retainedArena)return false;
-        auto& fresh=*retainedArena;
-        if(!aggregate->prepareConstructorRosterStorage(application.entities(),retainedArena,aggregateDiagnostic)||
-           !aggregate->bindConstructorQueryOwners(retainedArena,aggregateDiagnostic)||
-           !fresh.registerNativeLanes()||
-           !aggregate->registerConstructorQueryWorldOwners(retainedArena,aggregateDiagnostic)||
-           !fresh.sealNative())return false;
-        // Actual lighting/static-world/track-particle producers must run before
-        // Join can bind an Operation. This factory returns no such readiness.
-        return true;
-    }
+    // Common rewrite (area C): the RA aggregate composition createConstructorArenaNative
+    // (aggregate prepareConstructorRosterStorage / bindConstructorQueryOwners /
+    // registerConstructorQueryWorldOwners) is retired with the RA world. PORT STAND-IN: no
+    // common caller admits this fresh constructor arena yet; the common roster
+    // (common_roster50CR::loadAll) loads every slot. The arena type stays for the bridge's
+    // fresh constructor lanes (2123C8/212278/2127C8) and the Session constructor seam.
     Arena arena()noexcept {
         return {live_,{boost_,coolingCF8_,mainSpring_,mainResponse_,secondarySpring_,secondaryResponse_},
             selection_,ai_,aiSession_,navigation_,lap_,history_,rebaseModels_,rebaseCount_,rebaseWorkspace_,

@@ -126,7 +126,7 @@ bool readRole(Track& track,NavigationStorage& s,NavigationRole role,g::SourceLib
 std::atomic<std::uint64_t> navigationGeneration{0};
 } // namespace
 
-bool readNavigation2A1260(Track& track,Diagnostic& d)noexcept {
+bool readNavigation2A1260(Track& track,g::SourceLibmState49T& libm,Diagnostic& d)noexcept {
     try {
         d={};d.step=log::Step::navigation2A1260;
         if(track.roles.navigation)return refuse(d,0x2a1160,"navigation already read for this track (one attempt)");
@@ -154,10 +154,7 @@ bool readNavigation2A1260(Track& track,Diagnostic& d)noexcept {
         s->authoredPortalCount=static_cast<std::uint32_t>(portals);
         subRole(track,"nav_nodes.zones",track.identity.scbMember,s->authoredZoneCount);
         subRole(track,"nav_nodes.portals",track.identity.scbMember,s->authoredPortalCount);
-        // PORT STAND-IN (flagged, w0-requests\r4.txt): the frozen signature has no
-        // libm owner, so the 2A1D80 acos runs on a fresh default source libm state
-        // (mode 1, errno 0) instead of the session's serial owner.
-        g::SourceLibmState49T libm{};
+        // 2A1D80 acos runs on the session's one serial libm owner (W0 round 2, R4 #1).
         if(!readRole(track,*s,NavigationRole::map,libm,d)||!readRole(track,*s,NavigationRole::ai,libm,d))return false;
         s->gatesReady=s->map.gatesPrepared&&s->ai.gatesPrepared&&s->map.metadataBound&&s->ai.metadataBound;
         if(!s->gatesReady)return refuse(d,0x2a1d80,"navigation gates or metadata not prepared");

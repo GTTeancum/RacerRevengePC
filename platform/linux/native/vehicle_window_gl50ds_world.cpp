@@ -1,4 +1,8 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include "../../../tests/native/common_track50cr.h"
+#include "../../../src/game/original_gc_gameplay_lighting_candidate.h"
+#include "../../../src/game/original_light_flash50cr.h"
+#include "../../../src/assets/import_texture48e.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -430,7 +434,7 @@ void main(){
 }
 )GLSL";
         constexpr const char* fragment=R"GLSL(#version 400 core
-uniform int raComposition;
+uniform int coverageComposition;
 uniform sampler2D payloadImage;
 uniform sampler2D depthImage;
 uniform sampler2DMS destinationImage;
@@ -443,9 +447,9 @@ void main(){
     // A static SampleID use requires separate invocations for every sample.
     // Geometry coverage came from the original AA0 triangle's center raster.
     vec4 destinationByte=floor(texelFetch(destinationImage,pixel,gl_SampleID)*255.0+0.5);
-    sourceByte.rgb=raComposition==2 ?
+    sourceByte.rgb=coverageComposition==2 ?
         clamp(floor(sourceByte.rgb*sourceByte.a/128.0)+destinationByte.rgb,0.0,255.0) :
-        raComposition!=0 ?
+        coverageComposition!=0 ?
         clamp(destinationByte.rgb+floor((sourceByte.rgb-destinationByte.rgb)*sourceByte.a/128.0),0.0,255.0) :
         clamp(floor(sourceByte.rgb*destinationByte.a/128.0)+destinationByte.rgb,0.0,255.0);
     composedColor=sourceByte/255.0;
@@ -463,13 +467,13 @@ void main(){
             diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
             check("read coverage composition link log");
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition link failed");}
-        coverageRaCompositionUniform=shaderGl.getUniformLocation(coverageProgram,"raComposition");
+        coverageCompositionUniform=shaderGl.getUniformLocation(coverageProgram,"coverageComposition");
         coveragePayloadUniform=shaderGl.getUniformLocation(coverageProgram,"payloadImage");
         coverageDepthUniform=shaderGl.getUniformLocation(coverageProgram,"depthImage");
         coverageDestinationUniform=shaderGl.getUniformLocation(coverageProgram,"destinationImage");
         gl.genVertexArrays(1,&coverageArray);
         if(!check("locate coverage composition inputs and array")||!coverageArray||
-           coverageRaCompositionUniform<0||coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
+           coverageCompositionUniform<0||coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
         // These private program sampler assignments never vary between track and
         // racer composition. Uniform values survive binds and extent changes;
@@ -547,7 +551,7 @@ bool VehicleWindowGl50DS::Storage::drawCoveragePairTriangle(U bank,U first,U ima
             // The first successful bridge in this span establishes the private
             // composition mode and all three sampler-object bindings. Checked
             // bridge tails and base/map-2 group setup preserve those values.
-            gl.useProgram(coverageProgram);if(firstCoverageSetup)gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
+            gl.useProgram(coverageProgram);if(firstCoverageSetup)gl.uniform1i(coverageCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
             if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
@@ -1197,7 +1201,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U
         if(accepted){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.enable(0x809D);gl.enable(0x0B71);
             gl.depthFunc(0x0203);gl.depthMask(0);gl.useProgram(coverageProgram);
-            gl.uniform1i(coverageRaCompositionUniform,pass==1?2:0);drawGl.bindVertexArray(coverageArray);
+            gl.uniform1i(coverageCompositionUniform,pass==1?2:0);drawGl.bindVertexArray(coverageArray);
             if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
@@ -1316,5 +1320,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaRange(U bank,U first,U co
         }
         return true;
     }
+
+#include "vehicle_window_gl50ds_track_flare.inl"
 
 } // namespace rr::platform

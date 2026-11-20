@@ -21,6 +21,8 @@
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
+#include "course_trigger_actions50ct.h"
+#include "native_results_world_stop26d070.h"
 #include "../../src/game/original_ai_aural.h"
 #include <algorithm>
 #include <array>
@@ -57,7 +59,16 @@ struct AmbientDescriptor {std::string name;float cycleSeconds=0,chance=0;};
 struct State {bool played=false,randomAttempted=false;int slot=-1;};
 struct Receipt {bool complete=false;std::size_t eligible=0,started=0,stopped=0,controlled=0,deferred=0,randomDraws=0;};
 
-class Owner final {
+// The one positional-sound owner also owns the race's ordinary trigger Sound
+// actions (TOB TriggerN ActionM Type=Sound, every course): their PCM is loaded at
+// 05.12 from the Track's own trigger list (05.09) and each reached action plays
+// one centered one-shot on this owner's World4D8 transport pool (source gain 100,
+// pitch 4096, global delivery), replacing the TC-only two-voice owner. The
+// Results 26D070 stop claims exactly this owner's active World4D8 playbacks.
+class Owner final : public native_results_world_stop26D070::Owner {
+ struct TriggerClip {std::string name;p::AudioClip50HD clip{};};
+ std::vector<TriggerClip> triggerClips_;    // one per distinct authored trigger Sound file
+ static constexpr int triggerSlot=-2;        // assigned_ marker of a trigger one-shot
  const ct::Track* track_=nullptr;           // identity only (the race's one Track)
  a::AudioBank50HC bank_;
  ct::Block<Descriptor> rows_;
@@ -76,6 +87,38 @@ class Owner final {
      !groups_->uses(*mixer_)||mixer_->groupEpoch50IC()!=epoch_)return false;
   for(std::size_t i=0;i<voiceCount;++i)if(groups_->binding(firstVoice+i)!=g::RaceAudioGroup50IC::World4D8)return false;
   return true;
+ }
+ static std::string pcmName(std::string name){
+  // PORT MAPPING (flagged): the original opens resource+".wav" (308FB8); the
+  // port's audio bank holds the disc's VAG file of the same name.
+  for(auto& c:name)if(c=='\\')c='/';return name+".vag";
+ }
+ const TriggerClip* triggerClipFor(const course_trigger_actions50CT::ActionEvent& e)const noexcept {
+  if(thread_!=std::this_thread::get_id()||!e.authored||e.authored->kind!=course_trigger_sources50CT::ActionKind::Sound||
+     e.authored->positional)return nullptr;
+  try{const auto name=pcmName(e.authored->filename);
+   for(const auto& c:triggerClips_)if(c.name==name)return &c;}catch(...){}
+  return nullptr;
+ }
+ bool ownsActive26D070(std::size_t slot)const noexcept {
+  if(!mixer_||slot>=voiceCount||assigned_[slot]==-1)return false;
+  const auto* sound=const_cast<p::LogicalAudioOwner&>(logical_).sound(slot);
+  return sound&&logical_.active(*sound);
+ }
+ // One centered one-shot on the lowest free transport. A full pool drops the
+ // start (logged); it is not a refusal of the trigger query.
+ bool playTrigger(const course_trigger_actions50CT::ActionEvent& e)noexcept {
+  const auto* c=triggerClipFor(e);if(!c)return false;
+  if(!ready())return true;   // no transport bound (muted / not authored): no playback
+  for(std::size_t slot=0;slot<voiceCount;++slot)if(assigned_[slot]==triggerSlot){
+   auto* s=logical_.sound(slot);if(s&&!logical_.active(*s))assigned_[slot]=-1;}
+  std::size_t slot=0;while(slot<voiceCount&&assigned_[slot]!=-1)++slot;
+  if(slot==voiceCount){std::cerr<<"positional_sounds trigger_sound dropped: transport pool full\n";return true;}
+  if(mixer_->active(firstVoice+slot))return false;
+  auto* sound=logical_.sound(slot);if(!sound)return false;
+  sound->clip=c->clip;sound->available=true;sound->loop1B0=0;
+  if(logical_.start(*sound,1.f,1.f,false)!=p::LogicalAudioOwner::Result::complete)return false;
+  assigned_[slot]=triggerSlot;return true;
  }
 public:
  Owner(){assigned_.fill(-1);}Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
@@ -128,6 +171,21 @@ public:
     else need(found->loop==row->loop,"positional PCM delivery flags conflict");
     if(!states_.slot(i,0x2787B0u))throw std::runtime_error("positional state row refused");
    }
+   // Trigger Sound actions (05.09 trigger list, already read): distinct files.
+   if(track.roles.triggerSource&&track.roles.triggerSource->ready()){
+    const auto& triggers=*track.roles.triggerSource;
+    for(std::size_t t=0;t<triggers.liveCount();++t)for(const auto& action:triggers.source(t).actions){
+     if(action.kind!=course_trigger_sources50CT::ActionKind::Sound)continue;
+     // PORT STAND-IN (flagged): a Positional trigger Sound needs the original's
+     // 3D placement, not traced; refused (logged) instead of played centered.
+     need(!action.positional,"trigger Sound Positional=T is not supported natively (PORT STAND-IN)");
+     const auto name=pcmName(action.filename);
+     if(std::find_if(triggerClips_.begin(),triggerClips_.end(),[&](const auto& c){return c.name==name;})==triggerClips_.end())
+      triggerClips_.push_back({name,{}});
+     if(std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==name;})==requests.end())
+      requests.push_back({name,false,false,false});
+    }
+   }
    ambient_.resize(ambientCount_);
    for(std::size_t i=0;i<ambientCount_;++i){const auto& s=read->ambient.rows[i];auto& row=ambient_[i];
     row.name=s.resource;for(auto& c:row.name)if(c=='\\')c='/';row.name+=".vag";
@@ -135,24 +193,27 @@ public:
     if(std::find_if(requests.begin(),requests.end(),[&](const auto& q){return q.name==row.name;})==requests.end())
      requests.push_back({row.name,false,false,false});}
    std::cerr<<"positional_sounds site=common course="<<code<<" soultree_rows="<<count_<<" ambient_rows="<<ambientCount_
-       <<" pcm="<<requests.size()<<" ambient_scheduling=unsupported native_transport_slots="<<voiceCount<<"\n";
+       <<" trigger_sounds="<<triggerClips_.size()<<" pcm="<<requests.size()<<" ambient_scheduling=unsupported native_transport_slots="<<voiceCount<<"\n";
    // Absent soul-tree data = no positional transport (ambient rows are retained
    // only; PORT STAND-IN, flagged: no ambient scheduler 0x2793A0/0x278D70).
-   if(!count_){error.clear();return true;}
+   if(!count_&&triggerClips_.empty()){error.clear();return true;}
    for(std::size_t i=0;i<voiceCount;++i)need(!mixer.active(firstVoice+i)&&!mixer.hasVoiceGroupGain50IC(firstVoice+i)&&
       groups.binding(firstVoice+i)==g::RaceAudioGroup50IC::Unrepresented&&groups.canBind(firstVoice+i,g::RaceAudioGroup50IC::World4D8),
       "positional pool conflicts with an actual owner");
    need(a::loadAudioBank50HC(audioRoot,requests,bank_,error),"positional/retained ambient PCM bank rejected");
-   for(std::size_t i=0;i<count_;++i){const auto* clip=bank_.find(rows_.at(i)->name);
-    need(clip!=nullptr,"positional PCM unavailable");const auto& pcm=clip->pcm;
+   auto view=[&](const std::string& name){const auto* clip=bank_.find(name);
+    need(clip!=nullptr,"positional PCM unavailable: "+name);const auto& pcm=clip->pcm;
     const p::AudioClip50HD value{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,pcm.hasEmbeddedLoop?pcm.loopStart:0,pcm.hasEmbeddedLoop?pcm.loopEnd:0};
-    need(p::AudioMixer50HD::validClip(value)&&clips_.write(i,value,0x2787B0u),"positional PCM invalid");}
+    need(p::AudioMixer50HD::validClip(value),"positional PCM invalid: "+name);return value;};
+   for(std::size_t i=0;i<count_;++i)need(clips_.write(i,view(rows_.at(i)->name),0x2787B0u),"positional PCM store refused");
+   for(auto& c:triggerClips_)c.clip=view(c.name);
    authored_=true;
    mixer_=&mixer;groups_=&groups;epoch_=mixer.groupEpoch50IC();
    need(logical_.bind(mixer,firstVoice,voiceCount)&&groups.bindRange(firstVoice,voiceCount,g::RaceAudioGroup50IC::World4D8),"positional transport bind rejected");
    // Each reusable transport is registered with actual PCM. No playback starts
    // here; service assigns the selected descriptor's clip after retirement.
-   for(std::size_t i=0;i<voiceCount;++i)need(logical_.registerClip(i,*clips_.at(0),true),"positional slot registration rejected");
+   const auto& first=count_?*clips_.at(0):triggerClips_.front().clip;
+   for(std::size_t i=0;i<voiceCount;++i)need(logical_.registerClip(i,first,true),"positional slot registration rejected");
    ready_=true;error.clear();return true;
   }catch(const std::exception& e){blocked_=true;try{error=e.what();}catch(...){}return false;}
  }
@@ -168,6 +229,31 @@ public:
  std::span<const AmbientDescriptor> ambientDescriptors()const noexcept{return {ambient_.data(),ambient_.size()};}
  const a::AudioBank50HC& bank()const noexcept{return bank_;}
  static constexpr bool ambientSchedulingSupported()noexcept{return false;}
+ std::size_t triggerSoundCount()const noexcept{return triggerClips_.size();}
+ // Trigger Sound destination (course_trigger_actions50CT::Destinations::sound).
+ course_trigger_actions50CT::ActionSink triggerSink()noexcept{
+  return {this,
+   [](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept->bool{
+    return static_cast<const Owner*>(p)->triggerClipFor(e)!=nullptr;},
+   [](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept->bool{
+    return static_cast<Owner*>(p)->playTrigger(e);},
+   0x2a0e20u};
+ }
+ bool canStopResults26D070(const p::AudioMixer50HD& mixer,const p::RaceAudioGroups50IC& groups)const noexcept override {
+  return ready()&&mixer_==&mixer&&groups_==&groups&&mixer.canRecordControlChanges(voiceCount);
+ }
+ std::size_t resultsStopCount26D070()const noexcept override {
+  std::size_t n=0;for(std::size_t slot=0;slot<voiceCount;++slot)n+=ownsActive26D070(slot);return n;
+ }
+ std::size_t resultsStopVoice26D070(std::size_t n)const noexcept override {
+  for(std::size_t slot=0;slot<voiceCount;++slot)if(ownsActive26D070(slot)){if(!n)return firstVoice+slot;--n;}
+  return p::audioMaximumVoices50HD;
+ }
+ // Stops PCM only; one-shot played state and descriptor bookkeeping survive
+ // (the next service releases the stopped transports).
+ void stopResultsPreflighted26D070()noexcept override {
+  for(std::size_t slot=0;slot<voiceCount;++slot)if(ownsActive26D070(slot))mixer_->stop(firstVoice+slot);
+ }
  bool release(std::size_t row,Receipt& r)noexcept {
   auto* state=states_.at(row);if(!state)return false;if(state->slot<0)return true;
   const auto slot=static_cast<std::size_t>(state->slot);auto* sound=logical_.sound(slot);
@@ -218,6 +304,9 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   if(eligible[i])++r.eligible;
   else if(row.oneShot){if(row.resetWhenInaudible)state.played=false;state.randomAttempted=false;}
  }
+ // Trigger one-shots that finished give their transport back.
+ for(std::size_t slot=0;slot<voiceCount;++slot)if(assigned_[slot]==triggerSlot){
+  auto* sound=logical_.sound(slot);if(!sound)return fail();if(!logical_.active(*sound))assigned_[slot]=-1;}
  // Release completed/ineligible transport before deterministic admission.
  for(std::size_t i=0;i<count_;++i){auto& state=states[i];if(state.slot<0)continue;
   auto* sound=logical_.sound(static_cast<std::size_t>(state.slot));if(!sound)return fail();
@@ -233,7 +322,7 @@ inline Receipt Owner::service(const g::OriginalAiAudioListener* listeners,std::s
   if(!eligible[i]||state.slot>=0||(row.oneShot&&state.played))continue;
   // A latched unsuccessful random attempt does not create a playback.
   if(row.chance<100&&state.randomAttempted)continue;
-  std::size_t slot=0;while(slot<voiceCount&&assigned_[slot]>=0)++slot;
+  std::size_t slot=0;while(slot<voiceCount&&assigned_[slot]!=-1)++slot;
   if(slot==voiceCount){++r.deferred;continue;}
   if(mixer_->active(firstVoice+slot))return fail();
   if(row.chance<100){state.randomAttempted=true;const auto random=g::drawOriginalSharedRng50IU(shared);++r.randomDraws;

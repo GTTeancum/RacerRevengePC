@@ -112,7 +112,7 @@ bool VehicleWindowGl50DS::Storage::hasShadowResources() const noexcept {
     return shadowCasterProgram || shadowCasterVertexShader || shadowCasterFragmentShader ||
         shadowReceiverProgram || shadowReceiverVertexShader || shadowReceiverGeometryShader ||
         shadowReceiverFragmentShader || shadowCableVertexArray || shadowCableVertexBuffer ||
-        shadowRaArray || shadowRaNormals || shadowCpuVertexArray || shadowCpuVertexBuffer || !shadowCasterLods.empty();
+        shadowCpuVertexArray || shadowCpuVertexBuffer || !shadowCasterLods.empty();
 }
 
 bool VehicleWindowGl50DS::Storage::buildShadowReceiverStatics() noexcept {
@@ -794,8 +794,7 @@ bool VehicleWindowGl50DS::Storage::deleteShadowNames(VehicleWindowDiagnostic50DS
         !deleteShaderName(shadowCasterFragmentShader, false, d) || !deleteShaderName(shadowReceiverProgram, true, d) ||
         !deleteShaderName(shadowReceiverVertexShader, false, d) || !deleteShaderName(shadowReceiverGeometryShader, false, d) ||
         !deleteShaderName(shadowReceiverFragmentShader, false, d)) return false;
-    if (!deleteName(shadowCableVertexArray, gl.deleteVertexArrays, d) || !deleteName(shadowCableVertexBuffer, gl.deleteBuffers, d) ||
-        !deleteName(shadowRaArray, gl.deleteVertexArrays, d) || !deleteName(shadowRaNormals, gl.deleteBuffers, d)) return false;
+    if (!deleteName(shadowCableVertexArray, gl.deleteVertexArrays, d) || !deleteName(shadowCableVertexBuffer, gl.deleteBuffers, d)) return false;
     for (auto& lods : shadowCasterLods)
         for (auto& l : lods)
             if (!deleteName(l.vertexArray, gl.deleteVertexArrays, d) || !deleteName(l.vertexBuffer, gl.deleteBuffers, d) ||

@@ -22,11 +22,10 @@ inline bool Application::attachNativeConsumedRacePause(rr::game::OriginalRaceCon
        owner.pause100_->domain_!=standardMaterialDomainOwner_||owner.pause100_->context_!=materialContextOwner_||
        !materialContextOwner_||!materialContextOwner_->live()||!owner.loadDisplay_||
        raceDisplayOwner50LA_.lock()!=owner.loadDisplay_||!RaceDisplayLifetime50LA::uploadBindingLive(*owner.loadDisplay_))return false;
-    const auto prefix=owner.world74_->completedPrefixes();
-    if(!prefix.staticWorldDrawPlan||!prefix.staticWorldImages||!prefix.staticModelObservers||
-       !prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager)return false;
-    ra_cold_aggregate50LA::Diagnostic d;
-    const auto actualCamera=owner.world74_->borrowRuntimeSourceCamera(owner.world74_,d);
+    // The race's one World holds its loaded common Track (every course), and the
+    // camera is the race's own issued Camera34.
+    if(!owner.world74_->trackData())return false;
+    const auto actualCamera=owner.borrowRaceCamera34();
     if(!actualCamera||actualCamera.get()!=camera.get())return false;
     // Actual prepared native camera/bank and loaded draw resources admit this
     // native route. They are not a receipt for unrepresented original slot30.

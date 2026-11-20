@@ -145,7 +145,6 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    // Consumers here read1125C low byte; the native roster owns the complete
    // packed count word, with the actual admitted low5 lap selection retained.
    aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
-   aiInput.aiTrackLength3C=aiView.trackLength3C();
    aiInput.raceOwnersBound=originalAiSession.rankBound&&aiMainZone!=0;
    return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
        lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);

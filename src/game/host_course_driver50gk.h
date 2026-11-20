@@ -1,5 +1,6 @@
 #pragma once
 #include "track_navigation50eu.h"
+#include "navigation_view50cr.h"
 #include "device_held48y.h"
 
 namespace rr::host {
@@ -87,7 +88,8 @@ struct CourseDriverOutput50GK {
 // caller explicitly resets this HOST state, or disables the driver. Disable is
 // immediate and clears the host latch; it never resets any game state.
 // The caller must preserve its normal packet dispatch/control/physics ordering.
-bool driveCourse50GK(const game::TrackNavigation50EU&,const CourseSpeedLimits50GK&,
+// Route: the one common navigation view (map or AI role) of the race's track.
+bool driveCourse50GK(const game::NavigationView50CR&,const CourseSpeedLimits50GK&,
     const CourseDriverTuning50GK&,const CourseDriverInput50GK&,
     CourseDriverState50GK&,CourseDriverOutput50GK&,CourseDriverDiagnostic50GK&) noexcept;
 

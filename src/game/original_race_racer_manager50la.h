@@ -8,8 +8,10 @@ class OriginalApplicationEntities50LA;
 class OriginalRaceConstructor50LA;
 struct VehicleFrameState49W;
 struct AiRuntimeState50IV;
-struct TrackNavigation50EU;
-// Counted1AD440 owner for the existing canonical native RA roster. The native
+}
+namespace common_track50CR { class NavigationView; }
+namespace rr::game {
+// Counted1AD440 owner for the race's one native roster (every course). The native
 // Bank replaces source44/count/indexed reads explicitly; it does not certify
 //1AD520, Player construction, guest arrays, source40, or full Race load/attach.
 // The independent subtype3 record manager must not be installed on this route.
@@ -30,7 +32,7 @@ class OriginalRaceRacerManager50LA final {
     // reports1AEA70 returned or physical racer reset completed.
     bool continueRestart1AEA70(OriginalRaceConstructor50LA&,native_racer50HN::Bank&,
         VehicleFrameState49W&,AiRuntimeState50IV&,const std::uint32_t&,
-        const TrackNavigation50EU* actualMap,std::uint32_t actualA2,std::uint32_t&)noexcept;
+        const ::common_track50CR::NavigationView& actualMap,std::uint32_t actualA2,std::uint32_t&)noexcept;
     bool retireNativeDetached(std::uint32_t&)noexcept;
 public:
     OriginalRaceRacerManager50LA(const OriginalRaceRacerManager50LA&)=delete;

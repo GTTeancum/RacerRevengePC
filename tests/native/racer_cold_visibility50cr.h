@@ -11,10 +11,9 @@
 // Nothing here writes racer or guest memory; the lighting Owner performs the
 // retirement of its own registrations.
 //
-// Owner after W0: area E (lights). The racer Bank's query-active flags are still
-// the retired per-course pair (gbQueryActive_/mcQueryActive_, never set on the
-// common path); area C replaces them with the one collision world's flag and adds
-// it to selected() below (W0-RULINGS FIX LIST, native_racer_bank50hn_fixture.h).
+// Owner after W0: area E (lights). selected() also refuses while the racer Bank's one
+// query fence is up (queryActive_, set only by track_collision_world50CR::Owner::queryRacer
+// for the span of one indexed query): no retirement inside a collision query.
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_cables50hw_fixture.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
@@ -34,7 +33,7 @@ class Retirement final {
             (slot?bank.visiting_:bank.readBlocked_)&&
             bank.visitDepth_==1&&bank.currentSlot_==slot&&
             !bank.pendingToken_&&!bank.sourceIssuer_&&!bank.retirementVisit_&&
-            !bank.nativeFifoPins_&&!bank.raWorldLifetime_&&
+            !bank.nativeFifoPins_&&!bank.raWorldLifetime_&&!bank.queryActive_&&
             bank.queryState_==native_racer50HN::Bank::QueryState::idle;
     }
     static bool exactSpan(const native_racer50HN::Bank& bank,const void* address,
