@@ -10,7 +10,7 @@ bool Owner::prepareRaZonePrefix114D00(CameraVisibilityLease& lease,
     platform::VehicleWindowGl50DS& renderer,platform::VehicleWindowDiagnostic50DS& rendererDiagnostic,
     Diagnostic& d)noexcept {
     d={};
-    if(!cameraLeaseCurrent(lease)||!storage_||storage_->scene!=Scene::ra)
+    if(!cameraLeaseCurrent(lease)||!storage_)
         return fail(d,Status::identity,0x114d28);
     auto& s=*storage_;auto& world=s.visibility.portals;
     if(s.staticApplication!=&app||!s.staticOwner||!s.staticRegistrationComplete||
@@ -181,7 +181,7 @@ namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::prepareRaZoneScissor280230(const CameraVisibilityLease& lease,std::uint32_t zone,
     const OriginalApplicationEntities50LA& app,const OriginalCameraViewportFields& viewport,Diagnostic& d)noexcept {
     d={};
-    if(!cameraLeaseCurrent(lease)||!storage_||storage_->scene!=Scene::ra||
+    if(!cameraLeaseCurrent(lease)||!storage_||
        storage_->staticApplication!=&app||storage_->zoneProjectionLease!=&lease||
        zone>=storage_->world.zones.size()||!app.portalDepth443120_||!viewport.prepared)
         return fail(d,Status::phase,0x27ff38u);

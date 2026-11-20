@@ -14,6 +14,14 @@ bool Owner::bindRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner,
            a.source_block_offset!=b.source_block_offset||a.geometry_member!=b.geometry_member||
            a.position!=b.position||a.look!=b.look||a.up!=b.up)return false;
     }
+    // 272A58: static models are registered through each zone's StaticModels
+    // search list (110). Checked here, where the World binds them, for every
+    // course (the cold prepare no longer refuses a track on it).
+    for(std::size_t z=0;z<s.world.zones.size();++z){
+        const auto read=assets::readZoneSearchSelection50CN(s.world,z);
+        if(read.status!=assets::ZoneSearchReadStatus50CN::Complete||
+           read.selection.visibilityStatic110!=assets::ZoneSearchKind50CN::List)return false;
+    }
     // Native construction join for230450's process-shared quad. The retained
     // actual portal geometry already owns the authored four vertices; repeat
     // the source's literal quad copy/reorder once for each original portal.

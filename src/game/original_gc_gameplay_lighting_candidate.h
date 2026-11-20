@@ -1,7 +1,10 @@
 #pragma once
-// Limited native selected-light policy, already joined to gameplay.
-// No original cache or camera parity claim. MA/SA additions are source-only
-// and have not been built or tested.
+// The ONE track lighting owner (common rewrite R6, PLAN B-C14 / 2.4): every
+// course reads its SCB [Lights]/LightN rows through one numeric reader (2783D0,
+// all light types, flashers and the [Environment] ambient flash) and keeps one
+// visibility namespace (4C0) sized from the SCB's own zone and portal counts.
+// No course, scene or pod is named; courses differ only in their data.
+// No original cache or camera parity claim (native authored-zone selection).
 #include "vehicle_frame49w.h"
 #include "original_zone_scissor50la.h"
 #include "camera_view49f.h"
@@ -23,21 +26,21 @@ namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::game::original_world_environment50KG {struct SpatialBounds;class Owner;}
 namespace ra_pod_scene50LA { class Owner; }
 namespace mb_source_trigger50MB { class Owner; }
-namespace tc_cold_visibility50TC { class Retirement; }
-namespace tb_cold_visibility50TB { class Retirement; }
-namespace gb_cold_visibility50GB { class Retirement; }
-namespace mc_cold_visibility50MC { class Retirement; }
+// The one cold-unwind caller (replaces the four per-course Retirement classes;
+// its owner folds tc/tb/gb/mc_cold_visibility50xx.h into it).
+namespace track_cold_visibility50CR { class Retirement; }
 namespace track_animation_binding50AN { class Binding; }
-namespace mc_cold_sources50LA { class Owner; }
-namespace mc_lighting_authoring50MC { struct Record; }
+namespace common_track50CR { class Track; }
 namespace original_cable_selection50LA { class Binding; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_model_cold50LA { class Owner; }
 namespace rr::game { class OriginalNativeListMethodCustody50LA; class OriginalApplicationEntities50LA; class OriginalRacerEntityCold50LA; class OriginalRacerModelSceneOwner50LA; }
 namespace rr::game::original_gc_gameplay_lighting_candidate {
-constexpr std::uint32_t maximumRacers=8, gcZones=12, gcPortals=13,
-    gaPortals=18, maZones=9, maPortals=10, saZones=25, saPortals=25,
-    maximumZones=saZones, maximumPortals=saPortals;
+// The visibility topology is sized once from the SCB's own zone and portal
+// counts. PORT STAND-IN (flagged): maximumZones/maximumPortals are allocation
+// ceilings against a corrupt file (stock maxima: SC 30 zones / 34 portals), not
+// sizes and not admission gates; a larger world is refused and logged.
+constexpr std::uint32_t maximumRacers=8, maximumZones=64, maximumPortals=64;
 enum class Status : std::uint8_t {
     complete, unprepared, alreadyPrepared, sourceIdentity, sourceShape,
     sourceFields, unsupportedScene, phase, identity, bounds, registration,
@@ -74,41 +77,45 @@ struct RaAuthoredLightIdentity {
 };
 class CameraVisibilityLease;
 class Owner;
-// Read-only live original particle inputs. This lease grants no renderer or
-// gameplay admission. A copied value is observation, not a current borrow.
-struct GbParticleLightInputs {
+// Read-only live original particle inputs (1493EC registered directional RGB,
+// 149408 directional positionA0, 1494D4 global ambient+50), for every course.
+// This lease grants no renderer or gameplay admission. A copied value is
+// observation, not a current borrow. Replaces the GB and MC particle leases.
+struct ParticleLightInputs {
     std::array<float,4> globalAmbient50{}, registeredDirectional3C{}, positionA0{};
     std::uint64_t timedServiceRevision=0;
 };
-class GbParticleLightLease final {
+class ParticleLightLease final {
     friend class Owner;
     std::shared_ptr<Owner> owner_;
     std::uint64_t revision_=0;
 public:
-    GbParticleLightLease() noexcept=default;
-    ~GbParticleLightLease();
-    GbParticleLightLease(const GbParticleLightLease&)=delete;
-    GbParticleLightLease& operator=(const GbParticleLightLease&)=delete;
-    GbParticleLightLease(GbParticleLightLease&&)=delete;
-    GbParticleLightLease& operator=(GbParticleLightLease&&)=delete;
-    bool read(GbParticleLightInputs&) const noexcept;
+    ParticleLightLease() noexcept=default;
+    ~ParticleLightLease();
+    ParticleLightLease(const ParticleLightLease&)=delete;
+    ParticleLightLease& operator=(const ParticleLightLease&)=delete;
+    ParticleLightLease(ParticleLightLease&&)=delete;
+    ParticleLightLease& operator=(ParticleLightLease&&)=delete;
+    bool read(ParticleLightInputs&) const noexcept;
 };
-struct McParticleLightInputs {
-    std::array<float,4> globalAmbient50{}, registeredDirectional3C{}, positionA0{};
-    std::uint64_t timedServiceRevision=0;
-};
-class McParticleLightLease final {
-    friend class Owner;
-    std::shared_ptr<Owner> owner_;
-    std::uint64_t revision_=0;
-public:
-    McParticleLightLease() noexcept=default;
-    ~McParticleLightLease();
-    McParticleLightLease(const McParticleLightLease&)=delete;
-    McParticleLightLease& operator=(const McParticleLightLease&)=delete;
-    McParticleLightLease(McParticleLightLease&&)=delete;
-    McParticleLightLease& operator=(McParticleLightLease&&)=delete;
-    bool read(McParticleLightInputs&) const noexcept;
+// What the one numeric reader read from the SCB (2783D0), for the
+// common_track_data lines and the stock receipts (prepareLights). Values only.
+struct LightTally {
+    std::uint32_t numberOfLights=0,zones=0,portals=0;
+    std::uint32_t ambient=0,directional=0,points=0,emittingPoints=0,spotlights=0;
+    std::uint32_t local=0;              // emitting local lights retained for selection
+    std::uint32_t omittedNonEmitting=0; // non-emitting ObjectPoints (flare-only, never light)
+    std::uint32_t flashers=0;           // HasFlasher=T rows
+    std::uint32_t timedFlashers=0;      // emitting flashers serviced by 147650
+    std::uint32_t missingSlots=0;       // LightN absent: 157D00 failed, prior block kept (2773CC)
+    std::uint32_t zoneColorOverrides=0; // DirectionalLightColorForZoneN keys (278370)
+    bool ambientFlash=false;            // [Environment] AmbientColorFlash* authored (270E9C)
+    float flashMinIdle=0,flashIdle=0,flashMinDuration=0,flashDuration=0; // as authored
+    std::array<float,3> flashColor{};   // AmbientColorFlashColorRGB as authored
+    std::array<std::uint32_t,2> timedFlasherOrdinals{}; // first two emitting flashers (LightN)
+    float flasherPeriod=0,flasherFilter=0; // first emitting flasher's FlashPeriod/FlashFilter
+    std::array<float,3> flasherRgb{};   // first emitting flasher's ColorRGB as authored
+    bool environment3A4=false;          // 276C00 EnvironmentInfo prepared for the World
 };
 // Concrete native bridge only. No public constructor, arbitrary callback
 // registration, caller context, success flag or substitute racer collection.
@@ -203,12 +210,8 @@ public:
     // ordinal, never a collision pointer re-labelled as a visibility pointer.
     std::uint64_t zoneKey4C0(std::size_t ordinal) const noexcept;
     std::size_t zoneCount() const noexcept;
-    // Closed SC topology identity, available only through this current lease.
-    // Count alone never authorizes the distinct SC camera backing.
-    bool isScSourceTopology() const noexcept;
-    bool isTcSourceTopology() const noexcept;
-    // Currently admitted for authenticated GA authoring only. Null for other
-    // scenes, invalid ordinals or an expired lease. Borrow only within lease.
+    // The SCB's own ZoneN render authoring (27632C), every course. Null for
+    // invalid ordinals or an expired lease. Borrow only within lease.
     const AuthoredRenderZone* authoredRenderZone(std::size_t ordinal) const noexcept;
 };
 
@@ -272,10 +275,7 @@ class Owner final {
     static std::optional<std::size_t> podFlareAuthoredIndex(const ::ra_pod_scene50LA::Owner&,const OriginalWreckComponent50LA*)noexcept;
 
     friend class ::mb_source_trigger50MB::Owner;
-    friend class ::tc_cold_visibility50TC::Retirement;
-    friend class ::tb_cold_visibility50TB::Retirement;
-    friend class ::gb_cold_visibility50GB::Retirement;
-    friend class ::mc_cold_visibility50MC::Retirement;
+    friend class ::track_cold_visibility50CR::Retirement;
     friend class ::ra_pod_scene50LA::Owner;
     //Actual RA source flare identity in the SAME canonical visibility domain.
     //Private World producer only; no public admission/ready flag.
@@ -427,16 +427,12 @@ class Owner final {
     bool selectRaStatic(std::uint32_t,const std::array<float,3>&,
         original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
     bool raStaticCurrent() const noexcept;
-    friend class GbParticleLightLease;
-    void endGbParticleLightBorrow(GbParticleLightLease&) noexcept;
-    bool readGbParticleLightBorrow(const GbParticleLightLease&,GbParticleLightInputs&) const noexcept;
-    friend class McParticleLightLease;
-    void endMcParticleLightBorrow(McParticleLightLease&) noexcept;
-    bool readMcParticleLightBorrow(const McParticleLightLease&,McParticleLightInputs&) const noexcept;
+    friend class ParticleLightLease;
+    void endParticleLightBorrow(ParticleLightLease&) noexcept;
+    bool readParticleLightBorrow(const ParticleLightLease&,ParticleLightInputs&) const noexcept;
     friend class DrawLease;
     friend class CameraVisibilityLease;
     friend class ResetVisibilityLease;
-    enum class Scene : std::uint8_t { gc,ta,ga,ma,sa,ra,mb,sc,tc,rc,tb,gb,mc };
     struct Storage;
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
@@ -450,35 +446,20 @@ class Owner final {
         const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
         std::uint32_t*,ResetVisibilityLease&,Diagnostic&,bool player,bool input=false,
         const SourceTriggerVisibilityIdentity50MB* source=nullptr) noexcept;
-    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,Scene,Diagnostic&,std::shared_ptr<const ::mc_cold_sources50LA::Owner> = {}) noexcept;
+    // The one cold prepare over the track's decoded SCB (World48F). Every count
+    // that sizes storage is read from it.
+    bool prepareWorld(const assets::World48F&,std::uint32_t,Diagnostic&) noexcept;
     // Native cold teardown only; never a live reset or a public lease escape.
     bool retireRaFreshVehicle(std::uint32_t,Diagnostic&) noexcept;
-    // Terminal MB cold-session unwind only, with the actual Bank slot installed.
-    // No source query/reset receipt is invented; active reset/borrowers reject.
-    bool retireMbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
-        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
-        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
-    // TC terminal native cold unwind, callable only through the actual Bank
-    // selection/typed Rig-Cables bridge. No source query/reset receipt exists.
-    bool retireTcColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+    // Terminal cold-session unwind (every course), with the actual Bank slot
+    // installed. No source query/reset receipt is invented; active
+    // reset/borrowers reject. Replaces the MB/TC/TB/GB/MC copies.
+    bool retireColdVehicle(std::uint32_t,const VehicleFrameState49W&,
         const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
         std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
     // Read-only proof for a missing cold Rig/Cables prefix. A reached attach,
     // partial registration, graphics publication or prior retirement rejects.
-    bool tcColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
-    // Distinct TB terminal cold bridge; actual Bank/Rig/Cables authority only.
-    bool retireTbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
-        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
-        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
-    bool tbColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
-    bool retireGbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
-        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
-        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
-    bool gbColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
-    bool retireMcColdVehicle(std::uint32_t,const VehicleFrameState49W&,
-        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
-        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
-    bool mcColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
+    bool coldVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
     // Only the exact source Owner may call this inside Bank's private suspended
     // retirement visit, after every raw query/result/visibility borrow closes.
     // Never reports reset/graphics completion. A failed removal retains prefix.
@@ -492,93 +473,48 @@ public:
     ~Owner();
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
-    // Exact original tracks\\gc.scb,359830 bytes,SHA256 d47a83...be210d.
-    // Actual roster count is supplied by the native roster owner, never inferred
-    // from geometry. Cold-only. Failure leaves an empty owner retryable.
-    bool prepare(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+    // The ONE prepare for every course (common_track50CR::prepareLights, step
+    // 05.13): the SCB [Lights]/LightN rows of the track's own decoded world,
+    // every light type, flashers and the [Environment] ambient flash, one
+    // visibility topology sized from the SCB's zone/portal counts. The actual
+    // roster count is supplied by the native roster owner, never inferred from
+    // geometry. Cold-only. Failure leaves an empty owner retryable.
+    bool prepare(const ::common_track50CR::Track& track,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
-    // Exact TA bytes, explicit host policy: frozen authored lights, genuine
-    // racer visibility, native zone scan. No source light-D0/manager+88 claim.
-    bool prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact GA SCB,12 zones,18 portals,38 original lights. Its malformed
-    // authoring section remains intact; Light9 retains genuine reader/Init
-    // defaults. Uses the declared native spotlight selection policy.
-    bool prepareGaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact MA SCB,9 zones/10 portals,43 numerically reached lights. Retains
-    // 14 emitting ObjectPoints,13 spotlights and6 non-emitting flare objects.
-    // The stray Light276 block is outside NumberOfLights and is not registered.
-    bool prepareMaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact SA SCB,25 zones/25 portals,263 numerically reached lights. Its166
-    // non-emitting ObjectPoints do not contribute or acquire a flare renderer.
-    bool prepareCommonRouteNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Inactive RA source preparation: exact SCB,10 zones/10 portals,185
-    // numeric reader slots. Failed Light90/107 selection retains89/106;
-    // stray186/187 are excluded. Actual roster count remains caller-owned.
-    // Same explicit native authored-zone policy; no course admission follows.
-    bool prepareRaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact MB source; all384 rows validated,154 emitting locals retained.
-    // Native query only: authored flare rendering remains outside this owner.
-    // Authenticated RC15/15 topology uses unchanged legacy backing and no local lights.
-    // Exact TB10/11 source, including12 retained-selector repetitions ofLight92.
+    // What the reader read (null before a successful prepare).
+    const LightTally* tally() const noexcept;
     // The track's animation rows for the one visual-zone lane (every course):
-    // call before prepare*Native, with the count the course's [Animations] table
+    // call before prepare, with the count the course's [Animations] table
     // loads (0 = no lane). Refused above maximumTrackAnimationRows or after a prepare.
     static constexpr std::size_t maximumTrackAnimationRows=64; // = TrackAnimationLimits50AN::animations (checked by the binding)
     bool planTrackAnimationRows(std::size_t rows) noexcept;
     std::size_t trackAnimationRows() const noexcept;
     // Additional Storage backing for that lane at maximumRacers (lane state, the
-    // extra registration records, padding). Charge before prepare*Native.
+    // extra registration records, padding). Charge before prepare.
     static std::size_t trackAnimationStorageReservationBytes(std::size_t rows) noexcept;
-    // Exact GB13/17 source, sixty emitted points and two authored flashers.
-    // Authored flare rendering is a separate visual owner.
     // Requires this exact strong owner. Retains backing, excludes timed service,
     // camera/reset/geometry publication, and reports Light+A0, NOT toward/look78.
-    bool beginGbParticleLightBorrow(const std::shared_ptr<Owner>&,
-        GbParticleLightLease&,Diagnostic&) noexcept;
-    bool beginMcParticleLightBorrow(const std::shared_ptr<Owner>&,
-        McParticleLightLease&,Diagnostic&) noexcept;
-    // MC retains the exact cold source owner; no caller-supplied World is admitted.
-    bool prepareMcNative(std::shared_ptr<const ::mc_cold_sources50LA::Owner>,std::uint32_t,Diagnostic&) noexcept;
-    const ::mc_cold_sources50LA::Owner* mcSourceIdentity() const noexcept;
-    const ::mc_lighting_authoring50MC::Record* mcLightRecord(std::size_t) const noexcept;
-    bool queryMcZoneLight(std::uint32_t,const std::array<float,3>&,
-        original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
-    static std::size_t mcTopologyStorageReservationBytes() noexcept;
-    std::size_t mcRetainedPayloadBytes() const noexcept;
-    bool prepareGbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    static std::size_t gbTimedLightStorageReservationBytes() noexcept;
-    // Native fixed-boundary scheduling; actual shared RNG and pause come from
-    // the root. No draw/camera/reset/registration borrower may be active.
-    bool serviceGbTimedLights(float actualDelta,std::uint32_t& actualSharedRng,
+    bool beginParticleLightBorrow(const std::shared_ptr<Owner>&,
+        ParticleLightLease&,Diagnostic&) noexcept;
+    // 2754E0 ambient colour flash and 147650 point flashers, as authored in the
+    // SCB ([Environment] AmbientColorFlash*, LightN HasFlasher/FlashPattern/
+    // FlashPeriod/FlashFilter). A track that authors neither has nothing timed
+    // and returns true. Native fixed-boundary scheduling; actual shared RNG and
+    // pause come from the root. No draw/camera/reset/registration borrower may be active.
+    bool serviceTimedLights(float actualDelta,std::uint32_t& actualSharedRng,
         bool paused,Diagnostic&) noexcept;
-    bool prepareTbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    bool prepareRcNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact TC25-zone/26-portal backing; legacy25/25 and local240 remain.
-    bool prepareTcNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    // Exact SC30-zone/34-portal backing; legacy25/25 and local240 remain.
-    bool prepareScNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
-    bool prepareMbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
-        Diagnostic&) noexcept;
+    bool timedLights() const noexcept;
+    // Value query only (149680 zone colour blend and local selection at a
+    // position in a zone), not a live membership/renderer receipt.
+    bool queryZoneLight(std::uint32_t zone,const std::array<float,3>& position,
+        original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
+    // Host bytes this owner retains (payload ledgers).
+    std::size_t retainedPayloadBytes() const noexcept;
     const assets::World48F* world() const noexcept;
-    // Authenticated GC/GA/TA/MA/SA global ambient+50 with no flash authoring.
-    // Retains the last numeric-order ambient registration, not selected zone60.
-    // A separate method preserves currentGcGlobalAmbient50's GC-only contract.
+    // Global ambient+50 (148F90..148FFC): the last numeric-order ambient
+    // registration, or the current flash/restore value while an authored
+    // ambient flash runs (2754E0). Not the selected zone60. Every course.
     bool currentSourceGlobalAmbient50(std::array<float,4>&) const noexcept;
-    // Bound GC global148F90..148FFC ambient50, independent of per-racer zones.
-    // Only available when authenticated SCB omits the ambient-flash enabling
-    // key270E9C and this original-lighting lifetime is still valid. Other
-    // tracks and untracked scene changes reject. No white/selected-zone fallback.
-    bool currentGcGlobalAmbient50(std::array<float,4>&) const noexcept;
     // Actual fresh-grid229F20->2167A0 slice after the final real grid placement.
     // Source1AE578..1AE594 supplied4C0[0] to2169C0, whose216A20 stores C30.
     // This owner binds its actual first visibility row, never collision C34.
@@ -650,7 +586,7 @@ public:
     // This never attaches or selects a camera. Cold175224 uses the borrowed
     // actual7F0; later114C44/177AB0 use this SAME world and scratch. Camera
     // state and membership must remain outside every racer-bank snapshot.
-    // GC/GA/TA/MA/SA share this actual cold registration and serial lease. Authored
+    // Every course shares this actual cold registration and serial lease. Authored
     // lighting policy remains independent of camera visibility ownership.
     bool beginCameraVisibility(std::uint32_t actualRosterSlot,
         CameraVisibilityLease&,Diagnostic&) noexcept;

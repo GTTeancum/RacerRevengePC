@@ -7,7 +7,7 @@ bool Owner::prepareNativeRaStaticDraw(const CameraVisibilityLease& lease,
     std::uint32_t parent,const OriginalCameraViewportFields& viewport,
     std::vector<NativeRaStaticDraw50LA>& output,Diagnostic& d)const noexcept {
     d={};
-    if(!cameraLeaseCurrent(lease)||!storage_||storage_->scene!=Scene::ra||
+    if(!cameraLeaseCurrent(lease)||!storage_||
        storage_->staticApplication!=&app||!storage_->staticRegistrationComplete||
        !storage_->renderAuthoringReady||!app.portalViewportConstructed_||
        !app.portalEnabled36ADA8_||app.released_||!viewport.prepared||
