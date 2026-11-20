@@ -443,7 +443,10 @@ Application::Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock
             const auto* captureDirectory=std::getenv("RR_WINDOW_CAPTURE_DIR");
             require(enabled&&exact("RR_UNATTENDED_UI_ROUTE",mawhonicRylothTest?"main-mawhonic09-course-ra":"main-gasgano07-course-sa")&&
                 exact("RR_WINDOW_CAPTURE_AUTO","1")&&exact("RR_UNATTENDED_CAPTURE","1")&&
-                exact("RR_ORIGINAL_AI_ALL_RACERS","1")&&exact("RR_TRACK_FPS_BASELINE","1")&&
+                // Gasgano/SA also runs as the free-play direct-human route
+                // (Player0 human, RR_ORIGINAL_AI_ALL_RACERS=0); Mawhonic/RA stays all-AI.
+                (exact("RR_ORIGINAL_AI_ALL_RACERS","1")||(gasganoTest&&exact("RR_ORIGINAL_AI_ALL_RACERS","0")))&&
+                exact("RR_TRACK_FPS_BASELINE","1")&&
                 captureDirectory&&*captureDirectory,
                 "Explicit test profile requires the explicit complete original-AI window evidence route");
             require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),

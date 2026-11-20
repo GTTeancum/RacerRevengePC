@@ -312,10 +312,12 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
        !cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.application||!cold.lightManager||
        !cold.externalTransition||cold.externalTransition->snapshot().bound||
        (cold.previousScreen!=5&&cold.previousScreen!=9&&cold.previousScreen!=11&&cold.previousScreen!=6&&
-        !(cold.previousScreen==0&&cold.pauseCourseOrigin)))return result(d,S::unsupportedState);
+        cold.previousScreen!=10&&!(cold.previousScreen==0&&cold.pauseCourseOrigin)))return result(d,S::unsupportedState);
     // previousScreen 11: Free Play Hall Cross (1E41C4); 6: the race's own Free
     // Play Course row 1AB908. Neither writes a profile field before entry.
-    if((cold.previousScreen==11||cold.previousScreen==6)&&(cold.pauseCourseOrigin||cold.tournamentProposal))
+    // 10: Free Play Unlock Cross 20B6B0, whose 20B4B0 grant (the last pending
+    // flag, if any) is the only write before entry.
+    if((cold.previousScreen==11||cold.previousScreen==6||cold.previousScreen==10)&&(cold.pauseCourseOrigin||cold.tournamentProposal))
         return result(d,S::unsupportedState);
     const bool tournament=cold.previousScreen==9;
     const bool fromPause=bool(cold.pauseCourseOrigin);
@@ -424,6 +426,9 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
                 s->cold.pauseCourseOrigin->current(*this)&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
             (s->cold.previousScreen==11||s->cold.previousScreen==6)?
                 (sameStamp(stamp,s->coldStamp)&&stamp.mode34==0&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
+            s->cold.previousScreen==10?
+                (stamp.mode34==0&&(stamp.generation==s->coldStamp.generation||stamp.generation==s->coldStamp.generation+1)&&
+                 s->cold.profile->courseRiderSelectionSnapshot(rider)):
             (stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&s->cold.profile->courseRiderSelectionSnapshot(rider));
         valid=(s->state.mode34!=2||s->published)&&s->profileCurrent()&&origin&&s->entryPlan(entry,mode2)&&
             !entry.showPopup438&&entry.courseSlot14E4<=13&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);

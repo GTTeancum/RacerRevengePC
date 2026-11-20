@@ -921,7 +921,11 @@ struct OriginalUiFrontend50KG::Storage {
                !m.unlock->routeProposalCurrent(s.unlockProposal)||!admittedRequest(proposed)||
                !game::originalUiUnlockRouteShape50PD(decision,s.unlockProposal.next))return false;
             if(reshow){if(s.pending||!m.ownsRoute({r.targetScreen,r.targetPage}))return false;}
-            else if(!same({r.targetScreen,r.targetPage},{13,1})||!s.destination({13,1})||
+            else if(same({r.targetScreen,r.targetPage},{6,1})){
+                // 20B6B0: Free Play (P+34 == 0) exit to Course.
+                if(!s.cold.profile||s.cold.profile->mode34!=0||!s.destination({6,1})||!s.pending->course||
+                   !s.pending->course->canEnterMode(0))return false;
+            }else if(!same({r.targetScreen,r.targetPage},{13,1})||!s.destination({13,1})||
                 s.pending->garageOriginSerial!=s.unlockProposal.serial)return false;
             return m.unlock->commitRoute(s.unlockProposal,decision);
         }
@@ -1226,7 +1230,10 @@ struct OriginalUiFrontend50KG::Storage {
                 const bool fromRaceReturn=initialRaceReturn&&prospectiveMode==0;
                 const bool fromHall=active&&active->hall&&same(active->currentRoute(),{11,1})&&hallConfirm&&prospectiveMode==0&&
                     active->hall->confirmProposalCurrent(hallProposal)&&hallProposal.decision.request.targetScreen==6;
-                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament&&!fromPause&&!fromRaceReturn&&!fromHall)){
+                // Free Play Unlock Cross 20B6B0 (P+34 != 2 -> Course 6/1).
+                const bool fromUnlock=active&&active->unlock&&same(active->currentRoute(),{10,1})&&prospectiveMode==0&&
+                    active->unlock->routeProposalCurrent(unlockProposal)&&unlockProposal.decision.request.targetScreen==6;
+                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament&&!fromPause&&!fromRaceReturn&&!fromHall&&!fromUnlock)){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
                 input.prepareRylothBackground=true; // Original background resource, independent of test-pair provenance.
@@ -1241,7 +1248,7 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiCourseSessionCold50KG session;session.resources=m.courseResources;session.holograms=m.courseHolograms;
                 session.courseArchive=cold.course;session.english=&english;session.profile=cold.riderProfile;
                 session.commonProfile=cold.profile;session.application=cold.application;session.lightManager=cold.lightManager;
-                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromPause?0:fromTournament?9:fromHall?11:fromRaceReturn?6:5;
+                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromPause?0:fromTournament?9:fromHall?11:fromUnlock?10:fromRaceReturn?6:5;
                 if(fromPause)session.pauseCourseOrigin=nativePauseCourseOrigin;
                 if(fromTournament){
                     session.applicationAnimation=cold.applicationAnimation;
@@ -1317,7 +1324,10 @@ struct OriginalUiFrontend50KG::Storage {
                 const bool fromWin=active&&active->win&&same(active->currentRoute(),{7,1})&&
                     active->win->routeProposalCurrent(winProposal)&&winProposal.decision.request.targetScreen==10;
                 game::OriginalUnlockFacts50PD facts;std::uint32_t spritePods=0;
-                if(!unlockInputsReady()||prospectiveMode!=2||!cold.profile||cold.profile->mode34!=2||
+                // Free Play: only the race's own 1AB8E8 row (P+34 stays 0); the
+                // Hall and Win sources are tournament screens.
+                const bool freePlayRaceReturn=initialRaceReturn&&prospectiveMode==0;
+                if(!unlockInputsReady()||(prospectiveMode!=2&&!freePlayRaceReturn)||!cold.profile||cold.profile->mode34!=prospectiveMode||
                    (!initialRaceReturn&&!fromHall&&!fromWin)||(!initialRaceReturn&&!rgbaReady)||
                    !cold.riderProfile->unlockFacts187E30(facts)||!cold.riderProfile->unlockSpritePods209BE0(spritePods)){
                     result(d,Status::unavailableDestination);return false;}
@@ -1735,13 +1745,14 @@ Status OriginalUiFrontend50KG::prepareNativeRaceReturn(const OriginalUiFrontendC
         // Tournament Hall (1AB698), Win (1AB6FC/1AB758) or Unlock (1AB7F8) as
         // the FIRST screen. Each can later request Garage13, whose entry needs
         // the shared dialogs/dispatcher this lifetime boots like Garage-first.
-        // Free Play (mode0): the record row 1AB884 opens the Hall with P+34
-        // unchanged (1E4718 opens on P+700). Win7 is a tournament row only. The
-        // Free Play Unlock row (1AB8E8) still has no mode0 Unlock receiver.
-        if(cold.profile->mode34!=2u&&!(cold.profile->mode34==0u&&screen==11))
+        // Free Play (mode0): the record row 1AB884 opens the Hall and the
+        // 187E30 row 1AB8E8 the Unlock screen, both with P+34 unchanged
+        // (1E4718 opens on P+700; 20B6B0 then exits to Course). Win7 is a
+        // tournament row only.
+        if(cold.profile->mode34!=2u&&!(cold.profile->mode34==0u&&(screen==11||screen==10)))
             return reject(Status::unavailableDestination,0x17DE10,
-                screen==11?"Hall race return requires mode34 0 or 2":
-                "Win/Unlock race return is native only in tournament mode34==2");
+                screen==7?"Win race return is native only in tournament mode34==2":
+                "Hall/Unlock race return requires mode34 0 or 2");
         if(cold.application&&cold.application->controllerPopupResources)
             return reject(Status::unavailableDestination,0x1B7BD0,"race return: legacy controller popup owner blocks the shared UI boot");
         const auto status=prepareInitialNative(cold,&root,{},d);
@@ -2450,7 +2461,9 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             bool ready=false;
             if(reshow)ready=s->active->ownsRoute({10,1}); // Same manager, page vtable+A4 (20B654).
             else if(r.targetScreen==13)ready=s->prepareGarageFromScreen(s->unlockProposal.serial,r.sourcePC,receipt,d);
-            // else 6/1 (20B6B0, mode34!=2): STAND-IN refusal, Course is not reachable from Unlock natively.
+            // 20B6B0 (P+34 != 2, the Free Play race-return Unlock): Course 6/1.
+            else if(r.targetScreen==6)ready=s->cold.profile&&s->cold.profile->mode34==0&&s->courseInputsReady(0)&&
+                s->prepareDestination({6,1},receipt,d,0);
             if(!ready){s->unlockProposal={};return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination,r.sourcePC);}
             if(!s->active->unlock->routeProposalCurrent(s->unlockProposal))return s->fault(d,Status::transition,0x20B480);
             auto admitted=proposal;

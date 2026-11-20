@@ -476,8 +476,31 @@ public:
         active=observed.voice.active;fading=active&&fade_.flag20;
         return true;
     }
+    // 1A4AB4/1A4AB8 then 234440 with seconds <= 0 (2344A0..23453C): an active
+    // owned stream (74 bit0, 5C != -1) is stopped at once (26ABD0), 5C = -1,
+    // the 74 fade bits and 68/6C/70 cleared, 40 = 5. No timed volume is issued.
+    // A still-pending native fade admission is not discarded here.
+    UpdateReceipt50IW requestImmediateStop234440()noexcept {
+        if(!mixer_)return {Result::Unprepared,0x1a4ab0u,0,0.f};
+        if(paused_)return {Result::Paused,0x1a4ab0u,0,0.f};
+        if(playPending_)return {Result::PendingPlay,pendingCallPC_,pendingPlayPC_,0.f};
+        if(fadePending_)return pendingFadeReceipt();
+        if(!transportIdentity())return {Result::Ownership,0x1a4ab0u,0,0.f};
+        rr::platform::AudioVoiceObservation50HD observed{};
+        if(owned_&&!ownedMusicIdentity(observed))return {Result::Ownership,0x1a4ab0u,0,0.f};
+        state_.latch130=-1;state_.mode12C=0; //1A4AB4/1A4AB8; timer128 untouched.
+        if(!owned_||!observed.voice.active){ //234464 / 234484: no live stream.
+            owned_=false;return {Result::Updated,0x234488u,0,0.f};
+        }
+        mixer_->stop(voice);owned_=false; //2344B0 26ABD0, 2344BC 5C=-1.
+        fade_={};pendingVolume_={};nativeFade_={};endingFade_=false; //2344C0..234534.
+        return {Result::Updated,0x234538u,0,0.f};
+    }
     UpdateReceipt50IW requestFade1A4AB0(float seconds)noexcept {
         if(restartFadeTerminal_)return restartFadeReceipt_;
+        // 0 is the Results summary's 1A4AB0(0) (1C8F00 mtc1 zero): 234440
+        // takes its 2344A0 seconds<=0 branch, an immediate stream stop.
+        if(seconds==0.f)return requestImmediateStop234440();
         if(seconds!=0.5f&&seconds!=1.f)return {Result::Input,0x1a4ab0u,0,seconds};
         if(!mixer_)return {Result::Unprepared,0x1a4ab0u,0,seconds};
         if(paused_)return {Result::Paused,0x1a4ab0u,0,seconds};

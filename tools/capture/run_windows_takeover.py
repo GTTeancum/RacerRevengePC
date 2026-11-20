@@ -451,6 +451,11 @@ def main():
         # profile requires all eight original AI racers (see Run-Ryloth-FPS.cmd).
         env.update(RR_ORIGINAL_TEST_PROFILE='mawhonic-ryloth', RR_ORIGINAL_AI_ALL_RACERS='1',
                    RR_ORIGINAL_RIDER_PREVIEWS='3,7,9,23,24')
+    if args.route == 'main-gasgano07-course-sa':
+        # The game requires its explicit Gasgano test profile on this route
+        # (Gasgano remembered for this process only); the human races (AI=0)
+        # unless --all-ai was given.
+        env['RR_ORIGINAL_TEST_PROFILE'] = 'gasgano'
     if args.route == 'none':
         env.pop('RR_UNATTENDED_UI_ROUTE', None)
         env['RR_TRACK'] = args.track

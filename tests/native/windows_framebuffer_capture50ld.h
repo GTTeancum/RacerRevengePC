@@ -124,8 +124,10 @@ public:
    // Rooted TA/GA/MA menu routes retain the real human Player0. This permits
    // process-local menu navigation only; it neither supplies host input nor
    // claims a race is ready. Course Confirm still uses its actual destination.
+   // main-rider-course-sa and main-gasgano07-course-sa are free-play SA
+   // Single Race routes for the human Player0 too (stock SA checks).
    const bool directHumanRoute=allAi&&std::string(allAi)=="0"&&navigate_&&
-       !navigateSa_&&!navigateOcco_&&!navigateGasganoSa_&&!navigateMawhonicRa_;
+       !navigateOcco_&&!navigateMawhonicRa_;
    require((allAi&&std::string(allAi)=="1")||directHumanRoute,
        "unattended capture requires all-AI mode or an explicit supported direct-human menu route");
   }

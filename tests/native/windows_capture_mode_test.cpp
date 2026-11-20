@@ -26,8 +26,8 @@ int main(int argc,char** argv) {
         ++checked;
     };
     for(const char* route:{"main-rider-course-ta","main-dud04-course-ga","main-ben02-course-ga",
-                          "main-alder10-course-ma","main-ody11-course-ma"})check("0",route,true);
-    check("0","main-rider-course-sa",false);check("0","main-occo20-course-sa",false);
+                          "main-alder10-course-ma","main-ody11-course-ma","main-rider-course-sa"})check("0",route,true);
+    check("0","main-occo20-course-sa",false);
     check("0","",false);check("invalid","main-dud04-course-ga",false);
     check("1","main-rider-course-sa",true);check("1","",true);
     std::printf("capture mode admission: %u cases passed\n",checked);
