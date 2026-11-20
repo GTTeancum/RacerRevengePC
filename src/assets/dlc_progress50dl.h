@@ -19,6 +19,7 @@
 // This header defines the one layout of DLC progress; nothing else invents it.
 #include "../game/original_race_record_rule50kg.h"
 #include "../game/original_ui_hall_records50kg.h"
+#include "../game/original_tournament_result50kg.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -32,7 +33,8 @@
 
 namespace rr::assets::dlc50DL {
 
-inline constexpr const char* progressSchema="rrpc-dlc-progress/1";
+inline constexpr const char* progressSchema="rrpc-dlc-progress/2";   // written
+inline constexpr const char* progressSchemaV1="rrpc-dlc-progress/1"; // still read (no careers)
 inline constexpr const char* progressFileName="dlc-progress-v1.json";
 inline constexpr const char* progressBadFileName="dlc-progress-v1.bad.json";
 inline constexpr const char* progressLockName="dlc-progress-v1.lock";
@@ -44,6 +46,9 @@ struct ProgressLimits {
     static constexpr std::size_t pods=1024;           // pod entries kept (shown or not)
     static constexpr std::size_t nameChars=20;        // visible chars; lane is 21 bytes with NUL
     static constexpr std::size_t entries=3;           // per table, as the original rows
+    static constexpr std::size_t careers=1024;        // add-on pod careers kept (/2)
+    static constexpr std::uint8_t progress=13;        // 219C: course order 0..13 (13 = completed)
+    static constexpr std::uint8_t medal=8;            // 1938 holds the finish place 0..8 (0 = none)
 };
 // PORT EXTENSION: an empty time slot. The original rows are always seeded
 // (1801D0); an add-on table without hall_defaults starts empty. 21474836 s is
@@ -117,6 +122,23 @@ struct ProgressSubmitOutcome {
     std::string reason;
 };
 
+// ---- Add-on pod tournament career (schema /2). PORT EXTENSION, NOT ORIGINAL.
+// The stock career shape (17FFB0/1875C0: OriginalTournamentCareer50KG) for an
+// add-on pod: its own scalars and ONE pod row (an add-on career only races its
+// own pod). Never stored in the profile's 27 career tables or the stock save.
+// Bounds: abilities finite and >= 0, medals 0..8, progress 0..13; the u32 /
+// i16 lanes keep the stock storage widths.
+struct ProgressCareer {
+    std::uint32_t earned2190=0,unspent2194=0,kills2198=0;
+    std::uint8_t progress219C=0;
+    game::OriginalTournamentPodCareer50KG pod{};
+};
+bool validCareer(const ProgressCareer&) noexcept;
+// A fresh career: abilities from the pod's PHY [BaseAbilities]
+// (AddonPod::baseAbilities), remaining prizes from the stock prize table
+// (originalTournamentPrizes50KG), everything else zero.
+ProgressCareer seededCareer(const float (&baseAbilities)[6]) noexcept;
+
 class DlcProgress50DL final {
 public:
     enum class LoadStatus:std::uint8_t {
@@ -151,6 +173,15 @@ public:
     // Contract 2: every admitted add-on pod is unlocked ("unlock": "always").
     bool podUnlocked(const std::string& podKey) const noexcept;
 
+    // Add-on pod career (schema /2). careerSnapshot: the stored career of an
+    // admitted add-on pod, or a fresh seeded one (registry baseAbilities) when
+    // none is stored yet; false for a pod the catalog does not hold.
+    // commitCareer: bounds-checked replace of that pod's career (refused, and
+    // nothing changes, for a bad value, an unknown pod or the career limit);
+    // marks progress changed. Written at the next stock save moment.
+    bool careerSnapshot(const std::string& podKey,ProgressCareer& out) const noexcept;
+    bool commitCareer(const std::string& podKey,const ProgressCareer& career) noexcept;
+
     // Applies 1ABFC0 (selector 0) and, when it returns 1, 1AC440 to the target
     // rows. Never touches the stock Hall. Marks progress changed on any effect.
     ProgressSubmitOutcome submit(const ProgressRaceResult&) noexcept;
@@ -174,6 +205,7 @@ public:
         std::map<std::string,CourseEntry> courses;          // item key
         std::map<std::string,Table> stockCourseAddonPod;    // upper-case stock code
         std::map<std::string,bool> pods;                    // pod item key -> unlocked
+        std::map<std::string,ProgressCareer> careers;       // pod item key -> career (/2)
     };
     const State& state() const noexcept {return state_;}
     // Serialise / parse the whole file (bounds-checked, all or nothing).
