@@ -168,6 +168,11 @@ def main():
                         help='Tap the view key (C) 1 s after green and every 15 s (reaches the follow camera)')
     parser.add_argument('--results-confirm', type=float, default=0.0,
                         help='Tap Enter every N seconds once the Results replay is running (0 = off)')
+    parser.add_argument('--results-exit', choices=['main'],
+                        help='Test only: on the native free-play Results panel (the one a single race ends on; '
+                             'not the tournament Results replay), choose Main Menu and confirm it, as a player '
+                             'would (Down, Enter, Down, Enter, 1 s apart; sets RR_TEST_RESULTS_EXIT). The race '
+                             'returns to the original Main and the run then idles at Main until --seconds')
     parser.add_argument('--ieee-subnormals', action='store_true',
                         help='Reproduction only: disable the PS2 no-subnormal float mode')
     parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
@@ -303,7 +308,7 @@ def main():
     # in-process (RR_TEST_* read by the game), so the run must not depend on
     # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
     # from pausing or releasing those inputs; a real minimise/close still does.
-    injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or
+    injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or
                 args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None)
     if injected:
         env['RR_TEST_IGNORE_FOCUS'] = '1'
@@ -330,6 +335,8 @@ def main():
         env[key] = value
     if args.results_confirm:
         env['RR_TEST_RESULTS_CONFIRM'] = str(args.results_confirm)
+    if args.results_exit:
+        env['RR_TEST_RESULTS_EXIT'] = args.results_exit
     if args.camera_cycle:
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:

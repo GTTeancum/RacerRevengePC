@@ -510,6 +510,28 @@ void Context::run() {
     }
    }
    {
+    // Unattended test only: RR_TEST_RESULTS_EXIT=main drives the native
+    // free-play Results panel (HostRaceResults50IL, the panel a single race
+    // ends on) as a player would: Down (Main Menu), Enter (confirm prompt),
+    // Down (accept), Enter, one second apart, starting 2 s after it appears.
+    // Stock runs without the variable are unchanged.
+    static const bool resultsExitMain50PD=[]{const char* v=std::getenv("RR_TEST_RESULTS_EXIT");return v&&std::string(v)=="main";}();
+    static std::uint64_t exitStartNs50PD=0;static unsigned exitStep50PD=0;
+    auto& exitInput50PD=rr::platform::testResultsInput50PD();
+    if(resultsExitMain50PD&&captureRun.unattended()&&humanResultsReady&&!sessionMenu.open()&&
+       !native_common_results50PD::state().replayActive&&exitStep50PD<4u){
+     exitInput50PD.focus=true;
+     const auto nowNs=monotonicNow50DU();
+     if(!exitStartNs50PD)exitStartNs50PD=nowNs;
+     const auto due=exitStartNs50PD+2000000000ull+1000000000ull*exitStep50PD;
+     if(nowNs>=due){
+      const bool enter=exitStep50PD&1u;
+      if(enter)exitInput50PD.enter=true;else exitInput50PD.down=true;
+      std::cerr<<"test_results_exit step="<<++exitStep50PD<<" key="<<(enter?"enter":"down")<<'\n';
+     }
+    }
+   }
+   {
     // Unattended test only: hold keyboard throttle (W) once the race is green,
     // so the human launch at the start light is exercised like a real player.
     static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
@@ -1135,6 +1157,10 @@ void Context::run() {
     std::cerr<<"host_results_action action="<<unsigned(resultsAction)<<" tick="<<completedFrames
         <<" mixed_frames="<<liveAudio->mixedFrames()<<'\n';
     if(resultsAction==platform::HostRaceResults50IL::Action::MainMenu){
+     // Unattended RR_TEST_RESULTS_EXIT run: the next frontend's route stays idle.
+     {static const bool exitMain=[]{const char* v=std::getenv("RR_TEST_RESULTS_EXIT");return v&&std::string(v)=="main";}();
+      if(exitMain&&captureRun.unattended()){rr::platform::testResultsInput50PD().returnedToMain=true;
+       std::cerr<<"test_results_exit returned_to_main\n";}}
      // This explicit, confirmed Results action takes the same full owned
      // teardown as Pause -> Original Main, under that destination's same
      // application/source-camera admission. A menuRequested pulse would
