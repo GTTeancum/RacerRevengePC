@@ -1,0 +1,12 @@
+147c fix: add-on course test route Up press collided with the "go on to Confirm" code (Time Trial pick stopped with "unattended UI dispatch receipt was not verified") (build wt-147c-3, linked, not run)
+
+Evidence: evidence\c147-nv-tt (wt-147c-2, --addon-course-mode time_trial):
+event_move=1..3 reached subtype=3, then the route failed. pollAddonCourse
+returned 2 both for "go on to Confirm" and for the original Up press (input 2)
+that takes the row back to the courses; the caller read the Up as "proceed",
+never sent it, and the next poll found the receipt still pending.
+"Go on to Confirm" is now addonCourseProceed (100, not an original input).
+Test route only (tests/native/original_ui_capture_navigation50la.h); no game
+behaviour changes. Relink wt-147c-3 on wt-147c-2: 5 TUs, linked.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

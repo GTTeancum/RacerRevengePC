@@ -123,8 +123,10 @@ class Route final {
             if(const auto* c=rr::game::dlc50DL::addonCourseAt(i);c&&c->key==key)return c->number;
         return 0;
     }
-    // Course stage of the add-on course test: -1 wait, 1 Course Next, 2 go on to Confirm,
-    // or (event type first, 147c) 3 Down / 1 Right / 2 Up on the Course page rows.
+    // Not an original input: the event-type stage sends Up, which is original input 2.
+    static constexpr int addonCourseProceed=100;
+    // Course stage of the add-on course test: -1 wait, 1 Course Next, addonCourseProceed
+    // (go on to Confirm), or (event type first, 147c) 3 Down / 1 Right / 2 Up on the rows.
     int pollAddonCourse(const Snapshot& s,bool courseCaptured) {
         if(!addonCourseTarget_){
             addonCourseTarget_=addonCourseNumber(addonCourseKey_);
@@ -166,7 +168,7 @@ class Route final {
         std::cerr<<"addon_course_route confirm key="<<addonCourseKey_<<" number="<<addonCourseTarget_<<" moves="<<addonCourseMoves_
             <<" anchor_slot="<<s.course.courseSlot14E4<<" anchor_course="<<s.course.selectedCourse44
             <<" subtype="<<s.course.subtypeSlot14F4<<'\n';
-        return 2;
+        return addonCourseProceed;
     }
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,
         rr::game::OriginalUiTransitionRoute50KG b) noexcept {
@@ -393,7 +395,7 @@ public:
             }
             if(addonCourse_){
                 const int action=pollAddonCourse(s,courseCaptured);
-                if(action!=2)return action;
+                if(action!=addonCourseProceed)return action;
             }
             if(!courseCaptured)return -1;
             require(courseReady,"unattended Course race prerequisites are unavailable");
