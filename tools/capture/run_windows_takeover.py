@@ -435,6 +435,12 @@ def main():
         env['RR_TEST_ADDON_COURSE'] = args.addon_course
     if args.steer_invert:
         env['RR_TEST_STEER_INVERT'] = '1'
+    # A run that must reach Results (and what follows it) keeps racing past
+    # the FPS evidence: --results-exit / --hold-results / --hold-results-hall
+    # imply --race-full (otherwise the race stops before its finish).
+    if (args.results_exit or args.hold_results or args.hold_results_hall) and not args.race_full:
+        args.race_full = True
+        print('race_full implied by --results-exit/--hold-results/--hold-results-hall', flush=True)
     if args.race_full:
         env['RR_TEST_RACE_FULL_BUDGET'] = '1'
     if args.all_ai:
