@@ -813,10 +813,11 @@ SessionExit50DU Context::run() {
       originalMainApplication.riderProfile->courseRaceSnapshot(taSelected)&&
       (taSelected.mode34==2||taSelected.mode34==0)&&taSelected.subtype==1;
   // Actual174E48 gates: startup350 is zero; subtype2/3 never use authored cuts.
-  // 174E6C..174E88 read only Application 11258 (subtype), never P+34 (mode):
-  // Single Race (subtype1) takes the counted race in Free Play (mode0) as in
-  // Tournament (mode2). The former mode2-only gate on every course was a port
-  // stand-in (Free Play ended on the native HostRaceResults50IL panel).
+  // The counted race (1A65C0, one race class) is built for Single Race in
+  // Free Play (mode0) as in Tournament (mode2). Only its authored cuts
+  // differ: 174E90/174E9C keep them for P+34 == 2 or App+350 != 0 and zero
+  // them otherwise (no intro authoring then; see the publication stage). The
+  // former mode2-only race gate on every course was a port stand-in.
   std::cerr<<"consumed_ta_gate launch="<<bool(consumedLaunch)<<" camera="<<originalCameraEnabled
       <<" mode34="<<taSelected.mode34<<" subtype="<<taSelected.subtype<<" admitted="<<taAuthoredIntro<<"\n";
   if(consumedLaunch&&originalCameraEnabled&&taAuthoredIntro){

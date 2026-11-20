@@ -929,7 +929,12 @@ void Context::run() {
        runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),playerPodId));
   };
   auto prepareIntroAuthoring=[&](){
-   if(!taIntroAuthoring&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
+   // 174E6C..174EA8: Single Race keeps its authored cut count only in
+   // Tournament (P+34 == 2, 174E90) or with App+350 set (174E9C); otherwise
+   // the count is zeroed and no cut child is built. A Free Play counted race
+   // therefore has no authored intro: no cut/controller authoring here.
+   const bool introCutsAuthored=dynamicProfile.game34==2u||cameraStartup350!=0;
+   if(!taIntroAuthoring&&introCutsAuthored&&(consumedTaStage.race()||consumedMaStage.race()||consumedMbStage.race()||consumedScStage.race()||consumedGbStage.race()||consumedRcStage.race()||consumedTcStage.race()||consumedMcStage.race()||consumedTbStage.race()||consumedSaStage.race()||consumedGaStage.race()||consumedGcStage.race()||sourceConsumedIntroActivation)){
     taIntroAuthoring=originalMainApplication.retainNativeTaIntroAuthoring50LA();
     require50DU(bool(taIntroAuthoring),"actual selected-track intro authoring custody rejected");
     const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
