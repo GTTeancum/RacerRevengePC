@@ -1,9 +1,0 @@
-'vswhere.exe' is not recognized as an internal or external command,
-operable program or batch file.
-Rebuilding 4 sources
-Completed 0553-mc_application_cold50mc.rsp
-Completed 0552-gb_application_cold50gb.rsp
-Completed 0549-terrain_interactive_world50du.rsp
-Completed 0525-terrain_interactive_publication50du.rsp
-Completed link.rsp
-D:\Programming\GitHub\RacerRevengePC\build\wt-146r-6\rr_interactive_vehicle50du.exe 3BE59E47803F0A5CA2919E5ED5856B40EF883DEE992C973075E0B4FADA7E123F
