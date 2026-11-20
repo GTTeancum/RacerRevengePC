@@ -1,0 +1,27 @@
+Time Trial solo field: the consumed launch and the race's launch provenance take the 1AD520 solo field (fixes consumed_ta_prefix_rejected on a counted Time Trial; every course and the common route) (compile-checked, not run)
+
+Evidence: c148-ta-tt-restart (wt-148r-4, stock TA Time Trial): "consumed_ta_prefix_rejected
+source_pc=0" -> "actual consumed TA race/world constructor prefix rejected".
+
+Cause: the racer manager 1AD520 (1AD5A4..5DC) clears the opponent bits 1125C 7..10
+for subtype 3 and races one human. The port runs it at session cold entry
+(terrain_interactive_session50du.cpp commitRacerManager1AD520), BEFORE the counted
+race constructor (the original runs 1A65C0 first and 1AD520 inside its load). The
+consumed launch (ConsumedLaunch::matches / renewForRestart) then compared the Course
+receipt (entrants 8) with the profile's solo field (entrants 1) and refused before
+any constructor step (pc 0). The same exact comparison follows in every course's
+world prefix (original_*_world_cold_prefix50la.h, original_race_world_join50la.h,
+common route) against the race's launchSelection_.
+
+Fix (one rule, every course and the common route; no course or mode key):
+- original_course_race_targets50kx.h: sameLaunch1AD520(launched, current): the exact
+  selection, or for subtype 3 the same selection with the 1AD520 field (opponent
+  bits cleared, entrants 1). Used by matches and renewForRestart.
+- original_race_constructor50la.h: constructConsumedRaceCold1A65C0 records the
+  running selection (after 1AD520, checked by the same rule) as launchSelection_,
+  so every later same-profile check and the Results roster's field size read the
+  race's own field (1 for a Time Trial, 8 otherwise).
+
+Headers: original_course_race_targets50kx.h, original_race_constructor50la.h.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

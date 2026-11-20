@@ -86,6 +86,17 @@ inline bool same(const Selection& a,const Selection& b) noexcept {
         a.laps==b.laps&&a.entrants==b.entrants&&a.packed1125C==b.packed1125C&&
         a.mode34==b.mode34;
 }
+// The launched selection as the racer manager 1AD520 leaves it (1AD5A4..5DC):
+// a Time Trial (subtype 3) clears the opponent bits 1125C 7..10 and races a
+// solo field. The port runs 1AD520 at session cold entry, before the counted
+// race constructor (the original runs 1A65C0 first, 1AD520 inside its load),
+// so the consumed launch is compared with either form. One rule, every course.
+inline bool sameLaunch1AD520(const Selection& launched,const Selection& current) noexcept {
+    if(same(launched,current))return true;
+    if(launched.subtype!=3u)return false;
+    auto field=launched;field.packed1125C=static_cast<decltype(field.packed1125C)>(field.packed1125C&~0x780u);field.entrants=1u;
+    return same(field,current);
+}
 // Cold request admission only. Retains each actual authenticated target archive
 // before Course input starts. Native mesh/texture/AI/camera construction is NOT
 // reported complete here; the unchanged target cold loader must perform it.
@@ -310,7 +321,7 @@ public:
         // the profile's own stock rider is compared, never the add-on number.
         return profile_.get()==&actual&&target_&&generation==nextGeneration_&&
             target_->track==loadedTrack&&selection_.rider==rr::game::dlc50DL::profileRider(loadedRacer)&&
-            actual.courseRaceSnapshot(current)&&same(selection_,current)&&target(current)==target_;
+            actual.courseRaceSnapshot(current)&&sameLaunch1AD520(selection_,current)&&target(current)==target_;
     }
     // Restart Race re-runs the SAME consumed race constructor. Mint an
     // unclaimed launch for the next session only while the actual profile
@@ -319,7 +330,7 @@ public:
         Selection current;
         if(result||!profile_||!target_||destroyedGeneration!=nextGeneration_||
            destroyedGeneration==std::numeric_limits<std::uint64_t>::max()||
-           !profile_->courseRaceSnapshot(current)||!same(selection_,current)||target(current)!=target_)return false;
+           !profile_->courseRaceSnapshot(current)||!sameLaunch1AD520(selection_,current)||target(current)!=target_)return false;
         std::unique_ptr<ConsumedLaunch> renewed;
         try {renewed.reset(new ConsumedLaunch);}catch(...){return false;}
         renewed->profile_=profile_;renewed->selection_=selection_;renewed->target_=target_;

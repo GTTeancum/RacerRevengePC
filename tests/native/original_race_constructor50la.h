@@ -760,7 +760,13 @@ inline std::shared_ptr<rr::game::OriginalRaceConstructor50LA> Application::const
        !launch.matches(*riderProfile,session,launch.target_->track,launch.selection_.rider))return {};
     std::shared_ptr<T> owner;
     try {owner=std::shared_ptr<T>(new T(entitiesOwner_,riderProfile));}catch(...){return {};}
-    owner->launchSelection_=launch.selection_;
+    // The consumed selection as the race runs it: after 1AD520 (sameLaunch1AD520,
+    // matched above) a Time Trial's provenance is its solo field, so every later
+    // same-profile check and the roster's field size read the same values.
+    original_course_targets50KX::Selection running{};
+    if(!riderProfile->courseRaceSnapshot(running)||
+       !original_course_targets50KX::sameLaunch1AD520(launch.selection_,running))return {};
+    owner->launchSelection_=running;
     if(!owner->initializeCount(session))return {};
     launch.raceConstructorClaimed_=true;
     sourcePC=0x1a66cc;
