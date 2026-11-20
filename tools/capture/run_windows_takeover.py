@@ -162,6 +162,7 @@ def main():
     parser.add_argument('--route', choices=['main-dud04-course-ga', 'main-ben02-course-ga',
                         'main-alder10-course-ma', 'main-ody11-course-ma',
                         'main-rider-course-ta', 'main-tournament-course-ta',
+                        'main-rider-course-sa', 'main-gasgano07-course-sa',
                         'main-mawhonic09-course-ra', 'none'], default='main-dud04-course-ga')
     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
     parser.add_argument('--seconds', type=int, default=180)
@@ -338,7 +339,7 @@ def main():
         if args.seed_slow_hall is not None:
             target = saves / 'progress-v1.bin'
             target.write_bytes(seed_slow_hall(target.read_bytes(), args.seed_slow_hall,
-                                              args.route in ADDON_RIDER_ROUTES))
+                                              args.route not in PLAYER_RACER_ROUTES))  # free-play routes need Main slot 1
             print(f'test_seed hall={args.seed_slow_hall} slow=1', flush=True)
     if args.eyecheck_dlc_hall is not None:
         (saves / 'dlc-progress-v1.json').write_text(json.dumps(seed_dlc_hall(args.eyecheck_dlc_hall), indent=2) + '\n')
@@ -538,7 +539,7 @@ def main():
                           live_ids == {lifecycle[0][1]} and
                           all(row[0] == lifecycle[0][1] and tuple(row[1:]) in owners for row in retained)))
         track = ('GA' if args.route.endswith('-ga') else 'MA' if args.route.endswith('-ma') else
-                 'RA' if args.route.endswith('-ra') else 'TA')
+                 'RA' if args.route.endswith('-ra') else 'SA' if args.route.endswith('-sa') else 'TA')
         # A seeded tournament run goes to the course the seed's career reached.
         if args.route == 'main-tournament-course-ta' and args.seed_save:
             track = seeded_tournament_track((saves / 'progress-v1.bin').read_bytes()) or track
