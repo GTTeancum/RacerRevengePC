@@ -60,6 +60,11 @@ struct AddonPodUi {
     std::string archive;                 // dlc:/ path of the pod's own menu archive
     std::string riderModel,resultsIcon;  // member names exactly as dlc.json spells them
     std::vector<std::string> character,characterPages,podPages,shadow,portraits,background,garageModel;
+    // Optional "layout_slot": the stock rider (1..26, a Rider-screen racer) whose
+    // authored Rider pod and character widgets place this pod's menu models (the
+    // slot its menu members were converted for). 0 = absent: the Rider screen uses
+    // the anchor stock rider's widgets. PORT EXTENSION: a package has no widgets.
+    unsigned layoutSlot=0;
 };
 struct AddonPod {
     unsigned number=0;                   // 32..99

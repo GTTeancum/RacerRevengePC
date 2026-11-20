@@ -47,6 +47,9 @@ public:
         std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG> characterMaterials;
         std::unique_ptr<OriginalUiRiderCharacterScene50KG> character;
         std::uint32_t characterImageOwner=noOwner;
+        std::uint16_t characterLayout=0;      // widget the character assets were placed with
+        bool characterLayoutFixed=false;      // from ui.layout_slot (never re-read)
+        std::string mcf;
         bool characterReady=false;
         std::string characterRefused;
         // Menu-art step C: the portrait (ui.portraits) and the background
@@ -67,6 +70,8 @@ public:
         const assets::OriginalUiIpumTextureCache50KG* ipumCache=nullptr;
         std::uint16_t layoutWidget=0;         // authored stock User_Rotate pod widget (placement copy)
         std::uint16_t characterLayoutWidget=0;// authored stock Soultree_Character widget (placement copy)
+        // Authored Rider widgets per stock rider (0 = none), for ui.layout_slot.
+        std::array<std::uint16_t,32> podWidgets{},characterWidgets{};
     };
     OriginalUiRiderAddonModels50DL() noexcept=default;
     OriginalUiRiderAddonModels50DL(const OriginalUiRiderAddonModels50DL&)=delete;
@@ -88,7 +93,10 @@ public:
     // Build the row's character graph (entry motion sampled, attached, IK bound)
     // with the same shared motion/IK/libm owners the stock characters use, or
     // destroy it. start refuses a row without a ready character or a live graph.
-    bool startCharacter(std::size_t index,ModelMotionSharedState49T&,ModelMode0IkShared50KG&,
+    // characterLayoutWidget: the authored stock Soultree_Character widget that
+    // places the character for this highlight (used when the row has no
+    // ui.layout_slot; the assets are re-read with it when it differs).
+    bool startCharacter(std::size_t index,std::uint16_t characterLayoutWidget,ModelMotionSharedState49T&,ModelMode0IkShared50KG&,
         SourceLibmState49T&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     void stopCharacter(std::size_t index) noexcept;
     OriginalUiRiderCharacterScene50KG* liveCharacter(std::size_t index) noexcept;
@@ -96,6 +104,7 @@ public:
     void drain() noexcept;
 private:
     std::vector<Row> rows_;
+    std::shared_ptr<const assets::OriginalUiArchive50KG> stockRider_;
     bool loaded_=false;
 };
 

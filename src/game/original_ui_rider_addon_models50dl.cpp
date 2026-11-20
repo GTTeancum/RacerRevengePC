@@ -30,6 +30,8 @@ bool OriginalUiRiderAddonModels50DL::load(const Input& input) noexcept {
     if(loaded_||!input.stockRider||!input.appStart||!input.podTextures||!input.layoutWidget)return false;
     try {
         const auto count=reg::addonPodCount();
+        const auto slotWidget=[](const std::array<std::uint16_t,32>& map,unsigned slot)->std::uint16_t{
+            return slot<map.size()?map[slot]:0;};
         if(count>reg::RegistryLimits::pods)return false;
         std::vector<Row> rows;rows.reserve(count);
         for(std::size_t i=0;i<count;++i){
@@ -48,7 +50,10 @@ bool OriginalUiRiderAddonModels50DL::load(const Input& input) noexcept {
                 row.archive=archive;
                 auto podAssets=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();
                 assets::OriginalUiRiderPodDiagnostic50KG pd;
-                if(!podAssets->loadAddon(input.stockRider,input.layoutWidget,archive,pod->ui.riderModel,pd))
+                // Placement: the package's layout_slot widgets, else the default layout widget.
+                const auto podLayout=pod->ui.layoutSlot&&slotWidget(input.podWidgets,pod->ui.layoutSlot)?
+                    slotWidget(input.podWidgets,pod->ui.layoutSlot):input.layoutWidget;
+                if(!podAssets->loadAddon(input.stockRider,podLayout,archive,pod->ui.riderModel,pd))
                     row.refused="rider_model "+pod->ui.riderModel+" does not load (error "+std::to_string(unsigned(pd.error))+")";
                 else{
                     auto materials=std::make_shared<assets::OriginalUiRiderModelMaterials50KG>();
@@ -73,7 +78,10 @@ bool OriginalUiRiderAddonModels50DL::load(const Input& input) noexcept {
                 else{
                     auto assetsC=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
                     assets::OriginalUiRiderCharacterAssetDiagnostic50KG cd;
-                    if(!assetsC->loadAddon(input.stockRider,input.characterLayoutWidget,archive,mcf,cd))
+                    const auto fixed=pod->ui.layoutSlot?slotWidget(input.characterWidgets,pod->ui.layoutSlot):std::uint16_t(0);
+                    row.characterLayout=fixed?fixed:input.characterLayoutWidget;row.characterLayoutFixed=fixed!=0;
+                    row.mcf=mcf;stockRider_=input.stockRider;
+                    if(!assetsC->loadAddon(input.stockRider,row.characterLayout,archive,mcf,cd))
                         row.characterRefused="character "+mcf+" does not load (error "+std::to_string(unsigned(cd.error))+
                             " motion "+std::to_string(cd.motionOrdinal)+")";
                     else{
@@ -170,11 +178,21 @@ bool OriginalUiRiderAddonModels50DL::setPageImageOwner(std::size_t index,std::ui
     if(index>=rows_.size()||!rows_[index].pageImages||rows_[index].pageImageOwner!=noOwner)return false;
     rows_[index].pageImageOwner=owner;return true;
 }
-bool OriginalUiRiderAddonModels50DL::startCharacter(std::size_t index,ModelMotionSharedState49T& motion,
+bool OriginalUiRiderAddonModels50DL::startCharacter(std::size_t index,std::uint16_t layout,ModelMotionSharedState49T& motion,
     ModelMode0IkShared50KG& ik,SourceLibmState49T& libm,OriginalUiRiderModelDiagnostic50KG& d) noexcept {
     if(index>=rows_.size())return false;auto& row=rows_[index];
     if(!row.characterReady||!row.characterAssets||row.character)return false;
     try{
+        // PORT STAND-IN placement: without ui.layout_slot the character stands where
+        // the anchor stock rider's authored character widget stands (same model,
+        // motions and materials; only Position/Look/Up are re-read).
+        if(!row.characterLayoutFixed&&layout&&layout!=row.characterLayout&&stockRider_&&row.archive){
+            auto replaced=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
+            assets::OriginalUiRiderCharacterAssetDiagnostic50KG cd;
+            if(!replaced->loadAddon(stockRider_,layout,row.archive,row.mcf,cd)||!replaced->scene()||
+               !row.characterAssets->scene()||replaced->scene()->materials!=row.characterAssets->scene()->materials)return false;
+            row.characterAssets=std::move(replaced);row.characterLayout=layout;
+        }
         auto scene=std::make_unique<OriginalUiRiderCharacterScene50KG>();
         if(!scene->beginLoadAddon(row.characterAssets,motion,ik,d))return false;
         if(!scene->finishAttachment(libm,d)){(void)scene->modelDestroyedAfterDetach(d);return false;}

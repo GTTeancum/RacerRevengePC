@@ -186,6 +186,11 @@ struct OriginalUiRiderSession50KG::Storage {
     const game::OriginalUiRiderCharacterScene50KG* addonCharacter() const noexcept {
         return const_cast<Storage*>(this)->addonCharacter();
     }
+    // The anchor stock rider's authored character widget (placement stand-in).
+    std::uint16_t anchorCharacterLayout() const noexcept {
+        std::array<std::uint16_t,4> ids{};
+        return controlWidgets(state.slot4C8,state.rider4C4,ids)?ids[3]:0;
+    }
     std::uint16_t anchorCharacterWidget() const noexcept {
         std::array<std::uint16_t,4> ids{};
         return addonSlot&&controlWidgets(state.slot4C8,state.rider4C4,ids)?ids[3]:0;
@@ -236,7 +241,7 @@ struct OriginalUiRiderSession50KG::Storage {
             if(slot&&slot!=previous&&toRow){
                 game::OriginalUiRiderModelDiagnostic50KG cd;
                 if(!toRow->characterReady)addonCharacterNote=toRow->characterRefused.empty()?"character not prepared":toRow->characterRefused;
-                else if(!addonModels.startCharacter(slot-1,cold.application->modelMotion,cold.application->modelMode0Ik,
+                else if(!addonModels.startCharacter(slot-1,anchorCharacterLayout(),cold.application->modelMotion,cold.application->modelMode0Ik,
                     cold.application->modelLibm,cd))addonCharacterNote="character graph does not attach (error "+std::to_string(unsigned(cd.error))+")";
                 else addonCharacterNote.clear();
             }
@@ -939,14 +944,20 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // source is the authored pod widget of the default entry rider 19 (PORT STAND-IN).
         if((cold.prospectiveMode==0||cold.prospectiveMode==1)&&game::dlc50DL::addonRiderCount()){
             std::uint16_t layout=0,characterLayout=0;
+            game::OriginalUiRiderAddonModels50DL::Input addon;
             for(const auto control:page->groups[1].controls){
                 if(control<0||static_cast<std::size_t>(control)>=page->controls.size())continue;
-                if(s->selection()->controlRider(static_cast<std::uint16_t>(control))!=19)continue;
-                const auto& ids=page->controls[static_cast<std::size_t>(control)].widgets;
+                const auto rider=s->selection()->controlRider(static_cast<std::uint16_t>(control));
+                const auto& all=page->controls[static_cast<std::size_t>(control)].widgets;
+                // Authored pod/character widgets of every stock rider (ui.layout_slot).
+                if(rider>0&&static_cast<std::size_t>(rider)<addon.podWidgets.size()&&all.size()==4&&
+                   s->widgets().state(all[0]).kind==Kind::pod&&s->widgets().state(all[3]).kind==Kind::character){
+                    addon.podWidgets[static_cast<std::size_t>(rider)]=all[0];addon.characterWidgets[static_cast<std::size_t>(rider)]=all[3];}
+                if(rider!=19)continue;
+                const auto& ids=all;
                 if(!ids.empty()&&s->widgets().state(ids[0]).kind==Kind::pod)layout=ids[0];
                 if(ids.size()==4&&s->widgets().state(ids[3]).kind==Kind::character)characterLayout=ids[3];
             }
-            game::OriginalUiRiderAddonModels50DL::Input addon;
             addon.stockRider=cold.riderArchive;addon.appStart=cold.appStart;addon.podTextures=cold.podTextures;
             addon.materialRuntime=cold.materialRuntime;addon.ipumCache=cold.ipumCache.get();addon.layoutWidget=layout;
             addon.characterLayoutWidget=characterLayout;
@@ -1766,8 +1777,10 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         const bool drawn=s->addonOverlay.characterPackets&&!s->addonOverlay.characterRefused;
         const char* why=!s->addonCharacterNote.empty()?s->addonCharacterNote.c_str():
             s->addonOverlay.characterRefused?s->addonOverlay.characterRefused:"no packet";
-        std::fprintf(stderr,"dlc_rider_character key=%s motion=ent status=%s packets=%u%s%s%s\n",
+        const auto* crow=s->addonModelRow(s->addonSlot);
+        std::fprintf(stderr,"dlc_rider_character key=%s motion=ent status=%s packets=%u layout=%s layout_widget=%u%s%s%s\n",
             pod?pod->key.c_str():"-",drawn?"drawn":"refused",s->addonOverlay.characterPackets,
+            crow&&crow->characterLayoutFixed?"layout_slot":"anchor",crow?unsigned(crow->characterLayout):0u,
             drawn?"":" reason=\"",drawn?"":why,drawn?"":"\"");
     }
     if(s->addonSlot&&!s->addonModelLogged){

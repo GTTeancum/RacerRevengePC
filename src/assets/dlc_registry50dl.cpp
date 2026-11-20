@@ -310,6 +310,16 @@ bool readPod(const Package& p,const Json& o,PackageItems& items,AddonPod& pod,st
        !textList(*ui,"portraits",pod.ui.portraits,true,uw,reason)||!textList(*ui,"background",pod.ui.background,true,uw,reason)||
        !textList(*ui,"garage_model",pod.ui.garageModel,false,uw,reason))return false;
     if(pod.ui.riderModel.empty()||pod.ui.resultsIcon.empty())return fail(reason,uw+": rider_model and results_icon must name members");
+    if(const Json* slot=field(*ui,"layout_slot")){
+        std::uint64_t n=0;
+        if(slot->is_number_unsigned())n=slot->get<std::uint64_t>();
+        else if(slot->is_string()){const auto s=slot->get<std::string>();
+            if(s.empty()||s.size()>2)return fail(reason,uw+": layout_slot must be a stock racer 01..26");
+            for(const char c:s){if(c<'0'||c>'9')return fail(reason,uw+": layout_slot must be a stock racer 01..26");n=n*10+unsigned(c-'0');}}
+        else return fail(reason,uw+": layout_slot must be a stock racer 01..26");
+        if(n<1||n>26||n==5||n==6||n==13)return fail(reason,uw+": layout_slot must be a stock Rider-screen racer (not 5, 6, 13)");
+        pod.ui.layoutSlot=static_cast<unsigned>(n);
+    }
     // character = psg, mcf, vut and the six motions (original_ui_rider_character_assets50kg).
     {
         std::string base;
