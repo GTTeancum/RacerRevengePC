@@ -31,6 +31,26 @@ bool constructTaOwners174FA4()noexcept {
     coldController_.halfA8Value=static_cast<std::uint16_t>((coldController_.halfA8Value&~0x1f0u)|(taCuts_->cutCount()<<4));
     return true;
 }
+// 1A95B0 -> 174A30 -> 174DF0 for a counted race whose 174E48..174EC4 cut count
+// is zero: subtype 2/3 (174EA8), or subtype 1 with P+34 != 2 (174E90) and
+// App+350 == 0 (174E9C). 174F88..174F9C then skips the cut collection 174FA4
+// (+74) and the intro audio entity 177750 (+80); the controller itself and
+// the race slot48 store (1A95DC) exist exactly as in the Tournament. The
+// +64/+68/+6C/+70/+78/+7C children stay as this port builds them for the
+// zero-cut case today (the live 7C start owner; native 70/78/7C prefixes are
+// RA-only). Only the Application-issued same Session reaches this.
+bool constructCountedControllerWithoutCuts174A30()noexcept {
+    const auto launch=actual_.launchKind11258;
+    const bool cutsZeroed=launch==2u||launch==3u||
+        (launch==1u&&actual_.configuration34!=2u&&actual_.application350==0); //Same rule as prepare174DF0.
+    //1A95B0 builds one controller per human (race+1B0 low2); the native
+    // camera owns the single-human slot only. Zero humans: no controller.
+    if(zeroCutController_||actual_.humanCount34!=1u||!nativeTaIssuance_||nativeTaCutAuthoring_||taCuts_||
+       actual_.taIntroAuthoring||actual_.taIntroAudio||!cutsZeroed)return false;
+    if(!constructColdController174A30(nativeTaIssuance_->generation))return false;
+    zeroCutController_=true; //One-way native history; never rearmed.
+    return true;
+}
 bool bindTaIntroEntity()noexcept {
     if(!nativeIntroSourceCurrent())return false;
     if(!actual_.taIntroAudio||!actual_.taIntroAuthoring||!actual_.taIntroAudio->taIntroReady())return false;
@@ -309,6 +329,13 @@ bool retireTaController()noexcept {
         if(actual_.taIntroAudio&&!actual_.taIntroAudio->retireTaIntro142590())return false;
         if(coldController_.entity.firstChild18)return false;
         // Retire every borrowed registry/display edge BEFORE real74 arrays.
+        display_.controllers48[0]=nullptr;controllerEntity_={};objectChildren_={};
+        introChild_={};followChild_={};attachedChild_={};deathChild_={};collection_={};childOrder_.fill(0);
+    }else if(zeroCutController_&&coldController_.started&&!coldController_.released){
+        // Zero-cut counted controller (174F9C took 175044): no74/80 to retire.
+        // Its borrowed display/registry edges retire before174C20 exactly as
+        // the cut branch above does; the controller owns no generic child.
+        if(spatial_.registration34.attached||coldController_.entity.firstChild18)return false;
         display_.controllers48[0]=nullptr;controllerEntity_={};objectChildren_={};
         introChild_={};followChild_={};attachedChild_={};deathChild_={};collection_={};childOrder_.fill(0);
     }

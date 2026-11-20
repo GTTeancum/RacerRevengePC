@@ -668,6 +668,9 @@ class Session final {
     std::unique_ptr<OriginalTaCutChildrenCandidate> taCuts_;
     unsigned taCutCursor_=0;
     bool taPositive_=false,taFirstSelected_=false;
+    // 174A30 constructed for a counted race whose 174E48 cut count is zero
+    // (no +74 / +80). Native history; the Tournament route never sets it.
+    bool zeroCutController_=false;
     std::array<TrackIntroLine50HG,7> taLines_{};
     std::size_t taLineCount_=0; // Actual script span, not storage capacity.
     OriginalRaceCameraOwner controller_;
@@ -1394,6 +1397,11 @@ public:
         std::size_t firstVoice,std::size_t voiceCount)noexcept {
         return constructTaIntroAudio177750(std::move(bank),firstVoice,voiceCount);
     }
+    // Counted race with a zero 174E48 cut count: 174A30 only (174F9C skips
+    // 174FA4 and 177750). Caller first proves fresh Application admission.
+    bool constructCountedControllerWithoutCuts()noexcept {
+        return constructCountedControllerWithoutCuts174A30();
+    }
     const rr::assets::OriginalTaCutAuthoringCandidate* taCutAuthoring()const noexcept {
         return nativeTaCutAuthoring_?nativeTaCutAuthoring_->authoring.get():nullptr;
     }
@@ -1871,7 +1879,8 @@ public:
         // The consumed TA/RA constructor has one retained, generation-bound
         // real74 collection. Other unpublished constructor experiments do not
         // admit this source lifecycle, and retired owners cannot be reused.
-        if(coldController_.started&&(!taCuts_||coldController_.released||
+        // A zero-cut counted controller has no74 by the original 174F9C rule.
+        if(coldController_.started&&((!taCuts_&&!zeroCutController_)||coldController_.released||
            coldController_.issuerGeneration!=generation))return set(Status::sourcePath,0x174df0u);
         // Unpublished constructor staging is a different private lifetime,
         // not evidence for the existing reduced native prepare chronology.

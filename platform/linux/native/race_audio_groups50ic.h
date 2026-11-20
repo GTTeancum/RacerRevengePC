@@ -159,6 +159,16 @@ public:
     bool stopTaIntro2924A0()noexcept;
     bool serviceTaIntro235720(const original_ui_source_timing50LH::PublicationView&)noexcept;
     bool retireTaIntro142590()noexcept;
+    // Counted race with zero intro lines (174F9C skipped 177750): the same
+    // Announcer120 range and transport with an EMPTY event set, so 235720
+    // runs every race frame as in the original. No Sound, emitter, controller
+    // child or PCM. Metadata/provider are the caller's actual Application
+    // owners, authenticated again by the Aural owner.
+    bool beginZeroLineRaceIntro235720(const game::OriginalWreckComponent50LA& controller,
+        const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>& metadata,
+        const std::shared_ptr<const assets::OriginalStandardArchiveProvider50LA>& provider,
+        std::size_t firstVoice,std::size_t voiceCount)noexcept;
+    bool zeroLineRaceIntroOpen()const noexcept{return taIntroZeroLines_&&bool(taIntroTransport_);}
     // Inactive source constructor/load leaves. Caller must interleave actual
     // world141300 before the seventh group and attach the six groups as race children itself.
     bool constructNextCold2350D0(AudioMixer50HD&,
@@ -336,6 +346,10 @@ private:
     std::unique_ptr<NativeRaceIntroTransport50LA> taIntroTransport_;
     std::array<NativeRaceIntroTransport50LA::Playback,assets::originalRaceIntroEventsMax50LA> taIntroLatest_{};
     bool taIntroLive_=false;
+    // Empty-event-set transport (zero intro lines). Never set with taIntroLive_.
+    // Cleared on retirement (as taIntroLive_); the attempt is one-way history.
+    bool taIntroZeroLines_=false,taIntroZeroLinesAttempted_=false;
+    bool zeroLineRaceIntroCurrent()const noexcept;
     bool taIntroConstructionAdmission_=false;
     std::size_t taIntroFirstVoice_=0,taIntroVoiceCount_=0;
     bool taIntroExistingBindingsCurrent()const noexcept;
@@ -378,7 +392,7 @@ private:
     bool pauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)noexcept;
     bool canPauseGroupSuffix2356EC(game::RaceAudioGroup50IC group,bool requested)const noexcept {
         if(!current()||!groups_.initialized||!represented(group))return false;
-        if(group==game::RaceAudioGroup50IC::Announcer120&&taIntroLive_&&
+        if(group==game::RaceAudioGroup50IC::Announcer120&&(taIntroLive_||taIntroZeroLines_)&&
            (!taIntroTransport_||!taIntroTransport_->canSetPaused(requested)))return false;
         const auto state=groups_.state44[static_cast<std::size_t>(group)];
         if((state!=0)==requested)return true;
@@ -396,7 +410,7 @@ private:
         state=requested?1u:0u; //2356EC precedes26D380 on the actual allocated group.
         for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group)
             if(!mixer_->setVoiceGroupPaused50IC(i,requested))std::terminate();
-        if(group==game::RaceAudioGroup50IC::Announcer120&&taIntroLive_&&
+        if(group==game::RaceAudioGroup50IC::Announcer120&&(taIntroLive_||taIntroZeroLines_)&&
            !taIntroTransport_->setPaused(requested))std::terminate();
         return true;
     }

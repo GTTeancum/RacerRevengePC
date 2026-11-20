@@ -2229,6 +2229,29 @@ void Context::run() {
      require50DU(sourceCameraSession->constructTaIntro177750(
          taIntroPcm,platform::originalTaIntroFirstVoice50HD,platform::originalTaIntroVoices50HD),
          "actual TA intro audio177750 construction rejected");
+    }else if(nativeIntroRace()&&humanCourseEnabled){
+     // 1A95B0 -> 174A30 for EVERY counted race, once per human (race+1B0
+     // low2; zero humans build none). Here 174E48..174EC4 zeroed the
+     // cut count (P+34 != 2 and App+350 == 0, or subtype 2/3), so 174F9C skips
+     // the cut owners 174FA4 and the intro audio entity 177750. The controller
+     // and its race slot48 store (1A95DC) are the same as the Tournament's, and
+     // 235720 (the Announcer120 group update) runs every race frame with an
+     // empty event set. Same rule on every course; RA keeps its own session
+     // above and stays Tournament-only (its consumed prefix is the intro's).
+     const auto fresh=originalMainApplication.freshNativeTaCameraSession50LA();
+     require50DU(fresh&&fresh==sourceCameraSession&&sourceCameraSession->constructCountedControllerWithoutCuts(),
+         "actual counted-race controller174A30 construction rejected");
+     auto* controller=sourceCameraSession->taControllerEntity174A30();
+     require50DU(controller&&nativeIntroRace()->retainNativeIntroControllerSlot48(*controller),
+         "actual counted-race slot48 controller publication rejected");
+     auto* groups=liveAudio->groupsForProviders();
+     const auto domain=originalMainApplication.standardMaterialDomain();
+     const auto& aural=originalMainApplication.sourceAural00Owner_;
+     require50DU(groups&&aural&&domain&&groups->beginZeroLineRaceIntro235720(*controller,
+         aural->retainedStreamMetadata(),domain->archiveProvider3E1A70(),
+         platform::originalTaIntroFirstVoice50HD,platform::originalTaIntroVoices50HD),
+         "actual counted-race Announcer120 empty intro transport rejected");
+     std::cerr<<"counted_controller course="<<trackSession->world->code<<" cuts=0 slot48=1 intro_lines=0\n";
     }
    }else sourceCameraSession=std::make_shared<sourceCamera::Session>(sourceCameraActual);
    const auto prepared=sourceCameraSession->prepare(sessionIndex+1,isMcTrack?*mcSourceCameraAssets->inputs():sourceCameraAssets.inputs,*sourceCameraDisplay);

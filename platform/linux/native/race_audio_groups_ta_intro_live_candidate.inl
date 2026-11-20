@@ -117,9 +117,55 @@ inline bool RaceAudioGroups50IC::stopTaIntroBacking2924A0()noexcept {
     }
     return true;
 }
+inline bool RaceAudioGroups50IC::zeroLineRaceIntroCurrent()const noexcept {
+    if(!taIntroZeroLines_||taIntroLive_||taIntroConstructionAdmission_||coldTaIntroEmitter_||
+       taIntroNativeReserved_||taIntroExpectedController_||!taIntroTransport_||
+       coldRetiring_||nativeBindingsRetired_||!taIntroTransport_->current()||!coldTaIntroGroupIdentity())return false;
+    const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
+    return !p.count48&&!p.taIntroStarted&&!p.taIntroConstructed&&!p.taIntroAuthoring&&!p.taIntroManager;
+}
+inline bool RaceAudioGroups50IC::beginZeroLineRaceIntro235720(const game::OriginalWreckComponent50LA& controller,
+    const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>& metadata,
+    const std::shared_ptr<const assets::OriginalStandardArchiveProvider50LA>& provider,
+    std::size_t first,std::size_t count)noexcept {
+    // Same Announcer120 range admission as beginTaIntro177750, but no 177750:
+    // no event list, Sound, emitter, controller child or PCM bank.
+    if(taIntroZeroLinesAttempted_||taIntroConstructionAdmission_||taIntroLive_||taIntroTransport_||
+       coldTaIntroEmitter_||taIntroNativeReserved_||taIntroExpectedController_||
+       !current()||!groups_.initialized||coldNext_!=game::raceAudioGroupCount50IC||!coldTaIntroGroupIdentity()||
+       !metadata||!provider||count<3||first>=count_||count>count_-first||
+       controller.kind!=game::OriginalWreckComponentKind50LA::cameraController174A30||
+       controller.sessionGeneration!=coldSession_||controller.reference00!=1||
+       !coldApplication_||!coldApplication_->entityAuthority_.canRetire(controller))return false;
+    const auto& p=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
+    if(p.count48||p.taIntroStarted||p.taIntroConstructed||p.taIntroAuthoring||p.taIntroManager)return false;
+    for(std::size_t slot=first;slot<first+count;++slot){
+        AudioVoiceObservation50HD v;
+        if(!mixer_->inspectVoice(slot,v)||v.voice.active||v.groupKnown||v.playbackRevision||
+           bindings_[slot]!=game::RaceAudioGroup50IC::Unrepresented)return false;
+    }
+    const auto* actualAural=coldApplication_->auralNativeOwner_;
+    if(!actualAural||!coldApplication_->aural00Live_)return false;
+    auto manager=actualAural->retainColdStreamManager232DB0(coldApplication_,metadata,provider);
+    if(!manager)return false;
+    const auto observation=manager->inspect();
+    if(!observation.interfaceA0||observation.entity!=coldApplication_->aural00_||
+       !mixer_->canRecordControlChanges(count*2))return false;
+    taIntroZeroLinesAttempted_=true; //One-way; a later failure is never retried.
+    for(std::size_t n=0;n<count;++n){const auto slot=first+n;
+        if(!mixer_->setVoiceGroupGain50IC(slot,normalized(groups_,game::RaceAudioGroup50IC::Announcer120))||
+           !mixer_->setVoiceGroupPaused50IC(slot,groups_.state44[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)]!=0))return false;
+        bindings_[slot]=game::RaceAudioGroup50IC::Announcer120;
+    }
+    taIntroTransport_=NativeRaceIntroTransport50LA::create(std::move(manager),*mixer_,first,count,nullptr,nullptr);
+    if(!taIntroTransport_)return false;
+    taIntroZeroLines_=true;return zeroLineRaceIntroCurrent();
+}
 inline bool RaceAudioGroups50IC::serviceTaIntro235720(
     const original_ui_source_timing50LH::PublicationView& publication)noexcept {
-    if(!taIntroReady())return false;
+    // 235720 is the Announcer120 group update: authored lines, or the empty
+    // event set of a counted race with zero intro lines.
+    if(!taIntroReady()&&!zeroLineRaceIntroCurrent())return false;
     auto& group=coldGroups_[static_cast<std::size_t>(game::RaceAudioGroup50IC::Announcer120)];
     if(group.entity.firstChild18||group.entity.descendants24)return false;
     float factor=0;
@@ -150,6 +196,6 @@ inline bool RaceAudioGroups50IC::retireTaIntro142590()noexcept {
         if(group.taIntroAuthoring&&!clearColdTaIntroSounds2353D0())return false;
     }
     if(taIntroTransport_&&!taIntroTransport_->release())return false;
-    taIntroTransport_.reset();taIntroLive_=false;return true;
+    taIntroTransport_.reset();taIntroLive_=false;taIntroZeroLines_=false;return true;
 }
 }

@@ -3395,7 +3395,10 @@ SessionExit50DU Context::run() {
   taRootActive=false;return true;
  };
  auto beginTaRoot=[&](){
-  if(!taIntroAuthoring)return true;
+  // Root 140CE0 runs on the race slot48 controller of EVERY counted race
+  // (authored intro or zero cuts). Routes without that controller (RA Free
+  // Play, ALL8 spectator, legacy) keep their existing no-root behaviour.
+  if(!taIntroAuthoring&&!nativeIntroController())return true;
   if(taRootActive||!nativeIntroRace()||!sourceCameraSession||!nativeIntroController())return false;
   original_ui_source_timing50LH::Sample sample;
   if(!taRootTimingInitialized){
@@ -3573,7 +3576,9 @@ SessionExit50DU Context::run() {
    if(!retired)return closeRejected("mb_source_pending_retirement");
   }
   if(originalCameraEnabled){
-   if(taIntroAuthoring&&liveAudio->groupsForProviders()&&
+   // The zero-line counted race retires its empty Announcer120 transport here too.
+   if((taIntroAuthoring||(liveAudio->groupsForProviders()&&liveAudio->groupsForProviders()->zeroLineRaceIntroOpen()))&&
+      liveAudio->groupsForProviders()&&
       !liveAudio->groupsForProviders()->retireTaIntro142590())return closeRejected("TA intro audio retirement");
    if(taRootActive){
     std::string error;

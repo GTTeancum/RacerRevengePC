@@ -38,17 +38,21 @@ NativeRaceIntroTransport50LA::Assets::source(unsigned id,const AudioClip50HD& cl
 }
 bool OriginalApplicationAural50KG::raceIntroTransportCurrent(
     const NativeRaceIntroTransport50LA& t,bool acquiring)const noexcept {
+    // An EMPTY intro event set (no authoring and no PCM bank) is the
+    // Announcer120 transport of a counted race with zero intro lines.
     if(!current()||!backendCurrent()||!nativeStreamSlotsCurrent()||!attached_||
-       entity_.parent1C!=&entities_->root10_||!t.assets_||!t.assets_->authoring||!t.assets_->bank)return false;
+       entity_.parent1C!=&entities_->root10_||!t.assets_||
+       (t.assets_->authoring?!t.assets_->bank:bool(t.assets_->bank)))return false;
     const auto& i=**interfaceA0_;const auto& b=issuer_->garageAudioBackingOwner_;
     if((acquiring?i.raceIntroLease!=nullptr:i.raceIntroLease!=&t)||!b||
        !b->frontendOutputAttempted_||!b->frontendOutputClosed_||b->frontendOutputCloseFailed_||
        b->frontendOutputAccountingFailed_||!i.main->ordinaryOutputRetired_||
        !issuer_->sourceRace28COwner_||t.mixer_==i.mixer||
-       !same(i.main->nativeSourceMetadata_,t.assets_->authoring->metadataOwner()))return false;
+       (t.assets_->authoring?!same(i.main->nativeSourceMetadata_,t.assets_->authoring->metadataOwner()):
+                             !i.main->nativeSourceMetadata_))return false;
     const auto canonical=issuer_->standardMaterialDomainOwner_?
         issuer_->standardMaterialDomainOwner_->archiveProvider3E1A70():nullptr;
-    if(!canonical||canonical.get()!=t.assets_->authoring->providerIdentity())return false;
+    if(!canonical||(t.assets_->authoring&&canonical.get()!=t.assets_->authoring->providerIdentity()))return false;
     // Output close already stopped all frontend producers. No source route
     // or stream history is discarded: retired source cells remain in pool.
     for(std::size_t n=0;n<i.nativeCount;++n)
@@ -86,7 +90,15 @@ std::unique_ptr<NativeRaceIntroTransport50LA> NativeRaceIntroTransport50LA::crea
     std::size_t first,std::size_t count,
     std::shared_ptr<const assets::OriginalTaIntroAuthoringCandidate> authoring,
     std::shared_ptr<const assets::AudioBank50HC> bank)noexcept {
-    if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"&&authoring->trackId()!="RC"&&authoring->trackId()!="TC"&&authoring->trackId()!="MC"&&authoring->trackId()!="TB")||!bank||
+    // EMPTY event set: no authoring AND no bank. 235720 (the Announcer120
+    // group update) still runs every race frame; it plays nothing.
+    const bool empty=!authoring&&!bank;
+    if(empty){
+        if(!aural||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
+           first>=mixer.count()||count>mixer.count()-first||
+           !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||
+           mixer.auralMasterOwner_||!mixer.originalSoundMode50KG()||!mixer.canRecordControlChanges())return {};
+    }else if(!aural||!authoring||!authoring->eventCount()||authoring->eventCount()>rr::assets::originalRaceIntroEventsMax50LA||(authoring->trackId()!="TA"&&authoring->trackId()!="RA"&&authoring->trackId()!="GC"&&authoring->trackId()!="SA"&&authoring->trackId()!="MA"&&authoring->trackId()!="GA"&&authoring->trackId()!="MB"&&authoring->trackId()!="SC"&&authoring->trackId()!="GB"&&authoring->trackId()!="RC"&&authoring->trackId()!="TC"&&authoring->trackId()!="MC"&&authoring->trackId()!="TB")||!bank||
        bank->clips.size()!=authoring->eventCount()||bank->ready!=authoring->eventCount()||bank->missing||bank->invalid||bank->unsupported||first!=originalTaIntroFirstVoice50HD||count!=originalTaIntroVoices50HD||
        first>=mixer.count()||count>mixer.count()-first||
        !mixer.requiresVoiceGroupGains50IC()||mixer.nativeRaceIntroTransport_||mixer.nativeSourceWetProcessor_||
@@ -94,7 +106,7 @@ std::unique_ptr<NativeRaceIntroTransport50LA> NativeRaceIntroTransport50LA::crea
     try {
         auto t=std::unique_ptr<NativeRaceIntroTransport50LA>(new NativeRaceIntroTransport50LA);
         auto a=std::make_shared<Assets>();a->authoring=std::move(authoring);a->bank=std::move(bank);
-        for(unsigned id=1;id<=a->authoring->eventCount();++id){const auto* event=a->authoring->event(id);if(!event)return {};
+        if(!empty)for(unsigned id=1;id<=a->authoring->eventCount();++id){const auto* event=a->authoring->event(id);if(!event)return {};
             const auto* p=a->bank->find(std::string(event->filename));if(!p)return {};
             a->pcm[id-1]=p;a->clips[id-1]={p->pcm.samples.data(),p->pcm.frames,p->pcm.sampleRate,p->pcm.channels,0,0};
             if(!a->source(id,a->clips[id-1]))return {};
@@ -131,11 +143,14 @@ bool NativeRaceIntroTransport50LA::currentWithMixerPause(bool mixerPause)const n
     for(const auto& cell:pool.cells_)
         if(!std::isfinite(cell.elapsed)||cell.elapsed<0.f||cell.generation>500)return false;
     std::array<bool,48> claimed{};
-    for(unsigned id=1;id<=assets_->authoring->eventCount();++id)if(!assets_->source(id,assets_->clips[id-1]))return false;
+    // Empty event set: no source rows, and no playback can ever be issued.
+    if(assets_->authoring)
+        for(unsigned id=1;id<=assets_->authoring->eventCount();++id)if(!assets_->source(id,assets_->clips[id-1]))return false;
     for(std::size_t n=0;n<count_;++n){const auto slot=first_+n;const auto& in=instances_[n];
         if(!mixer_->hasVoiceGroupGain50IC(slot)||mixer_->groupPaused50IC_[slot]!=mixerPause||
            mixer_->nativeSourceVoiceRoutes_[slot].count)return false;
         if(!in.playback.serial){if(mixer_->active(slot)||mixer_->playbackRevision(slot)||in.route.count)return false;continue;}
+        if(!assets_->authoring)return false;
         const auto& v=mixer_->voices_[slot];
         if(in.playback.voice!=slot||in.playback.serial>nextSerial_||!in.eventId||in.eventId>assets_->authoring->eventCount()||
            mixer_->playbackRevision(slot)!=in.playback.revision||
@@ -161,7 +176,7 @@ bool NativeRaceIntroTransport50LA::renderCurrent(const void* owner,std::size_t s
         (**t->aural_->interfaceA0_).mixer->nativeSourceRoutes_.current(in.route);
 }
 bool NativeRaceIntroTransport50LA::canPlay(unsigned event)const noexcept {
-    if(!current()||event<1||event>assets_->authoring->eventCount()||nextSerial_>=INT_MAX||!mixer_->canRecordControlChanges(1))return false;
+    if(!current()||!assets_->authoring||event<1||event>assets_->authoring->eventCount()||nextSerial_>=INT_MAX||!mixer_->canRecordControlChanges(1))return false;
     float left=0,right=0;if(!mixer_->originalRouting50KG(0,left,right,100))return false;
     for(std::size_t n=0;n<count_;++n)
         if(!instances_[n].route.count&&!mixer_->active(first_+n))return true;
