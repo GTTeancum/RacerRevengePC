@@ -1,19 +1,10 @@
 #include "vehicle_window_gl50ds_storage.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include "raster_shared_edge.h"
-#include "../../../tests/native/rc_crystal50rc.h"
-#include "../../../tests/native/rc_particle_visual50rc.h"
-#include "../../../tests/native/rc_particle_render50rc.h"
-#include "../../../tests/native/gb_particle_visual50gb.h"
-#include "../../../tests/native/mc_particle_visual50mc.h"
-#include "../../../tests/native/gb_particle_render50gb.h"
-#include "../../../tests/native/mc_particle_render50mc.h"
-#include "../../../tests/native/ra_cold_aggregate50la.h"
-#include "../../../tests/native/ra_static_fog_numeric50la.h"
 
 namespace rr::platform {
-#include "vehicle_window_gl50ds_local_flare.inl"
 bool VehicleWindowGl50DS::Storage::hasCoverageResources() const noexcept {
         return coverageLive.owns()||coverageSpare.owns()||coverageProgram||
             coverageVertex||coverageFragment||coverageArray||pairCompare.colorPre||pairCompare.depthPre||
@@ -138,7 +129,10 @@ bool VehicleWindowGl50DS::Storage::createCoverageExtent(CoverageExtent& e) noexc
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
             if(!coverageComplete())return false;
         }
-        if(hasSpecularPairs50LA || request.raStaticWorld || request.track.rcCrystal){
+        // Snapshot/raster targets of the exact per-sample bridges: racer source
+        // pairs, and any track whose material data has a GS destination-alpha
+        // pair or an environment-map pass (every course alike).
+        if(hasSpecularPairs50LA || destinationAlphaSpans || request.track.environmentUv){
             if(!coverageFramebuffer(e.snapshot)||
                !coverageTextureStorage(e.snapshotColor,rgba8,width,height,true,colorAttachment))return false;
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
@@ -477,7 +471,7 @@ void main(){
         if(!check("locate coverage composition inputs and array")||!coverageArray||
            coverageRaCompositionUniform<0||coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
-        // These private program sampler assignments never vary between RA and
+        // These private program sampler assignments never vary between track and
         // racer composition. Uniform values survive binds and extent changes;
         // initialize once per link rather than three writes per coverage run.
         I previousProgram=0;gl.getIntegerv(0x8B8D,&previousProgram); // GL_CURRENT_PROGRAM
@@ -800,615 +794,6 @@ bool VehicleWindowGl50DS::Storage::resolveCoverage(U bank) noexcept {
         return resolved&&restored;
     }
 
-bool VehicleWindowGl50DS::Storage::hasRaWorldResources() const noexcept {
-        return raLocalFlareTexture.ownsResources()||raLocalFlareArray||raLocalFlareBuffer||raLocalFlareVertexShader||
-            raLocalFlareFragmentShader||raLocalFlareProgram||raWorldArray||raWorldVertices||raWorldOperands||raWorldIndices||raWorldVertexShader||raWorldGeometryShader||
-            raWorldFragment[0]||raWorldFragment[1]||raWorldProgram[0]||raWorldProgram[1];
-    }
-
-void VehicleWindowGl50DS::Storage::retireRaWorldPublication() noexcept {
-        if(raWorld){raWorld->retireRenderer(raWorldRenderer);raWorld.reset();}
-        raWorldRenderer=nullptr;raWorldImagePublication=0;raWorldFramePrepared=false;
-    }
-
-bool VehicleWindowGl50DS::Storage::raWorldCurrent(VehicleWindowDiagnostic50DS& d) const noexcept {
-        if(!request.raStaticWorld)return !raWorld || fail(d,VehicleWindowError50DS::material,"RA aggregate lease missing");
-        return (raWorld && request.raStaticWorld->coldStaticWorld()==raWorld.get() &&
-            raWorld->rendererPublication_==raWorldRenderer && raWorld->drawPlanCurrent() &&
-            request.raStaticWorldTextures && request.raStaticWorldTextures->raStaticWorldOwner()==raWorld.get() &&
-            request.raStaticWorldTextures->textureCount()==49 &&
-            request.raStaticWorldTextures->validBorrow(request.context,request.isCurrent,raWorldImagePublication)) ||
-            fail(d,VehicleWindowError50DS::material,"RA aggregate/world/image publication expired");
-    }
-
-bool VehicleWindowGl50DS::Storage::deleteRaWorldResources(VehicleWindowDiagnostic50DS& d) noexcept {
-        if(!deleteRaLocalFlareResources(d))return false;
-        for(U i=0;i<2;++i)if(!deleteShaderName(raWorldProgram[i],true,d)||
-            !deleteShaderName(raWorldFragment[i],false,d))return false;
-        return deleteShaderName(raWorldGeometryShader,false,d)&&
-            deleteShaderName(raWorldVertexShader,false,d)&&
-            deleteName(raWorldArray,gl.deleteVertexArrays,d)&&
-            deleteName(raWorldVertices,gl.deleteBuffers,d)&&deleteName(raWorldOperands,gl.deleteBuffers,d)&&
-            deleteName(raWorldIndices,gl.deleteBuffers,d);
-    }
-
-bool VehicleWindowGl50DS::Storage::createRaWorld() noexcept {
-        if(!raWorld)return true;
-        if(!raWorldCurrent(*diagnostic))return false;
-        // Validate the actual source plan before any GPU allocation. The GL
-        // count is signed, while source indices/ranges are unsigned.
-        for(const auto& plan:raWorld->surfaceDrawPlan_){
-            if(plan.raster>=raWorld->rasterInventory_.size()||
-               plan.surface>=raWorld->surfaceDrawPlan_.size()||
-               !plan.indexCount||plan.indexCount%3||
-               plan.indexCount>static_cast<U>(std::numeric_limits<I>::max())||
-               plan.indexStart>raWorld->indices_.size()||
-               plan.indexCount>raWorld->indices_.size()-plan.indexStart||
-               plan.indexCount>std::numeric_limits<U>::max()-plan.indexStart||
-               plan.vertexStart>raWorld->vertices_.size()||
-               plan.vertexCount>raWorld->vertices_.size()-plan.vertexStart||
-               plan.vertexCount>std::numeric_limits<U>::max()-plan.vertexStart)
-                return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source draw range exceeds native limits");
-            // import_scene48d emits chronological consecutive strip records,
-            // swapping only A/B for odd strip triangles. Restarts begin a new
-            // chronological run; lowering adds one constant placement offset.
-            // This invariant lets the GS recover source fan anchors from actual
-            // indexed vertex IDs, independently of draw batching/primitive ID.
-            for(U offset=0;offset<plan.indexCount;offset+=3){
-                const auto a=raWorld->indices_[plan.indexStart+offset];
-                const auto b=raWorld->indices_[plan.indexStart+offset+1];
-                const auto c=raWorld->indices_[plan.indexStart+offset+2];
-                const std::uint64_t oldest=std::min(a,b),middle=std::max(a,b);
-                if(oldest<plan.vertexStart||middle!=oldest+1||std::uint64_t(c)!=oldest+2||
-                   std::uint64_t(c)>=std::uint64_t(plan.vertexStart)+plan.vertexCount||
-                   c>static_cast<U>(std::numeric_limits<I>::max()))
-                    return fail(*diagnostic,VehicleWindowError50DS::assets,
-                        "RA source triangle lacks retained chronological strip indices");
-            }
-            if(raWorld->rasterInventory_[plan.raster].passFlags&4u)
-                return fail(*diagnostic,VehicleWindowError50DS::material,"RA fill-color program is not implemented");
-        }
-        try {
-            raWorldGeometry.resize(raWorld->vertices_.size());
-            raWorldFrame.resize(raWorld->vertices_.size());
-            raWorldFrameImages.resize(raWorld->surfaceDrawPlan_.size());
-        }catch(...){return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate complete RA frame streams");}
-        // The retained cold world owns immutable position/UV lanes. Crowd
-        // animation selects images. Keep current float RGBA/fog in a separate
-        // stream so each frame uploads only those lanes, without repacking.
-        // Reinitialize the immutable copies on every GPU creation.
-        for(std::size_t v=0;v<raWorldGeometry.size();++v){
-            const auto& input=raWorld->vertices_[v];auto& output=raWorldGeometry[v];
-            std::copy(input.worldPosition.begin(),input.worldPosition.end(),output.position);
-            std::copy(input.sourceUv.begin(),input.sourceUv.end(),output.uv);
-        }
-        const std::uint64_t vb=raWorldGeometry.size()*sizeof(RaWorldVertex),
-            fb=raWorldFrame.size()*sizeof(RaWorldFrameVertex),ib=raWorld->indices_.size()*sizeof(U);
-        if(!vb||!fb||!ib||vb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
-           fb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
-           ib>std::uint64_t(std::numeric_limits<std::intptr_t>::max()))
-            return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source buffer extent exceeds GL limits");
-        gl.genVertexArrays(1,&raWorldArray);drawGl.bindVertexArray(raWorldArray);
-        gl.genBuffers(1,&raWorldVertices);drawGl.bindBuffer(arrayBuffer,raWorldVertices);
-        gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(vb),raWorldGeometry.data(),staticDraw);
-        const I staticCounts[]={3,2};const std::size_t staticOffsets[]={offsetof(RaWorldVertex,position),offsetof(RaWorldVertex,uv)};
-        for(U i=0;i<2;++i){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,staticCounts[i],0x1406,0,sizeof(RaWorldVertex),reinterpret_cast<const void*>(staticOffsets[i]));}
-        gl.genBuffers(1,&raWorldOperands);drawGl.bindBuffer(arrayBuffer,raWorldOperands);
-        // A fresh renderer's value-initialized CPU records define every GPU
-        // operand, including unselected surfaces inspected by diagnostics.
-        gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(fb),raWorldFrame.data(),dynamicDraw);
-        const I frameCounts[]={4,1};const std::size_t frameOffsets[]={offsetof(RaWorldFrameVertex,color),offsetof(RaWorldFrameVertex,fog)};
-        for(U i=0;i<2;++i){gl.enableVertexAttribArray(i+2);gl.vertexAttribPointer(i+2,frameCounts[i],0x1406,0,sizeof(RaWorldFrameVertex),reinterpret_cast<const void*>(frameOffsets[i]));}
-        gl.genBuffers(1,&raWorldIndices);drawGl.bindBuffer(elementBuffer,raWorldIndices);
-        gl.bufferData(elementBuffer,static_cast<std::intptr_t>(ib),raWorld->indices_.data(),staticDraw);
-        if(!check("upload complete RA world geometry/index banks and allocate current source operands")||
-           !raWorldArray||!raWorldVertices||!raWorldOperands||!raWorldIndices)
-            return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA native geometry allocation failed");
-        std::int64_t actual=0;gl.getBufferParameteri64v(arrayBuffer,bufferSize,&actual);
-        if(actual!=static_cast<std::int64_t>(fb))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA current operand storage size differs");
-        drawGl.bindBuffer(arrayBuffer,raWorldVertices);gl.getBufferParameteri64v(arrayBuffer,bufferSize,&actual);
-        if(actual!=static_cast<std::int64_t>(vb))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA vertex storage size differs");
-        drawGl.bindBuffer(arrayBuffer,raWorldOperands);
-        gl.getBufferParameteri64v(elementBuffer,bufferSize,&actual);
-        if(actual!=static_cast<std::int64_t>(ib))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA index storage size differs");
-        if(!check("verify split RA vertex storage extents"))return false;
-        constexpr const char* vertex=R"GLSL(#version 400 core
-in vec3 position;in vec2 uv;in vec4 color;in float fogByte;
-uniform mat4 worldViewProjection,sourceWorldViewProjection;
-out SourceVertex { vec4 clip;vec2 uv;vec4 color;float fog;flat int sourceIndex; } operand;
-void main(){
-    gl_Position=vec4(position,1.0)*worldViewProjection;
-    operand.clip=vec4(position,1.0)*sourceWorldViewProjection;
-    operand.uv=uv;operand.color=color;operand.fog=fogByte;operand.sourceIndex=gl_VertexID;
-}
-)GLSL";
-        // Authenticated common clipper 366450, called by PrelitCompressed.
-        // Source near is Z+W; native depth conversion makes it GL Z+3W.
-        // Keep both positions: GL still owns final depth clipping/rasterization.
-        constexpr const char* geometry=R"GLSL(#version 400 core
-layout(triangles) in;
-layout(triangle_strip,max_vertices=21) out;
-in SourceVertex { vec4 clip;vec2 uv;vec4 color;float fog;flat int sourceIndex; } operand[];
-out vec2 sourceUv;smooth out vec4 packetColorTimesClipW;
-smooth out float packetFogTimesClipW;
-struct Vertex { vec4 clip;vec4 nativeClip;vec2 uv;vec4 color;float fog; };
-Vertex polygon[9],nextPolygon[9];
-float distanceToPlane(vec4 p,int plane){
-    int axis=2-plane/2;
-    return (plane%2==0)?p.w+p[axis]:p.w-p[axis];
-}
-Vertex intersection(Vertex a,Vertex b,float da,float db,bool aInside){
-    // 367330 / 367380 retain the entering/leaving endpoint forms.
-    float q=(aInside?da:db)/(da-db);
-    Vertex origin=a;
-    if(!aInside)origin=b;
-    Vertex result;
-    result.clip=origin.clip+q*(b.clip-a.clip);
-    result.nativeClip=origin.nativeClip+q*(b.nativeClip-a.nativeClip);
-    result.uv=origin.uv+q*(b.uv-a.uv);
-    result.color=origin.color+q*(b.color-a.color);
-    result.fog=origin.fog+q*(b.fog-a.fog);
-    return result;
-}
-void emitPacket(Vertex v){
-    gl_Position=v.nativeClip;sourceUv=v.uv;
-    // 367160 / 367180: undo post-near color weighting, then FTOI0.
-    vec4 rawColor=floor(clamp(v.color/v.clip.w,0.0,255.0));
-    // Source clipping's C*sourceW representation ends above. The separate
-    // native transport below carries final byte RGBA through GL clipping.
-    packetColorTimesClipW=rawColor*gl_Position.w;
-    // 367188 FTOI4 packs F in bits 4..11. Fog was never W-weighted
-    // during source clipping. Transport only AFTER polygon generation.
-    packetFogTimesClipW=floor(clamp(v.fog,0.0,255.0))*gl_Position.w;
-    EmitVertex();
-}
-void main(){
-    int count=3;bool clipped=false;
-    for(int i=0;i<3;++i){
-        polygon[i].clip=operand[i].clip;polygon[i].nativeClip=gl_in[i].gl_Position;
-        polygon[i].uv=operand[i].uv;polygon[i].color=operand[i].color;
-        polygon[i].fog=operand[i].fog;
-        for(int plane=0;plane<6;++plane)
-            clipped=clipped || distanceToPlane(polygon[i].clip,plane)<0.0;
-    }
-    if(!clipped){
-        // No source clip-generated operands: keep the original byte values.
-        for(int i=0;i<3;++i){
-            gl_Position=gl_in[i].gl_Position;sourceUv=operand[i].uv;
-            packetColorTimesClipW=operand[i].color*gl_Position.w;
-            packetFogTimesClipW=operand[i].fog*gl_Position.w;EmitVertex();
-        }
-        EndPrimitive();return;
-    }
-    // 3665F8..3667F0 assembles oldest, middle, current source records.
-    // The importer swaps the first two indices for odd strip triangles;
-    // undo that only for clipped polygons, preserving the source fan anchor.
-    if(operand[0].sourceIndex>operand[1].sourceIndex){
-        Vertex first=polygon[0];polygon[0]=polygon[1];polygon[1]=first;
-    }
-    // Convex triangle intersected by six half spaces has at most 3+6
-    // vertices. Each pass adds at most one; fan output is at most 21.
-    // Source order: -Z,+Z,-Y,+Y,-X,+X (366870..366FD8).
-    for(int plane=0;plane<6;++plane){
-        int nextCount=0;
-        for(int i=0;i<count;++i){
-            Vertex a=polygon[(i+count-1)%count],b=polygon[i];
-            float da=distanceToPlane(a.clip,plane),db=distanceToPlane(b.clip,plane);
-            bool aInside=da>=0.0,bInside=db>=0.0;
-            // The source stores A on inside edges, starting last -> first.
-            if(aInside)nextPolygon[nextCount++]=a;
-            // Preserve coincident boundary records: later source plane
-            // rotations depend on their count and therefore the fan anchor.
-            // At most two crossings, with at least one excluded vertex,
-            // imply nextCount<=count+1 even with endpoint intersections.
-            if(aInside!=bInside)nextPolygon[nextCount++]=intersection(a,b,da,db,aInside);
-        }
-        count=nextCount;
-        if(count<3)return;
-        for(int i=0;i<count;++i){
-            polygon[i]=nextPolygon[i];
-            // 3669C0: raw RGBA at first near intersection, C*W thereafter.
-            if(plane==0)polygon[i].color*=polygon[i].clip.w;
-        }
-    }
-    for(int i=1;i<count-1;++i){
-        emitPacket(polygon[0]);emitPacket(polygon[i]);emitPacket(polygon[i+1]);
-        EndPrimitive();
-    }
-}
-)GLSL";
-        constexpr const char* fragment=R"GLSL(
-in vec2 sourceUv;smooth in vec4 packetColorTimesClipW;smooth in float packetFogTimesClipW;
-uniform sampler2D image;uniform vec4 fogColorAndEnable;uniform float alphaReference;
-#ifndef RA_SAMPLE_DESTINATION
-uniform int payload;
-out float sourceDepth;
-#else
-uniform sampler2DMS destinationImage;
-#endif
-out vec4 sourceColor;
-void main(){
-    // Texture bank already incorporates source TEXA. Native base-level linear
-    // sampling; packet Gouraud/fog are screen-linear, UV is perspective-correct.
-    vec4 sampled=floor(clamp(texture(image,sourceUv)*255.0,0.0,255.0));
-    // Carry all original RGBA lanes homogeneously, as with fog below.
-    // Reconstruct screen-linear color before the unchanged byte operations.
-    vec4 packet=floor(clamp(packetColorTimesClipW*gl_FragCoord.w,0.0,255.0));
-    vec4 bytes=floor(clamp(sampled*packet/128.0,0.0,255.0));
-    if(alphaReference>=0.0 && bytes.a<=alphaReference)discard;
-    if(fogColorAndEnable.w!=0.0){
-        // Smooth transport of F*clipW, then multiply by interpolated 1/W.
-        // This reconstructs screen-linear F without a clip-generated F/W
-        // division near W=0. Preserve the existing byte clamp/quantization.
-        float f=floor(clamp(packetFogTimesClipW*gl_FragCoord.w,0.0,255.0));
-        bytes.rgb=clamp(floor((bytes.rgb*f+fogColorAndEnable.rgb*(255.0-f))/256.0),0.0,255.0);
-    }
-#ifndef RA_SAMPLE_DESTINATION
-    sourceDepth=gl_FragCoord.z;
-    sourceColor=payload!=0?bytes:bytes/255.0;
-#else
-    vec3 destination=floor(texelFetch(destinationImage,ivec2(gl_FragCoord.xy),gl_SampleID).rgb*255.0+0.5);
-    bytes.rgb=clamp(destination+floor((bytes.rgb-destination)*bytes.a/128.0),0.0,255.0);
-    sourceColor=bytes/255.0;
-#endif
-}
-)GLSL";
-        I geometryVertices=0,geometryComponents=0;
-        gl.getIntegerv(0x8DE0,&geometryVertices); // GL_MAX_GEOMETRY_OUTPUT_VERTICES
-        gl.getIntegerv(0x8DE1,&geometryComponents); // GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS
-        if(!check("query RA source clip geometry limits")||geometryVertices<21||geometryComponents<21*11)
-            return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source clip geometry limits insufficient");
-        if(!compileTrackShader(0x8B31,vertex,raWorldVertexShader)||
-           !compileTrackShader(0x8DD9,geometry,raWorldGeometryShader))return false;
-        try {
-        for(U i=0;i<2;++i){
-            std::string source=i?"#version 400 core\n#define RA_SAMPLE_DESTINATION\n":"#version 400 core\n";
-            source+=fragment;
-            if(!compileTrackShader(0x8B30,source.c_str(),raWorldFragment[i]))return false;
-            auto& p=raWorldProgram[i];p=shaderGl.createProgram();
-            if(!p)return fail(*diagnostic,VehicleWindowError50DS::shader,"zero RA world program");
-            shaderGl.attachShader(p,raWorldVertexShader);shaderGl.attachShader(p,raWorldGeometryShader);
-            shaderGl.attachShader(p,raWorldFragment[i]);
-            const char* names[]={"position","uv","color","fogByte"};
-            for(U a=0;a<4;++a)shaderGl.bindAttribLocation(p,a,names[a]);
-            shaderGl.bindFragDataLocation(p,0,"sourceColor");if(!i)shaderGl.bindFragDataLocation(p,1,"sourceDepth");
-            shaderGl.linkProgram(p);I linked=0;shaderGl.getProgramiv(p,0x8B82,&linked);
-            if(!check("link native RA source-byte material shader")||!linked){
-                shaderGl.getProgramInfoLog(p,sizeof(diagnostic->shader.log),nullptr,diagnostic->shader.log);
-                diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]=0;
-                return fail(*diagnostic,VehicleWindowError50DS::shader,"native RA world shader link failed");}
-            auto& u=raWorldUniform[i];u.matrix=shaderGl.getUniformLocation(p,"worldViewProjection");
-            u.sourceMatrix=shaderGl.getUniformLocation(p,"sourceWorldViewProjection");
-            u.image=shaderGl.getUniformLocation(p,"image");u.fog=shaderGl.getUniformLocation(p,"fogColorAndEnable");
-            u.alpha=shaderGl.getUniformLocation(p,"alphaReference");
-            u.payload=shaderGl.getUniformLocation(p,"payload");u.destination=shaderGl.getUniformLocation(p,"destinationImage");
-            if(u.matrix<0||u.sourceMatrix<0||u.image<0||u.fog<0||u.alpha<0||(i?u.destination<0:u.payload<0))
-                return fail(*diagnostic,VehicleWindowError50DS::shader,"RA source uniforms missing");
-        }
-        }catch(...){return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate RA shader source");}
-        drawGl.bindVertexArray(0);return check("finish native RA geometry and material programs");
-    }
-
-bool VehicleWindowGl50DS::Storage::prepareRaWorldFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d,bool& flareEntered) noexcept {
-        raWorldFramePrepared=false;
-        if(!raWorld)return true;
-        if(raLocalFlareFailed)return fail(d,VehicleWindowError50DS::frame,"previous flare transaction requires renderer retirement");
-        if(thread!=std::this_thread::get_id()||active||frameSet||diagnostic)
-            return fail(d,VehicleWindowError50DS::frame,"RA preparation requires idle owning renderer");
-        if(!current(d))return false;
-        diagnostic=&d;
-        struct PreparationDiagnostic {Storage& owner;~PreparationDiagnostic(){owner.diagnostic=nullptr;}} preparationDiagnostic{*this};
-        bool completed=false;
-        struct FlareFailure {bool& failed;bool& entered;bool& completed;
-            ~FlareFailure(){if(entered&&!completed)failed=true;}} flareFailure{raLocalFlareFailed,flareEntered,completed};
-        if(!raWorldCurrent(d))return false;
-        using N=ra_static_fog_numeric50LA::Status;
-        ra_cold_aggregate50LA::Diagnostic visibility;
-        if(!request.raStaticWorld->prepareNativeStaticDrawPublication(visibility)){
-            std::fprintf(stderr,"RA native visibility rejected: stage=%u failure=%s lighting_status=%u source_pc=0x%08x\n",
-                unsigned(visibility.stage),visibility.failure?visibility.failure:"",
-                unsigned(visibility.lighting.status),unsigned(visibility.lighting.sourcePC));
-            return fail(d,VehicleWindowError50DS::frame,"RA current original portal/model/LOD selection failed");
-        }
-        const auto* selected=request.raStaticWorld->nativeStaticDrawPublication();
-        if(!selected)return fail(d,VehicleWindowError50DS::frame,"RA native draw publication expired");
-        raWorldFrameDraws.clear();raLocalFlareFrames.clear();
-        try {
-            bool havePreviousScissor=false;
-            std::array<std::uint32_t,4> previousSourceScissor{};
-            std::array<std::int32_t,4> previousViewport{};
-            std::array<I,4> previousScissor{};
-            for(const auto& record:*selected){
-                using Kind=game::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA::Kind;
-                const bool localFlare=record.kind==Kind::lightFlare;
-                std::size_t firstSurface=0,surfaceCount=0;
-                if(!localFlare){
-                if(record.kind!=Kind::model)return fail(d,VehicleWindowError50DS::frame,"unknown actual RA draw kind");
-                // Cold construction appends each visual placement in strictly
-                // increasing source world-instance order. The live renderer
-                // publication prevents close/reordering of this same vector.
-                const auto found=std::lower_bound(raWorld->placements_.begin(),raWorld->placements_.end(),
-                    record.worldInstance,[](const auto& owned,std::size_t instance){return owned->worldInstance<instance;});
-                const ra_static_world50LA::Owner::Placement* placement=
-                    found!=raWorld->placements_.end()&&(*found)->worldInstance==record.worldInstance?found->get():nullptr;
-                if(!placement||record.sourceLod>=placement->lodRanges.size())
-                    return fail(d,VehicleWindowError50DS::assets,"RA selected authentic LOD has no retained geometry");
-                const auto& range=placement->lodRanges[record.sourceLod];
-                firstSurface=range.firstSurface;surfaceCount=range.surfaceCount;
-                }
-                if(firstSurface>raWorld->surfaceDrawPlan_.size()||
-                   surfaceCount>raWorld->surfaceDrawPlan_.size()-firstSurface||
-                   record.viewport[2]<=0||record.viewport[3]<=0||
-                   record.scissor[0]>record.scissor[1]||record.scissor[2]>record.scissor[3])
-                    return fail(d,VehicleWindowError50DS::assets,"RA selected surface/scissor range differs");
-                // Original scissor endpoints are inclusive and top-origin.
-                // Native framebuffer uses bottom-origin and actual pixel extent.
-                std::array<I,4> scissor{};
-                if(havePreviousScissor&&record.viewport==previousViewport&&
-                   record.scissor==previousSourceScissor){
-                    scissor=previousScissor;
-                }else{
-                    const double x=record.viewport[0],y=record.viewport[1];
-                    const double w=record.viewport[2],h=record.viewport[3];
-                    const double bounds[4]={
-                        (double(record.scissor[0])-x)/w*frame.width,
-                        (y+h-double(record.scissor[3])-1.)/h*frame.height,
-                        (double(record.scissor[1])+1.-x)/w*frame.width,
-                        (y+h-double(record.scissor[2]))/h*frame.height};
-                    for(U axis=0;axis<4;++axis){
-                        const double extent=(axis&1u)?frame.height:frame.width;
-                        const double rounded=axis<2?std::floor(bounds[axis]):std::ceil(bounds[axis]);
-                        scissor[axis]=static_cast<I>(std::max(0.,std::min(extent,rounded)));
-                    }
-                    previousViewport=record.viewport;previousSourceScissor=record.scissor;
-                    previousScissor=scissor;havePreviousScissor=true;
-                }
-                if(localFlare){
-                    // Queue identity only. Actual numeric/material services run
-                    // in the same ordered pass as preceding model services.
-                    raWorldFrameDraws.push_back({0,scissor,true,static_cast<std::size_t>(-1),
-                        static_cast<std::size_t>(&record-selected->data())});
-                    havePreviousScissor=false;
-                    continue;
-                }
-                if(scissor[0]>=scissor[2]||scissor[1]>=scissor[3])continue;
-                for(std::size_t surface=firstSurface;surface<firstSurface+surfaceCount;++surface){
-                    const auto& plan=raWorld->surfaceDrawPlan_[surface];
-                    if(plan.worldInstance!=record.worldInstance||plan.sourceLod!=record.sourceLod||plan.surface!=surface)
-                        return fail(d,VehicleWindowError50DS::assets,"RA native selection and source draw inventory differ");
-                    // Never reuse computed FP results across a possible allocator callback.
-                    if(raWorldFrameDraws.size()==raWorldFrameDraws.capacity())havePreviousScissor=false;
-                    raWorldFrameDraws.push_back({surface,scissor});
-                }
-            }
-        }catch(...){return fail(d,VehicleWindowError50DS::allocation,"allocate ordered RA selected frame surfaces");}
-        // Empty visibility is valid; it still owns the same actual camera.
-        ra_static_fog50LA::PlacementObservation firstPlacement;
-        if(raWorld->surfaceDrawPlan_.empty()||!request.raStaticWorld->readNativeStaticFogObservation(
-            raWorld->surfaceDrawPlan_.front().placement,raWorldCamera,firstPlacement))
-            return fail(d,VehicleWindowError50DS::frame,"RA current source camera/fog binding required");
-        NativeCameraViewContract50DX contract;
-        contract.provenance=NativeCameraViewProvenance50DX::currentCore49FForOutput;
-        contract.width=frame.width;contract.height=frame.height;contract.clipDepth=NativeCameraClipDepth50DX::negativeOneToOne;
-        NativeCameraMatrix50DX projected;NativeCameraViewError50DX error;
-        if(!convertNativeCameraView50DX(raWorldCamera.camera,contract,projected,error)||
-           std::memcmp(projected.worldViewProjection,frame.worldViewProjection,sizeof(projected.worldViewProjection)))
-            return fail(d,VehicleWindowError50DS::frame,"RA world requires exact current fog-prepared camera matrix");
-        for(U row=0;row<4;++row)for(U column=0;column<4;++column)
-            raWorldSourceMatrix[column*4+row]=raWorldCamera.camera.combined[row*4+column];
-        for(auto& selectedDraw:raWorldFrameDraws){
-            if(selectedDraw.localFlare){
-                const auto* currentSelection=request.raStaticWorld->nativeStaticDrawPublication();
-                if(currentSelection!=selected||!currentSelection||selectedDraw.record>=currentSelection->size())
-                    return fail(d,VehicleWindowError50DS::frame,"actual mixed flare publication changed");
-                const auto& record=(*currentSelection)[selectedDraw.record];
-                flareEntered=true;
-                RaLocalFlareFrame next;assets::OriginalStandardMaterialDiagnostic50LA material;
-                // Native direct visitor replaces unjoined renderer+40/20 in
-                // 141DD8, not source141D70/14B8E0 return authority.
-                const bool visited=request.raStaticWorld->visitNativeLocalFlareEmission(record,
-                    [&](auto& strip,const auto& table,auto& detail)noexcept {
-                        try {next.operands=std::make_unique<LocalFlareEmission::Operands>();}
-                        catch(...){return false;}
-                        const auto result=LocalFlareEmission::capture23CA50(strip,table,*next.operands,detail);
-                        if(result==LocalFlareEmission::Outcome::blocked)return false;
-                        if(result==LocalFlareEmission::Outcome::childrenOnly)next.operands.reset();
-                        return true;
-                    },material);
-                if(!visited){
-                    std::fprintf(stderr,"ra_local_flare_refused record=%zu status=%u pc=%x\n",selectedDraw.record,
-                        unsigned(material.status),unsigned(material.sourcePC));
-                    return fail(d,VehicleWindowError50DS::frame,"actual local flare numeric/material/strip visitor refused");
-                }
-                const auto& scissor=selectedDraw.scissor;
-                if(next.operands&&scissor[0]<scissor[2]&&scissor[1]<scissor[3]){
-                    if(!finishRaLocalFlareFrame(next))
-                        return fail(d,VehicleWindowError50DS::frame,"typed flare native frame operands/resources refused");
-                    try {selectedDraw.flare=raLocalFlareFrames.size();raLocalFlareFrames.push_back(std::move(next));}
-                    catch(...){return fail(d,VehicleWindowError50DS::allocation,"retain actual flare frame operands");}
-                }
-                continue;
-            }
-            const auto& plan=raWorld->surfaceDrawPlan_[selectedDraw.surface];
-            ra_static_fog50LA::CameraObservation camera;ra_static_fog50LA::PlacementObservation placement;
-            if(!request.raStaticWorld->readNativeStaticFogObservation(plan.placement,camera,placement))
-                return fail(d,VehicleWindowError50DS::frame,"current RA source camera/fog binding required");
-            if(camera.generation!=raWorldCamera.generation||camera.publication!=raWorldCamera.publication||
-               camera.frame!=raWorldCamera.frame||camera.fogRevision!=raWorldCamera.fogRevision)
-                return fail(d,VehicleWindowError50DS::frame,"RA source camera changed during frame preparation");
-            const auto& raster=raWorld->rasterInventory_[plan.raster];
-            std::size_t image=raster.firstImage;
-            if(raster.dynamicCrowdMap){
-                ra_cold_aggregate50LA::Diagnostic service;
-                ra_static_world50LA::Owner::ModelCrowdMap selected;ra_static_world50LA::Owner::Diagnostic map;
-                if(!request.raStaticWorld->serviceStaticCrowdSurface241848(plan.surface,service)||
-                   !raWorld->currentCrowdSurfaceMap24B26C(plan.surface,selected,map))
-                    return fail(d,VehicleWindowError50DS::material,"RA actual crowd model current-map service failed");
-                image=selected.imageIndex;
-            }
-            const auto* texture=request.raStaticWorldTextures->asset(static_cast<U>(image));
-            if(!texture||!texture->name)return fail(d,VehicleWindowError50DS::material,"RA current map lacks retained GPU image");
-            raWorldFrameImages[plan.surface]=texture->name;
-            ra_static_fog_numeric50LA::CompressedPreamble fog;
-            if(raster.fragmentDemands.sourceFogByte && placement.computeFogCandidate02){
-                const float slope=ra_static_fog_numeric50LA::detail::div(255.f,
-                    ra_static_fog_numeric50LA::detail::sub(camera.source.start34,camera.source.end38));
-                if(ra_static_fog_numeric50LA::prepareCompressed(placement.packetModel,camera.position,
-                    placement.positionScale,camera.source.end38,slope,fog)!=N::complete)
-                    return fail(d,VehicleWindowError50DS::frame,"RA compressed source fog operands rejected");
-            }
-            using DiffuseVertex=game::original_racer_lighting50KM::DiffuseVertexRgba;
-            bool visited=false,callbackSucceeded=false;
-            const auto prepareVertices=[&](const ra_static_lighting50LA::StaticDiffuseSurface* identity,
-                const std::vector<DiffuseVertex>* diffuse) noexcept {
-                visited=true;
-                if(diffuse&&(!identity||identity->cameraGeneration!=camera.generation||
-                   identity->cameraPublication!=camera.publication||identity->cameraFrame!=camera.frame||
-                   diffuse->size()<plan.vertexCount))
-                    return fail(d,VehicleWindowError50DS::frame,"RA current source diffuse bytes unavailable");
-                const auto prepareWithRawReader=[&](const auto& readRaw) noexcept {
-                    for(U v=0;v<plan.vertexCount;++v){
-                        const auto& input=raWorld->vertices_[plan.vertexStart+v];auto& output=raWorldFrame[plan.vertexStart+v];
-                        std::array<std::uint8_t,4> color;
-                        if(diffuse){
-                            color=(*diffuse)[v].rgba;
-                        }else {if(!plan.hasOriginalColors)return fail(d,VehicleWindowError50DS::assets,"RA prelit source colors absent");color=input.sourceColor;}
-                        for(U a=0;a<4;++a)output.color[a]=color[a];
-                        std::uint8_t fogByte=ra_static_fog_numeric50LA::noComputeFogByte;
-                        if(raster.fragmentDemands.sourceFogByte&&placement.computeFogCandidate02){
-                            std::array<std::int32_t,3> raw;
-                            if(!readRaw(v,raw)||
-                               ra_static_fog_numeric50LA::radialByte(fog,raw,fogByte)!=N::complete)
-                                return fail(d,VehicleWindowError50DS::frame,"RA original raw position/fog byte unavailable");
-                        }
-                        output.fog=fogByte;
-                    }
-                    return true;
-                };
-                if(raster.fragmentDemands.sourceFogByte&&placement.computeFogCandidate02){
-                    bool readVisited=false,readSucceeded=false;
-                    const bool prepared=request.raStaticWorld->visitNativeStaticRawPositionSurface(plan.surface,
-                        [&](const auto& readRaw) noexcept {
-                            readVisited=true;readSucceeded=prepareWithRawReader(readRaw);return readSucceeded;
-                        });
-                    if(!prepared){
-                        if(!readVisited||readSucceeded)
-                            return fail(d,VehicleWindowError50DS::frame,"RA original raw position/fog byte unavailable");
-                        return false;
-                    }
-                    return true;
-                }
-                // The actual no-fog branch cannot invoke this reader.
-                return prepareWithRawReader([](std::size_t,std::array<std::int32_t,3>&) noexcept {return false;});
-            };
-            if(raster.requiresNativeStaticLighting){
-                const bool prepared=request.raStaticWorld->visitNativeStaticDiffuseSurface(plan.surface,
-                    [&](const auto& identity,const auto& diffuse) noexcept {
-                        callbackSucceeded=prepareVertices(&identity,&diffuse);
-                        return callbackSucceeded;
-                    });
-                if(!prepared){
-                    if(!visited||callbackSucceeded)return fail(d,VehicleWindowError50DS::frame,"RA current source diffuse bytes unavailable");
-                    return false;
-                }
-            }else if(!prepareVertices(nullptr,nullptr))return false;
-        }
-        if(!request.raStaticWorld->nativeStaticDrawPublication()||!raWorldCurrent(d))return fail(d,VehicleWindowError50DS::frame,"RA current frame has no complete source plan");
-        raWorldFramePrepared=true;completed=true;return true;
-    }
-
-bool VehicleWindowGl50DS::Storage::raWorldFrameCurrent(VehicleWindowDiagnostic50DS& d) const noexcept {
-        if(!raWorldFramePrepared||!raWorldCurrent(d)||!request.raStaticWorld->nativeStaticDrawPublication()||raWorld->surfaceDrawPlan_.empty())
-            return fail(d,VehicleWindowError50DS::frame,"RA frame operands were not prepared");
-        // Other frame callbacks run after CPU preparation. Recheck the actual
-        // camera/fog lease at draw time rather than relying on cached numbers.
-        ra_static_fog50LA::CameraObservation camera;
-        ra_static_fog50LA::PlacementObservation placement;
-        if(!request.raStaticWorld->readNativeStaticFogObservation(
-               raWorld->surfaceDrawPlan_.front().placement,camera,placement)||
-           camera.generation!=raWorldCamera.generation||camera.publication!=raWorldCamera.publication||
-           camera.frame!=raWorldCamera.frame||camera.fogRevision!=raWorldCamera.fogRevision)
-            return fail(d,VehicleWindowError50DS::frame,"RA prepared camera/fog publication changed before draw");
-        for(const auto& frame:raLocalFlareFrames)
-            if(!frame.operands||!LocalFlareEmission::materialCurrent(*frame.operands))
-                return fail(d,VehicleWindowError50DS::frame,"flare originating/final material publication expired");
-        return true;
-    }
-
-void VehicleWindowGl50DS::Storage::bindRaWorldMaterial(const ra_static_world50LA::Owner::RasterInventory& raster,U program,bool payload,
-        bool uploadUniforms) noexcept {
-        using F=assets::OriginalUiGsField50KG;
-        const auto field=[&](F f){return raster.finalContext.fields[static_cast<std::size_t>(f)].value;};
-        const auto& u=raWorldUniform[program];
-        // Program1 is used only by direct AA1 blended draws: later checked
-        // primitives retain it. Program0 still binds for every AA0 payload.
-        if(uploadUniforms || program==0)gl.useProgram(raWorldProgram[program]);
-        // The selected draw's material/camera uniforms do not vary.
-        if(!uploadUniforms)return;
-        gl.uniformMatrix4fv(u.matrix,1,0,matrix);
-        gl.uniformMatrix4fv(u.sourceMatrix,1,0,raWorldSourceMatrix);gl.uniform1i(u.image,0);
-        const U color=raWorldCamera.source.color30;
-        //Original color30 is packed ARGB, not a GS-native low-byte-R word.
-        //RA SCB colorrgb180,180,165 is retained as0xffb4b4a5 by the actual
-        //fog owner;13E990 passes that packed word unchanged to renderer+28.
-        gl.uniform4f(u.fog,float((color>>16)&255),float((color>>8)&255),float(color&255),field(F::foggingOnOff)?1.f:0.f);
-        gl.uniform1f(u.alpha,field(F::alphaTestOnOff)?float(field(F::alphaReferenceValue)):-1.f);
-        if(program)gl.uniform1i(u.destination,2);else gl.uniform1i(u.payload,payload?1:0);
-    }
-
-bool VehicleWindowGl50DS::Storage::snapshotRaWorld(U bank,const std::array<I,4>& region) noexcept {
-        if(gl.copyImageSubData){
-            // Same distinct RGBA8/four-sample snapshot as the racer bridge.
-            gl.copyImageSubData(coverageLive.color[bank],coverageTexture,0,
-                region[0],region[1],0,coverageLive.snapshotColor,coverageTexture,0,
-                region[0],region[1],0,region[2]-region[0],region[3]-region[1],1);
-        }else{
-            // Extent creation checked these private FBO selectors; binds retain them.
-            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);
-            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
-            gl.blitFramebuffer(region[0],region[1],region[2],region[3],
-                region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
-        }
-        return check("retain actual per-sample destination before next RA primitive");
-    }
-
-bool VehicleWindowGl50DS::Storage::raTriangleOutsideNativeClip(U first) const noexcept {
-        // Skip only triangles provably outside one common GL clip plane.
-        // Conservative error bounds cover float dot-product rounding on GPU;
-        // uncertain/nonfinite cases retain the original ordered submission.
-        unsigned common=63u;
-        for(U corner=0;corner<3;++corner){
-            if(first+corner>=raWorld->indices_.size())return false;
-            const auto index=raWorld->indices_[first+corner];
-            if(index>=raWorldGeometry.size())return false;
-            const auto& v=raWorldGeometry[index];
-            const double p[4]={v.position[0],v.position[1],v.position[2],1.};
-            // Reuse only identical products, never reassociate a plane sum.
-            // Populate each axis at its first original plane so an earlier
-            // nonfinite rejection does not evaluate previously unreached axes.
-            double products[4][4];
-            unsigned outside=0;
-            for(U plane=0;plane<6;++plane){
-                const U axis=plane/2;const double sign=(plane&1)?-1.:1.;
-                double value=0,scale=0;
-                for(U k=0;k<4;++k){
-                    // Same row-vector product as GLSL; each output lane
-                    // reads one column of the column-major uniform storage.
-                    if(plane==0)products[3][k]=double(matrix[3*4+k])*p[k];
-                    if(!(plane&1))products[axis][k]=double(matrix[axis*4+k])*p[k];
-                    const double w=products[3][k];
-                    const double a=products[axis][k];
-                    value+=w+sign*a;scale+=std::abs(w)+std::abs(a);
-                }
-                if(!std::isfinite(value)||!std::isfinite(scale))return false;
-                const double margin=32.*std::numeric_limits<float>::epsilon()*scale+0.0001;
-                if(value < -margin)outside|=1u<<plane;
-            }
-            common&=outside;if(!common)return false;
-        }
-        return common!=0;
-    }
-
 void VehicleWindowGl50DS::Storage::beginRacerRasterOperandGroup(U slot,U component,U first,U count)noexcept {
         racerRasterCacheActive=false;
         if(count<3)return;
@@ -1491,17 +876,6 @@ std::array<I,4> VehicleWindowGl50DS::Storage::nativeTriangleRasterRegion(const s
         return nativeTriangleRasterOperands(vertices);
     }
 
-std::array<I,4> VehicleWindowGl50DS::Storage::raTriangleRasterRegion(U first)const noexcept {
-        std::array<std::array<float,3>,3> triangle;
-        for(U corner=0;corner<3;++corner){
-            if(first+corner>=raWorld->indices_.size())return {{0,0,width,height}};
-            const auto index=raWorld->indices_[first+corner];
-            if(index>=raWorldGeometry.size())return {{0,0,width,height}};
-            std::copy_n(raWorldGeometry[index].position,3,triangle[corner].begin());
-        }
-        return nativeTriangleRasterRegion(triangle);
-    }
-
 std::array<I,4> VehicleWindowGl50DS::Storage::racerTriangleRasterRegion(U slot,U component,U first)const noexcept {
         const std::array<I,4> full{{0,0,width,height}};
         if(slot>frameOpponentCount)return full;
@@ -1532,126 +906,48 @@ std::array<I,4> VehicleWindowGl50DS::Storage::racerTriangleRasterRegion(U slot,U
         return nativeTriangleRasterOperands(vertices,cache?part.indices+first:nullptr);
     }
 
-void VehicleWindowGl50DS::Storage::traceRaFogGpuAttestation() noexcept {
-        if(!gl.getVertexAttribiv||!gl.getVertexAttribPointerv||!gl.getBufferSubData||
-           !gl.getIntegerv||!gl.getBufferParameteri64v||!drawGl.bindVertexArray||
-           !drawGl.bindBuffer||!drawGl.getError){
-            std::fprintf(stderr,"ra_fog_gpu_attestation unavailable=missing_loaded_api gpu_winner_unknown=1\n");return;
-        }
-        const U priorError=drawGl.getError();
-        if(priorError){
-            std::fprintf(stderr,"ra_fog_gpu_attestation unavailable=preexisting_gl_error error=%u gpu_winner_unknown=1\n",priorError);return;
-        }
-        I oldArray=0,oldBuffer=0;
-        gl.getIntegerv(0x85B5,&oldArray);gl.getIntegerv(0x8894,&oldBuffer);
-        U error=drawGl.getError();
-        if(error||oldArray<0||oldBuffer<0){
-            std::fprintf(stderr,"ra_fog_gpu_attestation unavailable=binding_query error=%u gpu_winner_unknown=1\n",error);return;
-        }
-        drawGl.bindVertexArray(raWorldArray);
-        constexpr U properties[]={0x8622,0x8623,0x8624,0x8625,0x886A,0x889F,0x88FD};
-        // enabled,size,stride,type,normalized,associatedVBO,integer.
-        I actual[7]{};
-        for(U i=0;i<7;++i)gl.getVertexAttribiv(3,properties[i],&actual[i]);
-        void* pointer=nullptr;gl.getVertexAttribPointerv(3,0x8645,&pointer);
-        I element=0;gl.getIntegerv(0x8895,&element);
-        error=drawGl.getError();
-        const auto offset=reinterpret_cast<std::uintptr_t>(pointer);
-        const bool layout=!error&&actual[0]==1&&actual[1]==1&&
-            actual[2]==I(sizeof(RaWorldFrameVertex))&&actual[3]==I(floatType)&&actual[4]==0&&
-            actual[5]==I(raWorldOperands)&&actual[6]==0&&offset==offsetof(RaWorldFrameVertex,fog);
-        std::fprintf(stderr,"ra_fog_gpu_attribute vao=%u attribute=3 query_error=%u enabled=%d size=%d stride=%d type=%d normalized=%d vbo=%d integer=%d offset=%llu expected_vbo=%u expected_stride=%zu expected_offset=%zu layout_match=%u element_buffer=%d expected_element=%u gpu_winner_unknown=1\n",
-            raWorldArray,error,actual[0],actual[1],actual[2],actual[3],actual[4],actual[5],actual[6],
-            static_cast<unsigned long long>(offset),raWorldOperands,sizeof(RaWorldFrameVertex),offsetof(RaWorldFrameVertex,fog),unsigned(layout),element,raWorldIndices);
-        drawGl.bindBuffer(arrayBuffer,raWorldOperands);
-        std::int64_t vertexBytes=-1;gl.getBufferParameteri64v(arrayBuffer,bufferSize,&vertexBytes);
-        const U bufferError=drawGl.getError();
-        const std::size_t surface=438;
-        if(error||bufferError||vertexBytes<0||surface>=raWorld->surfaceDrawPlan_.size()){
-            std::fprintf(stderr,"ra_fog_gpu_attestation unavailable=source_or_buffer query_error=%u buffer_error=%u vertex_bytes=%lld surface=%zu\n",
-                error,bufferError,static_cast<long long>(vertexBytes),surface);
-        }else{
-            const auto& plan=raWorld->surfaceDrawPlan_[surface];
-            bool selected=false;for(const auto& draw:raWorldFrameDraws)if(!draw.localFlare&&draw.surface==surface)selected=true;
-            for(U triangle:{116u,117u}){
-                const std::size_t relative=std::size_t(triangle)*3;
-                if(relative>plan.indexCount||plan.indexCount-relative<3||
-                   std::size_t(plan.indexStart)>raWorld->indices_.size()||
-                   relative+3>raWorld->indices_.size()-std::size_t(plan.indexStart)){
-                    std::fprintf(stderr,"ra_fog_gpu_triangle surface=%zu triangle=%u unavailable=index_range\n",surface,triangle);continue;
-                }
-                for(U corner=0;corner<3;++corner){
-                    const auto index=raWorld->indices_[std::size_t(plan.indexStart)+relative+corner];
-                    const std::uint64_t byte=std::uint64_t(index)*sizeof(RaWorldFrameVertex)+offsetof(RaWorldFrameVertex,fog);
-                    if(index>=raWorldFrame.size()||byte>std::uint64_t(vertexBytes)||
-                       sizeof(float)>std::uint64_t(vertexBytes)-byte||
-                       byte>std::uint64_t(std::numeric_limits<std::intptr_t>::max())){
-                        std::fprintf(stderr,"ra_fog_gpu_vertex surface=%zu triangle=%u corner=%u index=%u unavailable=vertex_range\n",surface,triangle,corner,index);continue;
-                    }
-                    float gpu=0;gl.getBufferSubData(arrayBuffer,static_cast<std::intptr_t>(byte),sizeof(gpu),&gpu);
-                    // Unselected records outside the current upload interval
-                    // can differ after an abandoned CPU preparation. Report
-                    // that real staging/GPU difference rather than hiding it.
-                    const U readError=drawGl.getError();const float cpu=raWorldFrame[index].fog;
-                    U gpuBits=0,cpuBits=0;std::memcpy(&gpuBits,&gpu,sizeof(gpuBits));std::memcpy(&cpuBits,&cpu,sizeof(cpuBits));
-                    std::fprintf(stderr,"ra_fog_gpu_vertex surface=%zu triangle=%u corner=%u selected=%u index=%u byte=%llu buffer=%u read_error=%u cpu=%.9g gpu=%.9g cpu_bits=%08x gpu_bits=%08x bytes_match=%u fetch_layout_match=%u gpu_winner_unknown=1\n",
-                        surface,triangle,corner,unsigned(selected),index,static_cast<unsigned long long>(byte),raWorldOperands,readError,
-                        double(cpu),double(gpu),cpuBits,gpuBits,unsigned(!readError&&cpuBits==gpuBits),unsigned(layout));
-                }
-            }
-        }
-        // ARRAY_BUFFER is global; VAO restoration does not restore it. Neither
-        // queried VAO nor its element/attribute associations were modified.
-        drawGl.bindVertexArray(static_cast<U>(oldArray));drawGl.bindBuffer(arrayBuffer,static_cast<U>(oldBuffer));
-        I restoredArray=-1,restoredBuffer=-1;gl.getIntegerv(0x85B5,&restoredArray);gl.getIntegerv(0x8894,&restoredBuffer);
-        const U restoreError=drawGl.getError();
-        std::fprintf(stderr,"ra_fog_gpu_attestation_end old_vao=%d restored_vao=%d old_array_buffer=%d restored_array_buffer=%d restore_error=%u restored=%u gpu_winner_unknown=1\n",
-            oldArray,restoredArray,oldBuffer,restoredBuffer,restoreError,unsigned(!restoreError&&oldArray==restoredArray&&oldBuffer==restoredBuffer));
-    }
-
-void VehicleWindowGl50DS::Storage::traceRaPixelProvenance() noexcept {
-        if(raPixelProvenanceLogged)return;
-        const char* enabled=std::getenv("RR_RA_PIXEL_PROVENANCE");
+void VehicleWindowGl50DS::Storage::tracePixelProvenance() noexcept {
+        // One course-independent diagnostic (RR_PIXEL_PROVENANCE=1, default
+        // off) over the one track path: the uploaded track mesh, its source
+        // spans and the matrix of the retained accepted frame. Read-only.
+        if(pixelProvenanceLogged)return;
+        const char* enabled=std::getenv("RR_PIXEL_PROVENANCE");
         if(!enabled||std::strcmp(enabled,"1"))return;
-        raPixelProvenanceLogged=true;
-        traceRaFogGpuAttestation();
-        // Requested reference probe: GL pixel(50,28) in a640x448 capture.
-        // Select the corresponding pixel center when the framebuffer differs.
+        pixelProvenanceLogged=true;
+        const auto* mesh=retainedTrackMesh;
+        if(!mesh||!trackSpans||!trackSpanCount){
+            std::fprintf(stderr,"pixel_provenance unavailable=no_track_mesh gpu_winner_unknown=1\n");return;}
+        // Reference probe: GL pixel(50,28) in a640x448 capture; the matching
+        // pixel center when the framebuffer differs.
         const I px=std::min(width-1,static_cast<I>(50.5*double(width)/640.));
         const I py=std::min(height-1,static_cast<I>(28.5*double(height)/448.));
-        std::fprintf(stderr,"ra_pixel_provenance_begin cpu_candidates_only=1 capture_selected_frame=1 width=%d height=%d pixel=%d,%d camera_generation=%llu camera_publication=%llu camera_frame=%llu fog_revision=%llu draws=%zu\n",
-            width,height,px,py,static_cast<unsigned long long>(raWorldCamera.generation),
-            static_cast<unsigned long long>(raWorldCamera.publication),
-            static_cast<unsigned long long>(raWorldCamera.frame),
-            static_cast<unsigned long long>(raWorldCamera.fogRevision),raWorldFrameDraws.size());
+        std::fprintf(stderr,"pixel_provenance_begin cpu_candidates_only=1 capture_selected_frame=1 width=%d height=%d pixel=%d,%d spans=%u camera_publication=%llu\n",
+            width,height,px,py,trackSpanCount,static_cast<unsigned long long>(retainedRaceCameraPublication));
         constexpr std::size_t limit=512;
-        std::size_t triangles=0,candidates=0,logged=0,drawOrdinal=0;
-        for(const auto& draw:raWorldFrameDraws){
-            if(draw.localFlare){++drawOrdinal;continue;} //Model-only diagnostic, never relabel flare as surface0.
-            const auto& plan=raWorld->surfaceDrawPlan_[draw.surface];
-            const auto& raster=raWorld->rasterInventory_[plan.raster];
-            const auto& material=raWorld->imageFamilies_[raster.family].materialMember;
-            for(U first=plan.indexStart;first<plan.indexStart+plan.indexCount;first+=3){
+        std::size_t triangles=0,candidates=0,logged=0;
+        for(U i=0;i<trackSpanCount;++i){
+            const auto& span=trackSpans[i];
+            if(span.indexStart>mesh->indices.size()||mesh->indices.size()-span.indexStart<span.indexCount)continue;
+            for(U first=span.indexStart;first+3<=span.indexStart+span.indexCount;first+=3){
                 ++triangles;
-                if(px<draw.scissor[0]||px>=draw.scissor[2]||py<draw.scissor[1]||py>=draw.scissor[3])continue;
-                // Same matrix/index/vertex operands and conservative near-clip
-                // fallback as the actual RA blended-triangle raster region.
-                const auto region=raTriangleRasterRegion(first);
+                // Same mesh/index/matrix operands and conservative near-clip
+                // fallback as the GS destination-alpha raster region.
+                const auto region=gsTriangleRegion(first);
                 if(px<region[0]||px>=region[2]||py<region[1]||py>=region[3])continue;
                 ++candidates;if(logged==limit)continue;++logged;
-                std::fprintf(stderr,"ra_pixel_candidate draw=%zu worldInstance=%zu lod=%u sourceSurface=%u surface=%zu triangle=%u material=%s materialRow=%d blend=%u aa=%u scissor=%d,%d,%d,%d conservative_region=%d,%d,%d,%d",
-                    drawOrdinal,plan.worldInstance,plan.sourceLod,plan.sourceSurface,plan.surface,
-                    (first-plan.indexStart)/3,material.c_str(),raster.materialRow,
-                    unsigned(raster.fragmentDemands.orderedCurrentDestination),unsigned(raster.requiresNativeCoverage),
-                    draw.scissor[0],draw.scissor[1],draw.scissor[2],draw.scissor[3],
+                std::fprintf(stderr,"pixel_candidate span=%u selected=%u worldInstance=%u zone=%u pass=%u/%u texture=%u blend=%u aa=%u dest_alpha=%u environment=%u triangle=%u conservative_region=%d,%d,%d,%d",
+                    i,unsigned(span.submittedGameplayCandidate),span.worldInstance,span.sourceZone,span.sourcePass,span.sourcePassCount,
+                    span.material.textureIndex,unsigned(span.material.policy.blend),unsigned(span.nativeCoverage),
+                    unsigned(span.gsDestinationAlphaPass),unsigned(span.sourceEnvironmentMap),(first-span.indexStart)/3,
                     region[0],region[1],region[2],region[3]);
                 for(U corner=0;corner<3;++corner){
-                    const auto index=raWorld->indices_[first+corner];
-                    const auto& v=raWorldGeometry[index];const auto& current=raWorldFrame[index];
-                    std::fprintf(stderr," v%u_world=%.9g,%.9g,%.9g v%u_uv=%.9g,%.9g v%u_rgba=%.9g,%.9g,%.9g,%.9g v%u_fog=%.9g",
+                    const auto index=mesh->indices[first+corner];
+                    if(index>=mesh->vertices.size()){std::fprintf(stderr," v%u=out_of_range",corner);continue;}
+                    const auto& v=mesh->vertices[index];
+                    std::fprintf(stderr," v%u_world=%.9g,%.9g,%.9g v%u_uv=%.9g,%.9g v%u_rgba=%u,%u,%u,%u",
                         corner,double(v.position[0]),double(v.position[1]),double(v.position[2]),
-                        corner,double(v.uv[0]),double(v.uv[1]),corner,double(current.color[0]),double(current.color[1]),
-                        double(current.color[2]),double(current.color[3]),corner,double(current.fog));
+                        corner,double(v.uv[0]),double(v.uv[1]),corner,unsigned(v.color[0]),unsigned(v.color[1]),
+                        unsigned(v.color[2]),unsigned(v.color[3]));
                     double clip[4]{};
                     for(U column=0;column<4;++column){
                         for(U axis=0;axis<3;++axis)clip[column]+=double(matrix[column*4+axis])*v.position[axis];
@@ -1661,203 +957,40 @@ void VehicleWindowGl50DS::Storage::traceRaPixelProvenance() noexcept {
                 }
                 std::fprintf(stderr,"\n");
             }
-            ++drawOrdinal;
         }
-        std::fprintf(stderr,"ra_pixel_provenance_end triangles=%zu conservative_candidates=%zu logged=%zu truncated=%zu gpu_winner_unknown=1\n",
+        std::fprintf(stderr,"pixel_provenance_end triangles=%zu conservative_candidates=%zu logged=%zu truncated=%zu gpu_winner_unknown=1\n",
             triangles,candidates,logged,candidates-logged);
     }
 
-bool VehicleWindowGl50DS::Storage::drawRaWorld(U bank) noexcept {
-        if(!raWorld)return true;
-        bool complete=false;
-        struct FlareDrawFailure {bool& failed;const std::vector<RaLocalFlareFrame>& frames;bool& complete;
-            ~FlareDrawFailure(){if(!frames.empty()&&!complete)failed=true;}} flareFailure{raLocalFlareFailed,raLocalFlareFrames,complete};
-        if(!raWorldFrameCurrent(*diagnostic)||!coverageLive.scene[bank]||!coverageLive.snapshot||!coverageLive.raster)
-            return fail(*diagnostic,VehicleWindowError50DS::frame,"RA complete common target/coverage storage missing");
-        // Cold admission proves each surface's indices stay in its vertex
-        // range. Recompute one containing upload interval for this selection;
-        // no prior frame, LOD, or successful-upload receipt is reused.
-        std::size_t uploadFirst=raWorldFrame.size(),uploadEnd=0;
-        for(const auto& selectedDraw:raWorldFrameDraws){
-            if(selectedDraw.localFlare)continue;
-            if(selectedDraw.surface>=raWorld->surfaceDrawPlan_.size())
-                return fail(*diagnostic,VehicleWindowError50DS::assets,"RA selected upload surface exceeds retained plan");
-            const auto& plan=raWorld->surfaceDrawPlan_[selectedDraw.surface];
-            const std::size_t first=plan.vertexStart,count=plan.vertexCount;
-            if(!count||first>raWorldFrame.size()||count>raWorldFrame.size()-first)
-                return fail(*diagnostic,VehicleWindowError50DS::assets,"RA selected upload range exceeds current operands");
-            uploadFirst=std::min(uploadFirst,first);uploadEnd=std::max(uploadEnd,first+count);
-        }
-        drawGl.bindVertexArray(raWorldArray);drawGl.bindBuffer(arrayBuffer,raWorldOperands);
-        if(uploadFirst<uploadEnd)
-            drawGl.bufferSubData(arrayBuffer,static_cast<std::intptr_t>(uploadFirst*sizeof(RaWorldFrameVertex)),
-                static_cast<std::intptr_t>((uploadEnd-uploadFirst)*sizeof(RaWorldFrameVertex)),raWorldFrame.data()+uploadFirst);
-        drawGl.bindBuffer(elementBuffer,raWorldIndices);
-        gl.disable(0x0BE2);gl.disable(0x0B44);gl.disable(0x0C11);gl.disable(0x8DB9);gl.colorMask(1,1,1,1);
-        bool accepted=check("upload same-camera RA packed-color and fog operands");
-        for(const auto& selectedDraw:raWorldFrameDraws){
-            if(!accepted)break;
-            if(selectedDraw.localFlare){
-                if(selectedDraw.flare==static_cast<std::size_t>(-1))continue;
-                accepted=drawRaLocalFlare(bank,selectedDraw.flare,selectedDraw.scissor);
-                // Native mixed ordering is retained. The following model
-                // establishes its own program/VAO/texture and blend mode.
-                continue;
-            }
-            const auto& plan=raWorld->surfaceDrawPlan_[selectedDraw.surface];
-            const auto& raster=raWorld->rasterInventory_[plan.raster];
-            const bool blend=raster.fragmentDemands.orderedCurrentDestination;
-            const bool aa=raster.requiresNativeCoverage;
-            const U image=raWorldFrameImages[plan.surface];
-            // Opaque original triangles can share a draw. Blended triangles
-            // observe each preceding primitive's current destination samples.
-            const U step=blend?3:plan.indexCount;
-            // This uninterrupted selected draw has no callbacks or other
-            // writers of its private RA program uniforms. Establish them only
-            // after clipping admits a primitive, and reuse only after success.
-            bool firstPrimitive=true;
-            for(U first=plan.indexStart;accepted&&first<plan.indexStart+plan.indexCount;first+=step){
-                if(blend&&raTriangleOutsideNativeClip(first))continue;
-                if(blend){
-                    // Only this conservative raster rectangle can observe the
-                    // next primitive. Snapshot, payload clear and composition
-                    // share it; all other samples remain untouched.
-                    auto region=raTriangleRasterRegion(first);
-                    for(U axis=0;axis<2;++axis){region[axis]=std::max(region[axis],selectedDraw.scissor[axis]);
-                        region[axis+2]=std::min(region[axis+2],selectedDraw.scissor[axis+2]);}
-                    if(region[2]<=region[0]||region[3]<=region[1])continue;
-                    gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
-                    if(!snapshotRaWorld(bank,region)){accepted=false;break;}
-                }else {
-                    const auto& region=selectedDraw.scissor;
-                    gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
-                }
-                gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,image);
-                drawGl.bindVertexArray(raWorldArray);
-                if(blend&&!aa){
-                    // AA0 uses one center payload followed by per-sample
-                    // composition, matching the established racer bridge.
-                    gl.bindFramebuffer(framebuffer,coverageLive.raster);
-                    // Private raster FBO retains both checked attachment selectors.
-                    coverageAa0();gl.disable(0x0B71);gl.depthMask(0);
-                    const float invalid[]={0,0,0,-1};gl.clearBufferfv(0x1800,0,invalid);
-                    bindRaWorldMaterial(raster,0,true,firstPrimitive);
-                    drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
-                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
-                    gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
-                    gl.useProgram(coverageProgram);drawGl.bindVertexArray(coverageArray);
-                    gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,coverageLive.payload);
-                    gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
-                    gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
-                    // Later primitives retain mode1 from this selected draw's checked first bridge.
-                    if(firstPrimitive)gl.uniform1i(coverageRaCompositionUniform,1);gl.drawArrays(0x0004,0,3);
-                }else {
-                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
-                    bindTrackCoverage(aa?NativeTrackCoverage50DS::fourSampleAa1:NativeTrackCoverage50DS::aa0);
-                    gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
-                    bindRaWorldMaterial(raster,blend?1:0,false,firstPrimitive);
-                    if(blend){gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);}
-                    drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(step),0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
-                }
-                gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
-                gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);gl.activeTexture(textureUnit0);
-                accepted=check("draw source-ordered RA material primitive with source depth/alpha rules");
-                if(accepted)firstPrimitive=false;
-            }
-            if(accepted){++diagnostic->trackDraws;diagnostic->trackIndices+=plan.indexCount;}
-        }
-        gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
-        gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,0);
-        gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
-        gl.disable(0x0C11);
-        resetPodState();const bool restored=check("restore common scene target after complete RA world");
-        complete=accepted&&restored;return complete;
-    }
-
-bool VehicleWindowGl50DS::Storage::validateRcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
-    if(!input.track.rcParticleWindow)return true;
-    const auto& window=*input.track.rcParticleWindow;
-    if(input.track.gbParticleWindow||input.track.mcParticleWindow||input.gcParticleCpuTextures||input.gcParticleTextures||input.gcParticleMaterial||
-       rcParticleWindow.get()!=&window||!window.ready()||window.renderer_!=rcParticleRenderer||
-       !window.bank_.loaded()||window.bank_.textureCount()!=1||window.gpu_.textureCount()!=1||
-       !window.gpu_.validBorrow(input.context,input.isCurrent,window.gpu_.publicationToken())||
-       !window.gpu_.matchesSourceBank(window.bank_,window.gpu_.publicationToken()))
-        return fail(*diagnostic,VehicleWindowError50DS::material,"RC particle bank requires its exact retained Window publication");
-    const auto* source=window.bank_.texture(0);const auto* image=window.gpu_.asset(0);
-    if(!source||!image||!image->name||image->identity!=source->identity||
-       source->identity!=rc_particle_visual50RC::Window::imageIdentity||
-       source->texture.width!=128||source->texture.height!=1024||source->texture.rgba.size()!=128u*1024u*4u)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"RC actual particle atlas identity differs");
-    std::uint8_t maximum=0;
-    for(std::size_t i=3;i<source->texture.rgba.size();i+=4)maximum=std::max(maximum,source->texture.rgba[i]);
-    rcParticleMaximumAlpha=maximum;rcParticlePublication=window.gpu_.publicationToken();return true;
-}
-
-bool VehicleWindowGl50DS::Storage::validateGbParticleBank(const VehicleWindowRequest50DS& input) noexcept {
-    if(!input.track.gbParticleWindow)return true;
-    const auto& window=*input.track.gbParticleWindow;
-    if(input.track.rcParticleWindow||input.track.mcParticleWindow||input.gcParticleCpuTextures||input.gcParticleTextures||input.gcParticleMaterial||
-       gbParticleWindow.get()!=&window||!window.ready()||window.renderer_!=gbParticleRenderer||
-       !window.bank_.loaded()||window.bank_.textureCount()!=1||window.gpu_.textureCount()!=1||
-       !window.gpu_.validBorrow(input.context,input.isCurrent,window.gpu_.publicationToken())||
-       !window.gpu_.matchesSourceBank(window.bank_,window.gpu_.publicationToken()))
-        return fail(*diagnostic,VehicleWindowError50DS::material,"GB particle bank requires its exact retained Window publication");
-    const auto* source=window.bank_.texture(0);const auto* image=window.gpu_.asset(0);
-    if(!source||!image||!image->name||image->identity!=source->identity||
-       source->identity!=gb_particle_visual50GB::Window::imageIdentity||
-       source->texture.width!=128||source->texture.height!=1024||source->texture.rgba.size()!=128u*1024u*4u)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"GB actual particle atlas identity differs");
-    std::uint8_t maximum=0;
-    for(std::size_t i=3;i<source->texture.rgba.size();i+=4)maximum=std::max(maximum,source->texture.rgba[i]);
-    gbParticleMaximumAlpha=maximum;gbParticlePublication=window.gpu_.publicationToken();return true;
-}
-
-bool VehicleWindowGl50DS::Storage::validateMcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
-    if(!input.track.mcParticleWindow)return true;
-    const auto& window=*input.track.mcParticleWindow;
-    if(input.track.rcParticleWindow||input.track.gbParticleWindow||input.gcParticleCpuTextures||input.gcParticleTextures||input.gcParticleMaterial||
-       mcParticleWindow.get()!=&window||!window.ready()||window.renderer_!=mcParticleRenderer||
-       !window.bank_.loaded()||window.bank_.textureCount()!=1||window.gpu_.textureCount()!=1||
-       !window.gpu_.validBorrow(input.context,input.isCurrent,window.gpu_.publicationToken())||
-       !window.gpu_.matchesSourceBank(window.bank_,window.gpu_.publicationToken()))
-        return fail(*diagnostic,VehicleWindowError50DS::material,"MC particle bank requires its exact retained Window publication");
-    const auto* source=window.bank_.texture(0);const auto* image=window.gpu_.asset(0);
-    if(!source||!image||!image->name||image->identity!=source->identity||
-       source->identity!=mc_particle_visual50MC::Window::imageIdentity||
-       source->texture.width!=128||source->texture.height!=1024||source->texture.rgba.size()!=128u*1024u*4u)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"MC actual particle atlas identity differs");
-    std::uint8_t maximum=0;
-    for(std::size_t i=3;i<source->texture.rgba.size();i+=4)maximum=std::max(maximum,source->texture.rgba[i]);
-    mcParticleMaximumAlpha=maximum;mcParticlePublication=window.gpu_.publicationToken();return true;
-}
-
 bool VehicleWindowGl50DS::Storage::validateGcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
-    const auto* cpu=input.gcParticleCpuTextures;const auto* gpu=input.gcParticleTextures;
-    const auto* material=input.gcParticleMaterial;
+    // The one track particle bank (every course): the track's own PSM/PST
+    // decoded by the 1B4DC0 manager's cold owner. Admission reads the parsed
+    // material states and the atlas itself; no course member/atlas is pinned.
+    const auto* cpu=input.particleCpuTextures;const auto* gpu=input.particleTextures;
+    const auto* material=input.particleMaterial;
     if(!cpu&&!gpu&&!material)return true;
     if(!cpu||!gpu||!material||!cpu->loaded()||cpu->textureCount()!=1||gpu->textureCount()!=1||
        !gpu->validBorrow(input.context,input.isCurrent,gpu->publicationToken())||
-       material->identity!=&assets::originalGcParticlePsm50KG()||
-       material->textureIdentity!=&assets::originalGcParticlePst50KG()||
+       !material->identity||!material->textureIdentity||
        !material->templateIdentity||!material->fogEnabled||!material->alphaTestGreaterZero||
        !material->noDestinationAlphaConsumer)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"GC particle real PSM/PST/DefaultMT bank required");
+        return fail(*diagnostic,VehicleWindowError50DS::material,"track particle PSM/PST/DefaultMT bank required");
     const auto* source=cpu->texture(0);const auto* image=gpu->asset(0);
     if(!source||!image||!image->name||image->identity!=source->identity||
-       source->identity!=0x474344454d4f5052ull||source->texture.width!=128||source->texture.height!=1024||
-       source->texture.rgba.size()!=128u*1024u*4u)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"GC particle authentic atlas publication differs");
+       !source->texture.width||!source->texture.height||
+       source->texture.rgba.size()!=std::size_t(source->texture.width)*source->texture.height*4u)
+        return fail(*diagnostic,VehicleWindowError50DS::material,"track particle atlas publication differs");
     std::uint8_t maximum=0;
     for(std::size_t i=3;i<source->texture.rgba.size();i+=4)maximum=std::max(maximum,source->texture.rgba[i]);
     if(maximum!=material->maximumTextureAlpha)
-        return fail(*diagnostic,VehicleWindowError50DS::material,"GC particle atlas alpha admission differs");
+        return fail(*diagnostic,VehicleWindowError50DS::material,"track particle atlas alpha admission differs");
     for(unsigned state=0;state<2;++state){const auto& policy=material->states[state];
         if(policy.depthMethod!=2||policy.depthWrite||policy.environmentContext!=state||
            !policy.requiresOriginalDepthOwner||!policy.requiresSeparateAlphaStore||
            policy.blend!=(state?assets::OriginalUiMaterialBlend50KG::additive:assets::OriginalUiMaterialBlend50KG::sourceAlpha)||
            policy.minification!=assets::OriginalUiMaterialFilter50KG::linear||policy.magnification!=assets::OriginalUiMaterialFilter50KG::linear||
            policy.u!=assets::OriginalUiMaterialWrap50KG::repeat||policy.v!=assets::OriginalUiMaterialWrap50KG::repeat)
-            return fail(*diagnostic,VehicleWindowError50DS::material,"GC particle material state unsupported");
+            return fail(*diagnostic,VehicleWindowError50DS::material,"track particle material state unsupported");
     }
     gcParticleMaximumAlpha=maximum;gcParticlePublication=gpu->publicationToken();return true;
 }
@@ -1904,66 +1037,8 @@ bool VehicleWindowGl50DS::Storage::validateParticleDraw(const game::OriginalGcPa
 }
 
 bool VehicleWindowGl50DS::Storage::validateGcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
-    const auto* draw=frame.gcParticles;if(!draw)return true; //Resident bank while genuine UI owns presentation.
-    return validateParticleDraw(draw,frame,request.gcParticleTextures!=nullptr,gcParticleMaximumAlpha,d);
-}
-
-bool VehicleWindowGl50DS::Storage::validateRcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
-    if(!rcParticleWindow&&!frame.rcParticles)return true;
-    if(!rcParticleWindow||!frame.rcParticles||frame.gbParticles||frame.mcParticles||frame.gcParticles||!rcParticlePendingAttempt)
-        return fail(d,VehicleWindowError50DS::frame,"RC particles require the actual scoped owner and current Window draw attempt");
-    const auto* draw=frame.rcParticles->rendererDraw();const auto* material=frame.rcParticles->rendererMaterial();
-    if(!draw||!material||!rcParticleWindow->acceptsMaterial(*material)||
-       rcParticleWindow->materialBank(*material)!=&rcParticleWindow->bank_||
-       rcParticleWindow->materialGpu(*material)!=&rcParticleWindow->gpu_||
-       !rcParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,rcParticlePublication)||
-       !rcParticleWindow->gpu_.matchesSourceBank(rcParticleWindow->bank_,rcParticlePublication))
-        return fail(d,VehicleWindowError50DS::material,"RC numeric packet escaped its actual canonical material/atlas borrow");
-    return validateParticleDraw(draw,frame,true,rcParticleMaximumAlpha,d);
-}
-
-bool VehicleWindowGl50DS::Storage::validateGbParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
-    if(!gbParticleWindow&&!frame.gbParticles)return true;
-    if(!gbParticleWindow||!frame.gbParticles||frame.rcParticles||frame.mcParticles||frame.gcParticles||!gbParticlePendingAttempt)
-        return fail(d,VehicleWindowError50DS::frame,"GB particles require the actual scoped owner and current Window draw attempt");
-    const auto* draw=frame.gbParticles->rendererDraw();const auto* material=frame.gbParticles->rendererMaterial();
-    if(!draw||!material||frame.gbParticles->windowOwner()!=gbParticleWindow.get()||!gbParticleWindow->acceptsMaterial(*material)||
-       gbParticleWindow->materialBank(*material)!=&gbParticleWindow->bank_||
-       gbParticleWindow->materialGpu(*material)!=&gbParticleWindow->gpu_||
-       !gbParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,gbParticlePublication)||
-       !gbParticleWindow->gpu_.matchesSourceBank(gbParticleWindow->bank_,gbParticlePublication))
-        return fail(d,VehicleWindowError50DS::material,"GB numeric packet escaped its actual canonical material/atlas borrow");
-    // The very same source-bound fog and current camera drive opaque gameplay
-    // and particles; equal caller colors alone do not create this authority.
-    const auto& fog=frame.gbParticles->fog_->fields();const auto& opaque=request.track.worldFog;
-    if(!opaque.enabled||opaque.start!=fog.start34||opaque.end!=fog.end38||
-       opaque.color[0]!=31.f/255.f||opaque.color[1]!=28.f/255.f||opaque.color[2]!=55.f/255.f||!frame.worldFogCamera)
-        return fail(d,VehicleWindowError50DS::frame,"GB particle and opaque source-bound fog differ");
-    for(unsigned c=0;c<3;++c)if(frame.worldFogCamera[c]!=frame.gbParticles->storage_->cameraPosition[c])
-        return fail(d,VehicleWindowError50DS::frame,"GB particle and opaque current camera differ");
-    return validateParticleDraw(draw,frame,true,gbParticleMaximumAlpha,d);
-}
-
-bool VehicleWindowGl50DS::Storage::validateMcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
-    if(!mcParticleWindow&&!frame.mcParticles)return true;
-    if(!mcParticleWindow||!frame.mcParticles||frame.rcParticles||frame.gbParticles||frame.gcParticles||!mcParticlePendingAttempt)
-        return fail(d,VehicleWindowError50DS::frame,"MC particles require the actual scoped owner and current Window draw attempt");
-    const auto* draw=frame.mcParticles->rendererDraw();const auto* material=frame.mcParticles->rendererMaterial();
-    if(!draw||!material||frame.mcParticles->windowOwner()!=mcParticleWindow.get()||!mcParticleWindow->acceptsMaterial(*material)||
-       mcParticleWindow->materialBank(*material)!=&mcParticleWindow->bank_||
-       mcParticleWindow->materialGpu(*material)!=&mcParticleWindow->gpu_||
-       !mcParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,mcParticlePublication)||
-       !mcParticleWindow->gpu_.matchesSourceBank(mcParticleWindow->bank_,mcParticlePublication))
-        return fail(d,VehicleWindowError50DS::material,"MC numeric packet escaped its actual canonical material/atlas borrow");
-    // The very same source-bound fog and current camera drive opaque gameplay
-    // and particles; equal caller colors alone do not create this authority.
-    const auto& fog=frame.mcParticles->fog_->fields();const auto& opaque=request.track.worldFog;
-    if(!opaque.enabled||opaque.start!=fog.start34||opaque.end!=fog.end38||
-       opaque.color[0]!=100.f/255.f||opaque.color[1]!=73.f/255.f||opaque.color[2]!=81.f/255.f||!frame.worldFogCamera)
-        return fail(d,VehicleWindowError50DS::frame,"MC particle and opaque source-bound fog differ");
-    for(unsigned c=0;c<3;++c)if(frame.worldFogCamera[c]!=frame.mcParticles->storage_->cameraPosition[c])
-        return fail(d,VehicleWindowError50DS::frame,"MC particle and opaque current camera differ");
-    return validateParticleDraw(draw,frame,true,mcParticleMaximumAlpha,d);
+    const auto* draw=frame.particles;if(!draw)return true; //Resident bank while genuine UI owns presentation.
+    return validateParticleDraw(draw,frame,request.particleTextures!=nullptr,gcParticleMaximumAlpha,d);
 }
 
 bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
@@ -1974,7 +1049,7 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
     //store below samples the same authentic atlas after each RGB run.
     resetNativeGcLighting();gl.useProgram(uiProgram);
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
-    gl.bindTexture(texture2D,frameMcParticles?mcParticleWindow->gpu_.texture(0):frameGbParticles?gbParticleWindow->gpu_.texture(0):(frameRcParticles?rcParticleWindow->gpu_.texture(0):request.gcParticleTextures->texture(0)));
+    gl.bindTexture(texture2D,request.particleTextures->texture(0));
     constexpr U parameters[]={0x2801,0x2800,0x2802,0x2803,0x813C,0x813D};
     constexpr I expected[]={0x2601,0x2601,0x2901,0x2901,0,0};
     for(U i=0;i<6;++i){I actual=-1;gl.getTexParameteriv(texture2D,parameters[i],&actual);
@@ -2010,7 +1085,7 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
             reinterpret_cast<const void*>(std::uintptr_t(run.firstQuad)*6*sizeof(U)),0);
         accepted=check("draw authentic GC particle RGB run");
         if(accepted){
-            if(frameMcParticles)++diagnostic->mcParticleDraws;else if(frameGbParticles)++diagnostic->gbParticleDraws;else if(frameRcParticles)++diagnostic->rcParticleDraws;else ++diagnostic->gcParticleDraws;
+            ++diagnostic->particleDraws;
             //Actual separate source-A store, not source-over accumulation.
             //Both authenticated states use DATE0 and source (never destination)
             //alpha in ALPHA, so deferred alpha within this run cannot change
@@ -2019,10 +1094,7 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
             drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(run.quadCount*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(run.firstQuad)*6*sizeof(U)),0);
             accepted=check("store authentic GC particle source alpha");
-            if(accepted){if(frameMcParticles){++diagnostic->mcParticleAlphaDraws;diagnostic->mcParticleQuads+=run.quadCount;}
-                else if(frameGbParticles){++diagnostic->gbParticleAlphaDraws;diagnostic->gbParticleQuads+=run.quadCount;}
-                else if(frameRcParticles){++diagnostic->rcParticleAlphaDraws;diagnostic->rcParticleQuads+=run.quadCount;}
-                else{++diagnostic->gcParticleAlphaDraws;diagnostic->gcParticleQuads+=run.quadCount;}}
+            if(accepted){++diagnostic->particleAlphaDraws;diagnostic->particleQuads+=run.quadCount;}
         }
     }
     gl.uniform1i(gcParticleModeUniform,0);gl.disable(0x0BE2);gl.colorMask(1,1,1,1);
@@ -2030,59 +1102,68 @@ bool VehicleWindowGl50DS::Storage::drawGcParticles() noexcept {
     const bool restored=check("restore gameplay state after shared GC particles");return accepted&&restored;
 }
 
-bool VehicleWindowGl50DS::Storage::createRcCrystalProjection(const VehicleWindowTrack50DS& track)noexcept {
-        if(!track.rcCrystal||!coverageDemand)return fail(*diagnostic,VehicleWindowError50DS::request,
+bool VehicleWindowGl50DS::Storage::createEnvironmentUvProjection(const VehicleWindowTrack50DS& track)noexcept {
+        if(!track.environmentUv||!coverageDemand)return fail(*diagnostic,VehicleWindowError50DS::request,
             "environment-map projection requires the coverage targets of its destination-alpha pair");
-        rcCrystalUvs.reset(new(std::nothrow) std::array<float,2>[rc_crystal50RC::Owner::uvCount]);
-        if(!rcCrystalUvs)return fail(*diagnostic,VehicleWindowError50DS::allocation,"RC compact UV staging allocation");
+        // Staging sized once from the producer's own count (validated cold
+        // against the caller's budget); every per-frame write is bounded by it.
+        environmentUvCount=track.environmentUv->uvCount();
+        environmentUvs.reset(new(std::nothrow) std::array<float,2>[environmentUvCount]);
+        if(!environmentUvs){environmentUvCount=0;return fail(*diagnostic,VehicleWindowError50DS::allocation,"environment-map compact UV staging allocation");}
         const auto bytes=track.mesh->vertices.size()*sizeof(std::array<float,2>);
         gl.genBuffers(1,&trackProjectionBuffer);drawGl.bindBuffer(arrayBuffer,trackProjectionBuffer);
         gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(bytes),nullptr,dynamicDraw);
-        if(!check("allocate exact RC projection stream")||!trackProjectionBuffer||!verifyBuffer(arrayBuffer,bytes,dynamicDraw))return false;
+        if(!check("allocate exact environment-map projection stream")||!trackProjectionBuffer||!verifyBuffer(arrayBuffer,bytes,dynamicDraw))return false;
         drawGl.bindVertexArray(trackVertexArray);gl.enableVertexAttribArray(4);
         gl.vertexAttribPointer(4,2,floatType,0,sizeof(std::array<float,2>),nullptr);
         constexpr U properties[]={0x8622,0x8623,0x8624,0x8625,0x886A,0x889F,0x88FD};
         const I expected[]={1,2,sizeof(std::array<float,2>),static_cast<I>(floatType),0,static_cast<I>(trackProjectionBuffer),0};
         for(U p=0;p<7;++p){I actual=0;gl.getVertexAttribiv(4,properties[p],&actual);
-            if(!check("verify RC projection layout")||actual!=expected[p])return fail(*diagnostic,VehicleWindowError50DS::layout,"RC projection attribute differs");}
+            if(!check("verify environment-map projection layout")||actual!=expected[p])return fail(*diagnostic,VehicleWindowError50DS::layout,"environment-map projection attribute differs");}
         void* offset=nullptr;gl.getVertexAttribPointerv(4,0x8645,&offset);
-        if(!check("verify RC projection offset"))return false;
-        return !offset||fail(*diagnostic,VehicleWindowError50DS::layout,"RC projection offset differs");
+        if(!check("verify environment-map projection offset"))return false;
+        return !offset||fail(*diagnostic,VehicleWindowError50DS::layout,"environment-map projection offset differs");
     }
 
-bool VehicleWindowGl50DS::Storage::prepareRcCrystalFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d)noexcept {
+bool VehicleWindowGl50DS::Storage::prepareEnvironmentUvFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d)noexcept {
         environmentMapPrepared=false;
-        if(!request.track.rcCrystal)return true;
-        if(!coverageDemand||!rcCrystalUvs||!request.track.rcCrystal->ready()||
+        const auto* producer=request.track.environmentUv.get();
+        if(!producer)return true;
+        if(!coverageDemand||!environmentUvs||!producer->ready()||producer->uvCount()!=environmentUvCount||
            !frame.sourceBodyCamera50LA||!frame.sourceBodyCameraOwner50LA||!frame.sourceBodyCameraPublication50LA)
-            return fail(d,VehicleWindowError50DS::frame,"RC crystal needs actual retained source and current camera");
+            return fail(d,VehicleWindowError50DS::frame,"environment-map UVs need the retained producer and current camera");
         NativeCameraViewContract50DX contract{};contract.provenance=NativeCameraViewProvenance50DX::currentCore49FForOutput;
         contract.width=frame.width;contract.height=frame.height;contract.clipDepth=NativeCameraClipDepth50DX::negativeOneToOne;
         NativeCameraMatrix50DX converted{};NativeCameraViewError50DX error{};
         const game::CameraViewOutput49F camera=*frame.sourceBodyCamera50LA;
         if(!convertNativeCameraView50DX(camera,contract,converted,error)||
            std::memcmp(converted.worldViewProjection,frame.worldViewProjection,sizeof(converted.worldViewProjection))||
-           !request.track.rcCrystal->project(camera,rcCrystalUvs.get(),rc_crystal50RC::Owner::uvCount,environmentAmbient))
-            return fail(d,VehicleWindowError50DS::frame,"RC crystal camera/ambient/projection preflight rejected");
+           !producer->project(camera,environmentUvs.get(),environmentUvCount,environmentAmbient))
+            return fail(d,VehicleWindowError50DS::frame,"environment-map camera/ambient/projection preflight rejected");
         environmentMapPrepared=true;return true;
     }
 
-bool VehicleWindowGl50DS::Storage::uploadRcCrystalUvs()noexcept {
-        if(!request.track.rcCrystal)return true;
-        if(!environmentMapPrepared||!trackProjectionBuffer)return fail(*diagnostic,VehicleWindowError50DS::frame,"RC projection lacks complete preflight");
+bool VehicleWindowGl50DS::Storage::uploadEnvironmentUvs()noexcept {
+        const auto* producer=request.track.environmentUv.get();
+        if(!producer)return true;
+        if(!environmentMapPrepared||!trackProjectionBuffer)return fail(*diagnostic,VehicleWindowError50DS::frame,"environment-map projection lacks complete preflight");
         drawGl.bindBuffer(arrayBuffer,trackProjectionBuffer);std::size_t offset=0;
-        for(const auto& range:request.track.rcCrystal->ranges()){
+        const auto* ranges=producer->ranges();
+        for(std::size_t i=0;i<producer->rangeCount();++i){const auto& range=ranges[i];
+            // Bounded before the write: staging holds environmentUvCount UVs.
+            if(range.vertexCount>environmentUvCount-offset)
+                return fail(*diagnostic,VehicleWindowError50DS::frame,"environment-map range exceeds its sized staging");
             drawGl.bufferSubData(arrayBuffer,std::intptr_t(range.vertexStart)*sizeof(std::array<float,2>),
-                std::intptr_t(range.vertexCount)*sizeof(std::array<float,2>),rcCrystalUvs.get()+offset);
-            if(!check("upload authenticated RC crystal range"))return false;offset+=range.vertexCount;
+                std::intptr_t(range.vertexCount)*sizeof(std::array<float,2>),environmentUvs.get()+offset);
+            if(!check("upload environment-map UV range"))return false;offset+=range.vertexCount;
         }
-        return offset==rc_crystal50RC::Owner::uvCount;
+        return offset==environmentUvCount;
     }
 
 std::array<I,4> VehicleWindowGl50DS::Storage::gsTriangleRegion(U first)const noexcept {
-        // The SAME uploaded track mesh (validation requires the environment-map
-        // owner's mesh to be this mesh), so no course owner is consulted here.
-        const auto* mesh=request.track.mesh;
+        // The SAME uploaded track mesh, readable through the static-world lease
+        // (no course owner is consulted). Without it: full-target regions.
+        const auto* mesh=retainedTrackMesh;
         if(!mesh||first>mesh->indices.size()||mesh->indices.size()-first<3)return {{0,0,width,height}};
         std::array<std::array<float,3>,3> triangle{};
         for(U c=0;c<3;++c){const U index=mesh->indices[first+c];if(index>=mesh->vertices.size())return {{0,0,width,height}};
@@ -2091,9 +1172,9 @@ std::array<I,4> VehicleWindowGl50DS::Storage::gsTriangleRegion(U first)const noe
     }
 
 bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U pass,U image,const std::array<I,4>& region,U triangleCount,bool environment)noexcept {
-        diagnostic->rcCrystalTriangles+=triangleCount;
-        if(region[2]<=region[0]||region[3]<=region[1]){diagnostic->rcCrystalEmptyTriangles+=triangleCount;return true;}
-        if(region==std::array<I,4>{{0,0,width,height}})++diagnostic->rcCrystalFullRectangles;
+        diagnostic->destinationAlphaTriangles+=triangleCount;
+        if(region[2]<=region[0]||region[3]<=region[1]){diagnostic->destinationAlphaEmptyTriangles+=triangleCount;return true;}
+        if(region==std::array<I,4>{{0,0,width,height}})++diagnostic->destinationAlphaFullRectangles;
         if(!coverageDemand||!coverageLive.raster||!coverageLive.snapshot||(environment&&!environmentMapPrepared)||pass<1||pass>2)
             return fail(*diagnostic,VehicleWindowError50DS::frame,"GS destination-alpha exact bridge resources unavailable");
         coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);gl.colorMask(1,1,1,1);
@@ -2102,7 +1183,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
         gl.useProgram(trackProgram);gl.uniform1i(gsAlphaPayloadUniform,1);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);drawGl.bindVertexArray(trackVertexArray);
-        bool accepted=check("bind RC AA0 source byte/depth payload");
+        bool accepted=check("bind destination-alpha AA0 source byte/depth payload");
         if(accepted){drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(triangleCount*3),0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
             accepted=check("raster ordered GS destination-alpha triangle");}
         if(accepted){
@@ -2111,7 +1192,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U
                 region[2]-region[0],region[3]-region[1],1);
             else {gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
                 gl.blitFramebuffer(region[0],region[1],region[2],region[3],region[0],region[1],region[2],region[3],colorBufferBit,0x2600);}
-            accepted=check("copy actual RC per-sample destination bytes");
+            accepted=check("copy actual per-sample destination bytes");
         }
         if(accepted){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.enable(0x809D);gl.enable(0x0B71);
@@ -2120,9 +1201,9 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaTriangle(U bank,U first,U
             if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
-            accepted=check("bind exact RC alpha equation and per-sample destination");
-            if(accepted){++diagnostic->rcCrystalCompositionsIssued;gl.drawArrays(0x0004,0,3);
-                accepted=check("compose RC crystal RGB and independent source alpha");}
+            accepted=check("bind exact destination-alpha equation and per-sample destination");
+            if(accepted){++diagnostic->destinationAlphaCompositionsIssued;gl.drawArrays(0x0004,0,3);
+                accepted=check("compose destination-alpha RGB and independent source alpha");}
         }
         // Unconditional checked restoration even after partial driver failure.
         gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
@@ -2173,7 +1254,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaRange(U bank,U first,U co
         // floors (at most one level): the same deviation as the pod map-2
         // fixed route. RR_EXACT_DEST_ALPHA_BLEND=1 forces the exact bridge.
         if(fixedDestinationAlphaAdmitted(span,pass)){
-            diagnostic->rcCrystalTriangles+=count/3;
+            diagnostic->destinationAlphaTriangles+=count/3;
             if(coverageDemand){
                 if(!coverageLive.scene[bank])
                     return fail(*diagnostic,VehicleWindowError50DS::frame,"GS destination-alpha scene target unavailable");
@@ -2188,7 +1269,7 @@ bool VehicleWindowGl50DS::Storage::drawDestinationAlphaRange(U bank,U first,U co
             gl.uniform1i(gsAlphaPayloadUniform,2);
             bool accepted=check("bind GS destination-alpha fixed-function blend");
             if(accepted){
-                ++diagnostic->rcCrystalCompositionsIssued; // counts fixed draws on this route
+                ++diagnostic->destinationAlphaCompositionsIssued; // counts fixed draws on this route
                 drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(count),0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
                 accepted=check("draw GS destination-alpha range through fixed-function blend");

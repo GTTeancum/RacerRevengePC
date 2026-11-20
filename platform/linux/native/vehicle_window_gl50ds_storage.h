@@ -9,9 +9,6 @@
 struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer.
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_menu_raster_inputs50kg.h"
-#include "../../../tests/native/ra_static_world50la.h"
-#include "../../../tests/native/original_local_flare_emission50la.h"
-#include "../../../tests/native/ra_static_fog_observation50la.h"
 #include "original_ui_coverage_bounds50kg.h"
 #include "native_camera_view50dx.h"
 #include "../../../tests/native/original_race_f8_native_bars50la.h"
@@ -86,10 +83,9 @@ bool validateMaterialPolicy(const VehicleWindowMaterialBinding50DS& material,
     VehicleWindowDiagnostic50DS& d) noexcept;
 bool validateMaterials(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& owner, VehicleWindowDiagnostic50DS& d) noexcept;
-// This checks live canonical state without touching create-only span arrays.
-bool currentRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept;
-bool validateRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept;
-bool validateTbWorld(const VehicleWindowRequest50DS& request,VehicleWindowDiagnostic50DS& d) noexcept;
+// The one track load lease (request.commonTrack): required with a gameplay
+// track mesh, and its static world must be loaded. No course is consulted.
+bool validateCommonTrack(const VehicleWindowRequest50DS& request,VehicleWindowDiagnostic50DS& d) noexcept;
 bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept;
 bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept;
 bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept;
@@ -246,58 +242,11 @@ struct OwnerGl {
 using namespace vehicle_window_gl50ds_detail;
 
 struct VehicleWindowGl50DS::Storage {
-    std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFireOwner;
-    const VehicleWindowGl50DS* raStaticFireRenderer=nullptr;
-    std::uint64_t raStaticFirePublicationSerial=0;
-    void retireRaStaticFirePublication() noexcept;
-    std::shared_ptr<rc_particle_visual50RC::Window> rcParticleWindow;
-    const VehicleWindowGl50DS* rcParticleRenderer=nullptr;
-    std::uint64_t rcParticleAttempt=0,rcParticlePendingAttempt=0,rcParticleCompletedBefore=0;
-    bool cancelRcParticleAttempt() noexcept;
-    bool beginRcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    bool completeRcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    void retireRcParticlePublication() noexcept;
-    struct RcParticleAttemptScope {
-        Storage& state;VehicleWindowDiagnostic50DS& diagnostic;bool retainPending=false;
-        ~RcParticleAttemptScope() noexcept {
-            if(!retainPending&&!state.cancelRcParticleAttempt()){
-                diagnostic.cleanupIncomplete=true;
-                fail(diagnostic,VehicleWindowError50DS::cleanup,"RC failed draw attempt retirement rejected");
-            }
-        }
-    };
-    std::shared_ptr<gb_particle_visual50GB::Window> gbParticleWindow;
-    const VehicleWindowGl50DS* gbParticleRenderer=nullptr;
-    std::uint64_t gbParticleAttempt=0,gbParticlePendingAttempt=0,gbParticleCompletedBefore=0;
-    bool cancelGbParticleAttempt() noexcept;
-    bool beginGbParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    bool completeGbParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    void retireGbParticlePublication() noexcept;
-    struct GbParticleAttemptScope {
-        Storage& state;VehicleWindowDiagnostic50DS& diagnostic;bool retainPending=false;
-        ~GbParticleAttemptScope() noexcept {
-            if(!retainPending&&!state.cancelGbParticleAttempt()){
-                diagnostic.cleanupIncomplete=true;
-                fail(diagnostic,VehicleWindowError50DS::cleanup,"GB failed draw attempt retirement rejected");
-            }
-        }
-    };
-    std::shared_ptr<mc_particle_visual50MC::Window> mcParticleWindow;
-    const VehicleWindowGl50DS* mcParticleRenderer=nullptr;
-    std::uint64_t mcParticleAttempt=0,mcParticlePendingAttempt=0,mcParticleCompletedBefore=0;
-    bool cancelMcParticleAttempt() noexcept;
-    bool beginMcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    bool completeMcParticleAttempt(VehicleWindowDiagnostic50DS& d) noexcept;
-    void retireMcParticlePublication() noexcept;
-    struct McParticleAttemptScope {
-        Storage& state;VehicleWindowDiagnostic50DS& diagnostic;bool retainPending=false;
-        ~McParticleAttemptScope() noexcept {
-            if(!retainPending&&!state.cancelMcParticleAttempt()){
-                diagnostic.cleanupIncomplete=true;
-                fail(diagnostic,VehicleWindowError50DS::cleanup,"MC failed draw attempt retirement rejected");
-            }
-        }
-    };
+    // Leases of the one track load's role owners whose data the cold track,
+    // sky, water, animation and particle descriptors borrow. Taken at create
+    // from request.commonTrack, released only after checked GPU retirement.
+    std::array<std::shared_ptr<const void>,9> trackRoleLeases{};
+    void retireTrackLeases() noexcept;
     struct MaterialUv { float value[4] = {1.f, 1.f, 0.f, 0.f}; };
     struct Material {
         U textureIndex = assets::unresolvedMaterialTexture50EA, name = 0;
@@ -729,9 +678,9 @@ struct VehicleWindowGl50DS::Storage {
 #include "native_coverage_storage.inl"
 bool uiCoverageDisjointTraced=false;
 #include "original_ui_coverage_storage.inl"
-#include "ra_static_world_gl_storage.inl"
+#include "native_raster_operands_gl_storage.inl"
 #include "original_gc_particle_gl_storage50kg.inl"
-#include "rc_crystal_gl_storage.inl"
+#include "destination_alpha_gl_storage.inl"
 #include "original_race_hud_render.inl"
 #include "original_race_start_overlay_render.inl"
 #include "original_time_stats_render.inl"
@@ -932,7 +881,7 @@ bool uiCoverageDisjointTraced=false;
     // Diagnostic-only stamps. Default gameplay takes no clock samples here.
     std::chrono::steady_clock::time_point rendererPlayerStageStart{};
     std::chrono::steady_clock::time_point rendererStageNow() const noexcept;
-    void traceRaStage(const char* stage,std::chrono::steady_clock::time_point& start,bool nested=true) noexcept;
+    void traceRendererStage(const char* stage,std::chrono::steady_clock::time_point& start,bool nested=true) noexcept;
     static bool commit(void* context, std::uint8_t bank) noexcept;
     static void abort(void* context, std::uint8_t) noexcept;
     bool copyToWindow() noexcept;

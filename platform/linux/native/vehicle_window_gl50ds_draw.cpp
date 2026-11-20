@@ -1,6 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
 #include "../../../src/game/track_zone_visibility50zv.h"
-#include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "native_fxaa_pass.h"
 #include <memory>
 #include <algorithm>
@@ -21,23 +20,11 @@ void VehicleWindowGl50DS::Storage::acceptCompletedTrackVisibility() noexcept {
         if(!actualGameplay)return;
         if(trackVisibilityCompletedGeneration==std::numeric_limits<std::uint64_t>::max()) {
             trackVisibilityCompletedValid=false;
-            if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
             return;
         }
         for(U i=0;i<trackSpanCount;++i)
             trackSpans[i].submittedCompletedGameplay=trackSpans[i].submittedGameplayCandidate;
         ++trackVisibilityCompletedGeneration;trackVisibilityCompletedValid=true;
-        if(raStaticFireOwner){
-            // Exact cold admission proved source-order spans0..3 and retained
-            // their actual worldInstance identities. Read only issued draw bits.
-            if(trackSpanCount!=4){trackVisibilityCompletedValid=false;raStaticFireOwner->nativeCompletionLive_=false;return;}
-            std::array<bool,4> submitted{};
-            for(U i=0;i<4;++i)submitted[i]=trackSpans[i].submittedCompletedGameplay;
-            if(!raStaticFireOwner->recordNativeCompleted(raStaticFireRenderer,
-                raStaticFirePublicationSerial,trackVisibilityCompletedGeneration,submitted)){
-                trackVisibilityCompletedValid=false;raStaticFireOwner->nativeCompletionLive_=false;
-            }
-        }
     }
 
 bool VehicleWindowGl50DS::Storage::validateTrackAnimationFrames(const VehicleWindowFrame50DS& frame,
@@ -118,7 +105,7 @@ void VehicleWindowGl50DS::Storage::prepareTrackVisibility() noexcept {
     }
 
 // 2805B4 inclusive top-origin source scissor to the GL bottom-origin target,
-// with the same half-open, floor/ceil, clamped conversion the RA route uses.
+// with the same half-open, floor/ceil, clamped conversion as the zone walk.
 void VehicleWindowGl50DS::Storage::bindTrackZoneScissor(U zone) noexcept {
         if (zone == boundTrackZone) return;
         boundTrackZone = zone;
@@ -372,7 +359,7 @@ bool VehicleWindowGl50DS::Storage::copyNativeGcLights(NativeRacerLightingPolicy5
                         "unchanged host lighting cannot consume source-generated racer colors");
             return true;
         }
-        if (policy != NativeRacerLightingPolicy50DS::nativeGcSelectedLights || !input ||
+        if (policy != NativeRacerLightingPolicy50DS::nativeSelectedLights || !input ||
             request.mode != VehicleWindowMode50DS::callerMaterialTextures)
             return fail(d, VehicleWindowError50DS::frame,
                 "native GC lighting requires explicit textured policy and a selected-light packet");
@@ -483,9 +470,9 @@ bool VehicleWindowGl50DS::Storage::prepareSpecularFrame50LA(const game::VehicleD
             for (auto* model : frame.sourceBodyModelPackets50LA)
                 if (model) return fail(d, VehicleWindowError50DS::frame,
                     "source player model view owner supplied without paired body capability");
-            if(request.track.rcCrystal)return frame.sourceBodyCamera50LA&&frame.sourceBodyCameraOwner50LA&&
+            if(request.track.environmentUv)return frame.sourceBodyCamera50LA&&frame.sourceBodyCameraOwner50LA&&
                 frame.sourceBodyCameraPublication50LA&&!frame.sourceBodyFog50LA&&!frame.sourceBodyGlobals50LA ||
-                fail(d,VehicleWindowError50DS::frame,"RC crystal requires its actual source camera publication");
+                fail(d,VehicleWindowError50DS::frame,"environment-map UVs require the actual source camera publication");
             return (!frame.sourceBodyCamera50LA && !frame.sourceBodyCameraOwner50LA &&
                 !frame.sourceBodyCameraPublication50LA && !frame.sourceBodyFog50LA &&
                 !frame.sourceBodyGlobals50LA) ||
@@ -2126,16 +2113,14 @@ bool VehicleWindowGl50DS::Storage::begin(void* context, std::uint8_t bank) noexc
         s.gl.clearColor(s.clearRgba[0], s.clearRgba[1], s.clearRgba[2], s.clearRgba[3]);
         s.gl.clear(colorBufferBit | depthBufferBit);
         if (!s.check("begin explicit private frame")) return false;
-        s.traceRaStage("target_setup",stageStart);
-        if (!s.uploadRcCrystalUvs() || !s.uploadDynamicWorld(bank) || !s.drawSky())return false;
-        s.traceRaStage("sky",stageStart);
-        if(!s.drawRaWorld(bank))return false;
-        s.traceRaStage("ra_world",stageStart);
+        s.traceRendererStage("target_setup",stageStart);
+        if (!s.uploadEnvironmentUvs() || !s.uploadDynamicWorld(bank) || !s.drawSky())return false;
+        s.traceRendererStage("sky",stageStart);
         if(!s.drawTrack(false)||!s.drawDynamicWorld(bank,false))return false;
-        s.traceRaStage("legacy_world",stageStart);
+        s.traceRendererStage("track_world",stageStart);
         const bool accepted=s.uploadRacerNormals(bank, s.framePlayerBatch) && s.uploadSpecularUvs50LA(bank, 0, 0);
         if(accepted){
-            s.traceRaStage("player_stream_prepare",stageStart);
+            s.traceRendererStage("player_stream_prepare",stageStart);
             s.rendererPlayerStageStart=s.rendererStageNow();
         }
         return accepted;
@@ -2191,7 +2176,7 @@ std::chrono::steady_clock::time_point VehicleWindowGl50DS::Storage::rendererStag
             std::chrono::steady_clock::time_point{};
     }
 
-void VehicleWindowGl50DS::Storage::traceRaStage(const char* stage,std::chrono::steady_clock::time_point& start,bool nested) noexcept {
+void VehicleWindowGl50DS::Storage::traceRendererStage(const char* stage,std::chrono::steady_clock::time_point& start,bool nested) noexcept {
         if(!request.enableGameplayDisplayWallTiming)return;
         // Diagnostic only: serialize stage completion to locate GPU stalls.
         // These timings include submission/wait overhead, not GPU timer-query
@@ -2204,8 +2189,6 @@ void VehicleWindowGl50DS::Storage::traceRaStage(const char* stage,std::chrono::s
         if(completedStages)
             std::fprintf(stderr,"renderer_completed_stage name=%s nested_backend=%u wall_us=%lld\n",
                 stage,nested?1u:0u,static_cast<long long>(elapsed));
-        else if(request.raStaticWorld)
-            std::fprintf(stderr,"ra_renderer_stage name=%s cpu_submission_wall_us=%lld\n",stage,static_cast<long long>(elapsed));
         else
             std::fprintf(stderr,"renderer_stage name=%s nested_backend=%u submission_wall_us=%lld\n",
                 stage,nested?1u:0u,static_cast<long long>(elapsed));
@@ -2216,7 +2199,7 @@ void VehicleWindowGl50DS::Storage::traceRaStage(const char* stage,std::chrono::s
 bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noexcept {
         auto& s = *static_cast<Storage*>(context);
         if (!s.active || bank != (s.published ^ 1u)) return false;
-        s.traceRaStage("player_draw",s.rendererPlayerStageStart);
+        s.traceRendererStage("player_draw",s.rendererPlayerStageStart);
         // The player's last skinned component must not leave skin mode bound.
         s.gl.useProgram(s.shader->program()); s.releaseRacerSkin50LA();
         if (s.gpuSkinCheck50LA.requested && !s.checkGpuSkin50LA(bank)) return false;
@@ -2229,7 +2212,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
             if (!s.drawOpaqueOpponent(bank, i)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
-        s.traceRaStage("opaque_opponents",stageStart);
+        s.traceRendererStage("opaque_opponents",stageStart);
         // Debris pieces of destroyed racers, opaque, before cables/transparency.
         if (!s.drawDebris()) return false;
         if(s.request.enableGameplayDisplayWallTiming)
@@ -2266,9 +2249,9 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
                 s.racerView(s.frameOpponentArchetypes[i]).cableTextureName)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
-        s.traceRaStage("cables",stageStart);
+        s.traceRendererStage("cables",stageStart);
         if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
-        s.traceRaStage("transparent_world",stageStart);
+        s.traceRendererStage("transparent_world",stageStart);
         // Original order of the pod passes is the material drain order: 14D440
         // rebuilds the passes in material-registry (APPSTART Mat_Stbl) order
         // and 24A620 -> 24B9B0 -> 29C150 queue each pass FIFO (241280 per mesh,
@@ -2299,40 +2282,40 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
             return true;
         };
         if (!podEffects(1)) return false; // chariot translucency = pod_wndw glass
-        s.traceRaStage("pod_glass",stageStart);
+        s.traceRendererStage("pod_glass",stageStart);
         // Casters use their own LOD streams (a CPU fallback part re-uploads its
         // own vertices), so they no longer depend on the shared VBOs.
         // shadowCasterN / shadowReceiverN pairs in racer slot order (2756..2779).
         for (U slot = 0; slot < 1u + s.frameOpponentCount; ++slot)
             if (!s.drawShadowCasters(bank, slot) || !s.drawShadowReceivers(bank, slot)) return false;
         s.finishShadowReceivers();
-        s.traceRaStage("original_shadows",stageStart);
+        s.traceRendererStage("original_shadows",stageStart);
         if (!podEffects(2)) return false; // engine translucency = flames
         if(s.request.enableGameplayDisplayWallTiming&&s.hasExtraPasses50PP)
             std::fprintf(stderr,"native_pod_extra_pass draws=%llu alpha_saturated_spans=%llu\n",
                 static_cast<unsigned long long>(s.podExtraPassDraws50PP),
                 static_cast<unsigned long long>(s.podExtraPassAlphaSaturatedSpans50PP));
-        s.traceRaStage("transparent_racers",stageStart);
+        s.traceRendererStage("transparent_racers",stageStart);
         // Original water: after the opaque world and pods, before Binder and
         // particles. PENDING emulator check W-E1 (exact render-list slot).
         if (!s.drawWater()) return false;
         if (!s.drawGameplayBinders() || !s.drawGcParticles() || !s.drawEffects()) return false;
-        s.traceRaStage("binders_particles",stageStart);
-        if (s.hasSpecularPairs50LA || s.hasSingleDiffuse50LA || s.request.track.rcCrystal || s.frameGameplayBinderCount) {
-            // All body/crystal Ad consumers have completed. Current Binder/GC
+        s.traceRendererStage("binders_particles",stageStart);
+        if (s.hasSpecularPairs50LA || s.hasSingleDiffuse50LA || s.destinationAlphaSpans || s.request.track.environmentUv || s.frameGameplayBinderCount) {
+            // All body/destination-alpha Ad consumers have completed. Current Binder/GC
             // materials use source alpha and DATE0; the original HUD's private
             // scratch proves its own clear-before-Ad coverage. No later current
             // gameplay consumer needs these body/particle alpha bytes. Binder
-            // now also stores source A even without a body/crystal owner; keep
+            // now also stores source A even without a body/destination-alpha owner; keep
             // that private alpha out of the opaque native presentation.
             s.unbindSpecularFeedback50LA();
             s.gl.disable(0x0C11); s.gl.colorMask(0, 0, 0, 1);
             s.gl.clearColor(0.f, 0.f, 0.f, 1.f); s.gl.clear(colorBufferBit);
             s.gl.colorMask(1, 1, 1, 1);
-            if (!s.check("restore opaque presentation alpha after all body/crystal and particle consumers")) return false;
+            if (!s.check("restore opaque presentation alpha after all body/destination-alpha and particle consumers")) return false;
         }
         if (!s.resolveCoverage(bank)) return false;
-        s.traceRaStage("coverage_resolve",stageStart);
+        s.traceRendererStage("coverage_resolve",stageStart);
         // PC-native FXAA smooths the completed 3D scene only; every HUD,
         // Results, F8 and Pause layer below is drawn afterwards, unsmoothed.
         if (!s.drawFxaa(bank)) return false;
@@ -2344,7 +2327,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // Results admission rejects an active preceding source Pause; its
         // unrelated existing native Pause route remains unchanged otherwise.
         if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawRaceStartOverlay(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank) || !s.drawNativeResultsPackets(bank) || !s.drawNativeF8Bars(bank) || !s.drawPauseDerived(bank)) return false;
-        s.traceRaStage("hud_blur",stageStart);
+        s.traceRendererStage("hud_blur",stageStart);
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.

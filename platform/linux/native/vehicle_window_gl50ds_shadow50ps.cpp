@@ -150,17 +150,6 @@ bool VehicleWindowGl50DS::Storage::buildShadowReceiverStatics() noexcept {
                 add(span.worldInstance, vertices[v].position);
         }
     }
-    // RA publication: the retained surface plan carries the world instance.
-    if (raWorld) {
-        for (const auto& plan : raWorld->surfaceDrawPlan_) {
-            if (plan.worldInstance >= count)
-                return fail(*diagnostic, VehicleWindowError50DS::assets, "RA surface world instance outside receiver table");
-            if (plan.vertexStart > raWorld->vertices_.size() || plan.vertexCount > raWorld->vertices_.size() - plan.vertexStart)
-                return fail(*diagnostic, VehicleWindowError50DS::assets, "RA surface vertex range outside world");
-            for (std::size_t v = plan.vertexStart; v < std::size_t(plan.vertexStart) + plan.vertexCount; ++v)
-                add(static_cast<U>(plan.worldInstance), raWorld->vertices_[v].worldPosition.data());
-        }
-    }
     U used = 0;
     for (const auto& b : boxes) used += b.used ? 1u : 0u;
     try { shadowReceiverStatics.reserve(used); } catch (...) {
@@ -212,7 +201,7 @@ bool VehicleWindowGl50DS::Storage::buildShadowReceiverStatics() noexcept {
     if (shadowZoneCount > game::maxShadowZones50PS)
         return fail(*diagnostic, VehicleWindowError50DS::limits, "original shadow zone count outside bounds");
     std::fprintf(stderr, "original_shadow_receivers instances=%u with_geometry=%u receiving=%u portals=%zu zones=%u world=%s\n",
-        count, used, receiving, shadowPortals.size(), shadowZoneCount, raWorld ? "ra_surface_plan" : "track_spans");
+        count, used, receiving, shadowPortals.size(), shadowZoneCount, "track_spans");
     return true;
 }
 
@@ -423,7 +412,7 @@ bool VehicleWindowGl50DS::Storage::drawShadowCasterLod(std::uint8_t bank, const 
 
 bool VehicleWindowGl50DS::Storage::createOriginalShadows() noexcept {
     // Only a gameplay world renderer owns shadows; frontend/vehicle-only skip.
-    if (frontendOnly || (!trackSpanCount && !raWorld)) return true;
+    if (frontendOnly || !trackSpanCount) return true;
     shadowTrace = shadowTraceRequested();
     if (!buildShadowReceiverStatics()) return false;
     if (!loadDisplayFadeFunctions()) return false; // texture/FBO/drawArrays entry points
@@ -465,7 +454,7 @@ bool VehicleWindowGl50DS::Storage::createOriginalShadows() noexcept {
         if (caster) {
             shaderGl.bindAttribLocation(program, vehicleGlSkinPositionAttribute50LA, "rrSkinPosition50LA");
             shaderGl.bindAttribLocation(program, vehicleGlSkinBoneAttribute50LA, "rrSkinBone50LA");
-        } else shaderGl.bindAttribLocation(program, 3, "rrWorldNormal"); // track/RA normal stream
+        } else shaderGl.bindAttribLocation(program, 3, "rrWorldNormal"); // track normal stream
         shaderGl.bindFragDataLocation(program, vehicleGlColorOutput50CZ, "viewerOutput");
         shaderGl.linkProgram(program);
         I linked = 0; shaderGl.getProgramiv(program, 0x8B82, &linked);
@@ -512,40 +501,6 @@ bool VehicleWindowGl50DS::Storage::createOriginalShadows() noexcept {
     gl.vertexAttribPointer(vehicleGlPositionAttribute50CZ, 3, floatType, 0, 3 * sizeof(float), nullptr);
     if (!check("create original cable-shadow caster stream") || !shadowCableVertexArray || !shadowCableVertexBuffer)
         return fail(*diagnostic, VehicleWindowError50DS::allocation, "original cable-shadow caster stream");
-    // RA receivers: retained world positions plus world normals (placement
-    // rotation of each source normal) for the light-facing rule.
-    if (raWorld && raWorldArray && raWorldVertices && raWorldIndices) {
-        std::vector<float> normals;
-        try { normals.assign(raWorld->vertices_.size() * 3u, 0.f); } catch (...) {
-            return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate RA receiver normals");
-        }
-        for (const auto& plan : raWorld->surfaceDrawPlan_) {
-            if (plan.placement >= raWorld->placements_.size() || !raWorld->placements_[plan.placement])
-                return fail(*diagnostic, VehicleWindowError50DS::assets, "RA receiver placement missing");
-            const auto& m = raWorld->placements_[plan.placement]->visualMatrix;
-            for (std::size_t v = plan.vertexStart; v < std::size_t(plan.vertexStart) + plan.vertexCount &&
-                v < raWorld->vertices_.size(); ++v) {
-                const auto& n = raWorld->vertices_[v].sourceNormal;
-                double w[3];
-                for (U a = 0; a < 3; ++a) w[a] = n[0] * m[a] + n[1] * m[4 + a] + n[2] * m[8 + a];
-                const double length = std::sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
-                for (U a = 0; a < 3; ++a)
-                    normals[v * 3 + a] = length > 0.0 && std::isfinite(length) ? static_cast<float>(w[a] / length) : 0.f;
-            }
-        }
-        gl.genBuffers(1, &shadowRaNormals); drawGl.bindBuffer(arrayBuffer, shadowRaNormals);
-        gl.bufferData(arrayBuffer, std::intptr_t(normals.size() * sizeof(float)), normals.data(), staticDraw);
-        gl.genVertexArrays(1, &shadowRaArray); drawGl.bindVertexArray(shadowRaArray);
-        drawGl.bindBuffer(arrayBuffer, raWorldVertices);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 3, floatType, 0, sizeof(RaWorldVertex), reinterpret_cast<const void*>(offsetof(RaWorldVertex, position)));
-        drawGl.bindBuffer(arrayBuffer, shadowRaNormals);
-        gl.enableVertexAttribArray(3);
-        gl.vertexAttribPointer(3, 3, floatType, 0, 3 * sizeof(float), nullptr);
-        drawGl.bindBuffer(elementBuffer, raWorldIndices);
-        if (!check("create RA original shadow receiver stream") || !shadowRaArray || !shadowRaNormals)
-            return fail(*diagnostic, VehicleWindowError50DS::allocation, "RA original shadow receiver stream");
-    }
     drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
     if (shadowTrace) {
         const auto proc = [&](auto& pointer, const char* name) noexcept {
@@ -748,30 +703,6 @@ bool VehicleWindowGl50DS::Storage::drawShadowReceivers(std::uint8_t bank, U slot
                 accepted = check("draw original shadow receiver track range");
                 ++draws;
             }
-        }
-        // RA surface plan: this frame's selected model surfaces (current LOD),
-        // with the same scissor the world pass used.
-        if (accepted && raWorld && shadowRaArray && raWorldFramePrepared) {
-            drawGl.bindVertexArray(shadowRaArray);
-            drawGl.bindBuffer(elementBuffer, raWorldIndices);
-            for (const auto& selected : raWorldFrameDraws) {
-                if (!accepted) break;
-                if (selected.localFlare) continue;
-                if (selected.surface >= raWorld->surfaceDrawPlan_.size()) {
-                    accepted = fail(*diagnostic, VehicleWindowError50DS::frame, "receiver surface outside RA plan"); break;
-                }
-                const auto& plan = raWorld->surfaceDrawPlan_[selected.surface];
-                const int rule = shadowReceiverRule(i, static_cast<U>(plan.worldInstance));
-                if (rule < 0) continue;
-                if (rule != boundRule) { gl.uniform1i(shadowReceiverFacingUniform, rule); boundRule = rule; }
-                const auto& r = selected.scissor;
-                gl.enable(0x0C11); gl.scissor(r[0], r[1], r[2] - r[0], r[3] - r[1]);
-                drawGl.drawElementsBaseVertex(0x0004, I(plan.indexCount), 0x1405,
-                    reinterpret_cast<const void*>(std::uintptr_t(plan.indexStart) * sizeof(U)), 0);
-                accepted = check("draw original shadow receiver RA surface");
-                ++draws;
-            }
-            gl.disable(0x0C11);
         }
         if (query) gl.endQuery(0x8914);
         frameShadowReceiverDraws[i] = draws;

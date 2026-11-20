@@ -1,7 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
-#include "../../../tests/native/ra_static_fire_visual50la.h"
-#include "../../../tests/native/rc_crystal50rc.h"
-#include "../../../tests/native/tb_original_world50lm.h"
+#include "../../../tests/native/common_track50cr.h"
 
 namespace rr::platform {
 namespace vehicle_window_gl50ds_detail {
@@ -157,104 +155,45 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
     return true;
 }
 
-bool currentRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept {
-    if(!track.raStaticFire)return true;
-    if(!track.textures||track.textures->raStaticFireOwner()!=track.raStaticFire.get())
-        return fail(d,VehicleWindowError50DS::material,"FireP0t exact image publication lost");
-    constexpr std::int32_t fields[]={1,0,255,255,0,0,1,0,1,128,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,0,0,1,6,0,0,0,1,2,0};
-    constexpr std::int32_t sampler[]={0,0,1,5,0,-75};
-    for(std::size_t i=0;i<4;++i){
-        assets::OriginalStandardMaterialMapBindingView50LA map;
-        assets::OriginalStandardMaterialDiagnostic50LA md;
-        if(!track.raStaticFire->currentMap(i,map,md))
-            return fail(d,VehicleWindowError50DS::material,"FireP0t canonical map/collector expired");
-        if(map.contextAfter249610.fields.size()!=sizeof(fields)/sizeof(fields[0]))
-            return fail(d,VehicleWindowError50DS::material,"FireP0t unsupported canonical field extent");
-        for(std::size_t j=0;j<map.contextAfter249610.fields.size();++j)
-            if(map.contextAfter249610.fields[j].value!=fields[j])
-                return fail(d,VehicleWindowError50DS::material,"FireP0t unsupported canonical raster state");
-        for(std::size_t j=0;j<6;++j)if(map.contextAfter249610.sampler[j].value!=sampler[j])
-            return fail(d,VehicleWindowError50DS::material,"FireP0t canonical sampler changed");
-    }
-    return true;
-}
-
-bool validateRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept {
-    if(!track.raStaticFire){
-        if(track.textures&&track.textures->raStaticFireOwner())
-            return fail(d,VehicleWindowError50DS::material,"FireP0t image bank requires its typed track publication");
-        return true;
-    }
-    if(track.mesh!=track.raStaticFire->mesh()||!track.mesh||
-       track.mode!=VehicleWindowMode50DS::callerMaterialTextures||track.vertexColorScale!=1.f||
-       track.spanCount!=4||!track.spans||track.sourceNormals||track.sourceNormalCount||
-       track.sourceProjectionUvs||track.sourceProjectionCount)
-        return fail(d,VehicleWindowError50DS::material,"FireP0t requires exact source mesh/four spans/authored RGB and UV");
-    if(!currentRaStaticFire(track,d))return false;
-    for(std::size_t i=0;i<4;++i){
-        const auto* source=track.raStaticFire->span(i);const auto& span=track.spans[i];const auto& m=span.material;
-        if(!source||source->vertexStart!=span.vertexStart||source->vertexCount!=span.vertexCount||
-           source->indexStart!=span.indexStart||source->indexCount!=span.indexCount||
-           m.mode!=VehicleWindowMaterialMode50DS::requiredTexture||m.textureIndex!=0||
-           m.blend!=VehicleWindowBlend50DS::opaque||!m.depthWrite||!m.depthEqual||m.alphaScale!=1.f||
-           m.fixedBlendAlpha||m.unlit||!m.sourcePrelit||m.sourceDiffuseCompressed50LA||m.sourceSpecularPair50LA||
-           span.sourcePass!=1||span.sourcePassCount!=1||span.projectionPass||span.discardZeroAlpha||
-           !span.sourceAlphaTest||span.sourceAlphaReference||span.sourceUvAnimation||
-           !span.sourceFogKnown||!span.sourceFogEnabled)
-            return fail(d,VehicleWindowError50DS::material,"FireP0t source span or exact canonical lowering differs");
-    }
-    return true;
-}
-
-bool validateTbWorld(const VehicleWindowRequest50DS& request,VehicleWindowDiagnostic50DS& d) noexcept {
-    const auto& track=request.track;if(!track.tbWorld)return true;
-    const auto& owner=*track.tbWorld;const auto source=owner.sourceOwner();
-    const auto* spans=owner.spans();const auto* selections=owner.selections();
-    const auto* normals=owner.normals();const auto* projected=owner.projectionUvs();const auto* bank=owner.bank();
-    if(!owner.loaded()||!source||!source->ready()||request.raStaticWorld||track.rcCrystal||
-       track.raStaticFire||track.rcParticleWindow||track.gbParticleWindow||track.mcParticleWindow||track.mode!=VehicleWindowMode50DS::callerMaterialTextures||
-       // Counts from the owner's own data (were the stock TB 151225 / 286893 / 1376 / 103).
-       track.mesh!=owner.mesh()||!track.mesh||track.mesh->vertices.empty()||
-       track.mesh->indices.empty()||!spans||spans->empty()||!selections||
-       !normals||normals->size()!=track.mesh->vertices.size()||track.sourceNormals!=normals->data()||
-       track.sourceNormalCount!=normals->size()||!projected||projected->size()!=track.mesh->vertices.size()||
-       track.sourceProjectionUvs!=projected->data()||track.sourceProjectionCount!=projected->size()||
-       !track.spans||track.spanCount!=spans->size()||track.vertexColorScale!=255.f/128.f||!bank||!track.textures||
-       !track.textures->matchesSourceBank(*bank,track.textures->publicationToken())||
-       !bank->textureCount()||track.textures->textureCount()!=bank->textureCount())
-        return fail(d,VehicleWindowError50DS::request,"TB retained world/source publication differs");
-    for(std::size_t i=0;i<spans->size();++i){const auto& a=(*spans)[i];const auto& b=track.spans[i];
-        if(a.materialSelection>=selections->size()||a.vertexStart!=b.vertexStart||a.vertexCount!=b.vertexCount||
-           a.indexStart!=b.indexStart||a.indexCount!=b.indexCount||a.textureIndex!=b.material.textureIndex||
-           a.sourcePass!=b.sourcePass||a.sourcePassCount!=b.sourcePassCount||a.projectionPass!=b.projectionPass||
-           b.gsDestinationAlphaPass||b.sourceEnvironmentMap||b.material.mode!=VehicleWindowMaterialMode50DS::requiredTexture)
-            return fail(d,VehicleWindowError50DS::material,"TB ordered source span association differs");
-        // AA1 exactly where the span's own pass authors onePassAntialiasingOnOff=1
-        // (was: the material named CROWD, 33 stock spans).
-        bool aa1Valid=true;
-        const bool aa1=course_world_texture50ST::authoredOnePassAa1((*selections)[a.materialSelection].sourcePassFields,aa1Valid);
-        if(!aa1Valid||aa1!=(b.nativeCoverage==NativeTrackCoverage50DS::fourSampleAa1))
-            return fail(d,VehicleWindowError50DS::material,"TB authored AA1 lowering differs from the pass field");
-    }
-    for(U i=0;i<bank->textureCount();++i){const auto* cpu=bank->texture(i);const auto* gpu=track.textures->asset(i);
-        if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity)
-            return fail(d,VehicleWindowError50DS::material,"TB source image identity differs");
-    }
+bool validateCommonTrack(const VehicleWindowRequest50DS& request,VehicleWindowDiagnostic50DS& d) noexcept {
+    // Frontend, viewer and host-check routes supply no race track load.
+    if(!request.commonTrack)return true;
+    const auto& track=*request.commonTrack;const auto& roles=track.roles;
+    // One rule for every course: the lease is the loaded track whose static
+    // world produced the textured mesh; each borrowed descriptor names data of
+    // a role owner the same track load published. No course is consulted.
+    if(!track.loaded()||!roles.staticWorld||!request.track.mesh||
+       request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures)
+        return fail(d,VehicleWindowError50DS::request,"common track lease requires its loaded static world and textured track mesh");
+    if((request.sky.mesh&&!roles.sky)||(request.water.environmentTexture&&!roles.water)||
+       ((request.particleTextures||request.particleCpuTextures||request.particleMaterial)&&!roles.particles)||
+       (request.trackAnimationCount&&!roles.atm&&!roles.animation))
+        return fail(d,VehicleWindowError50DS::request,"track descriptor borrows a role the common track load did not publish");
     return true;
 }
 
 bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
-    if(!validateRaStaticFire(request.track,d)||!validateTbWorld(request,d))return false;
     const auto& track = request.track;
     const auto& fog = track.worldFog;
-    if(track.rcCrystal){
+    if(track.environmentUv){
+        // Producer sizes from its own data; both budgets are checked before
+        // any allocation: float2 GPU stream per mesh vertex, compact staging.
+        const auto& producer=*track.environmentUv;
         const std::uint64_t gpu=track.mesh?std::uint64_t(track.mesh->vertices.size())*sizeof(std::array<float,2>):0;
-        if(!track.rcCrystal->validate(track)||!gpu||gpu>track.maximumRcProjectionBytes||
-           gpu>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
-           rc_crystal50RC::Owner::uvCount*sizeof(std::array<float,2>)>track.maximumRcStagingBytes)
-            return fail(d,VehicleWindowError50DS::request,"RC crystal source association/projection budget rejected");
-    }else if(track.maximumRcProjectionBytes||track.maximumRcStagingBytes)
-        return fail(d,VehicleWindowError50DS::request,"RC projection budgets require typed source owner");
+        const std::uint64_t staging=std::uint64_t(producer.uvCount())*sizeof(std::array<float,2>);
+        std::uint64_t ranged=0;bool ordered=producer.ready()&&producer.ranges()&&producer.rangeCount();
+        std::uint64_t nextVertex=0;
+        for(std::size_t i=0;ordered&&i<producer.rangeCount();++i){const auto& r=producer.ranges()[i];
+            ordered=r.vertexCount&&r.vertexStart>=nextVertex&&track.mesh&&
+                std::uint64_t(r.vertexStart)+r.vertexCount<=track.mesh->vertices.size();
+            nextVertex=std::uint64_t(r.vertexStart)+r.vertexCount;ranged+=r.vertexCount;}
+        // The environment UVs and the authored projection share one float2
+        // attribute stream, so a track supplies at most one of them.
+        if(!ordered||ranged!=producer.uvCount()||track.sourceProjectionUvs||!producer.validate(track)||!gpu||gpu>track.maximumEnvironmentUvBytes||
+           gpu>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||!staging||staging>track.maximumEnvironmentStagingBytes)
+            return fail(d,VehicleWindowError50DS::request,"environment-map UV producer association/projection budget rejected");
+    }else if(track.maximumEnvironmentUvBytes||track.maximumEnvironmentStagingBytes)
+        return fail(d,VehicleWindowError50DS::request,"environment-map UV budgets require its producer");
     if (fog.enabled) {
         if (!track.mesh || track.mode != VehicleWindowMode50DS::callerMaterialTextures ||
             !std::isfinite(fog.start) || !std::isfinite(fog.end) ||
@@ -278,7 +217,7 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
             !track.textures && !track.spans && !track.spanCount && !track.enableFrustumCulling &&
             !track.cullingChunkTriangles && !track.sourceNormals && !track.sourceNormalCount &&
             !track.maximumNormalBytes && !track.sourceProjectionUvs && !track.sourceProjectionCount &&
-            !track.maximumProjectionBytes && !track.rcCrystal && !track.tbWorld && !track.maximumRcProjectionBytes && !track.maximumRcStagingBytes && !track.rcParticleWindow && !track.gbParticleWindow && !track.mcParticleWindow) ||
+            !track.maximumProjectionBytes && !track.environmentUv && !track.maximumEnvironmentUvBytes && !track.maximumEnvironmentStagingBytes) ||
             fail(d, VehicleWindowError50DS::request, "track mode/budgets/culling require an actual visual mesh");
     if ((track.mode != VehicleWindowMode50DS::viewerNeutralUntextured &&
             track.mode != VehicleWindowMode50DS::sourceVertexColors &&
@@ -350,9 +289,6 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
         if (index >= mesh.vertices.size())
             return fail(d, VehicleWindowError50DS::indices, "track index outside vertex array");
     if (track.mode == VehicleWindowMode50DS::callerMaterialTextures) {
-        if(track.textures&&track.textures->raStaticWorldOwner())
-            return fail(d,VehicleWindowError50DS::material,
-                "full RA image publication requires pending typed world renderer/light join");
         if (!track.textures || !track.textures->validBorrow(request.context, request.isCurrent,
             track.textures->publicationToken()) || !track.spans || !track.spanCount ||
             track.spanCount > maxVehicleWindowTrackSpans50DS)
@@ -377,9 +313,10 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
                 return fail(d,VehicleWindowError50DS::material,"GS destination-alpha pass lacks its same-surface partner");
             if(span.sourceZone>track.zoneCount)
                 return fail(d,VehicleWindowError50DS::material,"track span zone outside the world's authored zones");
-            // Stand-in: the retained RC owner is the only environment-map UV producer.
-            if(span.sourceEnvironmentMap&&(!track.rcCrystal||span.gsDestinationAlphaPass!=2))
-                return fail(d,VehicleWindowError50DS::material,"environment-map pass lacks its projection owner");
+            // The environment-map program is the pair's pass 2 and reads the
+            // track's environment UV producer (any course whose data has it).
+            if(span.sourceEnvironmentMap&&(!track.environmentUv||span.gsDestinationAlphaPass!=2))
+                return fail(d,VehicleWindowError50DS::material,"environment-map pass lacks its projection producer");
             if (span.material.sourceDiffuseCompressed50LA)
                 return fail(d, VehicleWindowError50DS::material,
                     "track, dynamic-world and sky spans cannot select racer source diffuse");
@@ -411,19 +348,19 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
                     return fail(d, VehicleWindowError50DS::indices,
                         "track span index escapes its declared source vertex range");
             if (span.sourceUvPolicy != NativeTrackUvPolicy50DS::legacySinglePass &&
-                span.sourceUvPolicy != NativeTrackUvPolicy50DS::scLavaTwoPass)
+                span.sourceUvPolicy != NativeTrackUvPolicy50DS::uvScrollTwoPass)
                 return fail(d,VehicleWindowError50DS::material,"unknown native track UV policy");
-            const bool scLava=span.sourceUvPolicy==NativeTrackUvPolicy50DS::scLavaTwoPass;
+            const bool scrollPair=span.sourceUvPolicy==NativeTrackUvPolicy50DS::uvScrollTwoPass;
             if ((span.discardZeroAlpha && span.sourceAlphaTest) ||
-                (!scLava && span.sourceUvAnimation && (span.sourcePass != 1 || span.sourcePassCount != 1 ||
+                (!scrollPair && span.sourceUvAnimation && (span.sourcePass != 1 || span.sourcePassCount != 1 ||
                     span.projectionPass || span.material.mode != VehicleWindowMaterialMode50DS::requiredTexture)))
                 return fail(d,VehicleWindowError50DS::material,
                     "source UV service requires one textured unprojected pass and one alpha-test mode");
-            if(scLava) {
+            if(scrollPair) {
                 // Both policies are checked before any GL allocation/publication.
                 const U first=span.sourcePass==1?i:i-1;
                 if(first+1>=track.spanCount ||
-                    !validScLavaUvPair50DS(track.spans[first],track.spans[first+1]))
+                    !validUvScrollTwoPassPair50DS(track.spans[first],track.spans[first+1]))
                     return fail(d,VehicleWindowError50DS::material,"SC lava exact adjacent two-pass UV/material pair differs");
             }
             if (span.material.mode == VehicleWindowMaterialMode50DS::untextured) {
@@ -493,8 +430,8 @@ bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWin
         const auto& span = request.track.spans[animation.sourceSpanIndex];
         if(span.sourceEnvironmentMap)
             return fail(d,VehicleWindowError50DS::material,"environment-map pass retains its actual static image; ATM override rejected");
-        if(span.sourceUvPolicy==NativeTrackUvPolicy50DS::scLavaTwoPass)
-            return fail(d,VehicleWindowError50DS::material,"SC lava retains its static original image; ATM override rejected");
+        if(span.sourceUvPolicy==NativeTrackUvPolicy50DS::uvScrollTwoPass)
+            return fail(d,VehicleWindowError50DS::material,"two-pass UV scroll retains its static original image; ATM override rejected");
         if (span.material.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
             span.material.textureIndex != animation.sourceTextureIndex)
             return fail(d, VehicleWindowError50DS::material, "animated source span texture identity mismatch");
@@ -518,8 +455,8 @@ bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindow
         world.mesh->indices.size() > maxVehicleWindowDynamicIndices50DS ||
         world.spanCount > maxVehicleWindowDynamicSpans50DS || world.enableFrustumCulling ||
         world.cullingChunkTriangles || world.sourceProjectionUvs ||
-        world.sourceProjectionCount || world.maximumProjectionBytes || world.rcCrystal || world.tbWorld ||
-        world.maximumRcProjectionBytes || world.maximumRcStagingBytes || world.rcParticleWindow || world.gbParticleWindow || world.mcParticleWindow))
+        world.sourceProjectionCount || world.maximumProjectionBytes || world.environmentUv ||
+        world.maximumEnvironmentUvBytes || world.maximumEnvironmentStagingBytes))
         return fail(d, VehicleWindowError50DS::limits,
             "dynamic world requires bounded textured topology without static culling/projection");
     const bool result = validateTrack(selected, d);
