@@ -145,11 +145,8 @@ public:
         OriginalSimpleVCRDiagnostic50LA d;
         if(!vcr->startRecord1A80C8(*race_,d)){why=d.operation?d.operation:"287B60 rejected";return false;}
         for(auto& t:tracks_)t.samples.clear();captured_.fill(false);
-        // 1A7BD0..1A7C18 clears race1B0 bit3 once the race-start fade-in is
-        // accepted. These courses' intro and its fade run natively (the TA
-        // camera start), long finished by GO: clear it here for them.
-        if(race_->flags1B0KnownValue_&8u)race_->flags1B0KnownValue_=std::uint8_t(race_->flags1B0KnownValue_&~8u);
-        race_->flags1B0KnownMask_=std::uint8_t(race_->flags1B0KnownMask_|8u);
+        // race1B0 bit3 is not touched here: only 1A7C18 clears it, after 2AEE90 accepted
+        // the race fade-in (the one 1A7BD0 owner, on every course).
         phase_=Phase::recording;lastWrites_=0;return true;
     }
     // 1A7F40..1A80EC (race update, non-subtype-3, B4 flags58 bits3..4 = 1 or 3,

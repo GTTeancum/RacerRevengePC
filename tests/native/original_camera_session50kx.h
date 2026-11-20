@@ -1386,8 +1386,9 @@ public:
     // must wait for the next image resumes at the next advanceSceneChild.
     // The caller (race start) performs 175430's 199770 on the race's own F8;
     // this Session applies the same call to its native HUD projection.
-    // PORT STAND-IN (restart.txt): 2D2090's TV +24 = 0, and 1AFC70's per-racer
-    // 3C/40/44 rows, +4C/+50/+54 (no port field in LapTimingManager50ID).
+    // PORT STAND-IN (restart.txt): 2D2090's TV +24 = 0, and 1AFC70's per-racer 3C[i]
+    // virtual74 (no port racer virtual; the racers' 216690 timing reset ran at 1AEA70).
+    // 1AFC70's 40[]/44[], +50 and +54 are stored by the race start's camera hook.
     bool rebindRacerCameras1ACBA0(std::uint32_t a1,bool replay1B0bit4)noexcept{
         if(!onOwnerThread()||closed_||abandoned_||!coldBound_||!displayInputs_){set(Status::owner,0x1acba0);return false;}
         if(pendingDisplayWork()||exit_.requestPending()||taSkipFadeRequest_.pending()||
@@ -1431,7 +1432,9 @@ public:
             set(Status::complete,0x1ace14);return true;
         }
         rearmRestartVideoOwners1AC8E0();
-        // 1AFC70(B4) on the port's fields: flags58 bits 0..4 = 0, +30 = 0, +34 = 0.
+        // 1AFC70(B4) on the port's fields: flags58 bits 0..4 = 0, +30 = 0, +34 = 0 (the
+        // countdown). Its per-racer 40[]/44[] rows, +54 = 0 and +50 = +4C are stored by the
+        // race start's camera hook on the AI session that owns them (publication resetCamera).
         actual_.all8Manager.flags58=static_cast<std::uint8_t>(actual_.all8Manager.flags58&~0x1fu);
         actual_.all8Manager.time30=0.f;countdown_.countdown34=0.f;
         // 1ACCEC..1ACD00: with race48+78 (the course TV camera), 2D30B0 resets its
@@ -1467,6 +1470,47 @@ public:
                 set(Status::sourcePath,0x1a46e0);return false;}
         }
         set(Status::complete,0x1ace10);return true;
+    }
+    // The 1AC8E0 preflight (the original 1AC8E0 has no refusal path): the same order, busy,
+    // owner, identity and visibility tests rebindRacerCameras1ACBA0 and its leaves
+    // (17BCE0, 178700, 175430, 1AD3C0) make, in the same order, with no store. 0 = every
+    // test passes; otherwise the pc the rebind would refuse with. What only the leaf
+    // itself can decide (the 1148D0/114770 zone moves, the 177AB0 transition, 1756D0,
+    // 2D5890, the 1A9750 drain) still refuses at its step.
+    std::uint32_t preflightRebindRacerCameras1ACBA0(std::uint32_t a1,bool replay1B0bit4)noexcept{
+        if(!onOwnerThread()||closed_||abandoned_||!coldBound_||!displayInputs_)return 0x1acba0u;
+        if(pendingDisplayWork()||exit_.requestPending()||taSkipFadeRequest_.pending()||
+           (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))return 0x1acba0u;
+        if(!replay1B0bit4){
+            if(const auto busy=restartVideoBusyPC1AC8E0())return busy;
+        }
+        const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
+        if(!replay1B0bit4&&!a1&&(launch==2||launch==3)&&!actual_.startMusicRequest)return 0x1ad3c0u;
+        if(actual_.humanCount34>1u)return 0x1750a0u;
+        if(actual_.humanCount34==1u){
+            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(0))return 0x1750a0u;
+            if(!follow_.prepared||!follow_.bank.records||!follow_.bank.count)return 0x175174u;
+            if(!attached_.prepared||!attachedOffset_.sourceMemberIdentity||attachedOffset_.pod60!=attached_.binding.pod60)
+                return 0x175208u;
+            lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+               !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return 0x175224u;
+            if(!lease.world()||!lease.workspace()||!lease.racerVisibility7F0())return 0x175224u;
+            // 17BCE0 (both branches).
+            if(follow_.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get())return 0x17bce0u;
+            if(!replay1B0bit4){
+                // 178700.
+                const auto& preference=actual_.preferences.slots[0];
+                if(preference.field11030>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max())||
+                   preference.field11038>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return 0x178700u;
+                if(preference.field11030!=0u&&preference.field11030!=5u)return 0x178810u;
+                if(controller_.mode44==4)return 0x1787ccu;
+            }
+        }
+        if(replay1B0bit4)return 0;
+        // 1AD3C0 (a1 == 0, 11258 2/3): the 308030 draw needs round-to-nearest.
+        if(!a1&&(launch==2||launch==3)&&std::fegetround()!=FE_TONEAREST)return 0x1ad3dcu;
+        return 0;
     }
 private:
     // In-place 1AC8E0 (race1B0 bit4 clear), every course and pod: each fade the restarted

@@ -7,6 +7,7 @@
 #include "native_water_surface50ws.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "native_wreck_debris_sim50pd.h"
+#include "native_wreck_effects50pd.h"
 #include "native_common_results50pd.h"
 #include "native_common_race50pd.h"
 #include "terrain_interactive_publication50du.h"
@@ -376,6 +377,7 @@ void Context::run() {
  auto& recoveryPaused=this->recoveryPaused;
  const auto& refreshAnimatedCandidates=this->refreshAnimatedCandidatesCall;
  const auto& restartGridPlacementCall=this->restartGridPlacementCall;
+ const auto& restartGridPreflightCall=this->restartGridPreflightCall;
  const auto& restartSetupTickCall=this->restartSetupTickCall;
  auto& renderDiagnostics=this->renderDiagnostics;
  auto& renderedCameraPublication=this->renderedCameraPublication;
@@ -2023,9 +2025,11 @@ void Context::run() {
    // finish. The host-panel fallback keeps committing at the finish.
    {const auto& common=native_common_results50PD::state();
     if(common.rootPublished&&!common.fallback&&!common.acknowledged)return;}
-   require50DU(humanCourseEnabled&&originalAiHumanCount==1&&racerBank.count()==8,
-       "tournament result lost its original manager roster");
+   // 1875C0 walks the manager's own count (count4C = the bank's racer count), not a
+   // fixed eight; the rows array is the 1AD520 field limit and is bounds-checked.
    std::array<rr::game::OriginalTournamentResultRacer50KG,8> rows{};
+   require50DU(humanCourseEnabled&&originalAiHumanCount==1&&racerBank.count()>0&&racerBank.count()<=rows.size(),
+       "tournament result lost its original manager roster");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     auto& row=rows[slot];row.pod60=dynamicRacer60[slot];row.class58=s.fields.vehicle58;
     row.retirementCD4=lapContinuity.timing.wordCD4;
@@ -2072,6 +2076,12 @@ void Context::run() {
      rr::game::initializeLapTimingFields50ID(lapContinuity.timing,mode11258);       // CB0..CD4, CC0, CB4 rule
      s.fields.damage7D0=0.f;s.fields.damage7D4=0.f;s.fields.damage7D8=0.f;s.fields.damage7DC=0.f; // 217420
      s.impactSupplement.environmentalD38=0.f;s.impactSupplement.environmentalD3C=0.f;
+     // The human's PlayerEventState49A carries the same racer fields (CB0/CB4/CB8 and the
+     // kill counter CD0, ++ at 225F34) for the player event child: 216690 resets them too.
+     if(s.fields.vehicle58==0u){
+      playerEvents.countCD0=0;playerEvents.valueCB0=0.f;playerEvents.valueCB8=0.f;
+      if(mode11258!=3u)playerEvents.valueCB4=0.f;
+     }
     });
     // CCC (place) and CD4 (retirement) as the AI manager's rank rows mirror them.
     originalAiSession.rank[slot].placeCCC=0;originalAiSession.rank[slot].retirementCD4=0;
@@ -2164,9 +2174,29 @@ void Context::run() {
    // = 141520 on the Time Trial record actor (flags29 bits 0/1 clear, vtable+28).
    return nativeRecordActor&&nativeRecordActor->restart1ACB18();
   };
+  // 1AFC70(B4) rows on the native AI session that owns them (race1B0 bit4 clear, 1ACC7C):
+  // per racer (count4C = the bank's racer count) 40[i] = 0 and 44[i] = 0, then +54 = 0 and
+  // +50 = +4C. flags58 bits 0..4, +30 and +34 are the camera Session's (same manager word).
+  // PORT STAND-IN (flagged): 3C[i] virtual74 has no port racer virtual.
+  const auto managerRowsFit1AFC70=[&]()noexcept->bool{
+   const std::size_t count4C=racerBank.count();
+   return originalAiSession.managerBound&&originalAiSession.retired40.bound&&
+       count4C<=originalAiSession.retired40.managerRows.size()&&count4C<=originalAiSession.finished44.managerRows.size();
+  };
+  const auto restartManager1AFC70=[&]()noexcept->bool{
+   if(!managerRowsFit1AFC70())return false;
+   const std::size_t count4C=racerBank.count();
+   for(std::size_t i=0;i<count4C;++i){originalAiSession.retired40.managerRows[i]=0;originalAiSession.finished44.managerRows[i]=0;}
+   originalAiSession.finished44.count54=0;
+   originalAiSession.retired40.activeCount50=static_cast<decltype(originalAiSession.retired40.activeCount50)>(count4C);
+   return true;
+  };
   const auto resetCamera=[&](std::uint32_t a1,bool replay1B0bit4)noexcept->bool{
    // 1ACBA0 per human 1AF330 / 1750A0, 1AFC70(B4) and 1ACD44 (area B's Session).
    if(!sourceCameraSession)return false;
+   if(!replay1B0bit4&&!restartManager1AFC70()){
+    try{std::cerr<<"race_start_camera pc=1AFC70 refused manager rows unavailable\n";}catch(...){}
+    return false;}
    if(sourceCameraSession->rebindRacerCameras1ACBA0(a1,replay1B0bit4))return true;
    const auto& d=sourceCameraSession->diagnostic();
    try{std::cerr<<"race_start_camera pc=1ACBA0 refused_pc="<<std::hex<<d.sourcePC<<std::dec<<'\n';}catch(...){}
@@ -2178,6 +2208,48 @@ void Context::run() {
     racerBank.visit(slot,[&](){bestLapCB4=lapContinuity.timing.bestLapCB4;});
     return true;
    }catch(...){return false;}
+  };
+  // The 1AC8E0 preflight (common_race_start50CR::Hooks::preflightRestart1AC8E0): every
+  // racer's 216690 / 2A2880 / 2169C0 / 1AEA70 owner tests and the camera Session's 1ACBA0
+  // tests, all before any effect and with no store. Poses are computed (pure) and checked.
+  const auto preflightRestart1AC8E0=[&](std::uint32_t a1,bool replay1B0bit4,std::uint32_t mode11258,
+      std::uint32_t& pc,const char*& why)noexcept->bool{
+   (void)mode11258;pc=0;why=nullptr;
+   const auto refuse=[&](std::uint32_t at,const char* reason)noexcept{
+    pc=at;why=reason;
+    try{std::cerr<<"race_start_preflight refused_pc="<<std::hex<<at<<std::dec<<" reason="<<reason<<'\n';}catch(...){}
+    return false;};
+   try{
+    if(!sourceCameraSession)return refuse(0x1acba0u,"camera session absent");
+    const std::size_t racers=racerBank.count();
+    if(!racers||racers>std::size(originalAiSession.rank))return refuse(0x1aea70u,"race field outside the manager rows");
+    if(!replay1B0bit4&&!managerRowsFit1AFC70())return refuse(0x1afc70u,"1AFC70 manager rows unavailable");
+    for(std::size_t slot=0;slot<racers;++slot){
+     if(!racerBank.active(slot))return refuse(0x216690u,"216690 racer slot inactive");
+     bool posed=false;
+     racerBank.visit(slot,[&](){
+      const auto humans=static_cast<std::size_t>(originalAiHumanCount);
+      const bool ai=s.fields.vehicle58==1u;
+      if(ai?slot<humans:slot>=humans)return;
+      const auto rank=static_cast<std::uint32_t>(ai?slot-humans:slot+(racers-humans));
+      rr::game::GridCenterResult50AC grid{};
+      if(rank>7u||!source_grid50IG::prepare(mapView,rank,grid))return;
+      const float lift=x.parameters.visual.verticalLimit7EC;
+      for(unsigned axis=0;axis<3;++axis){
+       const float at=std::bit_cast<float>(grid.position[axis]);
+       if(!std::isfinite(axis==1?at+lift:at+0.f))return;
+      }
+      for(unsigned axis=0;axis<4;++axis)if(!std::isfinite(std::bit_cast<float>(grid.heading[axis])))return;
+      posed=true;
+     });
+     if(!posed)return refuse(0x2a2880u,"2A2880 grid pose refused");
+     std::uint32_t at=0;const char* reason=nullptr;
+     if(!restartGridPreflightCall(slot,at,reason))return refuse(at?at:0x1aea70u,reason?reason:"1AEA70 racer owners unavailable");
+    }
+    if(const auto at=sourceCameraSession->preflightRebindRacerCameras1ACBA0(a1,replay1B0bit4))
+     return refuse(at,"1ACBA0 camera session not ready for the restart");
+    return true;
+   }catch(...){return refuse(0x1ac8e0u,"1AC8E0 preflight exception");}
   };
   common_race_start50CR::Hooks raceStartHooks{};
   raceStartHooks.resetRacerTiming216690.emplace(resetRacerTiming216690);
@@ -2192,9 +2264,13 @@ void Context::run() {
   // see common_race_start50CR::Hooks::restartSetupTick).
   const auto restartSetupTick=[&]()noexcept->bool{return restartSetupTickCall();};
   raceStartHooks.restartSetupTick.emplace(restartSetupTick);
+  raceStartHooks.preflightRestart1AC8E0.emplace(preflightRestart1AC8E0);
   struct RaceFlowBinding final {
    common_race_start50CR::Owner& start;common_race_end50CR::Owner& end;bool bound=false;
-   ~RaceFlowBinding(){if(bound){end.unbind();start.unbind();}}
+   ~RaceFlowBinding(){
+    // The world hook captures this publication's track owners: it never outlives them.
+    native_common_results50PD::state().restartWorld=nullptr;
+    if(bound){end.unbind();start.unbind();}}
   } raceFlowBinding{raceStart,raceEnd};
   if(const auto& countedRace=consumedStage.race()){
    require50DU(raceStart.bind(countedRace,roster,laps),"common race start bind rejected");
@@ -2206,6 +2282,36 @@ void Context::run() {
    endLaunch.app2E0=originalMainApplication.useProfile2E0();
    require50DU(raceEnd.bind(countedRace,endLaunch,raceStart),"common race end bind rejected");
    raceFlowBinding.bound=true;
+   // 1AC8E0's World74 leaves, reached directly as in the original (1AC900 / 1AC978 /
+   // 1AC98C), every course: no dependency on the Results root, race78 or a racing step.
+   //  161F60 (World+4A0 particles, when present): the one trackside emitter owner runs
+   //   the manager's own 161F60 removal, then puts every placement back to its authored
+   //   start state (null = no manager); with it the native wreck effects clear.
+   //  Scene::Reset 2702E0 (Scene vtable +0x74): 101D10 ResetAll of every track animation +
+   //   101B20 re-stop of every Animation-action target, then trigger manager +0x80 (2DCC70:
+   //   every trigger's fired bit 0x8 cleared) over the one trigger group of the track.
+   //   The lane route republishes every row's visual/collision membership after the
+   //   reset; the static route's next world service does.
+   //   PORT STAND-IN (flagged, existing): 27C330 (Scene+0x3D4) and the Particles-action
+   //   emitter reset of 2702E0 are not carried; the three leaves run together.
+   native_common_results50PD::state().restartWorld=[&](const char*& reason)->bool{
+    reason=nullptr;native_wreck_effects50PD::reset();
+    if(track.roles.emitters){
+     common_track50CR::Diagnostic d;
+     if(!track.roles.emitters->restart161F60(d)){static thread_local std::string why;
+      why="161F60 track particle emitter restart rejected: "+d.reason;reason=why.c_str();return false;}
+    }
+    std::size_t rows=0,triggers=0;
+    if(trackAnimationBinding){track_animation_binding50AN::Diagnostic resetDiagnostic;
+     if(!trackAnimationBinding->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
+     rows=trackAnimations?trackAnimations->rowCount():0;}
+    else if(trackAnimations){track_animation_runtime50AN::Diagnostic resetDiagnostic;
+     if(!trackAnimations->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
+     rows=trackAnimations->rowCount();}
+    if(track.roles.triggers)triggers=rr::game::raceResetNativeTriggerGroup2DCC70(*track.roles.triggers);
+    std::cerr<<"track_animation_race_reset course="<<(trackAnimations?trackAnimations->label():std::string("-"))
+        <<" rows="<<rows<<" common_triggers="<<triggers<<" at=1AC8E0\n";
+    return true;};
    require50DU(originalMainApplication.bindRaceStart50CR(this->raceStartOwner),"Application race start binding rejected");
    // Fresh race: only the shared tail (1AED30, 197040, race94; the cold load
    // placed every racer, so no 2A2880 here). Every fresh hook is filled: a

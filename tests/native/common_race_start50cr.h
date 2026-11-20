@@ -123,6 +123,13 @@ struct Hooks final {
     // original updates every racer on every intro/countdown frame (1AED30 only locks axes); the
     // port's held phase runs no racer frame, only this tick. Refusal names the racer (step pc 1AEA70).
     Hook<bool()noexcept> restartSetupTick;
+    // Restart only, before any 1AC8E0 effect (the original 1AC8E0 has no refusal path): every
+    // port-side owner test the hooks above would make for this restart, for every racer, with
+    // no store (2A2880/2169C0 poses computed and checked, the 1AEA70 racer owners, the 1ACBA0
+    // camera Session's order/busy/owner tests). False refuses the restart with pc/why and
+    // nothing moved. Empty = refused (an unchecked restart is never started).
+    Hook<bool(std::uint32_t a1,bool replay1B0bit4,std::uint32_t mode11258,std::uint32_t& pc,
+        const char*& why)noexcept> preflightRestart1AC8E0;
 };
 
 struct Receipt final {

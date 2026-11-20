@@ -5,6 +5,7 @@
 #include "native_common_results50pd.h"
 #include "native_common_race50pd.h"
 #include "native_race_replay50pd.h"
+#include "native_racer_restore228110_50cr.h"
 #include "native_wreck_debris_gpu50pd.h"
 #include "native_water_surface50ws.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
@@ -1884,7 +1885,8 @@ SessionExit50DU Context::run() {
   activateColdRace=[&](){
   require50DU(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized,
       "native cold race activation is one-shot after Course input ownership ends");
-  // Every activated race starts with its racers intact (Restart rebuilds them).
+  // Every activated race starts with its racers intact (an in-place 1AC8E0 restart
+  // restores them through 1AEA70's 228110, native_racer_restore228110_50cr.h).
   rr::game::resetNativeDestroyedRacers50PD();
   native_wreck_debris50PD::resetSim();
   native_wreck_effects50PD::reset();
@@ -3132,7 +3134,7 @@ SessionExit50DU Context::run() {
       if(!reset){pc=0x16e830u;why="16E830 needs an initialized original AI in every AI slot";return refuse();}
      }
     }
-    bool placed=false;
+    bool placed=false,restoredOut=false;std::uint32_t restoredState40=0;
     racerBank.visit(slot,[&](){
      requireRuntimeNavigation();
      if(!refreshAnimatedCandidates()){pc=0x124cb0u;why="world publication unavailable";return;}
@@ -3164,6 +3166,10 @@ SessionExit50DU Context::run() {
       if(!native_original_human_recovery::restart1AEA70(s,x.bindings,x.parameters,navigationProgress,start2169C0,
           originalManualResetSerial,originalHumanRecovery,owners,*originalRecoveryWorkspace,originalHumanRecoveryDiagnostic)){
        pc=originalHumanRecoveryDiagnostic.sourcePC;why=originalHumanRecoveryDiagnostic.message;return;}
+      // 1A24F0's a1 != 0 block (a1 = !race1B0 bit4), 1A2578..1A258C: 1098 = 5.0 and the
+      // lap cursor FF8 = 0 through its one owner (1A0360/1A258C, lap_progress50gf).
+      // PORT STAND-IN (flagged): racer350+100 = racer10A4 has no port field.
+      if(!replay1B0bit4){rr::game::initializePlayerLapCursor50GF(lapContinuity.state);playerEvents.value1098=5.f;}
       // The Ready lease publishes on the next ordinary graphics sequence.
       originalManualResetGraphicsDue=graphicsSequence[0]+1u;
      }else{
@@ -3183,7 +3189,13 @@ SessionExit50DU Context::run() {
        pc=originalRecoveryDiagnostic.sourcePC;why=originalRecoveryDiagnostic.message;return;}
      }
      // virtual78 a1 = !race1B0 bit4 (1AEB9C..1AEBB4): 216A30's a1 != 0 tail.
-     if(!replay1B0bit4)native_original_ai_recovery::fullReset216A30Tail(s,navigationProgress,baseTail);
+     if(!replay1B0bit4){
+      native_original_ai_recovery::fullReset216A30Tail(s,navigationProgress,baseTail);
+      // 21737C 228110 (the same tail): a destroyed or limping racer is whole again
+      // (state40 = 0, 7D0..7DC, C00..C06, its destroyed record); the one 228110 owner.
+      if(!native_racer_restore50CR::restore228110(slot,s,restoredOut,restoredState40)){
+       pc=0x228110u;why="228110 restore slot outside the destroyed-record table";return;}
+     }
      // 1AEBB8..1AEBCC: 844 = (1AC8E0 a1 != 0).
      s.fields.vehicle844=a1?1u:0u;
      // PORT STAND-IN (restart.txt): 1AEBD0..1AEBE0 B0+3C[slot] = 0 (no port
@@ -3192,9 +3204,52 @@ SessionExit50DU Context::run() {
      placed=true;
     });
     if(!placed)return refuse();
+    if(restoredOut){
+     // 228110: the restored racer's wreck pieces leave the world (and the death camera's
+     // debris view when it shows them), after the racer's own visit.
+     const auto removed=native_racer_restore50CR::removeRestoredPieces228110(1u<<slot);
+     std::cerr<<"race_start_grid pc=228110 slot="<<slot<<" restored state40="<<restoredState40
+         <<" debris_removed="<<removed<<'\n';
+    }
     return true;
    }catch(const std::exception& e){why=e.what();return refuse();}
    catch(...){return refuse();}
+  };
+  // 1AC8E0 has no refusal path: before the race start moves anything, the same owner
+  // tests restartGridPlacement1AEA70 makes are run for one slot with no store (bank
+  // visits are read-only here), so a refusal leaves the finished race untouched.
+  // Reports the refusing pc/reason; true = this slot's 1AEA70 owners are all present.
+  // The recovery owners' own deeper stages (216A30 / 1A24F0 probes) are not preflown
+  // (PORT STAND-IN, flagged: they only run as the reset itself).
+  const auto restartGridPreflight1AEA70=[&](std::size_t slot,std::uint32_t& pc,const char*& why)noexcept->bool{
+   pc=0x1aeb74u;why="restart placement owner unavailable";
+   try{
+    if(slot>=racerBank.count()||!racerBank.active(slot)||!originalRecoveryEnabled||!originalResetGround||
+       !originalRecoveryWorkspace||slot>=racerCables.size()||!racerCables[slot]||!originalAiAudio)return false;
+    if(slot==0){
+     if(restartSerial1AEA70==std::numeric_limits<std::uint64_t>::max())return false;
+     for(std::size_t ai=static_cast<std::size_t>(originalAiHumanCount);ai<racerBank.count();++ai){
+      bool ready=false;
+      racerBank.visit(ai,[&](){ready=s.fields.vehicle58==1u&&originalAi.initialized;});
+      if(!ready){pc=0x16e830u;why="16E830 needs an initialized original AI in every AI slot";return false;}
+     }
+    }
+    bool ready=false;
+    racerBank.visit(slot,[&](){
+     if(s.fields.vehicle58==0u){
+      if(!liveAudio||humanBaseUndertrack.pending||
+         originalManualResetSerial==std::numeric_limits<std::uint64_t>::max()){pc=0x1a24f0u;why="human reset owner busy";return;}
+      if(track.hasWater()&&!track.roles.water){pc=0x1a24f0u;why="human restart requires the track's water334";return;}
+     }else{
+      if(!s.fields.nativeAiOwnersBound50IV||!originalAi.initialized){pc=0x216a80u;why="AI D40/D44 reset owners unavailable";return;}
+      if(track.hasWater()&&(slot>=nativeWaterRacers.size()||!nativeWaterRacers[slot])){
+       pc=0x216a80u;why="AI restart requires the racer's water reset domain";return;}
+     }
+     ready=true;
+    });
+    if(ready){pc=0;why=nullptr;}
+    return ready;
+   }catch(...){return false;}
   };
   // Common rewrite (item 0): after the whole 1AC8E0 body (race1B0 bit4 clear), the fresh
   // race's one neutral setup tick for every racer (setupTickRacers above), every course and
@@ -3459,6 +3514,8 @@ SessionExit50DU Context::run() {
   .refreshAnimatedCandidatesCall=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
   .restartGridPlacementCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,const rr::game::UndertrackPlacement50ET&,
       std::uint32_t,bool)noexcept>{restartGridPlacement1AEA70},
+  .restartGridPreflightCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,std::uint32_t&,const char*&)noexcept>{
+      restartGridPreflight1AEA70},
   .restartSetupTickCall=interactive_frame50DU::BorrowedCall<bool()noexcept>{restartSetupTick1AC8E0},
   .renderDiagnostics=renderDiagnostics,
   .renderedCameraPublication=renderedCameraPublication,

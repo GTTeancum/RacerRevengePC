@@ -1,6 +1,7 @@
 // Source-identical Children prefix; no owners are moved out of runSession.
 #include "native_wreck_debris_sim50pd.h"
 #include "native_wreck_effects50pd.h"
+#include "common_race_log50cr.h"
 #include <cfenv>
 #include "terrain_interactive_frame_calls50du.h"
 #include "runtime_startup50fl_fixture.h"
@@ -61,6 +62,17 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  require50DU(!nativeSelectedLights||actualRacerSlot<graphicsSequence.size(),
      "selected-light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
+ // Common rewrite (R4, PLAN 2.5): the common_lap line for every racer, human and AI, at
+ // the one place each racer's CC8 advances this frame (1A0F18 for the human through
+ // lap_drive50GJ, the AI's 1A0DA0 navigation through driveOriginalAi50IV). Read only.
+ // PORT STAND-IN (flagged): common_lap50CR::Tracker::applyCrossing is not the live
+ // crossing owner yet; the banked lapContinuity.state is the live lap state (the
+ // tracker's own per-racer state stays unused), so the line is reported from it.
+ const auto reportCommonLap50CR=[&](std::size_t slot,std::uint32_t beforeCC8){
+  if(lapContinuity.state.vehicleCC8<=beforeCC8)return;
+  try{common_race_log50CR::lap(slot,lapContinuity.state.vehicleCC8,lapContinuity.timing.timeCB8,
+      lapContinuity.timing.bestLapCB4,lapContinuity.state.vehicleFF8);}catch(...){}
+ };
  // A destroyed racer (original state3/4) runs only its destroyed frame.
  if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u)
   return advanceDestroyedChildren(actualRacerSlot,preparedOuterFactor);
@@ -123,6 +135,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   // Common rewrite (I4): one AI input on every course (AiRuntimeInput50IV over
   // the one map/AI navigation views and the one live zone world, B-C12).
   // Metadata comes from aiFF4.metadata(), the 3C track length from the view.
+  const auto aiLapBeforeCC8=lapContinuity.state.vehicleCC8;
   bool aiReturned=[&]{
    requireRuntimeNavigation();
    AiRuntimeInput50IV aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;
@@ -149,6 +162,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
        lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
   }();
+  reportCommonLap50CR(actualRacerSlot,aiLapBeforeCC8);
   if(!aiReturned&&originalAi.physicalReset2255B0Pending&&originalRecoveryEnabled){
    std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
    if(originalResetGround&&racerCables[actualRacerSlot]&&sourceAiAudio&&
@@ -217,8 +231,10 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   // Common rewrite (I4): one 1A0DA0 navigation over the one map/AI views;
   // crossings go to the one lap owner (lap_drive50GJ::Owner over the one lap
   // tracker, common_lap50cr.h), every course.
+  const auto playerLapBeforeCC8=lapContinuity.state.vehicleCC8;
   const bool advanced=advancePlayerTrackNavigationEffects50GH(mapView,aiView,
       navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic);
+  reportCommonLap50CR(actualRacerSlot,playerLapBeforeCC8);
   addCounter50DU(nativeCalls);
   require50DU(reportNavigation(advanced,"live1A0DA0"),"source player navigation rejected");
   addCounter50DU(navigationUpdates);

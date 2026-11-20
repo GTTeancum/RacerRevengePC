@@ -122,7 +122,8 @@ bool Application::consumedRaAll8CameraCustodyNative34Current(
            session.generation_!=race->entity_.sessionGeneration||
            session.actual_.applicationEntities!=entitiesOwner_||
            !session.actual_.applicationAnimation.sameOwner(animationClock())||
-           session.actual_.humanCount34||session.actual_.bank.count()!=8u||
+           // The ALL8 field is the manager's own count (1AD520 limit 8), not a fixed eight.
+           session.actual_.humanCount34||!session.actual_.bank.count()||session.actual_.bank.count()>8u||
            session.closed_||session.abandoned_||!session.coldBound_||!session.readsBound_||
            session.frameStage_==original_camera_session50KX::Session::FrameStage::failed||
            !session.displayInputs_||!session.identitiesCurrent())return false;

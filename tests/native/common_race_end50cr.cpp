@@ -83,8 +83,13 @@ bool Owner::continue1A7DD0(const ::original_position_stats_adapter50LA::Owner& o
     if(decision.route==Route::tt_restart&&d.status==S::callerReturned&&d.sourcePC==0x1abc0cu){
         // 1ABC0C 1AC8E0(race,0): in place, no session reload. 216690 keeps the
         // best lap CB4 because 11258==3 (lap_timing50id.h).
+        // The caller sees true only after the restart completed (callerReturned at
+        // 1ABC0C) and then runs its own post-restart reset; a refusal departs.
         Receipt receipt;
-        return start_->begin(Request{Reason::restart,0u,callerTimeTrial1ABC0C,3u},hooks,receipt);
+        if(!start_->begin(Request{Reason::restart,0u,callerTimeTrial1ABC0C,3u},hooks,receipt))
+            return refuseToCourse(receipt.refusedPc?receipt.refusedPc:0x1ABC0Cu,
+                receipt.reason?receipt.reason:"Time Trial 1ABC0C 1AC8E0 refused");
+        return true;
     }
     if(decision.route==Route::practice&&d.status==S::callerReturned&&d.sourcePC==0x1abd28u){
         // 1ABCBC..1ABCFC VCR channel loop / 1ABD04 288630, then 1ABD10..2C race1B0
@@ -166,7 +171,10 @@ bool Application::departRace50CR(rr::game::OriginalRaceConstructor50LA& race,
         return refuse("race_depart",0x26D070u,"departure requires this Application's own counted race28C");
     const bool mainMenu=destination==Destination::mainMenu;
     const auto scope=race.endHud_.lock();const auto aural=sourceAural00Owner_;
-    auto* cycle=native_common_results50PD::state().raceCycleAudio;
+    // race10C+160: the counted race camera's own cycle-audio emitter (1BD9D4 / 1BDB6C read
+    // it from the race), the same owner the Results input uses.
+    const auto* camera=race.cameraNativeAdapter34_;
+    auto* cycle=scope&&camera&&camera==scope->camera_?&camera->actual_.cycleAudio:nullptr;
     if(!scope||!scope->music_||!scope->announcer_||!scope->gameplay_||!scope->engines_||
        !race.raceAudio_||!aural||!cycle)
         return refuse("aural_26D070",mainMenu?0x1BD9D4u:0x1BDB6Cu,"race audio owners (Aural, 10C scope, cycle audio) unavailable");
@@ -272,8 +280,8 @@ bool Application::quitTimeTrialFromPause1BDAB4(rr::game::OriginalRaceConstructor
         pc=0x1BDAC0u;pause.active200_=0;
         if(!pause.entity_||!pause.entity_->setActivity141630(false))return false;
         pc=0x1BDAE8u;
-        auto* cycle=native_common_results50PD::state().raceCycleAudio;
-        if(!cycle||!feedbackOk(*cycle,2u))return false;
+        // race10C+160 of this race (its camera's cycle-audio emitter), bound above.
+        if(!feedbackOk(camera->actual_.cycleAudio,2u))return false;
         pc=0x1BDB10u;
         if(!race.f8Attached_||!race.f8Source_||race.f8Owner_.get()!=race.f8Source_||
            !race.f8Source_->visibility199770(0,1,1,1,1))return false;

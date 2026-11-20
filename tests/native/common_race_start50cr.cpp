@@ -162,6 +162,39 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     };
     if(!endClockSettled())
         return run.fail(first,"1A7DA0 end-clock cut still suspended (pc=1A7DA0); restart refused before 1AC8E0"),done(false);
+    // ---- Preflight: the original 1AC8E0 has no refusal path, so every test a later step
+    // could refuse on is made here first, with no store; a refusal leaves the race exactly
+    // as it was (no half-restarted race). Race-internal owners first, then the port-side
+    // owners of every racer and the camera (Hooks::preflightRestart1AC8E0). What cannot be
+    // tested without running it (a leaf's own internal refusal) still refuses at its step.
+    {
+        const auto refuseBefore=[&](Step s,std::uint32_t pc,const char* why)noexcept {
+            out.ok=false;out.reached=s;out.refusedPc=pc?pc:stepPc(s);out.reason=why;return done(false);
+        };
+        if(!native_common_results50PD::state().restartWorld)
+            return refuseBefore(Step::triggerReset2DCC70,0,"World74 restart owner (2DCC70/161F60/2702E0) absent");
+        std::uint32_t pause=0;
+        if(!application_.animationClock().readPause11C(pause))
+            return refuseBefore(Step::app11CClear,0,"App11C owner unavailable");
+        if(r.music10C_&&!r.endHud_.lock())
+            return refuseBefore(Step::music1AC960,0,"race HUD/music scope absent for 1AC960");
+        if(!hooks.resetRacerTiming216690||!hooks.placeOnGrid2A2880||!hooks.lockStart1AED30||!hooks.resetCamera||
+           !hooks.showStartOverlay197040||(!bit4&&!hooks.restartSetupTick))
+            return refuseBefore(Step::racers1AEA70,0,"1AC8E0 race start hook absent");
+        // (race78's own belongsToRace identity test is the VCR's, reached only through
+        // the race leaves at 1ACB18 / 1ACD68.)
+        if(request.mode11258==3u&&!bit4&&r.vcr78Source_&&!hooks.restartRecordActor)
+            return refuseBefore(Step::record1ACB18,0x1acb18u,"1ACB18 record actor owner absent");
+        if(!bit4&&(!application_.profile||!application_.riderProfile))
+            return refuseBefore(Step::tail1ACB7C,0x1acc4cu,"1ACC4C profile 7E4/7E8 restart owner absent");
+        if(request.a1!=0u&&!bit4&&(!r.f8Attached_||!r.f8Source_||r.f8Owner_.get()!=r.f8Source_))
+            return refuseBefore(Step::cameraReset,0x1754d8u,"175430 199770 needs the race's own attached F8");
+        if(!hooks.preflightRestart1AC8E0)
+            return refuseBefore(Step::racers1AEA70,0,"1AC8E0 restart preflight owner absent");
+        std::uint32_t pc=0;const char* why=nullptr;
+        if(!(*hooks.preflightRestart1AC8E0)(request.a1,bit4,request.mode11258,pc,why))
+            return refuseBefore(Step::racers1AEA70,pc,why?why:"1AC8E0 restart preflight refused");
+    }
     // ---- 1AC8E0 restart body, in the Step order (dis_all.txt 1AC8E0..1ACE48) ----
     // 1AC900 World74+3D0 2DCC70; 161F60 and 2702E0 run through the same one
     // world hook. PORT STAND-IN (flagged, existing): the track owners perform

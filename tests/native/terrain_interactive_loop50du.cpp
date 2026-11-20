@@ -5,6 +5,7 @@
 #include "native_water_surface50ws.h"
 #include "native_common_results50pd.h"
 #include "native_race_replay50pd.h"
+#include "native_racer_restore228110_50cr.h"
 #include "../../platform/linux/native/test_results_input50pd.h"
 #include "../../src/game/original_race_end_entry50la.h"
 #include <cfenv>
@@ -267,8 +268,12 @@ void Context::run() {
  // Host record that the restarted race's 1A7BD0 fade-in (race1B0 bit3) is still to be
  // requested (host bookkeeping, not race state; see the presented-frame service below).
  bool restartFadeIn1A7BD0Pending=false;
+ // Host record that Pause row 10 in a Time Trial (1BDAB4, a record) opened Results page 3
+ // over the paused race (App11C stays set, as in the original: no 1BE830). The page owns
+ // the pad until its 1CA574..1CA6F0 confirm departs (host bookkeeping, not race state).
+ bool pauseRecordPage1BDAB4=false;
  const auto resetLoopAfterRaceStart=[&](){
-  restartFadeIn1A7BD0Pending=true;
+  restartFadeIn1A7BD0Pending=true;pauseRecordPage1BDAB4=false;
   // 1AFE30 at the restarted race's GO starts its recording again (287B60, bit1): the
   // race78 replay owner returns to its bound state (same race, same channels).
   {const char* why=nullptr;
@@ -514,17 +519,13 @@ void Context::run() {
    if(cd4&&std::bit_cast<std::int32_t>(race1A8)>=std::bit_cast<std::int32_t>(cd4)){
     std::cerr<<"replay_unwreck at="<<at<<" slot="<<slot<<" kept=1 cd4="<<cd4<<" race1A8="<<race1A8<<'\n';continue;}
    bool wasOut=false;std::uint32_t state=0;
-   require50DU(racerBank.visit(slot,[&](){
-    auto& record=rr::game::nativeDestroyedRacers50PD[slot];state=s.bodies.main.vehicleState40;
-    wasOut=state!=0u||record.destroyed||record.limping;
-    s.bodies.main.vehicleState40=0u;record={};
-    s.fields.damage7D0=s.fields.damage7D4=s.fields.damage7D8=s.fields.damage7DC=0.f;
-    std::memset(s.packedC00,0,sizeof s.packedC00);return true;}),"229F80 replay racer reset rejected");
+   require50DU(racerBank.visit(slot,[&](){return native_racer_restore50CR::restore228110(slot,s,wasOut,state);}),
+       "229F80 replay racer reset rejected");
    require50DU(replay.clearRacerBytes229F80(slot),"229F80 replay racer C00..C06 store rejected");
    if(wasOut){resetMask|=1u<<slot;
     std::cerr<<"replay_unwreck at="<<at<<" slot="<<slot<<" kept=0 state40="<<state<<" cd4="<<cd4<<" race1A8="<<race1A8<<'\n';}
   }
-  if(resetMask){const auto removed=native_wreck_debris50PD::removeRacers(resetMask);
+  if(resetMask){const auto removed=native_racer_restore50CR::removeRestoredPieces228110(resetMask);
    std::cerr<<"replay_unwreck at="<<at<<" mask=0x"<<std::hex<<resetMask<<std::dec<<" debris_removed="<<removed
        <<" debris_live="<<native_wreck_debris50PD::sim().pieces.size()<<'\n';}
   return true;
@@ -913,8 +914,11 @@ void Context::run() {
    // Common rewrite (I4): the host HostRaceResults50IL panel is deleted (F04);
    // only the legacy host Results overlay readiness remains a native modal.
    const bool nativeResultsOwnsInput=humanResultsReady;
+   // 140EF0 category 2 reaches Results104 1C8C30 regardless of App11C: the record page 3
+   // that Pause QUIT (1BDAB4) opened over the paused race takes the pad while App11C is set.
+   const bool applicationPausedModal=originalMainApplication.animationPaused()&&!pauseRecordPage1BDAB4;
    const bool nativeModalOwnsInput=sessionMenu.open()||nativeResultsOwnsInput||
-       sourcePauseParentAttached||originalMainApplication.animationPaused()||nativeMenuCommand;
+       sourcePauseParentAttached||applicationPausedModal||nativeMenuCommand;
    rr::game::OriginalResults104Diagnostic50LA resultsInputDiagnostic;
    const bool resultsInputOkay=(originalUiActive||nativeModalOwnsInput)?true:
        originalMainApplication.pressConsumedResults1C8C30(host,resultsInputDiagnostic);
@@ -1379,39 +1383,18 @@ void Context::run() {
     // retirement or unavailable-checkpoint suppression cleared hostInput.
     // HUD/live-audio admission uses it; no rejected host command is restored.
     using MenuResult=platform::HostSessionMenu50IF::Result;
-    enum class CountedRowKind:std::uint8_t{main,course};
     auto action=MenuResult::None;
     // Common rewrite (I4, PLAN 2.8): the Pause rows that leave the race, the
-    // same on every course and pod. Row 1 RESTART: 1BD934 1BE830 (closed by
-    // the Pause owner), 1BD990 1AC8E0(race,1) in place (restartInPlace1AC8E0).
-    // Row 10 QUIT in a Time Trial (11258 == 3): 1BDAB4 1ABFC0(race,1) and, on
-    // a record, the Results page 3 over the paused race; otherwise 1BDB5C and
-    // the Course departure (both inside quitTimeTrialFromPause1BDAB4). Row 10
-    // otherwise (1BDA74) and row 9 (1BD9B8): step 18 departRace50CR in the
-    // original order (26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60, 1BE830,
-    // 17DE10). Returns false when the race refused the row (logged by R9);
-    // the race then keeps running, never a port Quit.
-    const auto pauseLeaveRow=[&](CountedRowKind kind,const char* owner)->bool {
-     hostClock.pause(monotonicNow50DU());suppressResumeKeys=true;
-     const auto& owned=originalMainApplication.sourceRace28COwner_;
-     if(!owned){common_race_log50CR::pauseRefused(kind==CountedRowKind::main?0x1BD9B8u:0x1BDA74u,
-         "pause row has no counted race");return false;}
-     if(kind==CountedRowKind::course&&raceEnd.launch().subtype11258==3u){
-      bool qualifies=false;std::uint32_t pc=0;
-      const bool ok=originalMainApplication.quitTimeTrialFromPause1BDAB4(*owned,qualifies,pc);
-      std::cerr<<"pause_row_leave row=10 site=1BDAB4 owner="<<owner<<" ok="<<ok<<" qualifies="<<qualifies
-          <<" pc="<<std::hex<<pc<<std::dec<<'\n';
-      return ok;
-     }
-     common_race_end50CR::Departure departure{};
-     const auto destination=kind==CountedRowKind::main?common_race_end50CR::Destination::mainMenu:
-         common_race_end50CR::Destination::course;
-     const bool ok=originalMainApplication.departRace50CR(*owned,destination,departure);
-     std::cerr<<"pause_row_leave row="<<(kind==CountedRowKind::main?9:10)<<" site="
-         <<(kind==CountedRowKind::main?"1BD9B8":"1BDA74")<<" owner="<<owner<<" ok="<<ok
-         <<" reached_pc="<<std::hex<<departure.reachedPc<<std::dec<<'\n';
-     return ok&&departure.ok;
-    };
+    // same on every course and pod, run ONCE inside the counted Pause owner
+    // (1BD8CC, original_pause_callback_scheduler50la.inl). Row 1 RESTART:
+    // 1BD934 1BE830 there, then 1BD990 1AC8E0(race,1) here in place
+    // (restartInPlace1AC8E0, the one caller). Row 10 QUIT in a Time Trial
+    // (11258 == 3): 1BDAB4 1ABFC0(race,1) and, on a record, Results page 3 over
+    // the paused race (row = record); otherwise 1BDB5C and the Course
+    // departure. Row 10 otherwise (1BDA74) and row 9 (1BD9B8): step 18
+    // departRace50CR. The loop only acts on what the owner reports (departed /
+    // refused / record); it never runs a row body a second time. A refused row
+    // keeps the race running (logged by the owner), never a port Quit.
     // 149p: the original Pause owner on the counted race, every course (add-on
     // courses included): this poll's pad edges on native device 0 (keyboard
     // and first pad, the same physical aliases as the spectator producer:
@@ -1468,13 +1451,17 @@ void Context::run() {
       restartInPlace1AC8E0(common_race_start50CR::callerPauseRestart1BD934,1u,"pause_row1_original");
       forceSceneRender=true;continue;
      }
-     if(counted.row==CountedRow::main){
-      if(pauseLeaveRow(CountedRowKind::main,"original")){returnOriginalMainRequested=true;break;}
+     if(counted.row==CountedRow::main||counted.row==CountedRow::course||counted.row==CountedRow::record){
+      hostClock.pause(monotonicNow50DU());suppressResumeKeys=true;
+      std::cerr<<"pause_row_leave row="<<(counted.row==CountedRow::main?9:10)<<" departed="<<counted.departed
+          <<" record="<<(counted.row==CountedRow::record)<<" refused="<<counted.refused
+          <<" pc="<<std::hex<<counted.sourcePC<<std::dec<<'\n';
+      // Row 9 departed: 17DE10(App,6,4,1) queued; the original main menu takes over.
+      if(counted.row==CountedRow::main&&counted.departed){returnOriginalMainRequested=true;break;}
+      // 1BDAB4 record: Results page 3 is open over the paused race and owns input.
+      if(counted.row==CountedRow::record)pauseRecordPage1BDAB4=true;
+      // Row 10 departed: the frontend receiver takes the queued 17DE10 on the next iteration.
       forceSceneRender=true;continue;
-     }
-     if(counted.row==CountedRow::course){
-      pauseLeaveRow(CountedRowKind::course,"original");
-      forceSceneRender=true;continue; // the next iteration departs (or shows the record page)
      }
     }
     if(!countedOwnsPoll){
@@ -1988,12 +1975,12 @@ void Context::run() {
       }
       {
        rr::game::OriginalRaceEndEntryDiagnostic50LA endDiagnostic;
+       // The end owner (common_race_end50CR::Owner::continue1A7DD0) is the one writer of
+       // common.endCalls / endActive / lastPC / lastStatus; the loop only compares.
+       const auto previousPC=common.lastPC;const auto previousStatus=common.lastStatus;
        const bool dispatched=continueRaceEnd1A7DD0(endDiagnostic);
        using EndStatus=rr::game::OriginalRaceEndEntryDiagnostic50LA::Status;
-       const bool changed=common.lastPC!=endDiagnostic.sourcePC||common.lastStatus!=static_cast<std::uint8_t>(endDiagnostic.status);
-       ++common.endCalls;common.endActive=true;
-       common.lastPC=endDiagnostic.sourcePC;common.lastStatus=static_cast<std::uint8_t>(endDiagnostic.status);
-       common.lastOperation=endDiagnostic.operation;
+       const bool changed=previousPC!=endDiagnostic.sourcePC||previousStatus!=static_cast<std::uint8_t>(endDiagnostic.status);
        if(changed||common.endCalls<=3||common.endCalls%120==0)
         std::cerr<<"race_end_entry call="<<common.endCalls<<" dispatched="<<dispatched<<" status="<<static_cast<unsigned>(endDiagnostic.status)
             <<" pc="<<std::hex<<endDiagnostic.sourcePC<<std::dec
@@ -2003,10 +1990,13 @@ void Context::run() {
             <<" operation="<<(endDiagnostic.operation?endDiagnostic.operation:"")<<'\n';
        // 1ABBE8 (Time Trial): F8 shown, then 1ABC0C 1AC8E0(race,0) restarted
        // the race in place inside the dispatch; the loop's own end records
-       // start again (the race itself was reset by the race start).
-       if(dispatched&&endDiagnostic.status==EndStatus::source&&
+       // start again (the race itself was reset by the race start). The end
+       // entry reports the 1ABBE8 cut as callerReturned at 1ABC0C; the end owner
+       // ran 1AC8E0 on exactly that and returned true only when it completed.
+       if(dispatched&&raceEnd.launch().subtype11258==3u&&endDiagnostic.status==EndStatus::callerReturned&&
           endDiagnostic.sourcePC==common_race_start50CR::callerTimeTrial1ABC0C){
-        resetLoopAfterRaceStart();break;
+        resetLoopAfterRaceStart();
+        hostClock.pause(monotonicNow50DU());suppressResumeKeys=true;forceSceneRender=true;break;
        }
        if(dispatched){forceSceneRender=true;break;}
        // A refused dispatch (rejected Results root, owner/profile gate) was
@@ -2301,46 +2291,10 @@ void Context::run() {
         const bool bound=replay.bind(race,traits.data(),count,why);
         std::cerr<<"race_replay bind="<<bound<<" racers="<<count<<" why="<<(why?why:"")<<'\n';
         if(!bound)common.fallback=true;
-        // Scene::Reset 2702E0 (Scene vtable +0x74), called by the original at
-        // 1AC980 (1AC8E0 Results restart, after 161F60) and 1A81A4 (1A8158
-        // replay loop): 101D10 ResetAll of every track animation + 101B20
-        // re-stop of every Animation-action target, then trigger manager +0x80
-        // (2DCC70: every trigger's fired bit 0x8 cleared). Every course; the
-        // rows' collision is refreshed by the next world service and their
-        // visual by the next prepareDraw. The trigger half is the one trigger
-        // group of the track (track.roles.triggers, 274E90, every course).
-        // PORT STAND-IN (flagged): 27C330 (Scene+0x3D4) and the Particles-action
-        // emitter reset of 2702E0 are not carried here.
-        auto sceneReset2702E0=[this](const char* site,const char*& reason)->bool{
-         std::size_t rows=0,triggers=0;
-         // The lane route (track_animation_binding50an.h) republishes every row's visual and
-         // collision membership after the reset; the static route's next world service does.
-         if(trackAnimationBinding){track_animation_binding50AN::Diagnostic resetDiagnostic;
-          if(!trackAnimationBinding->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
-          rows=trackAnimations?trackAnimations->rowCount():0;}
-         else if(trackAnimations){track_animation_runtime50AN::Diagnostic resetDiagnostic;
-          if(!trackAnimations->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
-          rows=trackAnimations->rowCount();}
-         if(track.roles.triggers)triggers=rr::game::raceResetNativeTriggerGroup2DCC70(*track.roles.triggers);
-         std::cerr<<"track_animation_race_reset course="<<(trackAnimations?trackAnimations->label():std::string("-"))
-             <<" rows="<<rows<<" common_triggers="<<triggers<<" at="<<site<<'\n';
-         return true;};
-        // 161F60 (World+4A0 particles, when present): 1A824C in the 1A8158
-        // replay loop and 1AC978 in 1AC8E0. The one trackside emitter owner
-        // runs the manager's own 161F60 removal, then puts every placement
-        // back to its authored start state (every course; null = no manager).
-        auto particlesRestart161F60=[this](const char*& reason)->bool{
-         if(!track.roles.emitters)return true;
-         common_track50CR::Diagnostic d;
-         if(!track.roles.emitters->restart161F60(d)){static thread_local std::string why;why="161F60 track particle emitter restart rejected: "+d.reason;reason=why.c_str();return false;}
-         return true;};
-        common.restartWorld=[sceneReset2702E0,particlesRestart161F60](const char*& reason){
-         // The native world restart is the particle clear (161F60, wreck
-         // effects) and the animation/trigger reset 2702E0.
-         reason=nullptr;native_wreck_effects50PD::reset();
-         if(!particlesRestart161F60(reason))return false;
-         return sceneReset2702E0("1A81A4",reason);};
-        common.beginReplay=[this,unwreckReplayRacers229F80,sceneReset2702E0,particlesRestart161F60](const char*& reason){
+        // The 1AC8E0 World74 leaves (2DCC70 / 161F60 / 2702E0) are common.restartWorld, built
+        // at race publication from the track owners (terrain_interactive_publication50du.cpp),
+        // independent of Results and race78.
+        common.beginReplay=[this,unwreckReplayRacers229F80](const char*& reason){
          replayFrames50PD=0;replayCameraReported50PD=false;
          // The original race no longer opens its Pause once finished
          // (1A7CDC). Retire the host Pause drawing so Results' own 14D440
@@ -2359,10 +2313,8 @@ void Context::run() {
           if(!native_race_replay50PD::owner().markResultsReplay1AB520()){reason="1AB520 race1B0 bit4 rejected";return false;}
           if(!sourceCameraSession||!sourceCameraSession->enterResultsReplayCamera1ACE14()){reason="1ACE14 Results TV camera request rejected";return false;}
           std::cerr<<"race_replay tv_camera present="<<sourceCameraSession->replayTvPresent()<<'\n';
-          // 1AC8E0's particle reset 161F60, then every racer 3C = 1 and 229F80.
-          native_wreck_effects50PD::reset();
-          if(!particlesRestart161F60(reason))return false;
-          if(!sceneReset2702E0("1AC980",reason))return false;
+          // Every racer 3C = 1 and 229F80. 1AC8E0's 161F60 / 2702E0 ran once already, in the
+          // dispatch's world-reset cut (restartWorld, 1AC978 / 1AC98C) before this hook.
           unwreckReplayRacers229F80("1AB520");
          }
          const auto& owned=originalMainApplication.sourceRace28COwner_;
