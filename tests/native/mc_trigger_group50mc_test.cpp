@@ -13,7 +13,7 @@ int main(){try{
  shared.seed.lazy80A8=true;shared.seed.seed3D6B30=1;group.chance={&raw,&shared,&clock};
  Calls calls;group.actions={&calls,[](void*,const g::SourceTriggerActionCall50MC&)noexcept{return true;},
   [](void* p,const g::SourceTriggerActionCall50MC& c)noexcept{auto& s=*static_cast<Calls*>(p);++s.count;return g::SourceTriggerActionResult50MC{s.block?g::SourceTriggerActionStatus50MC::Blocked:g::SourceTriggerActionStatus50MC::Complete,c.source.sourceSite,0};}};
- group.triggerCount=21; // stock MC live count in a capacity store
+ need(g::sizeNativeTriggerGroup50MC(group,21,1024),"group sized once from the live count"); // stock MC live count (receipt)
  for(std::size_t i=0;i<21;++i){auto& s=group.triggers[i];s.collider.identity=1000+i;s.callbackCount98=1;s.randomTriggerPercent90=i==20?50:(i==1||i==2||i==19)?100:99;if(i==20)s.flags1B8|=4;}
  for(std::size_t i=0;i<16;++i)group.colliders[i].identity=2000+i;
  group.ready=true;group.queryActive=true;group.querySerial=1;group.queryCollider=2000;

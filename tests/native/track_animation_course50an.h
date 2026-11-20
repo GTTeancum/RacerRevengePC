@@ -14,23 +14,13 @@
 namespace track_animation_course50AN {
 namespace a=rr::assets;namespace g=rr::game;namespace rt=track_animation_runtime50AN;namespace src=track_animation_source50AN;
 struct Loaded {std::shared_ptr<rt::Owner> runtime;src::Extract extract;};
-// archivePath: the course RES; code: the course code (log label and tracks\<code>.tob member);
-// zoneCount: the loaded world's zones. Throws std::runtime_error with a plain message on refusal.
-inline Loaded load(const std::filesystem::path& archivePath,const char* code,std::size_t zoneCount,
-    g::SourceLibmState49T& libm,g::ModelMotionSharedState49T& shared){
- Loaded out;std::string label=code?code:"??";std::string lower=label;for(auto& c:lower)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
- auto archive=std::make_shared<a::ResArchive48C>();
- {std::ifstream f(rr::assets::dlc50DL::host(archivePath),std::ios::binary); // through the DLC overlay, as every course-archive open
-  if(!f)throw std::runtime_error("track animation course archive unreadable");
-  const a::DecodeLimits48C limits{};std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(f)),std::istreambuf_iterator<char>());
-  if(bytes.size()>limits.resource_file_bytes)throw std::runtime_error("track animation course archive above the RES limit");
-  a::DecodeError48C e{};if(!a::decodeResource48C(bytes,*archive,e,nullptr,limits))throw std::runtime_error("track animation course archive rejected: "+e.code);}
- std::vector<std::uint8_t> tob;a::DecodeError48C e{};
- if(!a::extractResMember48C(*archive,"tracks\\"+lower+".tob",tob,e)||tob.empty())throw std::runtime_error("track animation course TOB missing");
- a::ParameterDocument48F document;a::WorldLimits48F wl{};wl.retainDuplicateLabels=true; // the reader refuses duplicates it consumes
- if(!a::decodeParameters48F(tob,document,e,nullptr,wl))throw std::runtime_error("track animation course TOB rejected: "+e.code);
- out.extract=[archive](const std::string& name,std::vector<std::uint8_t>& bytes,std::size_t limit){
-  a::DecodeError48C x{};return a::extractResMember48C(*archive,name,bytes,x,limit);};
+// The chain over an already decoded TOB and a member reader: the race Track's
+// documents.tobDocument and Track::archive (common rewrite R5, 101860 in
+// prepareAnimation101860). label: the course code for the log lines; zoneCount:
+// the loaded world's zones. Throws std::runtime_error with a plain message on refusal.
+inline Loaded load(const a::ParameterDocument48F& document,const std::string& label,std::size_t zoneCount,
+    src::Extract extract,g::SourceLibmState49T& libm,g::ModelMotionSharedState49T& shared){
+ Loaded out;out.extract=std::move(extract);
  auto source=std::make_shared<src::Owner>();src::Diagnostic sd{};
  if(!source->load(document,static_cast<std::uint32_t>(zoneCount),out.extract,libm,sd)){
   std::cerr<<"track_animations course="<<label<<" refused: "<<sd.message<<" row="<<sd.row<<" member="<<sd.member<<'\n';
@@ -41,5 +31,24 @@ inline Loaded load(const std::filesystem::path& archivePath,const char* code,std
   std::cerr<<"track_animations course="<<label<<" create refused: "<<d.message<<" row="<<(d.row+1)<<'\n';
   throw std::runtime_error("track animation runtime rejected: "+d.message);}
  runtime->logTable(std::cerr);runtime->retainExtract(out.extract);out.runtime=std::move(runtime);return out;
+}
+// archivePath: the course RES; code: the course code (log label and tracks\<code>.tob member);
+// zoneCount: the loaded world's zones. Throws std::runtime_error with a plain message on refusal.
+inline Loaded load(const std::filesystem::path& archivePath,const char* code,std::size_t zoneCount,
+    g::SourceLibmState49T& libm,g::ModelMotionSharedState49T& shared){
+ std::string label=code?code:"??";std::string lower=label;for(auto& c:lower)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
+ auto archive=std::make_shared<a::ResArchive48C>();
+ {std::ifstream f(rr::assets::dlc50DL::host(archivePath),std::ios::binary); // through the DLC overlay, as every course-archive open
+  if(!f)throw std::runtime_error("track animation course archive unreadable");
+  const a::DecodeLimits48C limits{};std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(f)),std::istreambuf_iterator<char>());
+  if(bytes.size()>limits.resource_file_bytes)throw std::runtime_error("track animation course archive above the RES limit");
+  a::DecodeError48C e{};if(!a::decodeResource48C(bytes,*archive,e,nullptr,limits))throw std::runtime_error("track animation course archive rejected: "+e.code);}
+ std::vector<std::uint8_t> tob;a::DecodeError48C e{};
+ if(!a::extractResMember48C(*archive,"tracks\\"+lower+".tob",tob,e)||tob.empty())throw std::runtime_error("track animation course TOB missing");
+ a::ParameterDocument48F document;a::WorldLimits48F wl{};wl.retainDuplicateLabels=true; // the reader refuses duplicates it consumes
+ if(!a::decodeParameters48F(tob,document,e,nullptr,wl))throw std::runtime_error("track animation course TOB rejected: "+e.code);
+ auto extract=[archive](const std::string& name,std::vector<std::uint8_t>& bytes,std::size_t limit){
+  a::DecodeError48C x{};return a::extractResMember48C(*archive,name,bytes,x,limit);};
+ return load(document,label,zoneCount,std::move(extract),libm,shared);
 }
 } // namespace track_animation_course50AN

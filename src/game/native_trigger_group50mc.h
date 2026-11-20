@@ -1,16 +1,24 @@
 #pragma once
 #include "trigger_entry50in.h"
-#include "native_trigger_capacity50tg.h"
 #include "original_trigger_chance50mc.h"
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <new>
+#include <vector>
 namespace rr::game {
-// MC trigger store: capacity-sized once from the common trigger reader
-// (nativeTriggerCapacity50TG) with the authored live count triggerCount;
-// the stock count is a receipt of the authoring owner, not a size here.
-// Colliders: main+secondary of up to 8 racers. GA13/callback2 untouched.
+// The ONE trigger group of the common race path (2A00A0 entry, 2A0E20 actions,
+// 2A0B30 service) for every course (common rewrite R5, PLAN B-C13). It was
+// MC's group, the only one in 2A00A0 order (common-race 3.7).
+// Storage rule (PLAN 2.2): the per-trigger stores are sized ONCE from the TOB's
+// own live trigger count (course_trigger_sources50CT, [Triggers]
+// NumberOfTriggers) through sizeNativeTriggerGroup50MC below; nothing here is
+// sized from a stock count (TC's 22 is a receipt only). Every access below is
+// bounded by triggerCount, which equals the sized length.
+// Colliders: main+secondary of the race field (1AD520: 1..8 racers), so 16.
+// The per-trigger ignore list holds at most the 8 racers of that field.
 inline constexpr std::size_t nativeTriggerColliderCount50MC=16;
+inline constexpr std::size_t nativeTriggerIgnoreSlots50MC=8;
 struct NativeTriggerGroup50MC;
 struct SourceTriggerActionCall50MC {
     TriggerActionCall50IN source{};
@@ -53,12 +61,14 @@ struct SourceTriggerContactReceipt50MC {
     SourceTriggerActionResult50MC action{};
 };
 struct NativeTriggerGroup50MC {
- std::array<TriggerEntryState50IN,nativeTriggerCapacity50TG> triggers{};
- std::size_t triggerCount=0; // live authored prefix [0,triggerCount); 0 = no trigger state
+ // Sized once (sizeNativeTriggerGroup50MC) to the live authored count; 0 = no trigger state.
+ std::vector<TriggerEntryState50IN> triggers;
+ std::size_t triggerCount=0;
  TriggerColliderStorage50IN<nativeTriggerColliderCount50MC> colliders{};
- std::array<std::uint32_t,nativeTriggerCapacity50TG> ignoreCollider{};
- std::array<std::array<std::uint32_t,8>,nativeTriggerCapacity50TG> ignoreColliders{};
- std::array<std::size_t,nativeTriggerCapacity50TG> ignoreColliderCount{};
+ std::vector<std::uint32_t> ignoreCollider;
+ std::vector<std::array<std::uint32_t,nativeTriggerIgnoreSlots50MC>> ignoreColliders;
+ std::vector<std::size_t> ignoreColliderCount;
+ bool sized=false;
  OriginalTriggerChance50MC chance{};
  SourceTriggerActionHooks50MC actions{};
  SourceTriggerContactState50MC contact{};
@@ -68,6 +78,20 @@ struct NativeTriggerGroup50MC {
  bool ready=false,actionsFailed=false,queryActive=false;
  std::uint64_t contacts=0,dispatches=0;
 };
+// Size the per-trigger stores ONCE from the live count read from the course's
+// TOB. Refused (false, nothing changed) when already sized, when the count is
+// above `ceiling` (the caller's logged allocation guard, common_track50CR
+// BlockId::triggers) or when the allocation fails.
+inline bool sizeNativeTriggerGroup50MC(NativeTriggerGroup50MC& group,std::size_t count,std::size_t ceiling)noexcept {
+ if(group.sized||group.ready||count>ceiling)return false;
+ try{
+  std::vector<TriggerEntryState50IN> t(count);std::vector<std::uint32_t> one(count,0u);
+  std::vector<std::array<std::uint32_t,nativeTriggerIgnoreSlots50MC>> lists(count);std::vector<std::size_t> counts(count,0u);
+  group.triggers=std::move(t);group.ignoreCollider=std::move(one);group.ignoreColliders=std::move(lists);
+  group.ignoreColliderCount=std::move(counts);
+ }catch(...){return false;}
+ group.triggerCount=count;group.sized=true;return true;
+}
 inline std::size_t nativeTriggerCollider50MC(const NativeTriggerGroup50MC& group,std::uint32_t id)noexcept {
  for(std::size_t i=0;i<group.colliders.size();++i)if(group.colliders[i].identity==id)return i;
  return group.colliders.size();
@@ -75,14 +99,15 @@ inline std::size_t nativeTriggerCollider50MC(const NativeTriggerGroup50MC& group
 // Structural admission is shared by the distinct fallible source-action route.
 // A source-only group is never admitted by the legacy action dispatcher.
 inline bool validNativeTriggerStorage50MC(const NativeTriggerGroup50MC& group)noexcept {
- if(group.triggerCount>group.triggers.size())return false;
+ if(group.triggerCount!=group.triggers.size()||group.ignoreCollider.size()!=group.triggerCount||
+    group.ignoreColliders.size()!=group.triggerCount||group.ignoreColliderCount.size()!=group.triggerCount)return false;
  if(!group.ready||group.actionsFailed||!group.chance.bound())return false;
  for(std::size_t i=0;i<group.colliders.size();++i){
   if(!trigger_entry50IN_detail::valid(group.colliders[i]))return false;
   for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
  }
  for(std::size_t i=0;i<group.triggerCount;++i){const auto& state=group.triggers[i];
-  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90<0||state.randomTriggerPercent90>100||!state.callbackCount98||state.callbackCount98>nativeTriggerActionSlots50TG)return false;
+  if(!trigger_entry50IN_detail::valid(state)||state.randomTriggerPercent90<0||state.randomTriggerPercent90>100||!state.callbackCount98||state.callbackCount98>triggerActionCapacity50IN)return false;
   if(nativeTriggerCollider50MC(group,state.collider.identity)!=group.colliders.size())return false;
   for(std::size_t j=0;j<i;++j)if(state.collider.identity==group.triggers[j].collider.identity)return false;
   if(group.ignoreCollider[i]&&nativeTriggerCollider50MC(group,group.ignoreCollider[i])==group.colliders.size())return false;
@@ -120,7 +145,8 @@ inline bool nativeTriggerQueryBound50MC(const NativeTriggerGroup50MC& group,std:
 }
 inline bool nativeTriggerPairAllowed50MC(const NativeTriggerGroup50MC& group,
     std::size_t trigger,std::uint32_t collider)noexcept {
- if(trigger>=group.triggerCount||!group.ready||group.actionsFailed||
+ if(trigger>=group.triggerCount||trigger>=group.ignoreCollider.size()||trigger>=group.ignoreColliders.size()||
+    trigger>=group.ignoreColliderCount.size()||!group.ready||group.actionsFailed||
     nativeTriggerCollider50MC(group,collider)==group.colliders.size()||group.ignoreCollider[trigger]==collider)return false;
  if(group.ignoreColliderCount[trigger]>group.ignoreColliders[trigger].size())return false;
  for(std::size_t i=0;i<group.ignoreColliderCount[trigger];++i)if(group.ignoreColliders[trigger][i]==collider)return false;
@@ -223,7 +249,7 @@ inline SourceTriggerContactReceipt50MC resumeNativeSourceTriggerContact50MC(
     r.status=S::Complete;return r;
 }
 
-// MC LostAI/Animation/PodSound exits have no gameplay effects. This retains the ordinary2A0B30 removal
+// Exit service (2A0B30): action exits run through the hooks (the common action owner). This retains the ordinary2A0B30 removal
 // chronology while propagating a provider failure before any later exit. A
 // failure is terminal for this service call; do not replay removed-slot work.
 inline SourceTriggerContactReceipt50MC serviceNativeSourceTrigger50MC(
