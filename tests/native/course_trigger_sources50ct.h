@@ -262,8 +262,7 @@ class Owner final {
   }
   // PORT STAND-IN (flagged): attached triggers (Parent / AttachToSoulTree) are refused.
   need(!optional(b,"parent")&&!optional(b,"attachtosoultree"),"trigger attachment is not supported natively");
-  // Reader check of the authored decimal text, then the native geometry value.
-  (void)number(field(b,"position"));
+  // Position is an authored vector (x,y,z): the native vector reader checks each component.
   out.sphere.center=nativeVector(field(b,"position"));
   if(optional(b,"radius")){
    need(!optional(b,"box"),"trigger authors both Radius and Box");

@@ -4,7 +4,8 @@
 // the stock values are receipts (stock_course_receipts50cr.h) logged by the Track.
 #include "single_pass_world50lm.h"
 #include "original_world_material_admission50cm.h"
-#include "course_world_texture50st.h"   // the one texture budget (R7, 382B38/298900/2993A8)
+#include "course_world_texture50st.h"   // the one texture budget (R7, 382B38/298900/2993A8) and texture reader
+#include "../../src/assets/original_texture_candidate50tc.h"   // 24DADC texture request spelling
 namespace wma=original_world_material_admission50CM;
 
 namespace single_pass_world50LM {
@@ -63,10 +64,16 @@ bool Owner::loadDecoded(const a::ResArchive48C& archive,const a::World48F& world
                     const auto& pass=authored.passes[pi];const bool projected=wma::projected(pass);
                     shared::need(wma::pass(authored,pi), // common admission, no name/course key
                         "Unjoined original single-pass world pass/program/texture subset");
-                    const auto& map=pass.textures[0];shared::need(shared::name(map.name),"Invalid original single-pass world texture basename");
+                    const auto& map=pass.textures[0];
+                    // 1169D0/24DA98..24DADC: the request's last dot (if any) is replaced by
+                    // .pst, so an authored map "x.tga" or "x.psm" names the same stem as "x".
+                    // One rule for every material (retires the exact-bytes TC admission).
+                    const auto candidate=a::detail::originalPstCandidate24DADC(map.name);
+                    const auto stem=candidate.substr(0,candidate.find_last_of('.'));
+                    shared::need(shared::name(stem),"Invalid original single-pass world texture basename");
                     const a::ResourceEntry48C* texture=nullptr;
                     for(const char* extension:{".pst",".ipu",".tga",".atm"}){
-                        texture=next->entry("textures\\"+map.name+extension);if(texture)break;
+                        texture=next->entry("textures\\"+stem+extension);if(texture)break;
                     }
                     shared::need(texture,"Single-pass world required texture absent: "+map.name);
                     const auto textureKey=detail::key(texture->name);
@@ -76,8 +83,12 @@ bool Owner::loadDecoded(const a::ResArchive48C& archive,const a::World48F& world
                         d.stage="texture";d.member=texture->name;const auto bytes=next->member(*texture,d.decode);
                         const detail::SourceImage* pin=nullptr;
                         texturePins.emplace(textureKey,pin);
-                        std::uint32_t mip=0;bool decodedAnimated=false,independent=false;
-                        auto image=detail::image(texture->name,bytes,mip,decodedAnimated,d.decode,&independent,detail::initialFrame(pass.fields),false);
+                        // The one static-world texture reader (course_world_texture50ST: PST/ATM/IPUM and
+                        // TGA 29EA90/29EE40), from the bytes alone. No pin tables on this owner.
+                        course_world_texture50ST::Shape shape;
+                        auto image=course_world_texture50ST::decode(id.code.c_str(),textureKey,bytes,
+                            detail::initialFrame(pass.fields),shape,d.decode);
+                        const std::uint32_t mip=shape.mipIndex;const bool decodedAnimated=shape.animated,independent=false;
                         shared::need(decodedAnimated==animated,"Single-pass world texture animation source classification");
                         const auto index=static_cast<std::uint32_t>(images.size());
                         shared::need(index<budgets.textureCapacity&&image.size()>=16,"single-pass world original texture bank bound");

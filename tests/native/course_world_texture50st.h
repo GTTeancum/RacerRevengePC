@@ -18,7 +18,7 @@
 //
 // PORT STAND-IN (flagged): the native decoders below are the port's (IPU
 // intra decode, PST indexed decode, TGA 29EA90/29EE40 readers); their bounds
-// (16..1024 power-of-two mips, <=5 IPUM mips, square 16..256 type-2 TGA) are
+// (16..1024 power-of-two mips, <=5 IPUM mips, square 8..256 type-2 TGA) are
 // port capability limits, refused by capability, never by name or checksum.
 #include "pod_materials50ed_fixture.h"
 #include "course_archive_receipt50ci.h"
@@ -90,12 +90,13 @@ inline Bytes decode(const char* site,const std::string& name,const Bytes& source
         const std::size_t w=std::size_t(source[12])|(std::size_t(source[13])<<8);
         const std::size_t h=std::size_t(source[14])|(std::size_t(source[15])<<8);
         const auto depth=source[16];
-        shared::need(Convert::sourceShape(source,w,h,depth),
-            s+"TGA source shape (port reader: type 2 BGR24/BGRA32, square 16..256)");
+        constexpr auto minimum=Convert::readerMinimum; // 29EA90/29ECD8 read 8x8 too (251074 only stops mips)
+        shared::need(Convert::sourceShape(source,w,h,depth,minimum),
+            s+"TGA source shape (port reader: type 2 BGR24/BGRA32, square 8..256)");
         a::TextureMip48E image;image.width=static_cast<std::uint32_t>(w);image.height=static_cast<std::uint32_t>(h);
         if(depth==24){
             Bytes rgb;std::vector<std::uint16_t> words(w*h);
-            shared::need(Convert::read24_29EA90(source,w,h,rgb)&&Convert::convert1555_16C0D0(rgb,w,h,words),
+            shared::need(Convert::read24_29EA90(source,w,h,rgb,minimum)&&Convert::convert1555_16C0D0(rgb,w,h,words,minimum),
                 s+"BGR24 conversion");
             image.rgba.resize(words.size()*4);
             for(std::size_t i=0;i<words.size();++i){const auto word=words[i];
@@ -106,8 +107,16 @@ inline Bytes decode(const char* site,const std::string& name,const Bytes& source
                 // consumers'); one rule for every 24-bit TGA, not keyed on a name.
                 image.rgba[4*i+3]=255;
             }
-        }else shared::need(Convert::read32_29EE40(source,w,h,image.rgba),s+"BGRA32 source-alpha conversion");
-        shared::need(a::encodeTextureLevel48E(image,output,error),s+"TGA native framing");
+        }else shared::need(Convert::read32_29EE40(source,w,h,image.rgba,minimum),s+"BGRA32 source-alpha conversion");
+        if(w>=16)shared::need(a::encodeTextureLevel48E(image,output,error),s+"TGA native framing");
+        else{
+            // The 48E serializer keeps its 16 minimum; a sub-16 TGA (one level,
+            // no mips) gets the same RRTEX001 envelope here, bounded above.
+            output.assign({'R','R','T','E','X','0','0','1',
+                static_cast<std::uint8_t>(w),0,0,0,static_cast<std::uint8_t>(h),0,0,0});
+            shared::need(image.rgba.size()==w*h*4,s+"TGA native framing extent");
+            output.insert(output.end(),image.rgba.begin(),image.rgba.end());
+        }
         next.kind=3;next.frameCount=1;next.frameIndex=0;next.mipIndex=0;next.animated=false;
     }else{
         next.animated=name.ends_with(".ATM");

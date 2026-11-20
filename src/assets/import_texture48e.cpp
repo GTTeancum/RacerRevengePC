@@ -68,6 +68,12 @@ bool identifier(const std::string& s, bool dash = false) {
         (c >= '0' && c <= '9') || c == '_' || (dash && c == '-'))) return false;
     return true;
 }
+// basename.ext: identifier stem (dash allowed) + one identifier extension.
+bool dottedBasename(const std::string& s) {
+    const auto dot = s.find_last_of('.');
+    return dot != std::string::npos && dot > 0 && dot + 1 < s.size() &&
+        identifier(s.substr(0, dot), true) && identifier(s.substr(dot + 1));
+}
 struct Section {
     std::string name;
     std::size_t offset = 0;
@@ -302,6 +308,7 @@ static bool decodeMaterialImpl48E(const Bytes& input, Material48E& output, Decod
         }
         if (!parsed.inactive_sections.empty() || retainedEmptyDuplicate || exactTcMap) parsed.original_text = input;
         progress(hooks, "psm.bindings", 0, count); checkCancel(hooks, 0);
+        bool dottedMap = false;
         for (std::uint32_t pass = 1; pass <= count; ++pass) {
             const Section* section = nullptr; const auto name = "ShaderPass_" + std::to_string(pass);
             for (const auto& candidate : sections) if (candidate.name == name) section = &candidate;
@@ -315,7 +322,15 @@ static bool decodeMaterialImpl48E(const Bytes& input, Material48E& output, Decod
             const auto mapCount = maps ? number(maps->value, 1, 2, maps->source_offset, "psm.map_count") : 1;
             for (std::uint32_t slot = 1; slot <= mapCount; ++slot) {
                 const auto* map = section->find("TextureMap_" + std::to_string(slot));
-                require(map && (identifier(map->value, true) ||
+                // Original 1169D0/24DA98..24DADC spell the request by replacing the
+                // LAST dot's suffix with .pst, so a basename with one extension
+                // ("ahuts03.tga", "tc_blend8.psm") names the same texture stem as the
+                // bare basename. One rule for every material; the authored string is
+                // retained unchanged (original_text below) and the consumer forms the
+                // candidate (original_texture_candidate50tc.h).
+                const bool extended = map && dottedBasename(map->value);
+                dottedMap = dottedMap || extended;
+                require(map && (identifier(map->value, true) || extended ||
                     (exactTcMap && pass==1 && slot==1 && map->value==exactTcMap)),
                     DecodeKind48C::unsupported, "psm.texture_name", section->offset,
                     "Missing or unsupported texture basename/path; binding is not invented");
@@ -332,6 +347,7 @@ static bool decodeMaterialImpl48E(const Bytes& input, Material48E& output, Decod
             }
             parsed.passes.push_back(std::move(p)); progress(hooks, "psm.bindings", pass, count); checkCancel(hooks, section->offset);
         }
+        if (dottedMap) parsed.original_text = input;
         output = std::move(parsed); return true;
     } catch (const Failure& failure) { error = failure.error; }
     catch (const std::bad_alloc&) { allocationError(error); }

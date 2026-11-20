@@ -266,6 +266,12 @@ bool readAub271600(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
     d.value=0;
     try{
         if(t.roles.audio||t.roles.sounds)return refuse(d,step,0x271600u,"AUB owners already published");
+        // Host data check (never a race): the AUB owners are runtime owners of the race mixer
+        // and audio groups; the check logs the step as not built and goes on (race logs verify it).
+        if(in.hostDataCheck&&(!in.mixer||!in.audioGroups)){
+            log::load(step,true,0,"host check: runtime audio owners not built");
+            return true;
+        }
         if(!in.mixer||!in.audioGroups)return refuse(d,step,0x271600u,"AUB owners need the race mixer and audio groups");
         if(t.documents.aub.empty()){
             // The AUB member is read once, at its own size (bounded by the

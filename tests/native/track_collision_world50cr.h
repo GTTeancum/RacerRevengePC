@@ -130,9 +130,10 @@ class Owner final : public std::enable_shared_from_this<Owner>,public track_anim
   try{return !name.empty()&&track.archive.exists(name);}catch(...){return false;}
  }
  // Decimal -> binary32 placement vector (the original's own parse of the instance block).
- static std::array<float,3> vector(const a::ParameterBlock48F& block,const char* key){
+ static std::array<float,3> vector(const a::ParameterBlock48F& block,const char* key,const std::array<float,3>* absent=nullptr){
   const std::string* text=nullptr;
   for(const auto& field:block.fields)if(field.name==key){need(!text,"duplicate placement vector");text=&field.value;}
+  if(!text&&absent)return *absent; // 27A5A0..27A5AC -> 158CC8: an absent UpVector reads as (0,1,0)
   need(text,"missing placement vector");std::array<float,3> out{};std::size_t begin=0;
   for(unsigned axis=0;axis<3;++axis){auto end=text->find(',',begin);
    need((end==std::string::npos)==(axis==2),"placement vector extent");
@@ -240,7 +241,8 @@ public:
     need(track.archive.member(out.name,bytes,8u*1024u*1024u,member)&&a::decodeCollision48G(bytes,col,decode),"placed COL decode: "+out.name);
     need(a::encodeCollisionAsset48G(col,cache,why)&&a::loadCollisionMesh48I(cache,out.mesh,why),"native COL mesh preparation: "+out.name);
     const auto& block=world.parameters.blocks[instance.parameter_block];
-    const auto position=vector(block,"position"),look=vector(block,"lookvector"),up=vector(block,"upvector");
+    static constexpr std::array<float,3> absentUp{0.f,1.f,0.f};
+    const auto position=vector(block,"position"),look=vector(block,"lookvector"),up=vector(block,"upvector",&absentUp);
     need(a::prepareTrackCollider50AO(out.mesh,position,look,up,out.name.data(),out.name.size(),collisionMasks,out.instance),
      "COL placement/category preparation: "+out.name);
     next->stackCount=std::max(next->stackCount,out.mesh.nodes.size()+out.mesh.faces.size()+1);

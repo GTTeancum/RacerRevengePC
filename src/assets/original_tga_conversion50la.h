@@ -12,12 +12,17 @@ namespace rr::assets::detail {
 // Readers own their scratch allocation; converters/mips require already-sized
 // distinct output buffers and never allocate. Invalid arguments do not mutate.
 struct OriginalTgaConversion50LA final {
-    static bool dimensions(std::size_t width,std::size_t height) noexcept {
-        return width==height&&width>=16&&width<=256&&!(width&(width-1));
+    static bool dimensions(std::size_t width,std::size_t height,std::size_t minimum=16) noexcept {
+        return width==height&&width>=minimum&&width<=256&&!(width&(width-1));
     }
+    // 29EA90/29ECD8 (and 16C0D0) read any square power-of-two TGA; 251040 starts
+    // one level and 251074's minimum-16 comparison only stops the mip chain, so
+    // an 8x8 source is read and converted unchanged (no mips). Readers default to
+    // the reviewed 16 minimum; the static-world reader passes readerMinimum.
+    static constexpr std::size_t readerMinimum=8;
     static bool sourceShape(const std::vector<std::uint8_t>& source,
-        std::size_t width,std::size_t height,std::uint8_t depth) noexcept {
-        if(!dimensions(width,height)||(depth!=24&&depth!=32))return false;
+        std::size_t width,std::size_t height,std::uint8_t depth,std::size_t minimum=16) noexcept {
+        if(!dimensions(width,height,minimum)||(depth!=24&&depth!=32))return false;
         const auto bytesPerPixel=std::size_t(depth/8);
         // Exact type2, no ID/palette, origin(0,0), bottom-origin subset.
         // The retained26-byte footer is not converted or interpreted.
@@ -32,8 +37,8 @@ struct OriginalTgaConversion50LA final {
     //29EA90 swaps B/R;29ECD8 reverses bottom-origin rows. Scratch still holds
     // reader RGB until the later24E0E0 step in convert1555_16C0D0.
     static bool read24_29EA90(const std::vector<std::uint8_t>& source,
-        std::size_t width,std::size_t height,std::vector<std::uint8_t>& rgb) {
-        if(&source==&rgb||!sourceShape(source,width,height,24))return false;
+        std::size_t width,std::size_t height,std::vector<std::uint8_t>& rgb,std::size_t minimum=16) {
+        if(&source==&rgb||!sourceShape(source,width,height,24,minimum))return false;
         rgb.resize(width*height*3);
         for(std::size_t y=0;y<height;++y)for(std::size_t x=0;x<width;++x){
             const auto from=18+((height-1-y)*width+x)*3,to=(y*width+x)*3;
@@ -44,8 +49,8 @@ struct OriginalTgaConversion50LA final {
     //29EE40/29EF14/29F060: BGRA -> top-origin RGBA, alpha byte unchanged.
     //24E0E0 is a no-op for8888;16A530 reduction0 copies these bytes.
     static bool read32_29EE40(const std::vector<std::uint8_t>& source,
-        std::size_t width,std::size_t height,std::vector<std::uint8_t>& rgba) {
-        if(&source==&rgba||!sourceShape(source,width,height,32))return false;
+        std::size_t width,std::size_t height,std::vector<std::uint8_t>& rgba,std::size_t minimum=16) {
+        if(&source==&rgba||!sourceShape(source,width,height,32,minimum))return false;
         rgba.resize(width*height*4);
         for(std::size_t y=0;y<height;++y)for(std::size_t x=0;x<width;++x){
             const auto from=18+((height-1-y)*width+x)*4,to=(y*width+x)*4;
@@ -55,8 +60,8 @@ struct OriginalTgaConversion50LA final {
         return true;
     }
     static bool convert1555_16C0D0(std::vector<std::uint8_t>& rgb,
-        std::size_t width,std::size_t height,std::vector<std::uint16_t>& out) noexcept {
-        if(!dimensions(width,height)||rgb.size()!=width*height*3||
+        std::size_t width,std::size_t height,std::vector<std::uint16_t>& out,std::size_t minimum=16) noexcept {
+        if(!dimensions(width,height,minimum)||rgb.size()!=width*height*3||
            out.size()!=width*height)return false;
         for(std::size_t i=0;i<width*height;++i){
             //2511B0->24E0E0 mutates retained reader scratch back to BGR.
