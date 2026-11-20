@@ -1,0 +1,69 @@
+DLC add-on course records: 1ABFC0/1AC440 on the add-on course's own Hall rows in the DLC side file at the original record moment; Hall of Fame steps to add-on courses after the 13 stock courses and the race-return Hall opens on the add-on course just raced; runner --seed-slow-dlc-hall (build wt-148r-1, linked, not run)
+
+PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (the original has no add-on content).
+Retires the 147c stand-in "dlc_course_record hook=pending".
+
+Record moment (original rules, unchanged bodies, race_record_rule50kg):
+- 1ABFC0 (end dispatch selector 0 at 1AB568, Results selectors 1/2 at
+  1C8E94/1CA590): for an add-on race the rider profile runs the same
+  qualification on a HOST COPY of the Hall whose anchor row (1125F&15) holds
+  the add-on course's own rows (DlcProgress50DL::courseHall: its records, or
+  its hall_defaults). v0 decides 7E4 at 1AB598, so 1AB5BC takes the Hall row
+  1AB838/1AB884 exactly as a stock course does (Results name entry first,
+  mode 3, as for a stock record). Stock rows are never written. No side file
+  this session: answered as the early exclusion (v0=0), logged.
+- 1AC440 (1AB838, commitRaceAcknowledgementRecords1AC440_50PD ->
+  commitSingleHumanRaceRecords1AC440): an add-on race submits to the side
+  file (courses keyed by item key, records_key, archive SHA-256;
+  DlcProgress50DL::submit re-runs 1ABFC0 selector 0 then 1AC440 on the same
+  rows), racer key stock:NN or the pod item key, the persisted profile name
+  (1AC4B8). Stock Hall rows, stock ranks 11260.. and the stock save are not
+  written; the side file is saved at this moment under the stock autosave
+  condition (flags11050 bit0). The add-on ranks for the Hall recolour live
+  in host memory (src/game/dlc_course_records50dl.h, new narrow header),
+  cleared at the race start 1A66CC as 11260.. are. The original 1AB848
+  100BC save-pending store still runs (a later stock save rewrites the
+  unchanged stock Hall; the Results name entry writes the profile name as in
+  the original).
+
+Hall of Fame (Options mode5 and the Free Play race return mode0; never the
+tournament Hall mode2):
+- Add-on courses with side-file rows follow the last enabled stock course in
+  the course arrows, then wrap; Previous runs the block backwards. Same model
+  as the Course screen's add-on block (146r-U): port state over the stock
+  anchor control; only the original wrap and the moves inside the block are
+  taken over (sound 3/4 only, no navigation/planet/profile write); leaving
+  across the wrap applies the original move from the anchor.
+- Drawn: the add-on's own rows, its name in the anchor's course-name text
+  (that widget's font/colour/position), its planet name in the header (14
+  characters max, else the stock planet name), the template course's Hall
+  planet background and colours. The new-record rows of the race just run
+  are recoloured from the add-on ranks; for an add-on race the stock anchor
+  row is not recoloured. One per-frame record (new narrow header
+  platform/linux/native/original_ui_hall_addon50dl.h) is set by the session
+  around the render; null = stock frame.
+- Race-return Hall (mode0) opens on the add-on course just raced (the launch
+  rule addonCourseForLaunch).
+- Merged view for add-on pods on stock courses: unchanged.
+
+Log lines:
+  dlc_course_record site=1ABFC0 key=.. number=.. code=.. records_key=.. selector=S table=addon v0=V stock_hall=untouched
+  dlc_course_record site=1AC440 key=.. records_key=.. racer=.. status=recorded|not_qualified|refused lap_rank=.. race_rank=.. knockout_rank=.. stock_hall=untouched stock_save=not_written
+  dlc_course_record site=1AC440_save key=.. side_file=N stock_save=not_written
+  dlc_hall_addon action=planned|enter|step|leave|leave_wrap|open_raced|skipped ..
+  dlc_hall_draw key=.. name_drawn=.. planet_header=.. lap0=.. race0=.. new_record_rows=.. stock_row=untouched
+  (plus the existing dlc_progress submit/saved lines)
+
+Runner: --seed-slow-dlc-hall PACKAGE/ITEM writes saves/dlc-progress-v1.json
+(schema /2) with all-slow rows for that course; records_key and archive
+SHA-256 from the package's dlc.json under RR_DLC_ROOT. Only the side file.
+Results JSON addonCoursePick gains hall / progress / seededSlowHall.
+
+Stand-ins kept (flagged, unchanged): Time Trial and RA Free Play text panel
+(commit 53ff07a); add-on Time Trial therefore has no record path yet.
+
+Headers: two new narrow headers only (src/game/dlc_course_records50dl.h,
+platform/linux/native/original_ui_hall_addon50dl.h). Relink wt-148r-1 on
+wt-147c-2: 7 TUs (with commit 53ff07a), linked. Not run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

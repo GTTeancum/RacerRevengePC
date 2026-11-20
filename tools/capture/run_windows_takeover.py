@@ -143,6 +143,34 @@ def seed_slow_hall(data, code, free_play_main):
     struct.pack_into('<I', d, 12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
     return bytes(d)
 
+def seed_slow_dlc_course_hall(key, dlc_root):
+    """DLC save side file (schema rrpc-dlc-progress/2, the layout DlcProgress50DL
+    ::serialise writes, src/assets/dlc_progress50dl.cpp) holding the add-on
+    course `key` (<package-id>/<item-id>) with all-slow Hall rows (lap and race
+    59:59.99, name SLOW, knockouts empty), so any finished time on that course
+    qualifies under the unchanged 1ABFC0/1AC440 rules. records_key and the
+    archive SHA-256 come from the package's own dlc.json under dlc_root, so the
+    entry matches the item (an unknown package or item is refused). Only the
+    side file is written; the stock save is not touched. PORT EXTENSION."""
+    package, item_id = key.split('/', 1)
+    manifest = Path(dlc_root) / package / 'dlc.json'
+    if not manifest.is_file():
+        raise ValueError(f'--seed-slow-dlc-hall: no package {package} in {dlc_root}')
+    data = json.loads(manifest.read_text(encoding='utf-8'))
+    item = next((i for i in data.get('items', []) if i.get('kind') == 'course' and i.get('id') == item_id), None)
+    if item is None:
+        raise ValueError(f'--seed-slow-dlc-hall: package {package} has no course item {item_id}')
+    archive = next((f for f in data.get('files', []) if f.get('path') == item.get('archive')), None)
+    sha = (archive or {}).get('sha256', '')
+    if not re.fullmatch(r'[0-9a-f]{64}', sha):
+        raise ValueError(f'--seed-slow-dlc-hall: no SHA-256 for {item.get("archive")} in {manifest}')
+    slow = lambda: {'time': SLOW_HALL_SECONDS, 'name': 'SLOW'}
+    return {'schema': 'rrpc-dlc-progress/2',
+            'courses': {key: {'records_key': item.get('records_key', item_id), 'archive_sha256': sha,
+                              'hall': {'lap': [slow(), slow(), slow()], 'race': [slow(), slow(), slow()],
+                                       'knockouts': [None, None, None]}}},
+            'stock_course_addon_pod_records': {}, 'pods': {}, 'careers': {}}
+
 
 def digest(path):
     with path.open('rb') as stream:
@@ -242,6 +270,12 @@ def main():
                         help='Test only: with --seed-save, make course CODE\'s Hall rows all slow (lap/race '
                              '59:59.99, knockouts 0) so the unattended driver\'s time is a record (unchanged '
                              'original rules). For the free-play route also sets the Main slot to 1')
+    parser.add_argument('--seed-slow-dlc-hall', metavar='PACKAGE/ITEM',
+                        help='Test only (DLC add-on course records, PORT EXTENSION): write saves\\dlc-progress-v1.json '
+                             'with all-slow Hall rows (lap/race 59:59.99, name SLOW) for this add-on course, so the '
+                             'unattended driver\'s time on it is a record. Only the DLC side file is written. Needs '
+                             '--env RR_DLC_ROOT=<DLC folder>; use with --addon-course <same key> --results-exit main '
+                             '[--hold-results-hall]')
     parser.add_argument('--seed-save', type=Path,
                         help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
     parser.add_argument('--player-racer', type=int, choices=ORIGINAL_RACERS,
@@ -320,6 +354,13 @@ def main():
         args.route = 'main-options-hall-ta'   # in-process HallRoute (no manual input)
         if not any(item.startswith('RR_DLC_ROOT=') for item in args.env):
             parser.error('--eyecheck-dlc-hall needs --env RR_DLC_ROOT=<folder with the package>')
+    if args.seed_slow_dlc_hall is not None:
+        if not ADDON_COURSE_KEY.fullmatch(args.seed_slow_dlc_hall):
+            parser.error('--seed-slow-dlc-hall expects <package-id>/<item-id>, for example n64-vengeance/nv')
+        if args.eyecheck_dlc_hall is not None:
+            parser.error('--seed-slow-dlc-hall and --eyecheck-dlc-hall both write the DLC side file; use one')
+        if not any(item.startswith('RR_DLC_ROOT=') and len(item) > len('RR_DLC_ROOT=') for item in args.env):
+            parser.error('--seed-slow-dlc-hall needs --env RR_DLC_ROOT=<folder holding the DLC packages>')
     if args.addon_course is not None:
         if not ADDON_COURSE_KEY.fullmatch(args.addon_course):
             parser.error('--addon-course expects <package-id>/<item-id>, for example n64-vengeance/nv')
@@ -364,6 +405,11 @@ def main():
             target.write_bytes(seed_slow_hall(target.read_bytes(), args.seed_slow_hall,
                                               args.route not in PLAYER_RACER_ROUTES))  # free-play routes need Main slot 1
             print(f'test_seed hall={args.seed_slow_hall} slow=1', flush=True)
+    if args.seed_slow_dlc_hall is not None:
+        dlc_root = next(item.split('=', 1)[1] for item in args.env if item.startswith('RR_DLC_ROOT='))
+        (saves / 'dlc-progress-v1.json').write_text(
+            json.dumps(seed_slow_dlc_course_hall(args.seed_slow_dlc_hall, dlc_root), indent=2) + '\n')
+        print(f'test_seed dlc_hall={args.seed_slow_dlc_hall} slow=1', flush=True)
     if args.eyecheck_dlc_hall is not None:
         (saves / 'dlc-progress-v1.json').write_text(json.dumps(seed_dlc_hall(args.eyecheck_dlc_hall), indent=2) + '\n')
     staged = output / 'RacerRevengePC.exe'
@@ -687,7 +733,10 @@ def main():
                 restore=re.findall(r'dlc_course_carousel action=restore[^\r\n]*', texts),
                 selected=re.findall(r'dlc_course_confirm [^\r\n]*', texts),
                 carousel=re.findall(r'dlc_course_carousel [^\r\n]*', texts),
-                draw=re.findall(r'dlc_course_draw [^\r\n]*', texts))
+                draw=re.findall(r'dlc_course_draw [^\r\n]*', texts),
+                hall=re.findall(r'dlc_hall_(?:addon|draw) [^\r\n]*', texts),
+                progress=re.findall(r'dlc_progress [^\r\n]*', texts),
+                seededSlowHall=args.seed_slow_dlc_hall)
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

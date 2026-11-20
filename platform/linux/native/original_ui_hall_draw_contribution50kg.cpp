@@ -1,4 +1,5 @@
 #include "original_ui_hall_draw_contribution50kg.h"
+#include "original_ui_hall_addon50dl.h"
 #include "original_ui_hall_background_adapter50kg.h"
 #include "original_ui_material_adapter50kg.h"
 #include "vehicle_window_gl50ds.h"
@@ -15,7 +16,12 @@ using Diagnostic=OriginalUiHallContributionDiagnostic50KG;
 using Segment=OriginalUiHallSegment50KG;
 constexpr auto unresolved=assets::unresolvedMaterialTexture50EA;
 bool fail(Diagnostic& d,Error e,std::uint32_t pc=0) noexcept {d.error=e;d.sourcePC=pc;return false;}
+// PORT EXTENSION (DLC add-on course, 148r): the one per-frame record
+// (original_ui_hall_addon50dl.h). Owner thread only.
+thread_local OriginalUiHallAddonFrame50DL* hallAddonFrame=nullptr;
 }
+void setOriginalUiHallAddonFrame50DL(OriginalUiHallAddonFrame50DL* frame) noexcept {hallAddonFrame=frame;}
+OriginalUiHallAddonFrame50DL* originalUiHallAddonFrame50DL() noexcept {return hallAddonFrame;}
 struct OriginalUiHallDrawContribution50KG::Storage {
     std::shared_ptr<OriginalUiHallDrawResources50KG> resources;
     std::vector<game::OriginalUiTextureAnimation50KG> animation;
@@ -178,7 +184,39 @@ bool OriginalUiHallDrawContribution50KG::appendText(const game::OriginalUiTextLa
 bool OriginalUiHallDrawContribution50KG::widgets(bool top,bool shown,Diagnostic& d) noexcept {
     auto& s=*storage_;auto* bank=s.resources->widgets();const auto* order=bank->order(top);if(!order)return fail(d,Error::projection);
     const auto segment=top?Segment::onTopWidgets:Segment::ordinaryWidgets;
+    auto* addon=originalUiHallAddonFrame50DL();
+    const auto addonName=[&](std::uint16_t id,bool visible,Segment where,OriginalUiHallAddonFrame50DL& frame,Diagnostic& dd)->bool{
+        const auto* descriptor=bank->textDescriptor(id);const auto material=s.resources->widgetMaterial(id);
+        if(!descriptor||descriptor->depth!=1||material>=s.resources->materials()->size())return fail(dd,Error::geometry);
+        const auto& binding=(*s.resources->materials())[material];
+        if(binding.images.size()!=1||binding.animated)return fail(dd,Error::material);
+        const auto* font=s.resources->images()->font(binding.images[0]);
+        const auto* atlas=s.resources->textures()->texture(binding.images[0]);
+        if(!font||!atlas)return fail(dd,Error::resource);
+        const auto& text=*frame.name;
+        game::OriginalUiTextInput50KG input;input.font=font;input.atlas=&atlas->texture;
+        input.text=reinterpret_cast<const std::uint8_t*>(text.data());input.length=text.size();
+        game::OriginalUiTextLayout50KG glyphs;game::OriginalUiTextDiagnostic50KG quiet;
+        std::int32_t width=0,height=0;
+        if(text.empty()||!game::layoutOriginalUiText50KG(input,glyphs,quiet)||
+           !game::roundOriginalUiTextMetric50KG(glyphs.widthBeforeScaleAndRounding,1,width)||
+           !game::roundOriginalUiTextMetric50KG(glyphs.firstGlyphHeightBeforeScaleAndRounding,1,height)){++frame.nameSkipped;return true;}
+        game::OriginalUiHallTextProjection50KG live;
+        if(!bank->projectText(id,0,glyphs.fontLineHeight,width,height,visible,live,dd.widgets)){
+            if(dd.widgets.error==game::OriginalUiHallWidgetError50KG::hidden){dd.widgets={};return true;}
+            return fail(dd,Error::projection);}
+        if(live.line.scale!=1||live.line.rotation!=0||live.line.packetColor[3]>128){++frame.nameSkipped;return true;}
+        input.localX=live.position.positionedX;input.localY=live.position.positionedY;
+        if(!game::layoutOriginalUiText50KG(input,glyphs,quiet)){++frame.nameSkipped;return true;}
+        if(!appendText(glyphs,live.line.packetColor,material,0x2E0A30,where,id,dd))return false;
+        ++frame.nameDrawn;return true;
+    };
     for(auto id:*order){d.widgetId=id;const auto material=s.resources->widgetMaterial(id);
+        // PORT EXTENSION (DLC add-on course, 148r): the add-on name in place of
+        // the anchor's course-name line 0. A name the font cannot lay out is
+        // skipped (counted), never replaced by another text.
+        if(addon&&addon->name&&id==addon->anchorName&&s.resources->textGeometry(id)){
+            if(!addonName(id,shown,segment,*addon,d))return false;continue;}
         if(const auto* text=s.resources->textGeometry(id)){
             const auto* descriptor=bank->textDescriptor(id);if(!descriptor||descriptor->depth!=1)return fail(d,Error::geometry);
             for(std::size_t lineIndex=0;lineIndex<text->lines().size();++lineIndex){

@@ -1,6 +1,15 @@
 #include "original_ui_hall_session50kg.h"
+#include "original_ui_hall_addon50dl.h"
+#include "../../../src/assets/dlc_progress50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
+#include "../../../src/game/dlc_course_entries50dl.h"
+#include "../../../src/game/dlc_course_records50dl.h"
+#include "../../../src/game/original_course_descriptor50kg.h"
 #include <cmath>
+#include <cstdio>
 #include <limits>
+#include <string>
+#include <vector>
 namespace rr::platform { namespace {
 using S=OriginalUiHallSessionStatus50KG;using D=OriginalUiHallSessionDiagnostic50KG;
 using HP=game::OriginalUiHallPhase50KG;using MS=game::OriginalUiOptionsMenuStatus50KG;
@@ -25,6 +34,78 @@ struct OriginalUiHallOfFameSession50KG::Storage {
  bool confirmPending=false,confirmCommitted=false;
  std::uint32_t entryMode=5; // 5 Options entry; 2 tournament race return (unchanged P+34).
  std::uint64_t serial=0;
+ // ---- PORT EXTENSION, NOT ORIGINAL BEHAVIOUR (DLC add-on course records, 148r).
+ // The Options Hall (mode5) and the Free Play race-return Hall (mode0) only; the
+ // tournament Hall (mode2) never lists an add-on course (D3). After the last
+ // enabled stock course the course arrows continue through the admitted add-on
+ // courses in number order, then wrap to the first stock course; Previous runs
+ // the block backwards (the Course screen's add-on block, 146r-U). An add-on
+ // entry is port state only: the original navigation, widgets, planet write and
+ // remembered 6EC stay on the stock control the block follows (the anchor).
+ // Only the original wrap (Next from the last enabled slot, Previous from the
+ // first, as the unchanged move plan reports it) and moves inside the block are
+ // taken over; leaving across the wrap applies the original move from the
+ // anchor. Drawn: the add-on's own Hall rows (DLC side file, its hall_defaults
+ // until a record is kept), its name in the anchor's course-name text, its
+ // planet name in the header, the template course's Hall planet background and
+ // colours. The race-return Hall opens on the add-on course just raced.
+ struct HallAddon {unsigned number=0;std::string key,name,planetName;std::uint32_t planet=0;};
+ std::vector<HallAddon> addons;bool addonCarousel=false,addonAnchorLast=true;std::size_t addonSlot=0;
+ OriginalUiHallAddonFrame50DL addonFrame{};bool addonDrawLogged=false;
+ const HallAddon* addon()const noexcept{return addonSlot&&addonSlot<=addons.size()?&addons[addonSlot-1]:nullptr;}
+ void addonLog(const char* action)const noexcept{const auto* a=addon();
+  std::fprintf(stderr,"dlc_hall_addon action=%s mode=%u slot=%zu key=%s number=%u anchor_slot=%u anchor_course=%u\n",action,entryMode,addonSlot,
+   a?a->key.c_str():"-",a?a->number:0u,unsigned(nav.navigation.groups[1].selectedSlot),state.courseIndex);}
+ // Bind: one entry per admitted add-on course whose rows the side file holds.
+ void planAddons()noexcept{
+  try{
+   if(entryMode==2||!game::dlc50DL::addonCourseCount())return;
+   const auto* page=controller.page();if(!page||page->groups.size()<2)return;
+   for(std::size_t i=0;i<game::dlc50DL::addonCourseCount();++i){
+    const auto* c=game::dlc50DL::addonCourseAt(i);if(!c)continue;
+    assets::dlc50DL::ProgressHallView view;
+    if(!assets::dlc50DL::progressOwner().courseHall(c->key,view)){
+     std::fprintf(stderr,"dlc_hall_addon action=skipped key=%s number=%u reason=\"no DLC records this session\"\n",c->key.c_str(),c->number);continue;}
+    // The template stock course's Hall planet (course_screen.stock_template).
+    int stock=-1;const auto& descriptors=game::originalFreshCourseDescriptors50KG;
+    const auto up=[](char x){return x>='a'&&x<='z'?char(x-'a'+'A'):x;};
+    if(c->courseScreenTemplate.size()==2)for(std::size_t k=0;k<descriptors.size();++k)
+     if(descriptors[k].first==up(c->courseScreenTemplate[0])&&descriptors[k].second==up(c->courseScreenTemplate[1]))stock=int(k);
+    HallAddon e;e.number=c->number;e.key=c->key;e.name=c->name;e.planetName=c->planetName;e.planet=state.planetIndex;
+    bool found=false;
+    for(std::size_t slot=1;slot<=page->groups[1].controls.size()&&stock>=0;++slot){
+     auto probe=nav;probe.navigation.groups[1].selectedSlot=static_cast<std::uint16_t>(slot);
+     std::uint32_t course=0,planet=0;
+     if(controller.selectedCourse(probe,course,planet)&&course==std::uint32_t(stock)&&
+        cold.resources->backgroundImage(planet)!=assets::unresolvedMaterialTexture50EA){e.planet=planet;found=true;break;}
+    }
+    std::fprintf(stderr,"dlc_hall_addon action=planned mode=%u key=%s number=%u name=\"%s\" planet=%u template=%s%s\n",entryMode,
+     e.key.c_str(),e.number,e.name.c_str(),e.planet,c->courseScreenTemplate.c_str(),found?"":" template_planet=missing");
+    if(found)addons.push_back(std::move(e));
+   }
+   addonCarousel=!addons.empty();
+  }catch(...){addons.clear();addonCarousel=false;}
+ }
+ // Race-return Hall (mode0): open on the add-on course this race ran.
+ void openRacedAddon()noexcept{
+  if(entryMode!=0||!addonCarousel||addonSlot)return;
+  OriginalUiRiderProfileOwner50KG::CourseRaceSelection race;
+  if(!cold.profile->courseRaceSnapshot(race))return;
+  const unsigned number=game::dlc50DL::addonCourseForLaunch(0,race.subtype);
+  if(!number)return;
+  for(std::size_t i=0;i<addons.size();++i)if(addons[i].number==number){
+   addonAnchorLast=true;addonSlot=i+1;addonDrawLogged=false;addonLog("open_raced");return;}
+  std::fprintf(stderr,"dlc_hall_addon action=open_raced_skipped number=%u reason=\"not planned\"\n",number);
+ }
+ // The anchor control's course-name text widget (0 = none).
+ std::uint16_t anchorName()const noexcept{
+  const auto* page=controller.page();const auto slot=nav.navigation.groups[1].selectedSlot;
+  if(!page||page->groups.size()<2||!slot||slot>page->groups[1].controls.size())return 0;
+  const auto id=page->groups[1].controls[slot-1];
+  if(id<0||std::size_t(id)>=page->controls.size())return 0;
+  for(const auto w:page->controls[std::size_t(id)].widgets)if(cold.resources->widgets()->textDescriptor(w))return w;
+  return 0;
+ }
  bool operational()const noexcept{return !state.faulted&&!state.quitRequested&&!sourceClosing&&!sourceTornDown;}
  auto transition()const noexcept{return cold.externalTransition->snapshot();}
  bool currentPage()const noexcept{const auto t=transition();return t.bound&&t.current.screen==11&&t.current.page==1;}
@@ -66,7 +147,7 @@ struct OriginalUiHallOfFameSession50KG::Storage {
   if(!profileCurrent()||!cold.profile->hallSnapshot(view)||controller.phase(nav,p,view,plan)!=MS::ok||!apply(plan))fault(S::widget,pc);}
  static bool available(void* p)noexcept{auto&s=*static_cast<Storage*>(p);return s.operational()&&s.cold.resources->exitText()&&s.cold.resources->exitText()->prepared();}
  static void hook(void*p,const game::OriginalUiApertureHook50KG&e)noexcept{auto&s=*static_cast<Storage*>(p);if(!s.operational())return;
-  switch(e.kind){case H::openingAC:s.phase(HP::openingAC,e.targetPC);break;case H::openedB0:s.phase(HP::openedB0,e.targetPC);break;case H::closingB4:s.phase(HP::closingB4,e.targetPC);break;case H::closingThresholdB8:s.phase(HP::closedB8,e.targetPC);break;case H::closedBC:if(e.targetPC!=0x1D7A00)s.fault(S::aperture,e.targetPC);break;case H::screenExitObject440:if(!s.rendering||!s.collector.projectExitText(e,s.faultDetail.draw))s.fault(S::draw,e.callPC);break;}}
+  switch(e.kind){case H::openingAC:s.phase(HP::openingAC,e.targetPC);if(s.operational())s.openRacedAddon();break;case H::openedB0:s.phase(HP::openedB0,e.targetPC);break;case H::closingB4:s.phase(HP::closingB4,e.targetPC);break;case H::closingThresholdB8:s.phase(HP::closedB8,e.targetPC);break;case H::closedBC:if(e.targetPC!=0x1D7A00)s.fault(S::aperture,e.targetPC);break;case H::screenExitObject440:if(!s.rendering||!s.collector.projectExitText(e,s.faultDetail.draw))s.fault(S::draw,e.callPC);break;}}
  static void overlay(void*p,std::uint8_t ordinal,const game::OriginalUiApertureRectangle50KG&r)noexcept{auto&s=*static_cast<Storage*>(p);if(s.operational()&&(!s.rendering||!s.collector.projectAperture(ordinal,r,s.faultDetail.draw)))s.fault(S::draw,0x1D798C);}
  bool updateWidgets(bool top)noexcept{const auto* ids=cold.resources->widgets()->order(top);if(!ids)return false;for(auto id:*ids){auto& b=*cold.resources->widgets();if(b.state(id).kind==game::OriginalUiHallWidgetKind50KG::text&&!b.updateText(id,true,faultDetail.widget)&&faultDetail.widget.error!=game::OriginalUiHallWidgetError50KG::hidden)return false;}return true;}
 };
@@ -86,6 +167,7 @@ S OriginalUiHallOfFameSession50KG::bind(const OriginalUiHallSessionCold50KG&cold
   if(!s->collector.bindFrame(cold.resources,cold.gpu,d.draw))return result(d,S::draw);
   game::OriginalUiApertureCallbacks50KG cb;cb.context=s.get();cb.available=&Storage::available;cb.hook=&Storage::hook;cb.submitOverlay=&Storage::overlay;
   if(s->aperture.bindHallOfFame(cold.hallArchive,cb,d.aperture)!=AS::ok)return result(d,S::aperture);
+  s->planAddons(); // PORT EXTENSION (148r): add-on course entries; none = stock Hall unchanged
   s->state.bound=true;storage_=std::move(s);return result(d,S::ok);
  }catch(...){return result(d,S::resource);}
 }
@@ -135,6 +217,27 @@ S OriginalUiHallOfFameSession50KG::input(const OriginalUiMainSessionInput50KG&in
  }
  if(plan.backRequested){if(!s->idle()||!s->soundReady(5)||!game::originalUiHallBackShape50KG(plan.back))return result(d,r.status=S::unavailableDestination);s->pending=plan;s->pendingStamp=s->liveStamp;s->state.backProposalPending=true;++s->serial;if(!s->serial)++s->serial;r.routeProposal={this,s->serial,plan.back,s->pendingStamp};return result(d,r.status=S::backProposed);}
  if(status==MS::noChange)return result(d,r.status=S::noChange);
+ // PORT EXTENSION (DLC add-on course, 148r): the add-on block at the wrap.
+ if(s->addonCarousel&&in.controller==0&&(in.originalInput==0||in.originalInput==1)&&status==MS::ok&&plan.pauseVideo&&plan.soundRequested){
+  const bool forward=in.originalInput==1;
+  const auto from=s->nav.navigation.groups[1].selectedSlot,to=plan.state.navigation.groups[1].selectedSlot;
+  const bool wraps=forward?to<=from:to>=from;
+  if(s->addonSlot||wraps){
+   if(!s->soundReady(plan.soundId))return result(d,r.status=S::audio,plan.soundPC);
+   const auto count=s->addons.size();bool stockMove=false;const char* action=nullptr;
+   if(!s->addonSlot){s->addonAnchorLast=forward;s->addonSlot=forward?1:count;action="enter";}
+   else if(forward?s->addonSlot<count:s->addonSlot>1){s->addonSlot=forward?s->addonSlot+1:s->addonSlot-1;action="step";}
+   else{const bool across=forward==s->addonAnchorLast;s->addonLog(across?"leave_wrap":"leave");s->addonSlot=0;stockMove=across;}
+   s->addonDrawLogged=false;
+   if(!stockMove){
+    if(action)s->addonLog(action);
+    s->state.framePublished=false;s->inOperation=true;const bool played=s->sound(plan.soundId);s->inOperation=false;
+    if(!played){s->fault(S::audio,plan.soundPC);d=s->faultDetail;return r.status=d.status;}
+    return result(d,r.status=S::ok);
+   }
+   // Across the wrap: the original move from the anchor follows unchanged.
+  }
+ }
  s->state.framePublished=false;s->inOperation=true;const bool applied=s->apply(plan);s->inOperation=false;if(!applied){s->fault(S::widget,0x1E3F70);d=s->faultDetail;return r.status=d.status;}
  r.movementAccepted=plan.pauseVideo;return result(d,r.status=S::ok);
 }
@@ -162,18 +265,44 @@ S OriginalUiHallOfFameSession50KG::update(const OriginalUiMainSessionUpdate50KG&
  if(s->state.pageShown)ok=s->controller.update(s->nav,in.elapsedSeconds,plan)==MS::ok&&s->apply(plan);
  if(ok)ok=s->updateWidgets(false)&&s->updateWidgets(true);s->inOperation=false;if(!ok){s->fault(S::widget,0x1E45C0);d=s->faultDetail;return d.status;}++s->state.updateCount;return result(d,S::ok);}
 S OriginalUiHallOfFameSession50KG::render(const OriginalUiMainFrameClock50KG&clock,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!s->state.updateCount||!s->state.pageShown||!s->state.cameraActive||s->state.movementPresentationPending||(s->paused&&clock.advanceAnimations))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->confirmPending=false;s->inOperation=s->rendering=true;
- game::OriginalUiHallCourseRecords50KG row;bool ok=s->cold.profile->hallBrowseRecordSnapshot(s->state.courseIndex,row);OriginalUiHallPageInput50KG page{s->state.courseIndex,s->state.planetIndex,s->aperture.snapshot().state==game::OriginalUiApertureState50KG::open,&row};
- OriginalUiCourseProfileColors50KG colors;if(ok)ok=s->cold.profile->hallBrowsePlanetColors(s->state.planetIndex,colors);if(ok){page.colorsKnown=true;page.primaryColor79C=colors.primary79C;page.secondaryColor7A0=colors.secondary7A0;}
+ game::OriginalUiHallCourseRecords50KG row;bool ok=s->cold.profile->hallBrowseRecordSnapshot(s->state.courseIndex,row);
+ // PORT EXTENSION (DLC add-on course, 148r): an add-on entry draws its own rows,
+ // planet, name and planet header over the anchor (see Storage::HallAddon).
+ const auto* addon=s->addon();std::uint32_t planet=s->state.planetIndex;
+ if(ok&&addon){
+  assets::dlc50DL::ProgressHallView view;
+  if(assets::dlc50DL::progressOwner().courseHall(addon->key,view))row=view.rows;
+  else{row=assets::dlc50DL::emptyHallRows();if(!s->addonDrawLogged)std::fprintf(stderr,"dlc_hall_addon action=rows_unavailable key=%s\n",addon->key.c_str());}
+  planet=addon->planet;
+  s->addonFrame={};s->addonFrame.anchorName=s->anchorName();s->addonFrame.name=&addon->name;s->addonFrame.planetName=&addon->planetName;
+ }
+ OriginalUiHallPageInput50KG page{s->state.courseIndex,planet,s->aperture.snapshot().state==game::OriginalUiApertureState50KG::open,&row};
+ OriginalUiCourseProfileColors50KG colors;if(ok)ok=s->cold.profile->hallBrowsePlanetColors(planet,colors);if(ok){page.colorsKnown=true;page.primaryColor79C=colors.primary79C;page.secondaryColor7A0=colors.secondary7A0;}
  // 1E2010/1E2860/1E30A8: skipped in mode5. Otherwise, when the shown control's
  // CourseIndex equals 1125F&15, row r of each category is drawn 0xCCCCCC if
- // its first- or second-human rank equals r+1.
+ // its first- or second-human rank equals r+1. An add-on race's ranks are the
+ // add-on course's own (dlc_course_records50dl); its anchor row is not this
+ // race's row, so the stock recolour is not applied for an add-on race.
  if(ok&&s->entryMode!=5){game::OriginalUiHallProfile50KG view;ok=s->cold.profile->hallSnapshot(view);
-  if(ok&&view.mode34!=5&&s->state.courseIndex==view.raceCourse1125F)
+  OriginalUiRiderProfileOwner50KG::CourseRaceSelection race;
+  const unsigned raced=view.mode34==0&&s->cold.profile->courseRaceSnapshot(race)?game::dlc50DL::addonCourseForLaunch(0,race.subtype):0u;
+  if(ok&&addon){const auto last=game::dlc50DL::lastAddonCourseRecord();
+   if(last.number&&last.number==addon->number&&raced==addon->number){const std::uint32_t ranks[3]={last.lap,last.race,last.knockouts};
+    for(std::size_t c=0;c<3;++c)for(std::uint32_t r=0;r<3;++r)page.newRecordRow[c*3+r]=ranks[c]==r+1;}}
+  else if(ok&&!raced&&view.mode34!=5&&s->state.courseIndex==view.raceCourse1125F)
    for(std::size_t c=0;c<3;++c)for(std::uint32_t r=0;r<3;++r)page.newRecordRow[c*3+r]=view.ranks11260[c]==r+1||view.ranks1126C[c]==r+1;}
- if(ok)ok=s->collector.begin({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},s->state.planetIndex,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(page,s->state.pageShown,d.draw);
+ if(addon)setOriginalUiHallAddonFrame50DL(&s->addonFrame);
+ if(ok)ok=s->collector.begin({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},planet,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(page,s->state.pageShown,d.draw);
  if(ok&&s->state.pageShown){ok=s->cold.profile->commitHallRender(s->liveStamp);if(ok)s->liveStamp=s->cold.profile->stamp();}
  if(ok)ok=okay(s->aperture.render48(s->transition().lifecycle))&&!s->state.faulted;
  if(ok)ok=s->collector.projectPrompts(s->nav.inputFlags42C,d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.drain(d.draw);
+ setOriginalUiHallAddonFrame50DL(nullptr);
+ if(ok&&addon&&!s->addonDrawLogged){s->addonDrawLogged=true;
+  bool marked=false;for(const bool m:page.newRecordRow)marked=marked||m;
+  std::fprintf(stderr,"dlc_hall_draw key=%s number=%u name_drawn=%u name_skipped=%u planet_header=%u planet=%u lap0=%.2f race0=%.2f "
+   "knockout0=%u new_record_rows=%u anchor_course=%u stock_row=untouched\n",addon->key.c_str(),addon->number,s->addonFrame.nameDrawn,
+   s->addonFrame.nameSkipped,s->addonFrame.planetDrawn,planet,double(row.lap102F0[0]),double(row.race1033C[0]),unsigned(row.knockouts10388[0]),
+   unsigned(marked),s->state.courseIndex);}
  s->inOperation=s->rendering=false;if(!ok){if(s->state.faulted){d=s->faultDetail;return d.status;}s->fault(S::draw,0x1E3EF0);return result(d,S::draw,0x1E3EF0);}s->state.framePublished=true;++s->state.renderCount;return result(d,S::ok);}
 OriginalUiHallSessionSnapshot50KG OriginalUiHallOfFameSession50KG::snapshot()const noexcept{if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->aperture.snapshot();out.deferred1460=storage_->nav.deferred1460;out.promptMask42C=storage_->nav.inputFlags42C;out.confirmProposalPending=storage_->confirmPending;out.entryMode34=storage_->entryMode;return out;}
 const game::OriginalUiHallState50KG* OriginalUiHallOfFameSession50KG::navigationState()const noexcept{return storage_?&storage_->nav:nullptr;}

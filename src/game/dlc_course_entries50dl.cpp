@@ -1,4 +1,5 @@
 #include "dlc_course_entries50dl.h"
+#include "dlc_course_records50dl.h"
 // PORT EXTENSION, NOT ORIGINAL BEHAVIOUR: see dlc_course_entries50dl.h.
 #include "../assets/dlc_registry50dl.h"
 #include "original_course_descriptor50kg.h"
@@ -180,7 +181,11 @@ void announceAddonCourses() noexcept {
     applyTestAddonCourse();
 }
 
-// ---- RECORDS HOOK (DLC save side file, helper 146s; not merged here) ----------
+// ---- RECORDS HOOK (DLC save side file, helper 146s) -----------------------------
+// Wired by 148r: site 2 is the add-on branch of the rider profile's 1ABFC0
+// (qualification on the add-on rows) and 1AC440 commit (submit); the Hall
+// session shows the rows after the 13 stock courses (site 1's Hall twin).
+// The header's "HOOK, not wired" note predates 148r (left to avoid a rebuild).
 // src\assets\dlc_progress50dl.h DlcProgress50DL, filled from the registry as the
 // HOOK comment in dlc_registry50dl.h lists. Three call sites, add-on courses only
 // (stock courses keep the stock Hall; an add-on course never touches it):
@@ -194,6 +199,18 @@ std::string addonCourseRecordsTarget(unsigned number){
     const auto* c=reg::addonCourse(number);
     return c?c->key:std::string();
 }
+
+// ---- Last add-on course record ranks (148r, dlc_course_records50dl.h) ----------
+namespace {std::mutex recordMutex;AddonCourseRecordRanks lastRecord{};}
+bool noteAddonCourseRecord(const AddonCourseRecordRanks& r) noexcept {
+    if(!reg::addonCourse(r.number)||r.lap>3u||r.race>3u||r.knockouts>3u)return false;
+    std::lock_guard<std::mutex> lock(recordMutex);lastRecord=r;return true;
+}
+AddonCourseRecordRanks lastAddonCourseRecord() noexcept {
+    std::lock_guard<std::mutex> lock(recordMutex);
+    return reg::addonCourse(lastRecord.number)?lastRecord:AddonCourseRecordRanks{};
+}
+void clearAddonCourseRecord() noexcept {std::lock_guard<std::mutex> lock(recordMutex);lastRecord={};}
 
 // ---- Course-screen highlight (146r-U) ---------------------------------------------
 namespace {std::atomic<unsigned> highlightedCourse{0};}

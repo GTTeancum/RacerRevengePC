@@ -1,4 +1,5 @@
 #include "original_ui_hall_draw_resources50kg.h"
+#include "original_ui_hall_addon50dl.h"
 #include "original_ui_material_adapter50kg.h"
 #include <cmath>
 #include <algorithm>
@@ -200,7 +201,13 @@ bool OriginalUiHallDrawResources50KG::projectPage(const OriginalUiHallPageInput5
    lengths[base+2]=8;std::copy_n(value.begin(),8,text[base+2].begin());}
   else{std::int32_t value=0;static_assert(sizeof(value)==sizeof(records.knockouts10388[rank]));std::memcpy(&value,&records.knockouts10388[rank],sizeof(value));
    const auto result=std::to_chars(text[base+2].data(),text[base+2].data()+20,value);if(result.ec!=std::errc{})return fail(d,Error::geometry,0x1e2b8c);lengths[base+2]=static_cast<std::size_t>(result.ptr-text[base+2].data());}}
- const auto& name=s.planetNames[in.planetIndex];lengths[27]=name.size();std::copy(name.begin(),name.end(),text[27].begin());
+ // PORT EXTENSION (DLC add-on course, 148r): the add-on planet name in the
+ // header while the Hall shows an add-on course (original_ui_hall_addon50dl.h);
+ // a name over the header's 14-character capacity keeps the stock planet name.
+ auto* addon=originalUiHallAddonFrame50DL();
+ const bool addonPlanet=addon&&addon->planetName&&!addon->planetName->empty()&&addon->planetName->size()<=14;
+ const auto& name=addonPlanet?*addon->planetName:s.planetNames[in.planetIndex];lengths[27]=name.size();std::copy(name.begin(),name.end(),text[27].begin());
+ if(addonPlanet)++addon->planetDrawn;
  for(std::size_t category=0;category<3;++category)for(std::size_t rank=0;rank<3;++rank)for(std::size_t column=0;column<3;++column){
   const auto n=(category*3+rank)*3+column;constexpr float x[]={225,350,280};constexpr std::size_t capacity[]={3,21,20};constexpr unsigned justify[]={4,0,1};
   if(!embedded(text[n].data(),lengths[n],capacity[column],x[column],float(99+86*category+21*rank),justify[column],*font,atlas->texture,s.scratchGeometry[n],d))return false;}
