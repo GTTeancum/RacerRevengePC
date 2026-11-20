@@ -1,12 +1,18 @@
 #pragma once
+// Timed track lights, numerical leaf (common rewrite R6; replaces the GB-only
+// original_gb_light_flash50gb.h). Every value comes from the track's SCB:
+//  [Environment] AmbientColorFlashMinIdleTime / IdleTime / MinDuration /
+//  Duration / ColorRGB (270E9C enables, 2754E0 services), and per light
+//  HasFlasher / FlashPattern / FlashPeriod / FlashFilter (2779E4 reads,
+//  147650 services). The lighting owner reads the authoring and owns
+//  publication; these scalar structs confer no source/runtime authority.
 #include <array>
 #include <cfenv>
 #include <cmath>
 #include <cstdint>
+#include <string>
 
-namespace rr::game::original_gb_light_flash50GB {
-// Numerical leaf only. The typed GB lighting owner authenticates all authoring
-// and owns publication; these scalar structs confer no source/runtime authority.
+namespace rr::game::original_light_flash50CR {
 namespace detail {
 inline float add(float a,float b) noexcept {volatile float r=a+b;return r;}
 inline float sub(float a,float b) noexcept {volatile float r=a-b;return r;}
@@ -28,40 +34,77 @@ inline bool packed(const std::array<float,4>& color,std::uint32_t& result) noexc
  result=(c[3]<<24)|(c[0]<<16)|(c[1]<<8)|c[2];return true;
 }
 }
-struct AmbientState {
- float elapsed=0.f,idleThreshold=25.f,endThreshold=.24f;
+// [Environment] AmbientColorFlash* as authored (stock GB: 15 / 25 / .2 / .24).
+struct AmbientTimings {
+ float minIdle=0.f,idle=0.f,minDuration=0.f,duration=0.f;
 };
+inline bool validTimings(const AmbientTimings& t) noexcept {
+ using namespace detail;
+ return scalar(t.minIdle)&&scalar(t.idle)&&scalar(t.minDuration)&&scalar(t.duration)&&
+  t.minIdle>=0.f&&t.idle>0.f&&t.minDuration>=0.f&&t.duration>=0.f;
+}
+struct AmbientState {
+ AmbientTimings timings{};
+ // The initial cycle uses the authored IdleTime and Duration directly.
+ float elapsed=0.f,idleThreshold=0.f,endThreshold=0.f;
+};
+inline bool initializeAmbient(const AmbientTimings& t,AmbientState& out) noexcept {
+ if(!detail::arithmetic()||!validTimings(t))return false;
+ AmbientState next;next.timings=t;next.idleThreshold=t.idle;next.endThreshold=t.duration;
+ out=next;return true;
+}
 //2754E0 publishes using OLD thresholds, then rolls the cycle and increments.
-// Actual GB defaults are source-authored, including the initial .24 end value.
 inline bool advanceAmbient(AmbientState& state,float delta,std::uint32_t& sharedRaw,
  bool& publishFlash) noexcept {
  using namespace detail;
+ const auto& t=state.timings;
  // Bound the native fixed-step domain; no private clock or catch-up loop.
- if(!arithmetic()||!scalar(delta)||delta<0.f||delta>1.f||
+ const float highestIdle=t.idle>t.minIdle?t.idle:t.minIdle;
+ if(!arithmetic()||!validTimings(t)||!scalar(delta)||delta<0.f||delta>1.f||
     !scalar(state.elapsed)||state.elapsed<0.f||!scalar(state.idleThreshold)||
-    state.idleThreshold<15.f||state.idleThreshold>25.f||
+    state.idleThreshold<0.f||state.idleThreshold>highestIdle||
     !scalar(state.endThreshold)||state.endThreshold<0.f)return false;
  auto next=state;auto raw=sharedRaw;const bool flash=state.elapsed>state.idleThreshold;
  if(state.elapsed>state.endThreshold){
   next.elapsed=0.f;
-  const float idle=mul(randomUnit(raw),25.f);
-  next.idleThreshold=idle>15.f?idle:15.f; //2755A4 MAX.S.
-  const float duration=mul(randomUnit(raw),.24f);
-  const float bounded=duration<.2f?duration:.2f; //2755E0 MIN.S.
+  const float idle=mul(randomUnit(raw),t.idle);
+  next.idleThreshold=idle>t.minIdle?idle:t.minIdle;          //2755A4 MAX.S.
+  const float duration=mul(randomUnit(raw),t.duration);
+  const float bounded=duration<t.minDuration?duration:t.minDuration; //2755E0 MIN.S.
   next.endThreshold=add(bounded,next.idleThreshold);
  }
  next.elapsed=add(next.elapsed,delta);
  if(!scalar(next.elapsed)||!scalar(next.endThreshold))return false;
  state=next;sharedRaw=raw;publishFlash=flash;return true;
 }
+// FlashPattern: comma-separated 0/1 entries, entry k -> bit (31-k) (stock GB
+// "0,1,1,0,..." = 0x6ED66EBB). PORT STAND-IN (flagged): exactly 32 entries are
+// admitted; another length is refused, never padded or truncated.
+inline bool parsePattern(const std::string& text,std::uint32_t& out) noexcept {
+ std::uint32_t bits=0;std::size_t at=0;unsigned count=0;
+ while(at<=text.size()){
+  if(at==text.size()||count>=32u)return false;
+  const char c=text[at];
+  if(c!='0'&&c!='1')return false;
+  if(c=='1')bits|=1u<<(31u-count);
+  ++count;++at;
+  if(at==text.size())break;
+  if(text[at]!=',')return false;
+  ++at;
+ }
+ if(count!=32u)return false;
+ out=bits;return true;
+}
 struct PointState {
  std::uint32_t pattern=0,originalPacked=0;
- float period=2.f,elapsed=0.f,filter=.1f;
+ float period=0.f,elapsed=0.f,filter=0.f;
 };
-inline bool initializePoint(std::uint32_t pattern,const std::array<float,4>& color,
- PointState& output) noexcept {
- if(!detail::arithmetic())return false;PointState next;next.pattern=pattern;
- if(!detail::packed(color,next.originalPacked))return false;output=next;return true;
+inline bool initializePoint(std::uint32_t pattern,float period,float filter,
+ const std::array<float,4>& color,PointState& output) noexcept {
+ using namespace detail;
+ if(!arithmetic()||!scalar(period)||!(period>0.f)||!scalar(filter)||filter<0.f||filter>1.f)return false;
+ PointState next;next.pattern=pattern;next.period=period;next.filter=filter;
+ if(!packed(color,next.originalPacked))return false;output=next;return true;
 }
 //147650: same original operation order and low5-bit SRLV behavior. The caller
 // publishes the resulting color to the actual emitted point. Original146C40
@@ -69,7 +112,8 @@ inline bool initializePoint(std::uint32_t pattern,const std::array<float,4>& col
 inline bool advancePoint(PointState& state,float delta,const std::array<float,4>& current,
  std::array<float,4>& output) noexcept {
  using namespace detail;
- if(!arithmetic()||!scalar(delta)||delta<0.f||delta>1.f||state.period!=2.f||state.filter!=.1f||
+ if(!arithmetic()||!scalar(delta)||delta<0.f||delta>1.f||!scalar(state.period)||!(state.period>0.f)||
+    !scalar(state.filter)||state.filter<0.f||state.filter>1.f||
     !scalar(state.elapsed)||state.elapsed<0.f||state.elapsed>state.period)return false;
  // Original all-one pattern takes the no-service branch, before time changes.
  if(state.pattern==0xffffffffu){output=current;return true;}

@@ -8,10 +8,10 @@
 //  274AE0 joins the application sky directory (36B750, "skies\") and the name;
 //  1295B0/1289C0/1290E0 frame the CUB; 128D50/24F2C0 tile descriptor + mips;
 //  12A8A0 cube geometry; the viewport clear consumes [Fog] ColorRGB.
-// The CUB format checks (tables, texture flags, face masks/sizes, pose) are the
-// same as load(); only the identity pins (archive/CUB/SCB/tile/image SHA-256,
-// fixed fog byte offset, per-tile tables) are absent, because the data is read
-// rather than matched.
+// The CUB format checks (tables, texture flags, face masks/sizes, pose) are
+// enforced; there are no identity pins (archive/CUB/SCB/tile/image SHA-256,
+// fixed fog byte offset, per-tile tables): the data is read rather than matched.
+// This is the only sky image load (the per-course load()/loadGb were retired).
 namespace sky50gw_fixture {
 namespace course_data_detail50GW {
 inline const a::ParameterBlock48F& uniqueBlock(const a::ParameterDocument48F& p,
@@ -87,6 +87,9 @@ template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
         need(rgb&&rgb->find('\0')==std::string::npos,"Course sky [Fog] ColorRGB missing");
         auto next=std::make_unique<Storage>();
         parseFogRgb(rgb->c_str(),next->clearRgba);
+        next->cubeMember=member;next->cubeBytes=cub.size();next->internalCubes=internalCubes;next->cubeSha256=sha256(cub);
+        next->nativeRaProof=std::make_unique<NativeRaSourceProof>();
+        auto& proof=*next->nativeRaProof;
         next->mesh.vertices.reserve(vertexCount); next->mesh.indices.reserve(indexCount);
         next->spans.reserve(tileCount);
         std::array<Bytes, tileCount> images;
@@ -101,6 +104,9 @@ template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
             // mips, walked inside the base cube's bytes only.
             std::size_t largest=0,largestBytes=0;
             const auto bytes=walkTile(cub.data()+offset,cubeEnd-offset,largest,largestBytes);
+            need(bytes<=0xffffffffu&&offset<=0xffffffffu,"Course sky tile extent");
+            proof.tiles[index]={face,tile,static_cast<std::uint32_t>(offset),static_cast<std::uint32_t>(bytes),nullptr,nullptr,nullptr};
+            ++proof.consumedTiles;
             decodeLargestMip(cub.data()+offset,largest,largestBytes,images[index]);
             need(images[index].size() == 65552 && std::memcmp(images[index].data(), "RRTEX001", 8) == 0 &&
                 u32(images[index].data()+8) == 128 && u32(images[index].data()+12) == 128,
@@ -116,6 +122,10 @@ template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
         const a::MaterialTextureAssetsInput50EA bankInput{textures.data(), tileCount, slots.data(), tileCount,
             {tileCount,tileCount,3146496,3145728,128}};
         need(next->bank.load(bankInput, d.bank), "Sky texture bank: " + d.bank.parserMessage);
+        for(std::uint32_t i=0;i<tileCount;++i){const auto* image=next->bank.texture(i);
+            need(image&&image->identity==i,"Course sky bank image identity");proof.tiles[i].image=image;}
+        proof.mesh=&next->mesh;proof.bank=&next->bank;proof.spans=&next->spans;
+        proof.memberBytes=cub.size();
         storage_ = std::move(next); return true;
     } catch (const std::exception& e) { try { d.message = e.what(); } catch (...) {} return false; }
     catch (...) { try { d.message = "Unexpected cold course-data sky load failure"; } catch (...) {} return false; }
@@ -123,8 +133,25 @@ template<class Extract> inline bool Owner::loadCourseDataWith(Extract&& extract,
 inline bool Owner::loadFromCourseData(const a::ResArchive48C& archive,
     const a::World48F& world, Diagnostic& d) noexcept {
     // Bounded by the shared extractor ceiling (8 MiB) and the member's own extent.
-    return loadCourseDataWith([&](const std::string& member,std::vector<std::uint8_t>& out,a::DecodeError48C& error){
-        return a::extractResMember48C(archive,member,out,error);},world,d);
+    if(!loadCourseDataWith([&](const std::string& member,std::vector<std::uint8_t>& out,a::DecodeError48C& error){
+        return a::extractResMember48C(archive,member,out,error);},world,d))return false;
+    // Source proof: the archive member that produced these images (same bytes).
+    auto& proof=*storage_->nativeRaProof;const auto& wanted=storage_->cubeMember;
+    const auto lower=[](unsigned char c){return c>='A'&&c<='Z'?static_cast<unsigned char>(c-'A'+'a'):c;};
+    for(std::size_t i=0;i<archive.entries.size();++i){const auto& entry=archive.entries[i];
+        if(entry.name.size()!=wanted.size())continue;
+        bool same=true;for(std::size_t k=0;k<wanted.size()&&same;++k)
+            same=lower(static_cast<unsigned char>(entry.name[k]))==lower(static_cast<unsigned char>(wanted[k]));
+        if(!same)continue;
+        if(proof.member){d.message="Course sky CUB member ambiguous";storage_.reset();return false;}
+        if(entry.logical_offset>archive.decoded.size()||entry.bytes>archive.decoded.size()-entry.logical_offset||
+           entry.bytes!=storage_->cubeBytes){d.message="Course sky CUB member extent differs";storage_.reset();return false;}
+        proof.archive=&archive;proof.member=&entry.name;proof.memberOrdinal=i;
+        proof.memberOffset=entry.logical_offset;proof.memberBytes=entry.bytes;
+        proof.memberData=archive.decoded.data()+entry.logical_offset;
+    }
+    if(!proof.member){d.message="Course sky CUB member not in the course archive";storage_.reset();return false;}
+    return true;
 }
 inline bool Owner::loadFromCourseData(const a::IndexedResArchive48C& archive,
     const a::World48F& world, Diagnostic& d) noexcept {

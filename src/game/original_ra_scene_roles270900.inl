@@ -7,7 +7,7 @@ bool Owner::publishNativeEnvironment3A4(::ra_pod_scene50LA::Owner& owner,
     if(!podApplication(owner)||podApplication(owner)->nativeOwnerThread_!=std::this_thread::get_id()||
        !podColdConstructed(owner)||podTopologyClosed(owner)||podLighting(owner).get()!=this||
        podApplication(owner)->attachmentLock423F58()||!podEnvironment3A4(owner)||
-       !storage_||invalidated_||storage_->scene!=Scene::ra||
+       !storage_||invalidated_||
        (storage_->sceneOwner&&storage_->sceneOwner!=&owner)||storage_->staticBusy()||
        storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return false;
     auto& s=*storage_;
@@ -36,7 +36,7 @@ bool Owner::withdrawNativeEnvironment3A4(::ra_pod_scene50LA::Owner& owner)noexce
 bool Owner::nativeSceneRoles270900Current(const ::ra_pod_scene50LA::Owner* owner,
     const assets::World48F& source,const CollectionZone50BX* actualRows,std::uint32_t& pc)const noexcept {
     pc=0x270a50;
-    if(!owner||!storage_||invalidated_||storage_->scene!=Scene::ra||
+    if(!owner||!storage_||invalidated_||
        storage_->sceneOwner!=owner||storage_->staticBusy()||storage_->activeLease||
        storage_->activeCamera||storage_->activeReset||storage_->resetPending())return false;
     const auto& s=*storage_;
@@ -105,7 +105,7 @@ const PortalGeometry50EO* Owner::nativeRaPortal230450(const ::ra_pod_scene50LA::
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::raVisibilityListCustodyCurrent(const ::ra_pod_scene50LA::Owner* owner,
     const OriginalNativeListMethodCustody50LA* custody)const noexcept {
-    if(!owner||!custody||!storage_||storage_->scene!=Scene::ra||storage_->selectedMethods.empty()||
+    if(!owner||!custody||!storage_||storage_->selectedMethods.empty()||
        storage_->methods.empty()||storage_->registries.empty()||storage_->activeLease||
        storage_->activeCamera||storage_->activeReset||storage_->resetPending())return false;
     const auto& s=*storage_;const auto index=custody->ordinal_;
@@ -290,7 +290,7 @@ bool Owner::nativeRaLocalInputs(const ::ra_pod_scene50LA::Owner* owner,
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::raFlareDomainIdle(const ::ra_pod_scene50LA::Owner* owner,
     const OriginalWreckComponent50LA& entity)const noexcept {
-    if(!owner||!storage_||invalidated_||storage_->scene!=Scene::ra||storage_->sceneOwner!=owner||
+    if(!owner||!storage_||invalidated_||storage_->sceneOwner!=owner||
        !storage_->staticOwner||!storage_->staticApplication||!storage_->staticRegistrationComplete||
        storage_->staticBusy()||storage_->staticAccess||storage_->activeLease||storage_->activeCamera||
        storage_->activeReset||storage_->resetPending()||storage_->zoneProjectionLease||
@@ -304,7 +304,7 @@ bool Owner::raFlareDomainIdle(const ::ra_pod_scene50LA::Owner* owner,
            podFlareAuthoredIndex(*owner,f.entity)!=std::optional<std::size_t>(i+2u)||
            podFlareZoneIndex(*owner,f.entity)!=std::optional<std::size_t>(i<5u?1u:7u))return false;
     }
-    return !s.registrations.useTc&&!s.registrations.ra.empty()&&
+    return !s.registrations.rows.empty()&&
         life.storage.registrations==s.registrations.data()&&
         life.storage.registrationCapacity==s.registrations.size()&&
         life.objectCount==s.identityCount()&&s.registrations.size()==s.identityCount()&&
@@ -334,7 +334,7 @@ bool Owner::bindRaFlareIdentity(const ::ra_pod_scene50LA::Owner* owner,
     try {
         //Same canonical vector, no membership replay. Strong failure guarantee
         //for trivial registration elements; all existing values/IDs survive.
-        s.registrations.ra.resize(count+1u);
+        s.registrations.rows.resize(count+1u);
     }catch(...){return false;}
     //No allocation, callback or possible failure after pointer publication.
     auto& life=s.visibility.lifecycle;
@@ -436,7 +436,7 @@ bool Owner::releaseRaFlareIdentity(const ::ra_pod_scene50LA::Owner* owner,
         const auto used=registry.blockCount?registry.lastUsed:0u;
         for(std::uint32_t i=0;i<used;++i)if(!(registry.words[i]&2u)&&registry.words[i]==(identity<<2u))return refuse("live_token");
     }
-    s.registrations.ra.pop_back();s.raFlareAt(--s.raFlareCount)={};
+    s.registrations.rows.pop_back();s.raFlareAt(--s.raFlareCount)={};
     auto& life=s.visibility.lifecycle;
     life.storage.registrations=s.registrations.data();life.storage.registrationCapacity=s.registrations.size();
     life.objectCount=s.identityCount();return true;

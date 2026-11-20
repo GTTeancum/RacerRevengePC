@@ -38,7 +38,7 @@ bool Owner::drawRaZonePrefix27FEE0(CameraVisibilityLease& lease,
     const OriginalCameraViewportFields& viewport,OriginalZoneScissorPublication50LA& collector,
     Diagnostic& d)noexcept {
     d={};
-    if(!cameraLeaseCurrent(lease)||!storage_||storage_->scene!=Scene::ra||
+    if(!cameraLeaseCurrent(lease)||!storage_||
        storage_->zoneProjectionLease!=&lease||storage_->staticApplication!=&app||
        collector.application_!=&app||!parent38||parent38>storage_->world.zones.size()||
        !storage_->renderAuthoringReady||!app.portalEnabled36ADA8_||app.released_||!viewport.prepared)

@@ -320,8 +320,12 @@ struct OriginalTrackFogFrame50CR {
     std::uint64_t frame=0;
 };
 
-// Owns the zone table (World350 fog lanes), the five controllers (World4DC..4EC)
-// and the Application250 sample. Writes only the World3EC storage it is handed.
+// The ONE track fog owner (common_track50CR::Track::roles.fog, step 05.05 273C30),
+// every course. Owns the zone table (World350 fog lanes), the five controllers
+// (World4DC..4EC), the Application250 sample and the World3EC fields the track
+// load leaves (273C64/13E830), which the camera session (restore 1A98DC,
+// display, per-zone 275630) and the renderer borrow. Replaces the GB/MC/RA fog
+// owners. prepareFrame275630 writes only the World3EC storage it is handed.
 class OriginalTrackFogRuntime50CR final {
     struct Controller {
         float current00=1.0f;
@@ -335,6 +339,7 @@ class OriginalTrackFogRuntime50CR final {
     std::chrono::steady_clock::time_point last250_{};
     std::uint64_t frames_=0;
     std::uint32_t lastZone48_=0;
+    OriginalRaceFogFields fields3EC_{};
     bool prepared_=false,controllersBuilt_=false,clockStarted_=false,haveZone_=false;
 public:
     OriginalTrackFogRuntime50CR()=default;
@@ -345,11 +350,17 @@ public:
         if(prepared_)return track_fog50cr_detail::fogFail(d,OriginalTrackFogStatus50CR::state,0x1a9ee0,0);
         OriginalTrackFog50CR next;
         if(!readOriginalTrackFog50CR(world,next,d))return false;
-        fog_=std::move(next);
+        OriginalRaceFogFields loaded{};
+        if(!loadOriginalRaceFogFields50CR(next,loaded,d))return false;
+        fog_=std::move(next);fields3EC_=loaded;
         controllersBuilt_=fog_.zoneFogDiffers4F0; //270D1C..270E7C, defaults above
         prepared_=true;return true;
     }
     bool prepared() const noexcept {return prepared_;}
+    // World3EC as the track load left it (read-only), and the one mutable
+    // binding the camera session's restore/display/per-zone steps write.
+    const OriginalRaceFogFields* fields3EC() const noexcept {return prepared_?&fields3EC_:nullptr;}
+    OriginalRaceFogFields* cameraFields3EC() noexcept {return prepared_?&fields3EC_:nullptr;}
     const OriginalTrackFog50CR& fog() const noexcept {return fog_;}
     // 27563C..275644: the per-frame zone path runs only when World4F0 bit0 is set.
     bool zoneFogActive() const noexcept {return prepared_&&fog_.zoneFogDiffers4F0&&controllersBuilt_;}

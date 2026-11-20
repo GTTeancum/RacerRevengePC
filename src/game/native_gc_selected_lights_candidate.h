@@ -7,8 +7,8 @@
 namespace rr::game {
 namespace original_gc_gameplay_lighting_candidate { class Owner; }
 // Immutable-by-interface copied publication for the EXPLICIT native host-light
-// policy, not original generated RGBA or cache parity. Only the real GC owner
-// can publish it from a live draw lease. No owner/arena/lease pointer is borrowed.
+// policy, not original generated RGBA or cache parity. Only the one track
+// lighting owner (every course) can publish it from a live draw lease. No owner/arena/lease pointer is borrowed.
 // A stopped racer's retained completed geometry must retain this SAME snapshot.
 class NativeGcSelectedLightsCandidate final {
     friend class original_gc_gameplay_lighting_candidate::Owner;
