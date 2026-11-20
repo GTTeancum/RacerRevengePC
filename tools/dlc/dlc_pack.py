@@ -415,6 +415,11 @@ def read_items(p, d):
             need(set(ch) == want and len(ch) == len(want),
                  f'{uw}: character must be {base}.psg/.mcf/.vut and the six motions _ent _idl1 _idl2 _idl3 _breathe _sel')
             pod['ui_named'] = named
+            if 'layout_slot' in ui:  # optional: stock racer whose Rider widgets place the add-on (PORT STAND-IN layout)
+                ls = ui['layout_slot']
+                n = int(ls) if isinstance(ls, str) and ls.isdigit() and 1 <= len(ls) <= 2 else ls if isinstance(ls, int) and not isinstance(ls, bool) else None
+                need(n is not None, f'{uw}: layout_slot must be a stock racer 01..26')
+                need(1 <= n <= 26 and n not in (5, 6, 13), f'{uw}: layout_slot must be a stock Rider-screen racer (not 5, 6, 13)')
             pod['loose'] = []
             v = o.get('voice')
             if v is not None:
