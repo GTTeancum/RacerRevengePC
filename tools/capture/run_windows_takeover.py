@@ -276,6 +276,10 @@ def main():
                              'unattended driver\'s time on it is a record. Only the DLC side file is written. Needs '
                              '--env RR_DLC_ROOT=<DLC folder>; use with --addon-course <same key> --results-exit main '
                              '[--hold-results-hall]')
+    parser.add_argument('--pause-quit', type=float, default=0.0, metavar='SECONDS',
+                        help='Test only: after SECONDS of racing open Pause, step to its QUIT row (row 10) and confirm, '
+                             'as a player would (sets RR_TEST_PAUSE_QUIT). Free Play: the original 1BDA74 row '
+                             '(Course; a Time Trial asks its record first)')
     parser.add_argument('--seed-save', type=Path,
                         help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
     parser.add_argument('--player-racer', type=int, choices=ORIGINAL_RACERS,
@@ -443,9 +447,11 @@ def main():
     # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
     # from pausing or releasing those inputs; a real minimise/close still does.
     injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or args.hold_results or
-                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None)
+                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None or args.pause_quit)
     if injected:
         env['RR_TEST_IGNORE_FOCUS'] = '1'
+    if args.pause_quit:
+        env['RR_TEST_PAUSE_QUIT'] = str(args.pause_quit)
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
     if args.repair:
@@ -737,6 +743,11 @@ def main():
                 hall=re.findall(r'dlc_hall_(?:addon|draw) [^\r\n]*', texts),
                 progress=re.findall(r'dlc_progress [^\r\n]*', texts),
                 seededSlowHall=args.seed_slow_dlc_hall)
+        quit_texts = log_text + ''.join((output / name).read_text(errors='replace')
+                                        for name in ('stderr.log', 'stdout.log') if (output / name).is_file())
+        quit_lines = re.findall(r'(?:test_pause_quit|pause_quit|time_trial_restart) [^\r\n]*', quit_texts)
+        if args.pause_quit or quit_lines:
+            result['pauseQuit'] = dict(seconds=args.pause_quit, lines=quit_lines)
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

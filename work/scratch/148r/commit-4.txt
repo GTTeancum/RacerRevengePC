@@ -1,0 +1,40 @@
+Time Trial step B: finish restart (1ABC0C 1AC8E0) through the port's one native race restart; Pause QUIT row 10 on every counted Free Play race queues the original 17DE10(6,6,1) Course row (1BDA74/1BDB5C) instead of the port's program Quit; runner --pause-quit (build wt-148r-3, linked, not run)
+
+Original (dis_all.txt):
+- 1ABBE8: after 199770, 1ABC0C 1AC8E0(race,0) restarts the race in place
+  (per human 1148D0, 2A2880 grid, 114770, controller+64 vt18; every racer
+  +3C = 0; 2AED60 fade 500 ms; race+94 = 4.0 (countdown); Time Trial with
+  a VCR: 287BE0, race+A0 = 0, record actor B0+40 vt18; 267BE0; bit3).
+  The Pause RESTART row (1BD990) calls the same 1AC8E0 with a1 = 1.
+- Pause row 10 (1BDA74): App2E0; P+34 == 0 and 11258 == 3 -> 1ABFC0(race,1)
+  at 1BDAB4 (record -> Results page 3 -> 1CA6A4 1AC440 -> Hall 1CA6F0);
+  otherwise 1BDB5C: 26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60 500 ms,
+  1BE830, 17DE10(App,6,6,1) -> Course.
+
+Changes (terrain_interactive_loop50du.cpp, one rule for every course):
+- Time Trial finish: the end entry's 1ABC0C source stop (a43a9b5) now asks
+  the port's one native race restart, the owner the Pause RESTART row
+  (1AC8E0 a1=1) already uses: the same consumed race rebuilt for the same
+  selection. PORT STAND-IN (flagged): no in-place 1AC8E0 (grid, countdown
+  race+94, VCR/record actor reset) yet; a rebuild does not keep this run's
+  best lap.
+- Pause row 10 on a counted Free Play race (Results root published, P+34 0):
+  the request 17DE10(App,6,6,1) is queued through the same transfer the
+  1AB908 race return uses (commitRaceAcknowledgementTransfer50PD, route
+  course, pc 1bdbfc), the Pause closes and the next iteration departs to the
+  Course receiver (f661b36). A refused transfer falls back to the former
+  port Quit, logged. PORT STAND-INS (flagged): the 26D070/1A4AB0/267BE0/
+  2AED60 leaves are the race teardown's; Time Trial's 1BDAB4 record check
+  and Results page 3 are not owned yet, so a Time Trial also takes Course.
+- Test only: RR_TEST_PAUSE_QUIT=<seconds of racing> opens Pause, steps the
+  original rows to 10 and confirms. Runner --pause-quit SECONDS; result
+  JSON pauseQuit lines.
+
+Log lines: time_trial_restart site=1ABC0C call=1AC8E0 route=native_race_restart
+stand_in=1; test_pause_quit open_pause / row=10 confirm=1; pause_quit row=10
+site=1BDA74 subtype=S record_check=pending_1BDAB4|not_reached route=course
+pc=1bdbfc queued=1; then race_ack_transfer / frontend_race_return to Course.
+
+1 TU. Relink wt-148r-3 on wt-148r-2, linked. Not run.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
