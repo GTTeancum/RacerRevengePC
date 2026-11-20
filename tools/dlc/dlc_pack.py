@@ -521,7 +521,7 @@ def read_items(p, d):
                 need(isinstance(m, list) and m, f'{w}: modes must be a non-empty list')
                 for x in m:
                     need(x != 'circuit', f'{w}: mode circuit needs a later version of the port')
-                    need(x in ('single', 'time_trial'), f'{w}: modes may only hold single and time_trial')
+                    need(x in ('single', 'time_trial', 'vs'), f'{w}: modes may only hold single, time_trial and vs')
             rk = txt(o, 'records_key', w, False) or iid
             need(RECORDS_KEY.match(rk) is not None, f'{w}: records_key must be [a-z0-9-]{{1,47}}')
             h = o.get('hall_defaults')

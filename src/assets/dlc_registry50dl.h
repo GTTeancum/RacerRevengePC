@@ -115,7 +115,7 @@ struct AddonCourse {
     std::string courseScreenTemplate="ta",coursePreview; // stock code; preview dlc:/ path or empty
     std::string inheritTuning,inheritParticles;          // stock codes or empty
     bool ownTuning=false,ownParticles=false;             // members present in the archive
-    bool single=true,timeTrial=true;
+    bool single=true,timeTrial=true,vs=true; // modes; "vs" has no effect until two-player races are built
     std::string recordsKey;
     bool hallDefaults=false;AddonHallRow lap[3],race[3],knockouts[3];
     std::vector<std::string> enhancements;

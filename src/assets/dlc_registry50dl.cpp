@@ -472,12 +472,12 @@ bool readCourse(const Package& p,const Json& o,PackageItems& items,AddonCourse& 
     }
     if(const Json* m=field(o,"modes")){
         if(!m->is_array()||m->empty())return fail(reason,where+": modes must be a non-empty list");
-        c.single=c.timeTrial=false;
+        c.single=c.timeTrial=c.vs=false;
         for(const auto& e:*m){
             const std::string v=e.is_string()?e.get<std::string>():std::string();
             if(v=="circuit")return fail(reason,where+": mode circuit needs a later version of the port");
-            if(v=="single")c.single=true;else if(v=="time_trial")c.timeTrial=true;
-            else return fail(reason,where+": modes may only hold single and time_trial");
+            if(v=="single")c.single=true;else if(v=="time_trial")c.timeTrial=true;else if(v=="vs")c.vs=true;
+            else return fail(reason,where+": modes may only hold single, time_trial and vs");
         }
     }
     c.recordsKey=c.itemId;
