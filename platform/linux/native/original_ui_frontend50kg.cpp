@@ -176,6 +176,7 @@ struct OriginalUiFrontend50KG::Storage {
     const ::original_main_entry50KG::Application* nativeRaceReturnRoot=nullptr;
     Route nativeRaceReturnRoute{};
     OriginalUiRiderProfileStamp50KG nativeRaceReturnStamp{};
+    std::uint32_t nativeRaceReturnMode=2; // P+34 at the 1AB5BC request: 2 Tournament, 0 Free Play.
     struct Manager;
     std::unique_ptr<Manager> raceReturnBoot;
     std::shared_ptr<WinAudioAdapter50PD> winAudio;
@@ -1734,9 +1735,13 @@ Status OriginalUiFrontend50KG::prepareNativeRaceReturn(const OriginalUiFrontendC
         // Tournament Hall (1AB698), Win (1AB6FC/1AB758) or Unlock (1AB7F8) as
         // the FIRST screen. Each can later request Garage13, whose entry needs
         // the shared dialogs/dispatcher this lifetime boots like Garage-first.
-        // The mode0 Hall/Unlock rows (1AB884/1AB8E8) have no native receiver.
-        if(cold.profile->mode34!=2u)
-            return reject(Status::unavailableDestination,0x17DE10,"Hall/Win/Unlock race return is native only in tournament mode34==2");
+        // Free Play (mode0): the record row 1AB884 opens the Hall with P+34
+        // unchanged (1E4718 opens on P+700). Win7 is a tournament row only. The
+        // Free Play Unlock row (1AB8E8) still has no mode0 Unlock receiver.
+        if(cold.profile->mode34!=2u&&!(cold.profile->mode34==0u&&screen==11))
+            return reject(Status::unavailableDestination,0x17DE10,
+                screen==11?"Hall race return requires mode34 0 or 2":
+                "Win/Unlock race return is native only in tournament mode34==2");
         if(cold.application&&cold.application->controllerPopupResources)
             return reject(Status::unavailableDestination,0x1B7BD0,"race return: legacy controller popup owner blocks the shared UI boot");
         const auto status=prepareInitialNative(cold,&root,{},d);
@@ -1745,7 +1750,17 @@ Status OriginalUiFrontend50KG::prepareNativeRaceReturn(const OriginalUiFrontendC
                 "Unlock race return preparation failed";}
         return status;
     }
-    // Ending (17DE10 App,0x24,3,0) and the mode0 rows have no receiver.
+    case (6u<<8)|1u: {
+        // Free Play 1AB908: 17DE10(App,6,6,1), Course first with P+34 = 0.
+        if(cold.profile->mode34!=0u)
+            return reject(Status::unavailableDestination,0x17DE10,"Course race return is the Free Play (mode34==0) row only");
+        if(cold.application&&cold.application->controllerPopupResources)
+            return reject(Status::unavailableDestination,0x1B7BD0,"race return: legacy controller popup owner blocks the shared UI boot");
+        const auto status=prepareInitialNative(cold,&root,{},d);
+        if(status!=Status::ok&&!d.raceReturnDetail){d.raceReturnSourcePC=d.sourcePC;d.raceReturnDetail="Course race return preparation failed";}
+        return status;
+    }
+    // Ending (17DE10 App,0x24,3,0) and the Free Play Unlock row have no receiver.
     default:return reject(Status::unavailableDestination,0x17DE10,"race return route has no native receiver yet");
     }
 }
@@ -1851,12 +1866,15 @@ Status OriginalUiFrontend50KG::prepareInitialNative(const OriginalUiFrontendCold
                (cold.profile->mode34==0&&raceScreen==7))return s.fault(d,Status::invalidInput,0x17DE10);
             const Route first{static_cast<std::uint8_t>(raceScreen),1};
             s.nativeRaceReturnRoot=nativeHall;s.nativeRaceReturnRoute=first;s.nativeRaceReturnStamp=cold.riderProfile->stamp();
+            s.nativeRaceReturnMode=cold.profile->mode34;
             if(!assets::readOriginalUiEnglish50KG(*cold.localization,s.english,d.localization))return s.fault(d,Status::localization);
             // Shared-dialog boot bank (same session-less Main bank as Garage-first).
             if(!s.buildGarageBoot(s.raceReturnBoot,d))return s.fault(d,d.status);
             if(!s.build(s.active,first,d,cold.profile->mode34))return s.fault(d,d.status==Status::ok?Status::session:d.status,d.sourcePC);
             // Cold preparation writes no profile field (Unlock grants only on Cross).
-            if(cold.riderProfile->stamp().generation!=s.nativeRaceReturnStamp.generation||cold.profile->mode34!=2)
+            // 17DB80/ld_ui writes no mode: P+34 stays the race's (2 or 0).
+            if(cold.riderProfile->stamp().generation!=s.nativeRaceReturnStamp.generation||
+               cold.profile->mode34!=s.nativeRaceReturnMode)
                 return s.fault(d,Status::invalidInput,0x17DE10);
             s.prepared=true;return result(d,Status::ok);
         }
@@ -2173,13 +2191,14 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
            screen!=s->nativeRaceReturnRoute.screen||page!=s->nativeRaceReturnRoute.page||
            !root.videoOwner_||s->cold.video.lifetime.get()!=root.videoOwner_.get()||
            s->cold.lightManager!=root.lightManager||root.profile!=s->cold.profile||root.state!=s->cold.application||
-           root.riderProfile!=s->cold.riderProfile||s->cold.profile->mode34!=2||
+           root.riderProfile!=s->cold.riderProfile||s->cold.profile->mode34!=s->nativeRaceReturnMode||
+           (s->nativeRaceReturnMode!=2&&s->nativeRaceReturnMode!=0)||
            s->cold.riderProfile->stamp().generation!=s->nativeRaceReturnStamp.generation||
            !display||!display->frontendOwnerCurrent50KG()||&display->renderer_!=&renderer||
            !s->cold.application->sharedDialogs||!s->cold.application->sharedDialogs->loadedCurrent()||
            !s->raceReturnBoot||!s->raceReturnBoot->garageBoot||s->garageRestoration||s->pending||s->retiring||
            !s->active||!same(s->active->initialRoute,s->nativeRaceReturnRoute)||
-           !(s->active->hall||s->active->win||s->active->unlock)||
+           !(s->active->hall||s->active->win||s->active->unlock||(s->active->course&&s->nativeRaceReturnMode==0))||
            !s->garageDestinationFrontend||s->garageDestinationFrontend->materialApplicationOwner!=&root||s->lightManagerEntered)
             return s->fault(d,Status::invalidInput,0x17DE10);
     }
@@ -2209,7 +2228,8 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     }
     s->renderer=&renderer; // Native receiver custody precedes retaining this cleanup target.
     if(!s->active->prepared()||!renderer.originalUiSourceRgbaAvailable()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
-    const auto& firstArchive=s->nativeRaceReturnRoot?(s->active->hall?s->cold.hall:s->active->win?s->cold.win:s->cold.unlock):
+    const auto& firstArchive=s->nativeRaceReturnRoot?(s->active->hall?s->cold.hall:s->active->win?s->cold.win:
+        s->active->course?s->cold.course:s->cold.unlock):
         s->nativePauseCourseOrigin?s->cold.course:s->nativeHallRoot?s->cold.hall:s->cold.mainMenu;
     if(!firstArchive||!s->enterLightManager(*firstArchive,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
     if(s->nativeRaceReturnRoot&&s->active->hall&&!s->active->hall->acceptEntryProfileCommit())
@@ -2356,7 +2376,10 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             const bool ready=same(target,{13,1})?s->prepareGarageFromScreen(s->hallProposal.serial,proposal.request.sourcePC,receipt,d):
                 same(target,{7,1})?s->winInputsReady()&&s->prepareDestination(target,receipt,d,2):
                 same(target,{10,1})?s->unlockInputsReady()&&s->prepareDestination(target,receipt,d,2):
-                false; // 6/1 (1E41C4) is non-tournament only; unreachable from the mode2 Hall.
+                // 1E41C4: the non-tournament Hall (Free Play race return, P+34 = 0) -> Course 6/1.
+                same(target,{6,1})?s->cold.profile&&s->cold.profile->mode34==0&&s->courseInputsReady(0)&&
+                    s->prepareDestination(target,receipt,d,0):
+                false;
             if(!ready){s->hallConfirm=false;s->hallProposal={};
                 return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination,proposal.request.sourcePC);}
             if(!s->active->hall->confirmProposalCurrent(s->hallProposal))return s->fault(d,Status::transition,0x1E3FC0);
