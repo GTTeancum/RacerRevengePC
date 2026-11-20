@@ -437,7 +437,8 @@ def main():
         env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
     # A --hold-rider / --hold-course / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
     logs_only = (args.logs_only and not args.hold_rider and not args.hold_course and not args.hold_results and
-                 not args.hold_results_hall and args.eyecheck_dlc_hall is None)
+                 not args.hold_results_hall and args.eyecheck_dlc_hall is None and
+                 not (args.pause_quit and '--logs-only' not in __import__('sys').argv))
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
