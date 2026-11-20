@@ -2773,9 +2773,12 @@ public:
         auto& v=displayInputs_->video;
         if(!(v.flags404Low6&3u))return set(Status::complete);
         if(v.flags404Low6&4u)return set(Status::sourcePath,0x25aa38);
-        result_.start=frameStage_==FrameStage::taSkipVideo?
-            taSkipBlockingFade_.advance(v,actual_.applicationClock,backend):
-            blockingFade_.advance(v,actual_.applicationClock,backend);
+        // 25A9C0 is a fresh invocation for every new request: a completed fade owner with the
+        // request bits set again (a later fade, e.g. after an in-place 1AC8E0 restart) starts a
+        // new owner. A pending fade is never replaced (it is not complete).
+        auto& fade=frameStage_==FrameStage::taSkipVideo?taSkipBlockingFade_:blockingFade_;
+        if(&fade==&blockingFade_&&fade.complete()){fade.~OriginalVideoBlockingFade();::new(static_cast<void*>(&fade)) OriginalVideoBlockingFade();}
+        result_.start=fade.advance(v,actual_.applicationClock,backend);
         return set(result_.start.status==OriginalCameraStartStatus::complete?Status::complete:Status::videoPending,
             result_.start.sourcePC);
     }
