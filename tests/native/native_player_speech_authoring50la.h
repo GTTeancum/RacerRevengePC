@@ -181,13 +181,16 @@ private:
             auto& category=categories_[member-1];if(!category.declaredCount.present)return false;
             const unsigned sum=member==1?unsigned(counts_[0])+counts_[1]+counts_[2]+counts_[3]:
                 member==2?unsigned(counts_[4])+counts_[5]:unsigned(counts_[6])+counts_[7]+counts_[8];
-            // FLAG stand-in (racer-keyed, not an original branch): POD26's curses.ini
-            // omits Event2. Retire into one rule for every pod (an absent EventN is a
-            // hole the original's Config read skips) when a pod needs it.
-            const bool sparse=identity_->racer60==26u&&member==1u;
-            if(category.count!=sum+(sparse?1u:0u))return false;
+            // B-P02, one rule for every pod: 2C1170 reads each EventN of
+            // NumEvents through Config and 292650 selects among Event1..NumEvents;
+            // an EventN whose section is absent is a hole (nothing is read for it,
+            // no key of it may appear). The present events are the ones the
+            // sounds.ini [Indices] counts describe, so NumEvents == counts + holes.
+            unsigned present=0;
+            for(unsigned i=0;i<category.count;++i)if(category.events[i].sectionPresent)++present;
+            if(present!=sum)return false;
             for(unsigned i=0;i<category.count;++i){auto& row=category.events[i];d.eventId=i+1;
-                if(sparse&&i==1u){if(row.sectionPresent||row.filename.present||row.isStream.present||
+                if(!row.sectionPresent){if(row.filename.present||row.isStream.present||
                     row.isStereo.present||row.isLoop.present)return false;continue;}
                 if(!row.sectionPresent||!row.filename.present||!row.isStream.present||
                    row.isStream.text!="1"||row.isStereo.present||row.isLoop.present)return false;

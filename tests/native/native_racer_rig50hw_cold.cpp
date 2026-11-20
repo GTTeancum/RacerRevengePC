@@ -1,6 +1,7 @@
 // Exact existing cold body outlined to its own translation unit.
 // No ownership, allocation, source arithmetic, or exception-policy change.
 #include "native_racer_rig50hw_fixture.h"
+#include "common_race_log50cr.h"
 
 namespace native_racer50HW {
 Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& podJson) {
@@ -81,8 +82,13 @@ Rig::Rig(const std::filesystem::path& repository,const std::filesystem::path& po
                 "Original UI first-event table has no row for this racer");
             const auto disc=resourceFile.parent_path().parent_path().parent_path();
             const auto ui=f::readBytes(disc/"AUDIO/UIACCEPT.INI");
-            need(pod_materials50ed_fixture::detail::sha256(ui)=="245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b",
-                "Original UI selection names differ");
+            // B-P01: the original reads whatever UIACCEPT.INI the disc holds
+            // (1E7C74 never checks a digest). The shipped digest is a receipt:
+            // logged match|differs, never a refusal (PLAN 1.5, b429596 rule).
+            // The event-name lookup below still refuses a file that lacks the row.
+            common_race_log50CR::podReceipt(identity->racer60,"UIACCEPT",
+                pod_materials50ed_fixture::detail::sha256(ui)=="245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b"?
+                common_race_log50CR::Receipt::match:common_race_log50CR::Receipt::differs);
             const auto eventSection="[event"+std::to_string(firstUiAcceptEvent[identity->racer60])+"]";
             const std::string text(ui.begin(),ui.end());std::string comment;
             for(std::size_t at=0;at<text.size();){auto end=text.find('\n',at);if(end==std::string::npos)end=text.size();
