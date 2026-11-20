@@ -1,15 +1,23 @@
 #pragma once
 #include <cstddef>
 namespace rr::game {
-// The ONE definition of the common trigger reader's capacity (the original's
-// trigger reader walks [Triggers] NumberOfTriggers and TriggerN /
-// TriggerNActionK of whatever TOB the course holds; the port's store is sized
-// once for the largest stock set: TC 22 triggers; GB trigger 18 authors the
-// most actions, 5). The common reader (tests/native/sc_trigger_authoring50la.h
-// count / maxActions) and every capacity-sized native trigger group
-// (native_trigger_group50{tb,tc,mc,gb}.h) reference these; nothing else
-// defines a trigger capacity. Kept dependency-free so the ~152-TU group headers
-// can use it. GA's own group (native_trigger_group50ga.h, 13) is unchanged.
-inline constexpr std::size_t nativeTriggerCapacity50TG=22;
-inline constexpr std::size_t nativeTriggerActionSlots50TG=5;
+// Common rewrite (R5, PLAN B-C13 / 2.2 storage rule): the ONE trigger store of
+// the common race path (NativeTriggerGroup50MC, course_trigger_sources50CT) is
+// sized once from the TOB's own [Triggers] NumberOfTriggers and each trigger's
+// NumberOfActions (274E90 / 2A00A0 read whatever the course archive holds).
+// Nothing here sizes that store any more.
+//
+// RECEIPTS ONLY (stock_course_receipts50CR rows "ALL triggers.capacity" and
+// "ALL triggers.action_slots"): the largest stock trigger set (TC, 22) and the
+// most actions any stock trigger authors (GB trigger 18, 5).
+inline constexpr std::size_t stockLargestTriggerSetReceipt50TG=22;
+inline constexpr std::size_t stockLargestActionSetReceipt50TG=5;
+// PORT STAND-IN (flagged, retiring): the four legacy per-course trigger groups
+// native_trigger_group50{gb,tb,tc}.h still size fixed arrays from these two
+// names. They stay only because the shared query kernels (vehicle_live_query50eq.cpp,
+// indexed_type2_contact50cc.cpp, static_type2_producer49x.*, source_indexed_type2_query50mb.*)
+// still carry their pointer arms; the common path never instantiates them.
+// Delete both names with those groups.
+inline constexpr std::size_t nativeTriggerCapacity50TG=stockLargestTriggerSetReceipt50TG;
+inline constexpr std::size_t nativeTriggerActionSlots50TG=stockLargestActionSetReceipt50TG;
 } // namespace rr::game
