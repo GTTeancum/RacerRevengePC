@@ -2377,9 +2377,13 @@ SessionExit50DU Context::run() {
   require50DU(gameplayBinderEnabled&&gameplayBinder.loaded(),
       "track particles require the actual gameplay DefaultMT/runtime owners");
   gc_particle_materials50kg_fixture::Diagnostic diagnostic;
-  require50DU(particleMaterials.load(track.roles.particles->particlePsm(),track.roles.particles->particlePst(),
-      gameplayBinderTemplates,originalMainApplication.materialRuntime,diagnostic),
-      diagnostic.message.empty()?"original track particle material/atlas rejected":diagnostic.message.c_str());
+  // Load first, then build the message (argument evaluation order would read it before the load).
+  const bool particleMaterialLoaded=particleMaterials.load(track.roles.particles->particlePsm(),track.roles.particles->particlePst(),
+      gameplayBinderTemplates,originalMainApplication.materialRuntime,diagnostic);
+  const std::string particleMaterialWhy="original track particle material/atlas rejected: "+diagnostic.message+
+      " material="+diagnostic.material.field+" error="+std::to_string(static_cast<unsigned>(diagnostic.material.error))+
+      " source="+diagnostic.source.code+" bank="+diagnostic.bank.parserMessage;
+  require50DU(particleMaterialLoaded,particleMaterialWhy.c_str());
   require50DU(particleRender.prepare(*track.roles.particles->particles())==OriginalGcParticleRenderStatus50KG::complete,
       "actual track shared-manager render allocation rejected");
  }

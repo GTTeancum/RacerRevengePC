@@ -770,6 +770,13 @@ SessionExit50DU Context::run() {
   require50DU(rr::assets::readAiTrackTuning50IU(reinterpret_cast<const char*>(tuning.data()),
       tuning.size(),originalAiTuning,originalAiAuthoringDiagnostic),"original AI track tuning unavailable");
  }
+ // Pod-pod impact tuning from the same track TUN (every course; dropped in the I2 rewrite).
+ if(dynamicContactEnabled){
+  require50DU(rr::assets::readDynamicImpactAuthoring50IW(reinterpret_cast<const char*>(tuning.data()),
+      tuning.size(),dynamicTuning,diagnostic),"original dynamic contact tuning unavailable");
+  require50DU(rr::assets::readFinalImpactAuthoring49Y(reinterpret_cast<const char*>(tuning.data()),
+      tuning.size(),dynamicFinalTuning,diagnostic),"original final impact tuning unavailable");
+ }
  rr::assets::DefenseAuthoring49Y defense{};require50DU(rr::assets::readDefenseAuthoring49Y(reinterpret_cast<const char*>(phy.data()),phy.size(),defense,diagnostic)&&defense.baseDefense.present,"explicit base-profile defense");s.fields.defenseCF0=defense.baseDefense.value;
  // Profile overwrite and authored class selection are separate source gates.
  // Use the same UseValues/class decision as the already-bound physics.

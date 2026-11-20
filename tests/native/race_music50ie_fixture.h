@@ -190,111 +190,98 @@ class Owner final {
         state_.latch130=-1; //1A4AB4, before any tail admission.
         state_.mode12C=0;   //1A4AB8. timer128 is not read or changed.
     }
+    // One invocation per actual 1AC8E0 (Results replay, Pause RESTART, Time
+    // Trial finish, Practice), any number per race. Original 234440 has no
+    // pause or "already fading" test: while Pause holds the music group the
+    // same stores run and 235060 is issued; it overwrites any earlier 74 bit5
+    // / 6C / 70 on the same stream. Every refusal below happens before any
+    // stream store and leaves the transport exactly as it was (never terminal).
     UpdateReceipt50IW requestRestartFadeTail234440()noexcept {
-        if(restartFadeAttempted_)return restartFadeReceipt_;
-        restartFadeAttempted_=true;
         const auto stop=[this](Result result,std::uint32_t pc,std::uint32_t helper=0u){
-            restartFadeTerminal_=true;
-            restartFadeReceipt_={result,pc,helper,1.f,nativeFade_.phase,false};
-            return restartFadeReceipt_;
-        };
-        const auto done=[this](UpdateReceipt50IW result){
-            restartFadeReceipt_=result;
-            if(!result.completed())restartFadeTerminal_=true;
-            return restartFadeReceipt_;
+            return UpdateReceipt50IW{result,pc,helper,1.f,nativeFade_.phase,false};
         };
         if(!mixer_)return stop(Result::Unprepared,0x234440u);
-        if(paused_)return stop(Result::Paused,0x234440u);
+        // PORT: a backend-rejected start retained for retry has no original
+        // equivalent (the original stream started at once); refuse, unchanged.
         if(playPending_)return stop(Result::PendingPlay,pendingCallPC_,pendingPlayPC_);
-        if(fadePending_)return stop(Result::PendingFade234440,0x234440u);
         if(!transportIdentity())return stop(Result::Ownership,0x234440u);
-        if(!owned_)return done({Result::Updated,0x234488u,0,1.f});
         rr::platform::AudioVoiceObservation50HD observed{};
-        if(!ownedMusicIdentity(observed))return stop(Result::Ownership,0x234440u);
-        if(!observed.voice.active){
+        const bool live=owned_&&ownedMusicIdentity(observed)&&observed.voice.active;
+        if(owned_&&!live&&!ownedMusicIdentity(observed))return stop(Result::Ownership,0x234440u);
+        if(!live){
+            //234484: 5C==-1, return 0 through 234488 with no stream store.
+            // A port-side pending fade with no live stream is left to its own
+            // owner (update) rather than repaired here.
+            if(fadePending_)return stop(Result::PendingFade234440,fadeCallPC_,0x234440u);
             owned_=false;
-            return done({Result::Updated,0x234488u,0,1.f});
+            return {Result::Updated,0x234488u,0,1.f,nativeFade_.phase,false};
         }
         // Bounded SAME native stream mode4 / mode1 policy. No source handle,
         // logger output, stream64/68 clock or original IOP enqueue is invented.
-        // Already pending/fading source fields are not replayed or repaired.
-        if(fade_.flag20||fade_.retirement6C!=0.f||fade_.duration70!=0.f)
-            return stop(Result::Input,0x234540u);
+        // All values are computed first so a refusal stores nothing.
         if(std::fegetround()!=FE_TONEAREST)return stop(Result::Input,0x234540u);
         float retirement=0.f,duration=1.f;
         if(observed.voice.loop){
             volatile float next=0.35f+1.f; //234564.
             retirement=next;
-            fade_.flag20=true;             //234574.
-            fade_.retirement6C=retirement; //234578.
-            fade_.duration70=1.f;          //23458C delay slot.
         }else{
-            const auto& live=observed.voice;
-            const auto remaining=static_cast<float>((static_cast<double>(live.clip.frames)-
-                live.sourceFrame)/live.clip.sampleRate);
+            const auto& voiceLive=observed.voice;
+            const auto remaining=static_cast<float>((static_cast<double>(voiceLive.clip.frames)-
+                voiceLive.sourceFrame)/voiceLive.clip.sampleRate);
             if(!std::isfinite(remaining)||remaining<=0.f)
                 return stop(Result::Input,0x2345a0u);
             if(remaining<1.f){
                 volatile float nextRetirement=0.9f*remaining; //2346E4.
                 retirement=nextRetirement;
-                if(!std::isfinite(retirement)||retirement<=0.f)
-                    return stop(Result::Input,0x2346e4u);
-                fade_.flag20=true;             //2346FC.
-                fade_.retirement6C=retirement; //234700.
-                volatile float nextDuration=0.8f*remaining; //23470C.
+                volatile float nextDuration=0.8f*remaining;   //23470C.
                 duration=nextDuration;
-                if(!std::isfinite(duration)||duration<=0.f)
-                    return stop(Result::Input,0x23470cu);
-                fade_.duration70=duration;     //234714.
+                if(!std::isfinite(retirement)||retirement<=0.f)return stop(Result::Input,0x2346e4u);
+                if(!std::isfinite(duration)||duration<=0.f)return stop(Result::Input,0x23470cu);
             }else{
                 volatile float next=0.25f+1.f; //234738.
                 retirement=next;
-                fade_.flag20=true;             //234748.
-                fade_.retirement6C=retirement; //23474C.
-                fade_.duration70=1.f;          //234760 delay slot.
             }
         }
-        //235060 reaches conversion only AFTER all preceding stream stores.
-        // Reuse this owner's existing native conversion/scheduling convention,
-        // not the staged beginRequestedMusicFade helper.
         volatile float milliseconds=1000.f*duration; //23509C.
         if(!std::isfinite(milliseconds)||milliseconds<0.f||milliseconds>1000.f)
             return stop(Result::Input,0x23509cu);
         const auto rounded=static_cast<std::int32_t>(std::nearbyint(milliseconds));
+        // Commit: 74 bit5, 6C, 70 (234574/578/58C, 2346FC/700/714 or
+        // 234748/74C/760) overwrite any earlier fade on this SAME playback;
+        // the held native gain and PCM cursor are kept (as 234550..58C).
+        fade_={};fade_.flag20=true;fade_.retirement6C=retirement;fade_.duration70=duration;
+        //235060 reaches conversion only AFTER all preceding stream stores.
         endingFade_=true;fadeCallPC_=0x1a4abcu;fadeRequestedSeconds_=1.f;
         fadePending_=true;nativeFade_.phase=NativeFadePhase50IW::Pending;
         ++counters_.fadeRequests;
         pendingVolume_={0x2350a8u,0x26c8f0u,0,0,rounded};
-        return done(resumeNativeFadeAdmission());
+        const auto admitted=resumeNativeFadeAdmission();
+        // Paused host mix: the 235060 request is issued and retained; the
+        // native envelope is admitted by the first unpaused update() (the mix
+        // clock it runs on does not advance while paused).
+        if(admitted.result==Result::Paused&&fadePending_)
+            return {Result::Updated,0x2350a8u,0x26c8f0u,1.f,NativeFadePhase50IW::Pending,false};
+        return admitted;
     }
-    // Sticky native failure custody; neither host reset nor an ordinary
-    // update may silently retry this private source invocation.
-    bool restartFadeAttempted_=false,restartFadeTerminal_=false;
-    UpdateReceipt50IW restartFadeReceipt_{};
     // Private Pause row9/10 bridge, independent of restart's1.0-second request.
     // Actual Aural26D070 already stopped playback on this SAME retained owner.
     void writePauseReturnFadePrefix1A4AB0()noexcept {
         state_.latch130=-1; //1A4AB4, unconditionally before transport admission.
         state_.mode12C=0;   //1A4AB8. timer128 is neither read nor changed.
     }
+    // One invocation per actual 1BD9F0/1BDB88 call. Original 234440 has no
+    // pause test (Pause is open when rows 9/10 run) and no fade-in-progress
+    // test: with the stream already stopped by 26D070 it takes the 234484
+    // absent-stream return whatever fade fields an earlier request left.
+    // Every refusal stores nothing past 130/12C and leaves the transport live.
     UpdateReceipt50IW requestPauseReturnStoppedFadeTail234440()noexcept {
-        if(pauseReturnFadeAttempted_)return pauseReturnFadeReceipt_;
-        pauseReturnFadeAttempted_=true;
         const auto finish=[this](Result result,std::uint32_t pc,std::uint32_t helper=0u){
-            pauseReturnFadeReceipt_={result,pc,helper,.5f,nativeFade_.phase,false};
-            return pauseReturnFadeReceipt_;
+            return UpdateReceipt50IW{result,pc,helper,.5f,nativeFade_.phase,false};
         };
-        // Every result, including pending/failed transport, is terminal for
-        // this private invocation. It never resumes or schedules an envelope.
-        if(restartFadeTerminal_)
-            return finish(restartFadeReceipt_.result,restartFadeReceipt_.sourcePC,restartFadeReceipt_.helperPC);
         if(!mixer_)return finish(Result::Unprepared,0x234440u);
-        if(paused_)return finish(Result::Paused,0x234440u);
+        // PORT: a backend-rejected start retained for retry has no original
+        // equivalent (the original stream started at once); refuse, unchanged.
         if(playPending_)return finish(Result::PendingPlay,pendingCallPC_,pendingPlayPC_);
-        if(fadePending_||nativeFade_.phase==NativeFadePhase50IW::Pending)
-            return finish(Result::PendingFade234440,0x234440u);
-        if(nativeFade_.phase!=NativeFadePhase50IW::Idle&&nativeFade_.phase!=NativeFadePhase50IW::Retired)
-            return finish(Result::BackendRejected,0x234440u);
         if(!transportIdentity()||!mixer_->sampleRate())return finish(Result::Ownership,0x234440u);
         rr::platform::AudioVoiceObservation50HD observed{};
         if(!mixer_->inspectVoice(voice,observed)||!observed.groupKnown)
@@ -313,14 +300,13 @@ class Owner final {
         // Explicit native equivalent of234484's absent-handle return, whose
         //234488 delay slot returns0. No guest5C=-1, logger, IOP call, fade
         // timer, gain, source clock, reset or completion poll is invented.
-        // In particular keep owned_, playbackRevision_, song and PCM intact.
+        // In particular keep owned_, playbackRevision_, song and PCM intact,
+        // and leave any earlier native fade custody to update()/reset().
         return finish(Result::Updated,0x234488u);
     }
-    bool pauseReturnFadeAttempted_=false;
-    UpdateReceipt50IW pauseReturnFadeReceipt_{};
     bool canStopResultsNative26D070(const rr::platform::AudioMixer50HD& mixer,
         const rr::platform::RaceAudioGroups50IC& groups)const noexcept {
-        if(restartFadeTerminal_||mixer_!=&mixer||groups_!=&groups||!transportIdentity()||playPending_||fadePending_||
+        if(mixer_!=&mixer||groups_!=&groups||!transportIdentity()||playPending_||fadePending_||
            nativeFade_.phase==NativeFadePhase50IW::Fading||
            nativeFade_.phase==NativeFadePhase50IW::SilentRetirement)return false;
         rr::platform::AudioVoiceObservation50HD observed;
@@ -407,7 +393,6 @@ public:
     Receipt request(std::uint32_t song,std::uint32_t argumentA2,
         std::uint32_t liveMode11258)noexcept {
         Receipt r;r.song=song;++counters_.requests;
-        if(restartFadeTerminal_)return rejected(r,restartFadeReceipt_.result);
         if(!mixer_)return rejected(r,Result::Unprepared);
         if(paused_)return rejected(r,Result::Paused);
         if(fadePending_)return rejected(r,fade_.flag20?Result::PendingTimedVolume26C8F0:Result::PendingFade234440);
@@ -468,7 +453,6 @@ public:
     // playback must not let the ending timer pretend this owner is silent.
     bool readEndingActivity(bool& active,bool& fading)const noexcept {
         active=false;fading=false;
-        if(restartFadeTerminal_)return false;
         if(!transportIdentity()||playPending_)return false;
         if(!owned_)return true;
         rr::platform::AudioVoiceObservation50HD observed{};
@@ -497,7 +481,6 @@ public:
         return {Result::Updated,0x234538u,0,0.f};
     }
     UpdateReceipt50IW requestFade1A4AB0(float seconds)noexcept {
-        if(restartFadeTerminal_)return restartFadeReceipt_;
         // 0 is the Results summary's 1A4AB0(0) (1C8F00 mtc1 zero): 234440
         // takes its 2344A0 seconds<=0 branch, an immediate stream stop.
         if(seconds==0.f)return requestImmediateStop234440();
@@ -543,7 +526,6 @@ public:
     // is an explicit native block-boundary policy, not original IOP parity.
     // Both fade and silent retirement use the existing mixed-frame clock.
     UpdateReceipt50IW update(float sourceSeconds) noexcept {
-        if(restartFadeTerminal_)return restartFadeReceipt_;
         if(fadePending_)return resumeNativeFadeAdmission();
         if(playPending_)return {Result::PendingPlay,pendingCallPC_,pendingPlayPC_,0.f};
         if(!mixer_)return {Result::Unprepared,0x1a4af0u,0,0.f};
@@ -603,7 +585,6 @@ public:
     // Call after a real shared-mixer committed step, also before event dispatch.
     // Completion follows actual source-frame consumption, not a guessed timer.
     bool pollCompletion()noexcept {
-        if(restartFadeTerminal_)return false;
         if(!transportIdentity()||fadePending_||playPending_)return false;
         const bool active=mixer_->active(voice);
         if(!owned_&&active)return false; // Another writer violated117 ownership.
@@ -620,12 +601,6 @@ public:
     void pause(bool value)noexcept{paused_=value;}
     // Host race reset/close. No cumulative audio clock or other voice changes.
     void reset()noexcept {
-        if(restartFadeTerminal_){
-            // Actual host teardown may stop this same voice, but cannot erase
-            // retained failed source fields or reopen native admission.
-            if(transportIdentity()&&owned_)mixer_->stop(voice);
-            return;
-        }
         if(transportIdentity()&&owned_)mixer_->stop(voice);
         owned_=false;currentSong_=0;state_={};paused_=false;fadePending_=false;playPending_=false;
         pendingSong_=0;pendingArgumentA2_=0;pendingPlayPC_=0;pendingCallPC_=0;
@@ -677,7 +652,6 @@ private:
         return ownedMusicIdentity(observed)&&observed.voice.active;
     }
     UpdateReceipt50IW pendingFadeReceipt()const noexcept {
-        if(restartFadeTerminal_)return restartFadeReceipt_;
         if(!transportIdentity())return {Result::Ownership,fadeCallPC_,0x234440u,fadeRequestedSeconds_};
         if(pendingVolume_.helperPC){
             if(!fadePlaybackIdentity())return {Result::Ownership,
@@ -688,7 +662,6 @@ private:
         return {Result::PendingFade234440,fadeCallPC_,0x234440u,fadeRequestedSeconds_};
     }
     UpdateReceipt50IW resumeNativeFadeAdmission()noexcept {
-        if(restartFadeTerminal_)return restartFadeReceipt_;
         if(timedVolumePolicy_!=TimedVolumePolicy50IW::NativeLinearSharedMix)return pendingFadeReceipt();
         if(paused_)return {Result::Paused,0x2350a8u,0x26c8f0u,fadeRequestedSeconds_,NativeFadePhase50IW::Pending,false};
         if(!pendingVolume_.helperPC||!fadePlaybackIdentity()||
@@ -723,7 +696,6 @@ private:
             fadeRequestedSeconds_,nativeFade_.phase,true};
     }
     Result advanceNativeFade()noexcept {
-        if(restartFadeTerminal_)return restartFadeReceipt_.result;
         if(nativeFade_.phase!=NativeFadePhase50IW::Fading&&
            nativeFade_.phase!=NativeFadePhase50IW::SilentRetirement)return Result::Updated;
         if(!transportIdentity()||!mixer_->sampleRate())return Result::Ownership;
@@ -760,7 +732,6 @@ private:
         return Result::Updated;
     }
     Receipt resumePlay(Receipt r) noexcept {
-        if(restartFadeTerminal_)return rejected(r,restartFadeReceipt_.result);
         r.sourcePlayPC=pendingPlayPC_;r.stoppedPrevious=pendingStoppedPrevious_;
         if(!transportIdentity())return rejected(r,Result::Ownership);
         const auto i=detail::index(pendingSong_);

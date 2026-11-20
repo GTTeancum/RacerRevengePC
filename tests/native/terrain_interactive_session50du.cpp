@@ -593,10 +593,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
   }
  };
- // B-C06: activation from launch data only, every course. The original builds
- // Pause100, Results104 and F8 for every race at race vtable+74 (1A8A40), so
- // the original Pause owner activates for every counted race (human or ALL8).
- const bool sourceConsumedPauseActivation=rootedCourseRace&&originalCameraEnabled;
+ // B-C06: activation from launch data only, every course. Pause100 is built for every race
+ // (1A8A40); a human race binds it through attachCountedRace (publication), and this flag is
+ // the ALL8 spectator binding only: the original branches on humans34 == 0 (the observation
+ // requires it), never on the course.
+ const bool sourceConsumedPauseActivation=rootedCourseRace&&originalCameraEnabled&&allAiEnabled;
  // Intro cuts are decided by 174EA8 from launch data: subtype 2 and 3 have no
  // cuts, subtype 1 has them only when P+34 == 2 (tournament) and App+350 == 0.
  // The cut count itself is the TOB's (World+3E4, 174E58), read by the camera

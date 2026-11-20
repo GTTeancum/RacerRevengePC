@@ -329,19 +329,10 @@ inline bool Owner::countedConfirm1BD8CC(rr::game::InputEvent48Z& event,rr::game:
         auto& race=*application_->sourceRace28COwner_;
         if((race.flags1B0KnownMask_&0x10u)&&(race.flags1B0KnownValue_&0x10u))
             race.flags1B0KnownValue_=std::uint8_t(race.flags1B0KnownValue_&~0x10u);
-        const auto* hooks=native_common_results50PD::state().raceStartHooks;
-        const common_race_start50CR::Request request{common_race_start50CR::Reason::restart,1u,
-            common_race_start50CR::callerPauseRestart1BD934,camera->actual_.launchKind11258};
-        common_race_start50CR::Receipt receipt;
-        if(hooks)out.restarted=application_->restartConsumedRace1AC8E0(race,request,*hooks,receipt);
-        else{
-            common_race_log50CR::RaceStart line;line.restart=true;line.a1=1;line.caller=request.caller;
-            line.ok=false;line.refusedPc=0x1AC8E0u;line.reason="race start hooks not bound (I3 publication)";
-            common_race_log50CR::raceStart(line);
-        }
+        // 1BD990 1AC8E0(race,1): run by the race loop on row==restart (the one caller, with the
+        // race-start hooks and the loop-state reset after it); the owner reports the row only.
         feedback();out.sourcePC=0x1BD9A8;
-        std::fprintf(stderr,"pause_row row=1 site=1BD990 restart=in_place ok=%d\n",int(out.restarted));
-        if(!out.restarted){out.refused=true;out.gate=10;}
+        std::fprintf(stderr,"pause_row row=1 site=1BD990 restart=in_place handed_to=race_loop%s", "\n");
         return true;
     }
     if(row==9u||row==10u){

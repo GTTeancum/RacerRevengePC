@@ -21,6 +21,7 @@
 #include <bit>
 #include <cfenv>
 #include <cmath>
+#include <cstdio>
 #include <exception>
 #include <limits>
 #include <optional>
@@ -63,8 +64,10 @@ struct OriginalRaceMusicManager50LA::Impl final {
     std::array<std::optional<std::uint32_t>,3> endContactSpeechOffsets{};
     std::array<std::uint32_t,128> endContactSpeechScratch{};
     std::array<bool,128> endContactSpeechScratchKnown{};
-    std::optional<race_music50IE::UpdateReceipt50IW> restartFadeReceipt;
-    std::optional<race_music50IE::UpdateReceipt50IW> pauseReturnFadeReceipt;
+    std::optional<race_music50IE::UpdateReceipt50IW> restartFadeReceipt; //Last 1AC960 invocation (diagnostic only).
+    std::array<char,192> restartFadeRefusal{}; //Text of the last 1AC960 refusal; lives as long as d.operation.
+    std::optional<race_music50IE::UpdateReceipt50IW> pauseReturnFadeReceipt; //Last row 9/10 invocation (diagnostic only).
+    std::array<char,192> pauseReturnFadeRefusal{};
     bool endQueueStopped=false;
     std::uint32_t endQueueStopPC=0x1a4cd4;
 
@@ -362,6 +365,21 @@ bool OriginalRaceMusicManager50LA::serviceNativeMenuAudio(
     // Fractional native output clock can consume zero frames for a short call.
     d.sourcePC=0x1a4440;return true;
 }
+namespace {
+const char* restartFadeResultName(race_music50IE::Result r)noexcept {
+    using R=race_music50IE::Result;
+    switch(r){
+    case R::Started:return "Started";case R::Suppressed:return "Suppressed";
+    case R::Unavailable:return "Unavailable";case R::Unprepared:return "Unprepared";
+    case R::Paused:return "Paused";case R::UnsupportedEvent:return "UnsupportedEvent";
+    case R::Input:return "Input";case R::Ownership:return "Ownership";
+    case R::BackendRejected:return "BackendRejected";case R::Refreshed:return "Refreshed";
+    case R::PendingFade234440:return "PendingFade234440";case R::PendingPlay:return "PendingPlay";
+    case R::Updated:return "Updated";case R::PendingTimedVolume26C8F0:return "PendingTimedVolume26C8F0";
+    }
+    return "unknown";
+}
+} // namespace
 bool OriginalRaceMusicManager50LA::restartNativeFade1AC960(
     const OriginalRaceConstructor50LA& race,const Impl::Registration& scope,
     OriginalRaceMusicManagerDiagnostic50LA& d)noexcept {
@@ -373,17 +391,21 @@ bool OriginalRaceMusicManager50LA::restartNativeFade1AC960(
        impl_->loadCut!=Impl::LoadCut::nativeReady||race.music10C_.get()!=this)
         return Impl::stop(d,0x1ac964,"Actual same-Race10C/native state owner unavailable");
     auto& p=*impl_;
-    if(p.restartFadeReceipt)
-        return Impl::stop(d,p.restartFadeReceipt->helperPC?p.restartFadeReceipt->helperPC:
-            p.restartFadeReceipt->sourcePC,"Restart music invocation already attempted; no replay");
+    // One 1A4AB0(race10C,1.0) per actual 1AC8E0 run: every restart (Results
+    // replay, Pause RESTART, Time Trial finish, Practice) invokes it afresh.
     //1AC958/95C constructs actual F12=1.0 before JAL1A4AB0. Source helper
     //writes130 then12C, leaving128 unchanged, before loading child164.
     p.music->writeRestartFadePrefix1A4AB0();
     p.restartFadeReceipt=p.music->requestRestartFadeTail234440();
     const auto& result=*p.restartFadeReceipt;
-    if(!result.completed())
-        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,
-            "Actual native234440 transport continuation stopped; source music prefix and reached fade effects retained");
+    if(!result.completed()){
+        // A refusal stores nothing past 130/12C and leaves the transport live.
+        std::snprintf(p.restartFadeRefusal.data(),p.restartFadeRefusal.size(),
+            "1AC960 234440 restart fade refused: result=%u(%s) source_pc=%X helper_pc=%X; transport unchanged",
+            static_cast<unsigned>(result.result),restartFadeResultName(result.result),
+            static_cast<unsigned>(result.sourcePC),static_cast<unsigned>(result.helperPC));
+        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,p.restartFadeRefusal.data());
+    }
     d.sourcePC=0x1ac968;return true; //Native transport adaptation, not guest IOP/logging completion.
 }
 bool OriginalRaceMusicManager50LA::pauseReturnNativeFade1A4AB0(
@@ -400,24 +422,28 @@ bool OriginalRaceMusicManager50LA::pauseReturnNativeFade1A4AB0(
        scope.race_.lock().get()!=&race||race.music10C_.get()!=this)
         return Impl::stop(d,caller+4u,"Actual Pause same-Race10C/native state owner unavailable");
     auto& p=*impl_;
-    if(p.pauseReturnFadeReceipt)
-        return Impl::stop(d,p.pauseReturnFadeReceipt->helperPC?p.pauseReturnFadeReceipt->helperPC:
-            p.pauseReturnFadeReceipt->sourcePC,"Pause return music invocation already attempted; no replay");
+    // One 1A4AB0(race10C,.5) per actual row 9/10 call; no one-shot custody.
     //1BD9E4/E8 or1BDB7C/80 supplies F12=.5 at the actual call.1A4AB4 writes130=-1,
     //1A4AB8 writes12C=0, then1A4ABC/C0 tail-calls234440 on child164.
-    // Neither128 nor restart's independent one-time custody is touched.
+    // 128 and the restart fade are not touched.
     p.music->writePauseReturnFadePrefix1A4AB0();
-    p.pauseReturnFadeReceipt=race_music50IE::UpdateReceipt50IW{
-        race_music50IE::Result::Ownership,0x1a4ac0u,0x234440u,.5f,p.music->nativeFade_.phase,false};
-    // Even backend failure is terminal for this invocation, with both source
-    // stores retained. Do not preflight it before130/12C or repair/retry it.
-    if(!nativeBackendCurrent(scope)||!p.aural->backendCurrent())
-        return Impl::stop(d,0x234440,"Actual Pause native backend unavailable; source130/12C retained");
+    // Backend check follows the unconditional 130/12C stores (never preflighted);
+    // a refusal leaves the transport as it was.
+    if(!nativeBackendCurrent(scope)||!p.aural->backendCurrent()){
+        p.pauseReturnFadeReceipt=race_music50IE::UpdateReceipt50IW{
+            race_music50IE::Result::Ownership,0x1a4ac0u,0x234440u,.5f,p.music->nativeFade_.phase,false};
+        return Impl::stop(d,0x234440,"1A4AB0(.5) Pause return refused: result=7(Ownership) source_pc=1A4AC0 helper_pc=234440 "
+            "(native music backend unavailable); 130/12C stored, transport unchanged");
+    }
     p.pauseReturnFadeReceipt=p.music->requestPauseReturnStoppedFadeTail234440();
     const auto& result=*p.pauseReturnFadeReceipt;
-    if(!result.completed())
-        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,
-            "Actual Pause stopped music continuation rejected; source prefix and native ownership retained");
+    if(!result.completed()){
+        std::snprintf(p.pauseReturnFadeRefusal.data(),p.pauseReturnFadeRefusal.size(),
+            "1A4AB0(.5) Pause return 234440 refused: result=%u(%s) source_pc=%X helper_pc=%X; transport unchanged",
+            static_cast<unsigned>(result.result),restartFadeResultName(result.result),
+            static_cast<unsigned>(result.sourcePC),static_cast<unsigned>(result.helperPC));
+        return Impl::stop(d,result.helperPC?result.helperPC:result.sourcePC,p.pauseReturnFadeRefusal.data());
+    }
     d.sourcePC=caller+8u;return true; //Native stopped-stream adapter, not original IOP/logging completion.
 }
 bool OriginalRaceMusicManager50LA::advanceNativeListenerConsumedStep(

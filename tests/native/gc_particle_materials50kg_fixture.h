@@ -3,6 +3,7 @@
 #include "../../src/assets/original_gc_particle_material50kg.h"
 #include "../../platform/linux/native/material_texture_gl50eb.h"
 #include <memory>
+#include <iostream>
 
 namespace gc_particle_materials50kg_fixture {
 namespace a=rr::assets;
@@ -51,10 +52,15 @@ public:
             using shared::need;
             need(!storage_,"GC particle material already loaded");
             need(a::authenticOriginalGcParticlePsm50KG(psm),"GC original demoprt.psm identity differs");
-            need(a::authenticOriginalGcParticlePst50KG(pst),"GC original demoprt.pst identity differs");
+            // The atlas pixels (PST) are each course's own data: the stock GC identity is a
+            // receipt, not a gate (TA authors its own demoprt.pst). The PSM stays authenticated:
+            // it is the one ParticleCode material every stock course shares.
+            std::cerr<<"common_track_data role=particles.atlas_pst receipt="
+                <<(a::authenticOriginalGcParticlePst50KG(pst)?"match":"differs")<<" value="<<pst.size()<<std::endl;
+            need(pst.size()>=16&&pst.size()<=8u*1024u*1024u,"track particle atlas PST extent");
             auto next=std::make_unique<Storage>();
             a::TextureLimits48E limits;
-            limits.input_bytes=a::originalGcParticlePst50KG().bytes;
+            limits.input_bytes=pst.size();
             limits.decoded_bytes=2u*rgbaBytes+16u;
             need(a::decodeTexture48E(pst,next->sourceTexture,d.source,nullptr,limits),
                 "GC original demoprt PST decode");
@@ -70,7 +76,7 @@ public:
             const auto* published=next->bank.texture(0);
             need(published&&published->identity==textureIdentity&&published->texture.width==128&&
                 published->texture.height==1024&&published->texture.rgba==next->sourceTexture.mips[0].rgba,
-                "GC bank must preserve the exact authenticated source decode");
+                "track particle atlas must decode to the 128x1024 ParticleCode atlas (renderer UV frame)");
             storage_=std::move(next);return true;
         }catch(const std::exception& e){try{d.message=e.what();}catch(...){}return false;}
         catch(...){try{d.message="GC particle cold source failure";}catch(...){}return false;}
