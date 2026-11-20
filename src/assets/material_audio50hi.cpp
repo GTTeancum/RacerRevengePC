@@ -13,94 +13,8 @@ const std::string& field(const ParameterBlock48F&b,const char*name){const auto* 
 const ParameterBlock48F* optionalBlock(const ParameterDocument48F&p,const std::string&name){for(const auto&b:p.blocks)if(b.name==name)return &b;return nullptr;}
 int number(const std::string&s){int v=0;const auto r=std::from_chars(s.data(),s.data()+s.size(),v);need(r.ec==std::errc{}&&r.ptr==s.data()+s.size(),"50HI invalid integer authoring");return v;}
 std::string filename(const ParameterBlock48F&b){auto n=field(b,"soundresourcefile");need(!n.empty()&&n.size()<200&&n.find('.')==std::string::npos,"50HI invalid sound resource name");for(auto&c:n){need((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='\\'||c=='/',"50HI invalid sound resource path");if(c=='\\')c='/';}need(n.rfind("sfx/race/",0)==0&&n.find("//")==std::string::npos,"50HI unexpected resource family");return n+".vag";}
-std::uint32_t rotateRight50HI(std::uint32_t x, unsigned n) noexcept {
-    return (x >> n) | (x << (32u - n));
-}
-// Standard SHA-256, fixed stack workspace; no member-sized temporary copies.
-// Constants are the SHA-256 constants also retained in audio_assets50hc.cpp.
-void shaBlock50HI(const std::uint8_t* block, std::array<std::uint32_t, 8>& h) noexcept {
-    constexpr std::uint32_t k[64] = {
-        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-    };
-    std::uint32_t w[64]{};
-    for (unsigned i = 0; i < 16; ++i)
-        for (unsigned j = 0; j < 4; ++j) w[i] = (w[i] << 8) | block[i * 4 + j];
-    for (unsigned i = 16; i < 64; ++i) {
-        const auto s0 = rotateRight50HI(w[i-15],7) ^ rotateRight50HI(w[i-15],18) ^ (w[i-15] >> 3);
-        const auto s1 = rotateRight50HI(w[i-2],17) ^ rotateRight50HI(w[i-2],19) ^ (w[i-2] >> 10);
-        w[i] = w[i-16] + s0 + w[i-7] + s1;
-    }
-    auto a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], v=h[7];
-    for (unsigned i = 0; i < 64; ++i) {
-        const auto s1 = rotateRight50HI(e,6) ^ rotateRight50HI(e,11) ^ rotateRight50HI(e,25);
-        const auto ch = (e & f) ^ (~e & g);
-        const auto t1 = v + s1 + ch + k[i] + w[i];
-        const auto s0 = rotateRight50HI(a,2) ^ rotateRight50HI(a,13) ^ rotateRight50HI(a,22);
-        const auto maj = (a & b) ^ (a & c) ^ (b & c);
-        const auto t2 = s0 + maj;
-        v=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
-    }
-    h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
-}
-bool hashMatches50HI(const std::uint8_t* data, std::size_t size,
-    const char* expected) noexcept {
-    std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
-        0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
-    std::size_t at = 0;
-    for (; size - at >= 64; at += 64) {
-        shaBlock50HI(data + at, h);
-    }
-    std::array<std::uint8_t, 128> tail{};
-    const std::size_t remainder = size - at;
-    if (remainder) std::memcpy(tail.data(), data + at, remainder);
-    tail[remainder] = 0x80;
-    const std::size_t padded = remainder < 56 ? 64 : 128;
-    const std::uint64_t bits = static_cast<std::uint64_t>(size) * 8u;
-    for (unsigned i = 0; i < 8; ++i)
-        tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
-    shaBlock50HI(tail.data(), h);
-    if (padded == 128) shaBlock50HI(tail.data() + 64, h);
-    constexpr char hex[] = "0123456789abcdef";
-    for (unsigned i = 0; i < 64; ++i)
-        if (expected[i] != hex[(h[i / 8] >> ((7u - i % 8) * 4)) & 15u])
-            return false;
-    return true;
-}
-enum class CatalogShape50HI { legacy, authenticatedMb, authenticatedTc, authenticatedTb, authenticatedMc };
-// One reader for every course AUB (the original 279B60/279E50 read whatever
-// AUB the course archive holds). The per-course stock shapes below are
-// RECEIPTS (logged when the data differs), never admission gates; the
-// admission bounds are the native stores (maxMaterialAudioRows50HI /
-// maxMaterialDriveRows50HI rows, one material byte).
-void receipt50HI(CatalogShape50HI shape,const char* what,std::size_t actual,std::size_t stock){
-    if(actual==stock)return;
-    const char* code=shape==CatalogShape50HI::authenticatedMb?"MB":shape==CatalogShape50HI::authenticatedTc?"TC":
-        shape==CatalogShape50HI::authenticatedTb?"TB":shape==CatalogShape50HI::authenticatedMc?"MC":"legacy";
-    std::cerr<<"course_count site=material_audio_catalog_"<<code<<" "<<what<<"="<<actual<<" stock="<<stock<<"\n";
-}
-bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error,CatalogShape50HI shape){
+bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error){
     try{
-        // Stock AUB identities: receipts (the provider logs the member receipt).
-        const bool mc=shape==CatalogShape50HI::authenticatedMc;
-        const bool tb=shape==CatalogShape50HI::authenticatedTb;
-        const bool mb=shape==CatalogShape50HI::authenticatedMb;
-        const bool tc=shape==CatalogShape50HI::authenticatedTc;
-        const bool stockAub=(mc&&aub.size()==50722u&&hashMatches50HI(aub.data(),aub.size(),
-            "bbb238196c131979092c7a5cc5066fdfc131156ecb6ec632786279786f779554"))||
-            (tb&&aub.size()==50826u&&hashMatches50HI(aub.data(),aub.size(),
-            "00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19"))||
-            (tc&&aub.size()==44646u&&hashMatches50HI(aub.data(),aub.size(),
-            "a4e331f8ac8a4849e717f6a37588304b1642129b8b690b39d7b818449eab838d"))||
-            (mb&&aub.size()==57210u&&hashMatches50HI(aub.data(),aub.size(),
-            "669a20fc6275a7463a1a4a8f529b41ef45ce971f8f4d49b8631f5279699a0d89"));
-        if((mc||tb||tc||mb)&&!stockAub)receipt50HI(shape,"stock_aub",0,1);
         ParameterDocument48F p;DecodeError48C d;WorldLimits48F limits{};limits.retainDuplicateLabels=true;need(decodeParameters48F(aub,p,d,nullptr,limits),"50HI AUB parameter decode failed");
         const auto&s=block(p,"sounds");const int rows=number(field(s,"nummaterialcollisionsounds"));
         const int driveRows=number(field(s,"nummaterialdriveonsounds"));
@@ -108,20 +22,13 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
         need(rows>=1&&static_cast<std::size_t>(rows)<=rr::game::maxMaterialAudioRows50HI&&
             driveRows>=1&&static_cast<std::size_t>(driveRows)<=rr::game::maxMaterialDriveRows50HI,
             "50HI material row counts outside the native sound stores");
-        if(mc){receipt50HI(shape,"collision_rows",rows,12);receipt50HI(shape,"drive_rows",driveRows,8);}
-        if(tb){receipt50HI(shape,"collision_rows",rows,24);receipt50HI(shape,"drive_rows",driveRows,20);}
-        if(tc){receipt50HI(shape,"collision_rows",rows,16);receipt50HI(shape,"drive_rows",driveRows,12);}
-        if(mb){receipt50HI(shape,"collision_rows",rows,20);receipt50HI(shape,"drive_rows",driveRows,12);}
         MaterialAudioCatalog50HI next;std::vector<AudioRequest50HC> unique;
         next.parameters.rowCount=static_cast<std::uint32_t>(rows);
         next.parameters.driveRowCount=static_cast<std::uint32_t>(driveRows);
         const int materials=number(field(s,"nummaterials"));need(materials>=0&&materials<=255,"50HI material assignment count outside one material byte");
-        if(mc||tb||tc)receipt50HI(shape,"materials",materials,5);
-        if(mb)receipt50HI(shape,"materials",materials,3);
         next.materialCount=static_cast<std::uint32_t>(materials);
         const auto* defaultText=optionalField(s,"defaultmaterial");const int fallback=defaultText?number(*defaultText):0;
         need(fallback>=0&&fallback<=255,"50HI invalid default material byte");next.defaultMaterial=static_cast<std::uint32_t>(fallback);
-        if(mb||tc||mc||tb)receipt50HI(shape,"default_material",fallback,1);
         //271674..271804: increasing material order; missing list means0.
         //2717E4 is STRICT less-than. Preserve this source off-by-one behavior.
         for(int material=1;material<=materials;++material){
@@ -171,43 +78,13 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
             if(i<static_cast<unsigned>(rows))add(next.collision[i],false);
             if(i<static_cast<unsigned>(driveRows))add(next.drive[i],true);
         }
-        // Stock traversal shapes: receipts. The section keys above were
-        // resolved from the AUB itself (157D00 keeps the prior section).
-        const auto sectionsInOrder=[&](){std::size_t n=0;
-            for(std::uint32_t i=0;i<static_cast<std::uint32_t>(rows);++i)if(next.collisionSectionKeys[i]!=i+1u)++n;
-            for(std::uint32_t i=0;i<static_cast<std::uint32_t>(driveRows);++i)if(next.driveSectionKeys[i]!=i+1u)++n;
-            return n;};
-        if(mb){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),29);receipt50HI(shape,"unique_clips",unique.size(),25);
-            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
-        if(tc){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),8);receipt50HI(shape,"unique_clips",unique.size(),21);
-            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
-        if(tb){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),54);receipt50HI(shape,"unique_clips",unique.size(),33);
-            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
-        if(mc){receipt50HI(shape,"object_materials",next.orderedObjectMaterials.size(),3);receipt50HI(shape,"unique_clips",unique.size(),15);
-            receipt50HI(shape,"reread_sections",sectionsInOrder(),0);}
         out=std::move(next);requests=std::move(unique);error.clear();return true;
     }catch(const std::exception&e){error=e.what();return false;}
 }
 } // namespace
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
-    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::legacy);
-}
-bool readMbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
-    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
-    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedMb);
-}
-bool readTcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
-    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
-    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedTc);
-}
-bool readTbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
-    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
-    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedTb);
-}
-bool readMcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
-    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
-    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedMc);
+    return readCatalog50HI(aub,out,requests,error);
 }
 bool applyTrackMaterialAssignments50HI(const MaterialAudioCatalog50HI& catalog,const World48F& world,
     std::uint32_t zone,std::uint32_t ordinal,rr::game::ContactMaterial50HI& value,std::string& error){

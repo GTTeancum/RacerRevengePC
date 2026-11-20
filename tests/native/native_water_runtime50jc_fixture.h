@@ -14,7 +14,8 @@
 #include <utility>
 #include <vector>
 
-// One canonical native water object for the entire selected GC session. This
+// One canonical native water object per race, for every course whose SCB names
+// water (A9; created by the common 05.10 step, Track::roles.water). This
 // owner performs construction, time/wave commits, ordered force writes and
 // signed-lattice commits. It is deliberately NOT copied into a racer bank.
 // Construction alone does not authorize a vehicle334 attachment or declare
@@ -123,7 +124,7 @@ public:
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
     // Application must outlive this Owner. Cold-only allocation at this
     // owner's final address. Resources must be
-    // the same authenticated GC WTT/PST/TGA owner retained by ColdScene.
+    // the course WTT/PST/TGA resources owner (Track::roles.waterResources).
     // The force/kernel constants below are original ELF initializers, not
     // observed values from a selected GC snapshot or caller-tuned substitutes.
     void initialize(Application& application,std::shared_ptr<const water_resources50JC::Owner> resources,
@@ -132,7 +133,7 @@ public:
            !resources->authored.bound||resources->authored.general.poolCount!=0||
            resources->signatures.size()!=static_cast<std::size_t>(resources->authored.general.signatureCount)||
            resources->signatures.size()>queries_.size())
-            throw std::runtime_error("native water requires one authenticated cold GC resource owner and explicit one-view policy");
+            throw std::runtime_error("native water requires one cold course water resource owner and explicit one-view policy");
         if(std::fegetround()!=FE_TONEAREST)
             throw std::runtime_error("native water cold arithmetic rounding differs");
         water_height_detail50jc::Math math;
