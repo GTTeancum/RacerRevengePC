@@ -1,6 +1,14 @@
 #pragma once
+// W0 common rewrite: the one track, world, stage, lap, roster, start and end owners.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "original_consumed_stage50du.h"
+#include "common_lap50cr.h"
+#include "common_roster50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
 #include "terrain_interactive_loop_providers50du.h"
-namespace ga_trigger_actions { class Owner; }
 
 namespace interactive_loop50DU {
 namespace platform=rr::platform;
@@ -12,6 +20,18 @@ using J=nlohmann::json;
 // Synchronous, non-owning view of the existing runSession locals. It neither
 // copies state nor owns resources; each reference/callback outlives this view.
 struct Context final {
+    // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
+    using trackType = const common_track50CR::Track;
+    trackType& track;
+    // W0 common rewrite: one lap tracker (common_lap50cr.h)
+    using lapsType = common_lap50CR::Tracker;
+    lapsType& laps;
+    // W0 common rewrite: one race start 1A6AA0/1AC8E0 (common_race_start50cr.h)
+    using raceStartType = common_race_start50CR::Owner;
+    raceStartType& raceStart;
+    // W0 common rewrite: one end dispatch 1A7DD0 and departure (common_race_end50cr.h)
+    using raceEndType = common_race_end50CR::Owner;
+    raceEndType& raceEnd;
     using originalUiActiveType = bool;
     originalUiActiveType& originalUiActive;
     using courseRaceLaunchedType = bool;
@@ -79,8 +99,8 @@ struct Context final {
     discardedHostNsType& discardedHostNs;
     using courseTargetsType = original_course_targets50KX::Catalog;
     courseTargetsType& courseTargets;
-    using courseRaceColdType = const bool;
-    courseRaceColdType& courseRaceCold;
+    using rootedCourseRaceType = const bool;
+    rootedCourseRaceType& rootedCourseRace;
     using courseColdLoadType = original_course_targets50KX::ColdLoadRequest;
     courseColdLoadType& courseColdLoad;
     using sessionIndexType = std::uint64_t;
@@ -164,18 +184,12 @@ struct Context final {
     sourceFadeInType& sourceFadeIn;
     using sourceFadeOutType = std::unique_ptr<rr::platform::OriginalVideoBlockingNativeBackend>;
     sourceFadeOutType& sourceFadeOut;
-    using suspendedTaCameraFrameType = std::optional<std::uint64_t>;
-    suspendedTaCameraFrameType& suspendedTaCameraFrame;
+    using suspendedCameraFrameType = std::optional<std::uint64_t>;
+    suspendedCameraFrameType& suspendedCameraFrame;
     using originalCameraEnabledType = const bool;
     originalCameraEnabledType& originalCameraEnabled;
-    using isGaTrackType = const bool;
-    isGaTrackType& isGaTrack;
-    using restartRequestedType = bool;
-    restartRequestedType& restartRequested;
     using returnOriginalMainRequestedType = bool;
     returnOriginalMainRequestedType& returnOriginalMainRequested;
-    using resultsUiType = rr::platform::HostRaceResults50IL;
-    resultsUiType& resultsUi;
     using humanResultsReadyType = bool;
     humanResultsReadyType& humanResultsReady;
     using humanResultsActiveType = bool;
@@ -198,20 +212,6 @@ struct Context final {
     selectedTrackType& selectedTrack;
     using raceEnabledType = const bool;
     raceEnabledType& raceEnabled;
-    using isMbTrackType = const bool;
-    isMbTrackType& isMbTrack;
-    using isTcTrackType = const bool;
-    isTcTrackType& isTcTrack;
-    using isRcTrackType = const bool;
-    isRcTrackType& isRcTrack;
-    using isTbTrackType = const bool;
-    isTbTrackType& isTbTrack;
-    using isGbTrackType = const bool;
-    isGbTrackType& isGbTrack;
-    using isMcTrackType = const bool;
-    isMcTrackType& isMcTrack;
-    using navigationMapType = const rr::game::TrackNavigation50EU*;
-    navigationMapType& navigationMap;
     using navigationProgressType = rr::game::TrackNavigationProgress50EU;
     navigationProgressType& navigationProgress;
     using xType = runtime_startup50fl::Fixture;
@@ -252,33 +252,22 @@ struct Context final {
     stepNsType& stepNs;
     using originalAiEnabledType = const bool;
     originalAiEnabledType& originalAiEnabled;
-    using legacyRaceType = race_session50HM::Session;
-    legacyRaceType& legacyRace;
-    using mbRaceType = race_session50HM::MbSession;
-    mbRaceType& mbRace;
-    using tcRaceType = race_session50HM::TcSession;
-    tcRaceType& tcRace;
-    using gbRaceType = race_session50HM::GbSession;
-    gbRaceType& gbRace;
-    using mcRaceType = race_session50HM::McSession;
-    mcRaceType& mcRace;
-    using tbRaceType = race_session50HM::TbSession;
-    tbRaceType& tbRace;
+    using raceSessionType = race_session50HM::CourseSession;
+    raceSessionType& raceSession;
     BorrowedCall<void()> commitCompletedTournament;
     BorrowedCall<bool()> trackBaselineEligible;
     BorrowedCall<void() noexcept> discardTrackBaseline;
     BorrowedCall<void()> captureCommitted;
     BorrowedCall<void(const char*)> reportUiState;
     BorrowedCall<void()> stopFeedbackTransport;
-    BorrowedCall<bool()> finishTaRoot;
-    BorrowedCall<bool()> finishTaRootWithResults;
-    BorrowedCall<bool()> beginTaRoot;
+    BorrowedCall<bool()> finishRaceRoot;
+    BorrowedCall<bool()> finishRaceRootWithResults;
+    BorrowedCall<bool()> beginRaceRoot;
     BorrowedCall<void()> publishSourceCameraFog;
-    BorrowedCall<void()> requireMbRuntimeNavigation50MB;
+    BorrowedCall<void()> requireRuntimeNavigation;
     BorrowedCall<void()> advanceWorldAnimations;
-    BorrowedCall<void()> advanceNativeGcWater;
-    BorrowedCall<void()> advanceRcTrackParticles;
-    BorrowedCall<void()> advanceTbTrackParticles;
+    BorrowedCall<void()> advanceWater;
+    BorrowedCall<void()> advanceTrackParticles;
     BorrowedCall<bool()> refreshAnimatedCandidates;
     BorrowedCall<void(std::uint64_t,bool)> advanceSourceAudioWorld;
     BorrowedCall<void()> updateOpponentAudio;
@@ -325,14 +314,12 @@ struct Context final {
     pendingSpeechType& pendingSpeech;
     using originalManualResetGraphicsDueType = std::uint64_t;
     originalManualResetGraphicsDueType& originalManualResetGraphicsDue;
-    using gcGraphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
-    gcGraphicsSequenceType& gcGraphicsSequence;
+    using graphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
+    graphicsSequenceType& graphicsSequence;
     using nativeSelectedLightsType = const bool;
     nativeSelectedLightsType& nativeSelectedLights;
-    using gcLightOwnerType = rr::game::original_gc_gameplay_lighting_candidate::Owner;
-    gcLightOwnerType& gcLightOwner;
-    using gcLightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
-    gcLightDiagnosticType& gcLightDiagnostic;
+    using lightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
+    lightDiagnosticType& lightDiagnostic;
     using mType = rr::game::MainBodyState49K;
     mType& m;
     using raceRacerCountType = const std::uint32_t;
@@ -395,8 +382,8 @@ struct Context final {
     nativeModelDomainType& nativeModelDomain;
     using nativeLightingPolicyType = const rr::game::original_gc_gameplay_lighting_candidate::CachePolicy;
     nativeLightingPolicyType& nativeLightingPolicy;
-    using gcDrawLightsType = std::array<rr::game::NativeGcSelectedLightsCandidate,rr::game::defaultHostRaceRacers50HT>;
-    gcDrawLightsType& gcDrawLights;
+    using drawLightsType = std::array<rr::game::NativeGcSelectedLightsCandidate,rr::game::defaultHostRaceRacers50HT>;
+    drawLightsType& drawLights;
     using racerVisualsType = std::array<std::unique_ptr<native_racer50HW::Visual>,8>;
     racerVisualsType& racerVisuals;
     using nativeLeftModelsType = std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>;
@@ -435,26 +422,18 @@ struct Context final {
     BorrowedCall<void(std::size_t)> projectDynamicActorsForSlot;
     BorrowedCall<bool(std::size_t,interactive_frame50DU::Part,float,float)> advanceFramePart;
     BorrowedCall<void(const original_all8_frame::Schedule&,std::size_t)> captureDynamicBeforeScheduledPhysics;
-    using isRaTrackType = const bool;
-    isRaTrackType& isRaTrack;
-    using raWorldType = std::shared_ptr<ra_cold_aggregate50LA::Owner>;
-    raWorldType& raWorld;
-    using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;
-    gbQueryBindingType& gbQueryBinding;
     using audioListenerType = rr::game::SpeechPosition50HG;
     audioListenerType& audioListener;
     using audioListenerReadyType = bool;
     audioListenerReadyType& audioListenerReady;
     using boostStateType = rr::game::BoostState50FK;
     boostStateType& boostState;
-    BorrowedCall<std::uint32_t()> selectedMapCount50MB;
-    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNode50MB;
+    BorrowedCall<std::uint32_t()> selectedMapCount;
+    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNode;
     using baseTailType = rr::game::BaseTailState50X;
     baseTailType& baseTail;
     using coldFlameType = rr::assets::PodFlameOwners50W;
     coldFlameType& coldFlame;
-    using nativeGcWaterType = std::unique_ptr<native_gc_water_session50KG::Owner>;
-    nativeGcWaterType& nativeGcWater;
     using sourceBlurType = rr::game::GameplayBlurPending;
     sourceBlurType& sourceBlur;
     using racerCablesType = std::array<std::unique_ptr<native_racer50HW::Cables>,8>;
@@ -463,12 +442,8 @@ struct Context final {
     mainContactFramesType& mainContactFrames;
     using secondaryContactFramesType = std::uint64_t;
     secondaryContactFramesType& secondaryContactFrames;
-    using mcWaterOwnerType = std::shared_ptr<mc_water50MC::Owner>;
-    mcWaterOwnerType& mcWaterOwner;
     using playerRacer60Type = const std::uint32_t;
     playerRacer60Type& playerRacer60;
-    using gcTriggerActionsType = std::unique_ptr<gc_trigger_actions50KG::Owner>;
-    gcTriggerActionsType& gcTriggerActions;
     using terrainOwnerCountType = const std::size_t;
     terrainOwnerCountType& terrainOwnerCount;
     using terrainQueriesType = std::uint64_t;
@@ -543,14 +518,6 @@ struct Context final {
     gameplayBinderType& gameplayBinder;
     using racerHudNamesType = std::array<std::array<char,rr::platform::maxVehicleWindowRacerName50DS+1>,rr::game::defaultHostRaceRacers50HT>;
     racerHudNamesType& racerHudNames;
-    using isScTrackType = const bool;
-    isScTrackType& isScTrack;
-    using scZeroSkyType = sc_zero_sky50KX::Owner;
-    scZeroSkyType& scZeroSky;
-    using raSkyType = const sky50gw_fixture::Owner*;
-    raSkyType& raSky;
-    using mcSkyOwnerType = std::unique_ptr<mc_sky50MC::Owner>;
-    mcSkyOwnerType& mcSkyOwner;
     using skyOwnerType = std::unique_ptr<sky50gw_fixture::Owner>;
     skyOwnerType& skyOwner;
     using playerFlameUvsType = std::vector<platform::VehicleWindowMaterialUv50DS>;
@@ -581,38 +548,14 @@ struct Context final {
     sourcePositionStatsHudType& sourcePositionStatsHud;
     using sourcePositionStatsResourcesType = original_main_entry50KG::PositionStatsResourceResult50LA;
     sourcePositionStatsResourcesType& sourcePositionStatsResources;
-    using gcParticleRenderType = OriginalGcParticleRenderOwner50KG;
-    gcParticleRenderType& gcParticleRender;
+    using particleRenderType = OriginalGcParticleRenderOwner50KG;
+    particleRenderType& particleRender;
     using trackAnimationsType = std::shared_ptr<track_animation_runtime50AN::Owner>;
     trackAnimationsType& trackAnimations;
     using trackAnimationBindingType = std::unique_ptr<track_animation_binding50AN::Binding>;
     trackAnimationBindingType& trackAnimationBinding;
-    using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;  // the common trigger chain
-    gaTriggerActionsType& gaTriggerActions;
     using trackAnimationWindowType = track_animation_window50AN::Owner;
     trackAnimationWindowType& trackAnimationWindow;
-    using gcAtmType = gc_atm_window_fixture::Owner;
-    gcAtmType& gcAtm;
-    using gaAtmType = ga_atm_window_fixture::Owner;
-    gaAtmType& gaAtm;
-    using maCommonRouteAtmType = ma_sa_atm_window_fixture::Owner;
-    maCommonRouteAtmType& maCommonRouteAtm;
-    using mbAtmType = mb_atm_window_fixture::Owner;
-    mbAtmType& mbAtm;
-    using scAtmType = sc_atm_window_fixture::Owner;
-    scAtmType& scAtm;
-    using tbAtmType = tb_atm_window_fixture::Owner;
-    tbAtmType& tbAtm;
-    using mcAtmType = mc_atm_window_fixture::Owner;
-    mcAtmType& mcAtm;
-    using gbAtmType = gb_atm_window_fixture::Owner;
-    gbAtmType& gbAtm;
-    using rcAtmType = rc_atm_window_fixture::Owner;
-    rcAtmType& rcAtm;
-    using tcAtmType = tc_atm_window_fixture::Owner;
-    tcAtmType& tcAtm;
-    using maOrCommonRouteTrackType = const bool;
-    maOrCommonRouteTrackType& maOrCommonRouteTrack;
     using sourceSkySelectionType = original_track_sky50KX::Owner;
     sourceSkySelectionType& sourceSkySelection;
     using opponentFlamePreparedType = bool[maxHostRaceOpponents50HT];
@@ -629,26 +572,6 @@ struct Context final {
     sourceApplicationClockType& sourceApplicationClock;
     using trackUvAnimationType = track_uv_animation50uv_fixture::Owner;
     trackUvAnimationType& trackUvAnimation;
-    using mcParticleWindowType = std::shared_ptr<mc_particle_visual50MC::Window>;
-    mcParticleWindowType& mcParticleWindow;
-    using mcParticleRenderType = std::shared_ptr<mc_particle_render50MC::Owner>;
-    mcParticleRenderType& mcParticleRender;
-    using mcParticleRenderDiagnosticType = mc_particle_render50MC::Diagnostic;
-    mcParticleRenderDiagnosticType& mcParticleRenderDiagnostic;
-    using mcParticleFrame152NoticeType = bool;
-    mcParticleFrame152NoticeType& mcParticleFrame152Notice;
-    using gbParticleWindowType = std::shared_ptr<gb_particle_visual50GB::Window>;
-    gbParticleWindowType& gbParticleWindow;
-    using gbParticleRenderType = std::shared_ptr<gb_particle_render50GB::Owner>;
-    gbParticleRenderType& gbParticleRender;
-    using gbParticleRenderDiagnosticType = gb_particle_render50GB::Diagnostic;
-    gbParticleRenderDiagnosticType& gbParticleRenderDiagnostic;
-    using rcParticleWindowType = std::shared_ptr<rc_particle_visual50RC::Window>;
-    rcParticleWindowType& rcParticleWindow;
-    using rcParticleRenderType = std::shared_ptr<rc_particle_render50RC::Owner>;
-    rcParticleRenderType& rcParticleRender;
-    using rcParticleRenderDiagnosticType = rc_particle_render50RC::Diagnostic;
-    rcParticleRenderDiagnosticType& rcParticleRenderDiagnostic;
     using sourceRaceHudRejectionReportedType = bool;
     sourceRaceHudRejectionReportedType& sourceRaceHudRejectionReported;
     using acceptedRacePresentationType = RacePresentation50HZ;
@@ -691,8 +614,6 @@ struct Context final {
     BorrowedCall<void(const char*)> reportOriginalAiFleet;
     using trackAnimationStepsType = std::uint64_t;
     trackAnimationStepsType& trackAnimationSteps;
-    using gcNativeGateType = const bool;
-    gcNativeGateType& gcNativeGate;
     using boostButtonCodeType = const std::uint32_t;
     boostButtonCodeType& boostButtonCode;
     using powerslideButtonCodeType = const std::uint32_t;
@@ -703,7 +624,7 @@ struct Context final {
     courseDiagnosticType& courseDiagnostic;
     using courseOutputType = rr::host::CourseDriverOutput50GK;
     courseOutputType& courseOutput;
-    BorrowedCall<std::uint8_t(std::uint32_t)> selectedMapIndex50MB;
+    BorrowedCall<std::uint8_t(std::uint32_t)> selectedMapIndex;
     using opponentAudioType = std::unique_ptr<opponent_audio50HX::Owner>;
     opponentAudioType& opponentAudio;
     using observedNativeTicksType = std::array<std::uint64_t,maxHostRaceRacers50HT>;

@@ -5,71 +5,11 @@
 #include "cold_load_diagnostics50du.h"
 #include "../../platform/linux/native/original_ta_intro_preload50la.h"
 #include "original_ui_source_timing50lh.h"
-#include "mc_particle_render50mc.h"
-#include "mc_particle_cold50mc.h"
 #include "../../src/game/original_entity_chains50la.h" // Inactive source-faithful Entity chain operations.
 // runtime_allocations50fl.h stays in the single executable main TU.
 #include "original_disc_effects50lb.h"
-#include "ga_original_world50lh.h"
-#include "gc_original_world50lm.h"
-#include "ta_original_world50le.h"
-#include "ma_sa_original_world50lm.h"
-#include "sc_original_world50lm.h"
-#include "tb_original_world50lm.h"
-#include "gb_original_world50lm.h"
-#include "gb_track_fog50gb.h"
-#include "mc_track_fog50mc.h"
-#include "mc_water50mc.h"
-#include "mc_sky50mc.h"
-#include "mc_camera_assets50mc.h"
-#include "mc_positional_sound50mc.h"
-#include "gb_positional_sound50gb.h"
 #include "track_animation_binding50an.h"
-#include "mc_atm_window_fixture.h"
 #include "track_uv_animation50uv_fixture.h"
-#include "mc_static_model_params50mc.h"
-#include "mc_cold_visibility50mc.h"
-#include "gb_particle_render50gb.h"
-#include "gb_particle_visual50gb.h"
-#include "gb_query50gb.h"
-#include "mc_query50mc.h"
-#include "gb_cold_visibility50gb.h"
-#include "gb_collision_world50gb.h"
-#include "gb_atm_window_fixture.h"
-#include "gb_static_model_params50gb.h"
-#include "gb_particle_runtime50gb.h"
-#include "gb_trigger_actions50gb.h"
-#include "gb_navigation50gb.h"
-#include "source_grid50gb_fixture.h"
-#include "gb_pod_sound50gb.h"
-#include "tb_atm_window_fixture.h"
-#include "tb_static_model_params50tb.h"
-#include "rc_original_world50lm.h"
-#include "rc_atm_window_fixture.h"
-#include "rc_crystal50rc.h"
-#include "rc_static_model_params50rc.h"
-#include "rc_particle_visual50rc.h"
-#include "tc_original_world50lm.h"
-#include "tc_atm_window_fixture.h"
-#include "tc_static_model_params50tc.h"
-#include "sc_atm_window_fixture.h"
-#include "sc_zero_sky50kx_fixture.h"
-#include "sc_static_model_params_fixture.h"
-#include "mb_original_world50lm.h"
-#include "mb_atm_window_fixture.h"
-#include "mb_static_model_params_fixture.h"
-#include "mb_navigation50mb.h"
-#include "mb_collision_world50mb.h"
-#include "mb_source_trigger50mb.h"
-#include "tc_collision_world50tc.h"
-#include "tb_collision_world50tb.h"
-#include "tb_cold_visibility50tb.h"
-#include "rc_collision_world50rc.h"
-#include "tc_cold_visibility50tc.h"
-#include "tb_cold_visibility50tb.h"
-#include "source_grid50tc_fixture.h"
-#include "source_grid50tb_fixture.h"
-#include "native_cold_model_retirement50lh.h"
 #include "../../src/game/original_pause_storage50la.h" // Inactive concrete Pause cold storage.
 #include "../../src/game/original_pause_text_geometry50la.h" // Inactive original CPU glyph leaf.
 #include "../../src/game/original_pause_texture_geometry50la.h" // Inactive original CPU texture leaf.
@@ -95,29 +35,15 @@
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "race_session50hm_fixture.h"
 #include "original_camera_assets50kx.h"
-#include "native_ta_particle_cold50la_fixture.h"
-#include "rc_particle_runtime50rc.h"
-#include "rc_particle_render50rc.h"
-#include "rc_particle_visual50rc.h"
-#include "ra_cold_aggregate50la.h" // Inactive cold owner: compile visibility only.
 #include "original_wreck_rig_inventory50la.h" // Inactive authentic ordered asset join.
 // Unused cold wreck-storage compile visibility lives in its dedicated TU.
-#include "sc_trigger_authoring50la.h" // Inactive SC source/zero-sky/trigger authoring only.
 #include "../../src/game/original_damage_state50la.h"
-#include "../../src/game/original_ra_static_fragment_bytes.h" // Inactive native byte arithmetic; no renderer admission.
 #include "../../src/game/original_position_stats_numeric50la.h" // Uncalled numeric subset.
 #include "../../src/game/original_position_map_bounds50la.h" // Uncalled map bounds subset.
 #include "original_position_stats_adapter50la.h" // Uncalled actual view-zero observation.
-#include "ra_static_fog_numeric50la.h" // Uncalled native arithmetic; no renderer admission.
-#include "ra_static_model_factory50la.h" // Uncalled cold ownership stage.
-#include "ra_track_particle_manager50la.h" // Inactive same-Application manager stage.
-#include "ra_source_camera_factory50la.h" // Inactive same-Bank camera wrapper.
-#include "ra_native_session50la.h"
-#include "ra_crowd_image50la.h" // Inactive frame0 verifier; no image/lease is minted.
-#include "ra_tga_source50la.h" // Inactive exact-source TGA verifier; no population.
-#include "ra_fire_model_sources50la.h" // Inactive authentic payload/reference stage only.
-#include "ra_static_fire_visual50la.h" // Inactive native static CPU owner; no RA runtime admission.
 #include "original_camera_input50kx.h"
+#include "native_ta_particle_cold50la_fixture.h" // W0: the one particle prepare (R7)
+#include "gc_particle_materials50kg_fixture.h"
 #include "original_time_stats_adapter50la.h"
 #include "original_damage_observation50la.h"
 #include "original_speed_boost_adapter50la.h"
@@ -136,7 +62,6 @@
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "native_gc_water_session50kg_fixture.h"
-#include "gc_particle_materials50kg_fixture.h"
 #include "../../src/game/original_gc_particle_render50kg.h"
 #include "native_gc_other_particle_children50kg_fixture.h"
 #include "../../src/game/original_native_collision_categories.h"
@@ -151,9 +76,6 @@
 #include "live_audio50hf_fixture.h"
 #include "pod_speech_authoring50hg_fixture.h"
 #include "material_audio_provider50hi_fixture.h"
-#include "rc_positional_sound50rc.h"
-#include "tb_positional_sound50tb.h"
-#include "tb_pod_sound50tb.h"
 #include "host_chase_camera50fn_fixture.h"
 #include "capture_visibility50fo_fixture.h"
 #include "terrain_probe_authoring50fq_fixture.h"
@@ -169,14 +91,8 @@
 #include "material_alpha50gx_fixture.h"
 #include "sky50gw_fixture.h"
 #include "original_track_sky50kx_fixture.h"
-#include "ma_trigger_candidates_fixture.h"
-#include "sc_trigger_candidates_fixture.h"
-#include "sc_runtime_ground50la.h"
-#include "ma_static_model_params_fixture.h"
-#include "sa_trigger_candidates_fixture.h"
 #include "track_animation_course50an.h"
 #include "track_animation_window50an.h"
-#include "ma_sa_atm_window_fixture.h"
 // Interactive Linux development client. Cold ownership/setup is adapted from
 // terrain_offscreen_drive50dh.cpp, retained as a separate harness. Test-only
 // retained-data loading remains, but source-word validation runs separately.
@@ -191,19 +107,7 @@
 #include "original_race_load_prefix50la.h" // Inactive actual early load-owner join.
 #include "original_pause_cold_driver50la.h" // Same-Application two-phase Pause resources.
 #include "original_race_world_join50la.h" // Inactive same-aggregate race world ownership.
-#include "original_consumed_ra_stage50du.h" // Existing consumed RA ownership.
-#include "original_consumed_gc_stage50du.h" // Distinct actual GC counted prefix.
-#include "original_consumed_ta_stage50du.h" // Genuine TA race/world audio ownership.
-#include "original_consumed_ma_stage50du.h" // Actual selected-track counted prefix.
-#include "original_consumed_mb_stage50du.h"
-#include "original_consumed_sc_stage50du.h"
-#include "original_consumed_gb_stage50du.h"
-#include "original_consumed_mc_stage50du.h"
-#include "original_consumed_tb_stage50du.h"
-#include "original_consumed_rc_stage50du.h"
-#include "original_consumed_tc_stage50du.h"
-#include "original_consumed_sa_stage50du.h" // Actual selected-track counted prefix.
-#include "original_consumed_ga_stage50du.h" // Actual selected-track counted prefix.
+#include "original_consumed_stage50du.h" // W0: the one consumed race stage (R1).
 #include "original_native_ta_root_audio50la.h"
 #include "../../platform/linux/native/original_spectator_menu_input50la.h" // Physical spectator UI edges; inactive until lifecycle join.
 #include "original_race_native_retirement50la.h" // Explicit native ownership close, inactive.
@@ -218,7 +122,6 @@
 #include "original_cable_selection50la.h" // Uncalled ordinary source update.
 #include "../../src/game/original_position_stats_clip50la.h" // Uncalled numeric owner.
 #include "../../src/game/original_position_stats_loader_data50la.h"
-#include "../../platform/linux/native/host_race_results50il.h"
 #include "../../platform/linux/native/keyboard_packet50dr.h"
 #include "../../platform/linux/native/selected_control_input50ky.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
@@ -256,13 +159,6 @@
 #include "track_runtime_storage50ig_fixture.h"
 #include "track_static_candidates50ig_fixture.h"
 #include "track_animation_candidates50an.h"
-#include "gc_trigger_candidates50kg_fixture.h"
-#include "gc_static_model_params50kg_fixture.h"
-#include "ga_trigger_authoring_fixture.h"
-#include "ga_trigger_actions_fixture.h"
-#include "ga_trigger_candidates_fixture.h"
-#include "gc_atm_window_fixture.h"
-#include "ga_atm_window_fixture.h"
 #include "gameplay_binder_window_candidate_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "selected_grid_navigation50ig.h"

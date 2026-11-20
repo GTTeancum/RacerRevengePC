@@ -1,4 +1,13 @@
 #pragma once
+// W0 common rewrite: the one track, world, stage, lap, roster, start and end owners.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "original_consumed_stage50du.h"
+#include "common_lap50cr.h"
+#include "common_roster50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
 // Only original borrowed prefix identities. World owners and nested collision
 // Borrow types do not cross this declaration seam; they stay in world.cpp.
 #include "terrain_interactive_session50du.h"
@@ -20,8 +29,6 @@ namespace interactive_loop50DU { struct GameplayDisplayWallTotals50DU; }
 class ColdLoadDiagnostics50DU;
 namespace checkpoint_recovery50fi_fixture { struct Plan; }
 namespace cold50i { struct Mesh; }
-namespace gb_pod_sound50GB { class Owner; }
-namespace gb_trigger_authoring50GB { class Owner; }
 namespace lap_drive50GJ { struct Continuity; }
 namespace live_audio50HF { class Owner; }
 namespace native_ai50IV { struct Session; }
@@ -77,8 +84,6 @@ namespace rr::platform { class OriginalSoundMode50KG; }
 namespace rr::platform { struct SelectedControlInput50KY; }
 namespace rr::platform { struct VehicleWindowDiagnostic50DS; }
 namespace runtime_startup50fl { struct Fixture; }
-namespace tb_pod_sound50TB { class Owner; }
-namespace tb_trigger_authoring50TB { class Owner; }
 namespace track_session_assets50IG { struct SessionAssets; }
 namespace windows_capture50LD { class Run; }
 namespace interactive_world50DU {
@@ -88,6 +93,12 @@ using interactive_frame50DU::BorrowedCall;
 using interactive_loop50DU::GameplayDisplayWallTotals50DU;
 using J=nlohmann::json;
 struct Context final {
+    // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
+    using trackType = const common_track50CR::Track;
+    trackType& track;
+    // W0 common rewrite: one roster (common_roster50cr.h)
+    using rosterType = common_roster50CR::Owner;
+    rosterType& roster;
     using allAiControllerSamplesType = std::uint64_t;
     allAiControllerSamplesType& allAiControllerSamples;
     using allAiEnabledType = const bool;
@@ -126,14 +137,12 @@ struct Context final {
     corpusType& corpus;
     using courseColdLoadType = original_course_targets50KX::ColdLoadRequest;
     courseColdLoadType& courseColdLoad;
-    using courseRaceColdType = const bool;
-    courseRaceColdType& courseRaceCold;
+    using rootedCourseRaceType = const bool;
+    rootedCourseRaceType& rootedCourseRace;
     using courseRaceLaunchedType = bool;
     courseRaceLaunchedType& courseRaceLaunched;
     using deviceIndexType = const std::uint32_t;
     deviceIndexType& deviceIndex;
-    using directOriginalHumanType = const bool;
-    directOriginalHumanType& directOriginalHuman;
     using directOriginalInputsType = const bool;
     directOriginalInputsType& directOriginalInputs;
     using displayWallTotalsType = GameplayDisplayWallTotals50DU;
@@ -178,24 +187,12 @@ struct Context final {
     dynamicTuningType& dynamicTuning;
     using endpointPolicyType = const native_racer_collision50HW::EndpointPolicy;
     endpointPolicyType& endpointPolicy;
-    using gaOriginalDiscType = const bool;
-    gaOriginalDiscType& gaOriginalDisc;
-    using gbLiveAudioPreparedType = bool;
-    gbLiveAudioPreparedType& gbLiveAudioPrepared;
-    using gbOriginalDiscType = const bool;
-    gbOriginalDiscType& gbOriginalDisc;
-    using gbPodSoundType = std::shared_ptr<gb_pod_sound50GB::Owner>;
-    gbPodSoundType& gbPodSound;
-    using gbPreparedAudioRootType = std::filesystem::path;
-    gbPreparedAudioRootType& gbPreparedAudioRoot;
-    using gbSoundModeType = std::shared_ptr<rr::platform::OriginalSoundMode50KG>;
-    gbSoundModeType& gbSoundMode;
-    using gcNativeGateType = const bool;
-    gcNativeGateType& gcNativeGate;
-    using gcNativeWorldSelectedType = const bool;
-    gcNativeWorldSelectedType& gcNativeWorldSelected;
-    using gcOriginalDiscType = const bool;
-    gcOriginalDiscType& gcOriginalDisc;
+    using liveAudioPreparedType = bool;
+    liveAudioPreparedType& liveAudioPrepared;
+    using preparedAudioRootType = std::filesystem::path;
+    preparedAudioRootType& preparedAudioRoot;
+    using soundModeType = std::shared_ptr<rr::platform::OriginalSoundMode50KG>;
+    soundModeType& soundMode;
     using headlessLiveType = bool;
     headlessLiveType& headlessLive;
     using hostType = rr::platform::GameHost50ER;
@@ -206,40 +203,10 @@ struct Context final {
     humanControlInputType& humanControlInput;
     using humanCourseEnabledType = const bool;
     humanCourseEnabledType& humanCourseEnabled;
-    using isGaTrackType = const bool;
-    isGaTrackType& isGaTrack;
-    using isGbTrackType = const bool;
-    isGbTrackType& isGbTrack;
-    using isGcTrackType = const bool;
-    isGcTrackType& isGcTrack;
-    using maOrCommonRouteTrackType = const bool;
-    maOrCommonRouteTrackType& maOrCommonRouteTrack;
-    using isMaTrackType = const bool;
-    isMaTrackType& isMaTrack;
-    using isMbTrackType = const bool;
-    isMbTrackType& isMbTrack;
-    using isMcTrackType = const bool;
-    isMcTrackType& isMcTrack;
-    using isRaTrackType = const bool;
-    isRaTrackType& isRaTrack;
-    using isRcTrackType = const bool;
-    isRcTrackType& isRcTrack;
-    using commonRouteTrackType = const bool;
-    commonRouteTrackType& commonRouteTrack;
-    using isScTrackType = const bool;
-    isScTrackType& isScTrack;
-    using isTaTrackType = const bool;
-    isTaTrackType& isTaTrack;
-    using isTbTrackType = const bool;
-    isTbTrackType& isTbTrack;
-    using isTcTrackType = const bool;
-    isTcTrackType& isTcTrack;
     using lapContinuityType = lap_drive50GJ::Continuity;
     lapContinuityType& lapContinuity;
     using lastCommittedWrongWayType = bool;
     lastCommittedWrongWayType& lastCommittedWrongWay;
-    using legacyCandidatesType = std::vector<rr::game::Type2StaticCandidate49X>;
-    legacyCandidatesType& legacyCandidates;
     using liveAudioType = std::unique_ptr<live_audio50HF::Owner>;
     liveAudioType& liveAudio;
     using loadedAudioSettingsType = const rr::game::RaceAudioSettings50IC;
@@ -248,16 +215,10 @@ struct Context final {
     loadedTrackType& loadedTrack;
     using mType = rr::game::MainBodyState49K;
     mType& m;
-    using maOriginalDiscType = const bool;
-    maOriginalDiscType& maOriginalDisc;
     using mainQueryResourceType = const rr::game::Type2ResourceView49X;
     mainQueryResourceType& mainQueryResource;
     using managerRuntimeSelectionType = rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection;
     managerRuntimeSelectionType& managerRuntimeSelection;
-    using mbOriginalDiscType = const bool;
-    mbOriginalDiscType& mbOriginalDisc;
-    using mcOriginalDiscType = const bool;
-    mcOriginalDiscType& mcOriginalDisc;
     using meshesType = std::vector<cold50i::Mesh>;
     meshesType& meshes;
     using mode1EnabledType = bool;
@@ -268,40 +229,16 @@ struct Context final {
     monotonicNow50DUType monotonicNow50DU;
     using namesType = std::vector<std::string>;
     namesType& names;
-    using nativeGaSelectionType = const bool;
-    nativeGaSelectionType& nativeGaSelection;
-    using nativeGbSelectionType = const bool;
-    nativeGbSelectionType& nativeGbSelection;
-    using nativeMaSelectionType = const bool;
-    nativeMaSelectionType& nativeMaSelection;
-    using nativeMbSelectionType = const bool;
-    nativeMbSelectionType& nativeMbSelection;
-    using nativeMcSelectionType = const bool;
-    nativeMcSelectionType& nativeMcSelection;
     using nativeOrdinaryLaunch11258Type = std::uint32_t;
     nativeOrdinaryLaunch11258Type& nativeOrdinaryLaunch11258;
     using nativeOriginalFleetType = const bool;
     nativeOriginalFleetType& nativeOriginalFleet;
-    using nativeRaSelectionType = const bool;
-    nativeRaSelectionType& nativeRaSelection;
     using nativeRacerManagerType = std::unique_ptr<original_racer_manager_entity::Owner>;
     nativeRacerManagerType& nativeRacerManager;
-    using nativeRcSelectionType = const bool;
-    nativeRcSelectionType& nativeRcSelection;
     using nativeRecordActorType = std::unique_ptr<original_subtype3_record::Owner>;
     nativeRecordActorType& nativeRecordActor;
-    using nativeCommonRouteSelectionType = const bool;
-    nativeCommonRouteSelectionType& nativeCommonRouteSelection;
-    using nativeScSelectionType = const bool;
-    nativeScSelectionType& nativeScSelection;
     using nativeSelectedLightsType = const bool;
     nativeSelectedLightsType& nativeSelectedLights;
-    using nativeTaSelectionType = const bool;
-    nativeTaSelectionType& nativeTaSelection;
-    using nativeTbSelectionType = const bool;
-    nativeTbSelectionType& nativeTbSelection;
-    using nativeTcSelectionType = const bool;
-    nativeTcSelectionType& nativeTcSelection;
     using nativeVideoType = std::shared_ptr<original_main_entry50KG::Video>;
     nativeVideoType& nativeVideo;
     using nativeWaterApplicationType = native_gc_water_session50KG::Application;
@@ -362,8 +299,6 @@ struct Context final {
     playerSource5CType& playerSource5C;
     using playerUsesRosterRigType = const bool;
     playerUsesRosterRigType& playerUsesRosterRig;
-    BorrowedCall<void(std::shared_ptr<const gb_trigger_authoring50GB::Owner>)> prepareGbPodSoundCall;
-    BorrowedCall<void(std::shared_ptr<const tb_trigger_authoring50TB::Owner>)> prepareTbPodSoundCall;
     using qfilterType = rr::game::CollisionFilter48J;
     qfilterType& qfilter;
     using queryType = rr::game::Type2StaticQuery49X;
@@ -376,8 +311,6 @@ struct Context final {
     raceRacerCountType& raceRacerCount;
     using racerContactsEnabledType = const bool;
     racerContactsEnabledType& racerContactsEnabled;
-    using rcOriginalDiscType = const bool;
-    rcOriginalDiscType& rcOriginalDisc;
     using renderDiagnosticsType = render_diagnostics50GQ::Interval;
     renderDiagnosticsType& renderDiagnostics;
     using reportHost50DUType = void(*)(const rr::platform::GameHostDiagnostic50ER&);
@@ -388,10 +321,6 @@ struct Context final {
     requestedWindowSamplesType& requestedWindowSamples;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using commonRouteOriginalDiscType = const bool;
-    commonRouteOriginalDiscType& commonRouteOriginalDisc;
-    using scOriginalDiscType = const bool;
-    scOriginalDiscType& scOriginalDisc;
     using selectedAudioSettingsType = rr::game::RaceAudioSettings50IC;
     selectedAudioSettingsType& selectedAudioSettings;
     using selectedOriginalType = const rr::game::original_racer_selection50IJ::Entry*;
@@ -418,20 +347,6 @@ struct Context final {
     stackCountType& stackCount;
     using startAtMenuType = bool;
     startAtMenuType& startAtMenu;
-    using taOriginalDiscType = const bool;
-    taOriginalDiscType& taOriginalDisc;
-    using tbLiveAudioPreparedType = bool;
-    tbLiveAudioPreparedType& tbLiveAudioPrepared;
-    using tbOriginalDiscType = const bool;
-    tbOriginalDiscType& tbOriginalDisc;
-    using tbPodSoundType = std::shared_ptr<tb_pod_sound50TB::Owner>;
-    tbPodSoundType& tbPodSound;
-    using tbPreparedAudioRootType = std::filesystem::path;
-    tbPreparedAudioRootType& tbPreparedAudioRoot;
-    using tbSoundModeType = std::shared_ptr<rr::platform::OriginalSoundMode50KG>;
-    tbSoundModeType& tbSoundMode;
-    using tcOriginalDiscType = const bool;
-    tcOriginalDiscType& tcOriginalDisc;
     using tournamentLaunchSelectionType = rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection;
     tournamentLaunchSelectionType& tournamentLaunchSelection;
     using tournamentLaunchStampType = rr::platform::OriginalUiRiderProfileStamp50KG;

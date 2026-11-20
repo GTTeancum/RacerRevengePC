@@ -23,7 +23,9 @@ struct VehicleWindowDiagnostic50DS;
 }
 
 // Original exit values; shared without importing any gameplay Context.
-enum class SessionExit50DU { Quit, Restart, Checkpoint, ReturnOriginalMain, CourseColdLoad, ResultsHallReturn, PauseMenuReturn };
+// W0 common rewrite: Restart is retired. Every restart is in place (common_race_start50CR,
+// 1AC8E0); a session reload happens only when the player picks a new race from a menu.
+enum class SessionExit50DU { Quit, Checkpoint, ReturnOriginalMain, CourseColdLoad, ResultsHallReturn, PauseMenuReturn };
 
 // Original main-TU functions, including the one monotonic clock epoch.
 // This borrowed service view owns no state and is consumed synchronously.

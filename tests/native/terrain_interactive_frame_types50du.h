@@ -3,10 +3,9 @@
 // loaders, renderer owners and frontend implementations out of its declaration.
 // These three complete owners are needed only for their existing nested Borrow
 // types; their ownership and retirement protocols are deliberately unchanged.
-#include "rc_collision_world50rc.h"
-#include "tb_collision_world50tb.h"
-#include "tc_collision_world50tc.h"
 #include "../../src/game/host_race_limits50ht.h"
+#include "../../src/game/pod_cables50fd.h"          // W0: was reached through the per-course collision headers
+#include "../../src/game/impact_transitions50c.h"    // W0: same
 #include "../../src/game/impact_effects50b.h"
 #include "../../src/game/candidate_collection50bx.h"
 #include "../../src/game/controller_feedback50kz.h"
@@ -122,23 +121,16 @@ namespace original_gc_gameplay_lighting_candidate { class Owner; struct Diagnost
 }
 namespace authored_runtime_ground50cp_fixture { struct ColdScene; }
 namespace checkpoint_recovery50fi_fixture { struct Plan; }
-namespace ga_trigger_actions { class Owner; }
-namespace gb_query50GB { class Binding; }
-namespace gc_trigger_actions50KG { class Owner; }
 namespace lap_drive50GJ { struct Continuity; struct Owner; }
 namespace live_audio50HF { class Owner; }
 namespace live_terrain_probe50fr { struct Context; struct Owner; }
-namespace ma_trigger_actions { class Owner; }
 namespace material_audio50HI { class Provider; }
-namespace mb_collision_world50MB { class Owner; }
-namespace mb_source_trigger50MB { class Owner; }
-namespace mc_particle_vehicle50MC { class Owner; }
-namespace mc_query50MC { class Binding; }
-namespace mc_water50MC { class Owner; }
 namespace native_ai50IV { struct Session; }
 namespace native_dynamic_contact50IW { class Registry; struct Snapshot; }
 namespace native_gc_other_particle_children50KG { struct Runtime; struct SharedAuthoring; }
-namespace native_gc_water_racer50KG { class Owner; }
+namespace native_gc_water_racer50KG { class Owner; } // per-racer water runtime (R7; created only when the SCB names water)
+namespace original_subtype3_record { class Owner; }
+namespace race_audio50HQ { class Owner; }
 namespace native_gc_water_session50KG { struct Application; class Owner; }
 namespace native_original_ai_audio { class Owner; }
 namespace native_original_ai_recovery { struct Diagnostic; struct Models; struct State; }
@@ -147,15 +139,8 @@ namespace native_racer50HN { class Bank; }
 namespace native_racer50HW { class Cables; }
 namespace opponent_audio50HX { struct BoostState; }
 namespace original_ai_reset_ground_bridge { class GroundBridge; }
-namespace ra_cold_aggregate50LA { struct Diagnostic; class Owner; }
 namespace race_mode1_host50ID { class Owner; }
-namespace rc_trigger_actions { class Owner; }
-namespace rc_trigger_authoring { class Owner; }
 namespace runtime_startup50fl { struct Fixture; }
-namespace sa_trigger_actions { class Owner; }
-namespace sc_trigger_actions { class Owner; }
-namespace tb_trigger_actions50TB { class Owner; }
-namespace tc_trigger_actions50TC { class Owner; }
 namespace terrain_probe_authoring50fq_fixture { struct Owner; }
 namespace track_height_cold50JB { struct Owner; }
 namespace track_runtime_storage50IG { struct Counts; template<class T> class FixedBuffer; struct Storage; }

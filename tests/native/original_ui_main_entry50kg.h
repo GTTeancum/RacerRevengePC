@@ -18,26 +18,17 @@ namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalLoadingScreen40Mode0LA; class OriginalSessionF8Intro50LA;class OriginalLoadingManager33050LA;}
 namespace original_results_roster50LA { class Read; }
 namespace interactive_publication50DU { struct Context; }
-namespace ra_cold_roster50LA { class Operation; }
 namespace ra_native_session50LA { class Join; }
 namespace rr::game { class OriginalResults10450LA; struct InputEvent48Z; struct OriginalResults104Diagnostic50LA; struct OriginalRaceF8Diagnostic50LA; struct OriginalRaceEndEntryDiagnostic50LA; struct OriginalHumanEndClockResult50KG; }
 namespace interactive_continuation50DU {struct Context;}
 namespace original_course_targets50KX { class ConsumedLaunch; }
 namespace ra_cold_aggregate50LA { class Owner; }
-namespace ta_original_world50LE { class Owner; }
-namespace gc_original_world50LM { class Owner; }
-namespace ga_original_world50LH { class Owner; }
-namespace ma_original_world50LM { class Owner; }
-namespace mb_original_world50LM { class Owner; }
-namespace sc_original_world50LM { class Owner; }
-namespace gb_original_world50LM { class Owner; }
-namespace mc_camera_assets50MC { class Owner; }
-namespace tb_original_world50LM { class Owner; }
-namespace mc_original_world50LM { class Owner; }
-namespace rc_original_world50LM { class Owner; }
-namespace tc_original_world50LM { class Owner; }
-namespace common_route_world50LM { class Owner; }
-namespace ra_cold_sources50LA { class ColdNavigationLease; }
+// W0 common rewrite: the one track, world, roster, race start and end (common_*50cr.h).
+namespace common_track50CR { class Track; class Load; struct Identity; struct LoadInputs; struct Diagnostic; class NavigationView; }
+namespace common_race_world50CR { class World; }
+namespace common_roster50CR { class Owner; }
+namespace common_race_start50CR { class Owner; struct Request; struct Hooks; struct Receipt; }
+namespace common_race_end50CR { class Owner; enum class Destination : std::uint8_t; struct Departure; }
 namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; struct ActualOwners; struct AuthoredStorage; struct Result; }
@@ -51,6 +42,7 @@ namespace native_ai50IV { struct Session; }
 #include "original_ui_elapsed50lh.h"
 #include "original_ui_source_timing50lh.h"
 #include <optional>
+#include <span>
 #include "original_ui_rider_pacing50lb.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../src/game/original_frontend_camera_cold50la.h"
@@ -210,6 +202,11 @@ struct DamageColdResult50LA {
 };
 struct Application {
     friend class ::ra_cold_aggregate50LA::Owner; //Same-App material admission and actual ordered source directory stores; no lazy prepare.
+    // W0: the one track load (R3) takes over the RA aggregate's material admission and directory stores.
+    friend class ::common_track50CR::Load;
+    // W0: the one race start (1AC8E0) and end/departure (1A7DD0, step 18) reach Application internals (R9).
+    friend class ::common_race_start50CR::Owner;
+    friend class ::common_race_end50CR::Owner;
     friend class ::original_camera_session50KX::Session;
     friend class rr::game::OriginalSessionF8Intro50LA;
     friend class RaceDisplayLifetime50LA;
@@ -268,13 +265,13 @@ private:
     bool loadConsumedPauseSourceCold50LA(rr::game::OriginalRaceConstructor50LA&,
         original_pause_cold50LA::Owner&,bool beforeCollector)const noexcept;
     bool loadConsumedPauseResultsBeforeCollector50LA(rr::game::OriginalRaceConstructor50LA&,
-        original_pause_cold50LA::Owner&,std::shared_ptr<ra_cold_roster50LA::Operation>,
+        original_pause_cold50LA::Owner&,const common_roster50CR::Owner&,
         rr::game::OriginalResults104Diagnostic50LA&)const noexcept;
     bool loadHumanTournamentPauseResultsBeforeCollector50LA(rr::game::OriginalRaceConstructor50LA&,
-        original_pause_cold50LA::Owner&,std::shared_ptr<ra_cold_roster50LA::Operation>,
+        original_pause_cold50LA::Owner&,const common_roster50CR::Owner&,
         const std::array<std::uint32_t,8>&,rr::game::OriginalResults104Diagnostic50LA&)const noexcept;
     bool loadPauseResultsBeforeCollectorImpl50LA(rr::game::OriginalRaceConstructor50LA&,
-        original_pause_cold50LA::Owner&,std::shared_ptr<ra_cold_roster50LA::Operation>,
+        original_pause_cold50LA::Owner&,const common_roster50CR::Owner&,
         const std::array<std::uint32_t,8>*,rr::game::OriginalResults104Diagnostic50LA&)const noexcept;
     // Private F8 slot38 bridge, called at the native accepted-Root pre-Camera
     // cut with this actual140CE4 factor and Race/F8. No new root admission.
@@ -525,6 +522,8 @@ private:
     // Weak custody of the ONE Application-created canonical TA native Session.
     // Root/consumers own its lifetime; this never prolongs borrowed stack owners.
     mutable std::weak_ptr<original_camera_session50KX::Session> nativeTaCameraSession50LA_;
+    // W0 (R9): the bound race start of the current counted race (bindRaceStart50CR). Weak: never extends it.
+    mutable std::weak_ptr<common_race_start50CR::Owner> raceStart50CR_;
     // Uncalled private source prefix. Selects only the retained factory-issued
     // Session; no caller Session, key, generation, clock or readiness parameter.
     std::shared_ptr<original_camera_session50KX::Session> freshNativeTaCameraSession50LA()const noexcept;
@@ -629,8 +628,6 @@ private:
     //audio route without ANY new effects. Neither is full1A9EE0 completion.
     // Private conditional source segment; no caller joins the missing music1A3C00 interval.
     bool loadRetainedSourceTrackSegment1A6CF4(std::uint32_t&)const noexcept;
-    bool completeConsumedRaWorldNativePrefix1A9EE0(
-        original_camera_session50KX::Session&,std::uint32_t&)const noexcept;
     bool retireConsumedRaMusicNative10C(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
     bool revokeConsumedRaCameraNative34(original_camera_session50KX::Session&)const noexcept;
     bool retireConsumedRaCameraNative34(rr::game::OriginalRaceConstructor50LA&,std::uint32_t&)const noexcept;
@@ -1074,58 +1071,48 @@ private:
     //17C848/84C copies the six original bytes at3A8600 into36B420.
     const std::string fontDirectory36B420_="font\\";
 public:
-    // Borrow of the one Application-issued course Session (TA/MA/SA/GA/GC).
+    // Borrow of the one Application-issued course Session (every course).
     // Its root owner closes it explicitly; this never extends that lifetime
     // beyond the synchronous caller.
     std::shared_ptr<original_camera_session50KX::Session> issuedCourseCameraSession50LA()const noexcept {
         return nativeTaCameraSession50LA_.lock();
     }
-    // Native allocation/custody only, replacing the existing canonical-TA
-    // make_shared at its real root. Does not call the source constructor.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeTaCameraSession50LA(
+    // W0 common rewrite (R2): the ONE camera-session factory, 1A6DC0 -> 1A95B0 -> 174DF0/174E58 -> 174A30
+    // (+174FA4 when the cut count is nonzero) for every course, built from the GC factory (full checks).
+    // `world74` is the race's one World (cut count World+3E4 = TOB [CSCameras].NumberOfCameras, 174E58);
+    // `tob` is that World's TOB member bytes (must equal authored.tob); `map` is the one navigation map
+    // view (radar/start map, B8). 174EA8 zeroes the cuts for subtypes 2/3 and for subtype 1 when
+    // P+34 != 2 or App+350 != 0, so RA Free Play / Time Trial get the zero-cut controller with no course
+    // code. `authored` keeps the selected pod's CAM/PHY custody. Replaces the 12
+    // createNativeXxCameraSession50LA (Ta, Gc, Ga, CommonRoute, Ma, Mb, Sc, Gb, Tb, Mc, Rc, Tc).
+    std::shared_ptr<original_camera_session50KX::Session> createNativeCourseCameraSession50LA(
         original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root GC custody requires the genuine consumed GC race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeGcCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root GA custody requires the genuine consumed GA race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeGaCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root SA custody requires the genuine consumed SA race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeCommonRouteCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root MA custody requires the genuine consumed MA race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeMaCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root MB custody requires the genuine consumed MB race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeMbCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root SC custody requires the genuine consumed SC race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeScCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // Same-root GB custody requires the genuine consumed GB race/world owner.
-    std::shared_ptr<original_camera_session50KX::Session> createNativeGbCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    std::shared_ptr<original_camera_session50KX::Session> createNativeTbCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    // MC's camera inputs come from its own assets owner (CAM owned, TOB borrowed from the MC source).
-    std::shared_ptr<original_camera_session50KX::Session> createNativeMcCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const mc_camera_assets50MC::Owner&)const noexcept;
-    std::shared_ptr<original_camera_session50KX::Session> createNativeRcCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
-    std::shared_ptr<original_camera_session50KX::Session> createNativeTcCameraSession50LA(
-        original_camera_session50KX::ActualOwners,
-        const original_camera_session50KX::AuthoredStorage&)const noexcept;
+        const rr::game::OriginalRaceConstructor50LA& race,
+        const common_race_world50CR::World& world74,
+        std::span<const std::uint8_t> tob,
+        const common_track50CR::NavigationView& map,
+        const original_camera_session50KX::AuthoredStorage& authored)const noexcept;
+    // W0 common rewrite (R9): race start entry 1AC8E0 for callers that hold only the Application
+    // (Results replay rows 1CA..., Pause RESTART 1BD934, Time Trial 1ABC0C, Practice 1ABC1C). Runs the
+    // bound common_race_start50CR::Owner in place; never reloads the session. `hooks` come from I3.
+    bool bindRaceStart50CR(const std::shared_ptr<common_race_start50CR::Owner>&)const noexcept;
+    bool restartConsumedRace1AC8E0(rr::game::OriginalRaceConstructor50LA&,const common_race_start50CR::Request&,
+        const common_race_start50CR::Hooks&,common_race_start50CR::Receipt&)const noexcept;
+    // W0 common rewrite (R9): Time Trial Pause QUIT row 10, 1BDAB4: 1ABFC0(race,1). If it qualifies:
+    // Pause+200 = 0, close (1BE830), 1A4B90(2), 199770, activate Results104, 1CA8E0(Results,3,0) record/
+    // name page 3; returns qualifies=true. If not: 1BDB5C, then departure to Course 17DE10(6,6,1).
+    // Logs pause_quit_record. Replaces the loop's queuePauseCourse1BDA74 record_check=pending_1BDAB4.
+    bool quitTimeTrialFromPause1BDAB4(rr::game::OriginalRaceConstructor50LA&,bool& qualifies,
+        std::uint32_t& pc)const noexcept;
+    // W0 common rewrite (R9): record page confirm 1CA574..1CA6F0: 1ABFC0(race,2), 26D070 / 1A4B90(2) /
+    // 1A4AB0(0.5) / 267BE0 / 2AED60, deactivate, App11C = 0, 1AC440 lap rows, save pending, 17DE10(6,11,1)
+    // Hall. Uses the existing original_race_record_rule50kg.h / original_results104_input50la.cpp downstream.
+    bool confirmTimeTrialRecord1CA574(rr::game::OriginalRaceConstructor50LA&,std::uint32_t& pc)const noexcept;
+    // W0 common rewrite (R9): step 18 departure in the original order (26D070, 1A4AB0(0.5), 1A4B90(2),
+    // 267BE0, 2AED60, 1BE830, 17DE10) for Pause rows 9/10, Results rows and the record confirm. Replaces
+    // the 149p port teardown/ReturnOriginalMain stand-ins (F05).
+    bool departRace50CR(rr::game::OriginalRaceConstructor50LA&,common_race_end50CR::Destination,
+        common_race_end50CR::Departure&)const noexcept;
     const rr::assets::OriginalUiMaterialRuntime50KG& materialRuntime=*materialRuntimeOwner_;
     rr::game::OriginalApplicationAnimationClockView50KG animationClock()const noexcept {
         return rr::game::OriginalApplicationAnimationClockView50KG(animationClockOwner_);
@@ -1225,9 +1212,10 @@ public:
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
     // Detached source-stage TunnelTrack ownership; no race publication/activation.
+    // W0: the spline bytes come from the race's one Track (m<code>.spl / a<code>.spl), any course (R4).
     std::shared_ptr<rr::game::OriginalTunnelTrack50LA> constructTunnelTrackCold2A1160(
         std::uint64_t,rr::game::OriginalTunnelTrackRole50LA,
-        std::shared_ptr<const ra_cold_sources50LA::ColdNavigationLease>)const noexcept;
+        std::shared_ptr<const common_track50CR::Track>)const noexcept;
     bool bindTunnelTrackColdProjection2A1260(rr::game::OriginalTunnelTrack50LA&)const noexcept;
     std::shared_ptr<rr::game::OriginalRaceTuning50LA> retainRaceTuningCold1A7184()const noexcept;
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> constructConsumedRaceCold1A65C0(
@@ -1249,32 +1237,17 @@ public:
     // F8 and 1AD230 through the race's live HUD scope. Each reports whether
     // its private owner accepted; neither refusal stops the request.
     void countedPauseRequest1A87A0_149p(rr::game::OriginalRaceConstructor50LA&,bool& f8,bool& hud)const noexcept;
+    // W0 common rewrite (R1): the ONE race World 1A6BC0 -> 1B2870 -> 141300 -> 2350D0 -> 1B2918 for every
+    // course, replacing the 13 constructConsumedXxRaceWorld1A6BC0 / constructConsumedCommonRouteWorld1A6BC0.
+    // The Track is the race's (still unloaded) one track; loadConsumedRaceTrack1A9EE0 fills it next.
     bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedTaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<ta_original_world50LE::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedGcRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<gc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedMaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<ma_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedMbRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<mb_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedScRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<sc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedGbRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<gb_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedMcRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<mc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedTbRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<tb_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedRcRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<rc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedTcRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<tc_original_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedCommonRouteWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<common_route_world50LM::Owner>,std::uint32_t& sourcePC)const noexcept;
-    bool constructConsumedGaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
-        std::shared_ptr<ga_original_world50LH::Owner>,std::uint32_t& sourcePC)const noexcept;
+        std::shared_ptr<common_track50CR::Track>,std::uint32_t& sourcePC)const noexcept;
+    // W0 common rewrite (R3): 1A6D80 -> 1A9EE0, the one track load (steps 04-05) into the race's World,
+    // through this Application's standard archive provider 3E1A70 and texture resolver (race mount
+    // lease, released by Track::release 1316A0). Replaces completeConsumedRaWorldNativePrefix1A9EE0
+    // (RA only, reached through the camera session). Runs BEFORE the camera session, as the original.
+    bool loadConsumedRaceTrack1A9EE0(rr::game::OriginalRaceConstructor50LA&,common_track50CR::Track&,
+        const common_track50CR::Identity&,const common_track50CR::LoadInputs&,common_track50CR::Diagnostic&)const noexcept;
     const std::int32_t& applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
     bool constructNativeTaIntroCamera50LA()const noexcept;
     std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> retainNativeTaIntroAuthoring50LA()const noexcept;

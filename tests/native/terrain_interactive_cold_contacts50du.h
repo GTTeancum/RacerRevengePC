@@ -1,14 +1,28 @@
 #pragma once
+// W0 common rewrite: the one track, world, stage, lap, roster, start and end owners.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "original_consumed_stage50du.h"
+#include "common_lap50cr.h"
+#include "common_roster50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
 #include "course_trigger_sources50ct.h"
 #include "terrain_interactive_cold_types50du.h"
 #include "native_borrowed_call50du.h"
-#include "sc_trigger_authoring_fixture.h"
 
 namespace interactive_cold50DU {
 namespace platform=rr::platform;
 using namespace rr::game;
 // Synchronous references to original root locals; no resource/callback ownership.
 struct ContactsContext final {
+    // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
+    using trackType = const common_track50CR::Track;
+    trackType& track;
+    // W0 common rewrite: one roster (common_roster50cr.h)
+    using rosterType = common_roster50CR::Owner;
+    rosterType& roster;
     using allAiEnabledType = const bool;
     allAiEnabledType& allAiEnabled;
     using applicationClockType = rr::game::HostMonotonicClock50ID;
@@ -19,8 +33,8 @@ struct ContactsContext final {
     completedFramesType& completedFrames;
     using contactBindingsType = std::array<native_racer_contact50HW::Binding,rr::game::defaultHostRaceRacers50HT>;
     contactBindingsType& contactBindings;
-    using directOriginalHumanType = const bool;
-    directOriginalHumanType& directOriginalHuman;
+    using rootedCourseRaceType = const bool;
+    rootedCourseRaceType& rootedCourseRace;
     using dynamicContactEnabledType = const bool;
     dynamicContactEnabledType& dynamicContactEnabled;
     using dynamicRacer60Type = std::array<std::uint32_t,rr::game::defaultHostRaceRacers50HT>;
@@ -29,82 +43,32 @@ struct ContactsContext final {
     dynamicRegistryType& dynamicRegistry;
     using trackAnimationsType = std::shared_ptr<track_animation_runtime50AN::Owner>;
     trackAnimationsType& trackAnimations;
-    using gaGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
-    gaGateAudioType& gaGateAudio;
-    using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
-    gaTriggerActionsType& gaTriggerActions;
-    using gaTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    gaTriggerAuthoringType& gaTriggerAuthoring;
-    using gbCollisionWorldType = std::shared_ptr<gb_collision_world50GB::Owner>;
-    gbCollisionWorldType& gbCollisionWorld;
-    using gbNavigationOwnerType = std::shared_ptr<gb_navigation50GB::Owner>;
-    gbNavigationOwnerType& gbNavigationOwner;
-    using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;
-    gbQueryBindingType& gbQueryBinding;
-    using gcGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
-    gcGateAudioType& gcGateAudio;
-    using gcGraphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
-    gcGraphicsSequenceType& gcGraphicsSequence;
-    using gcLightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
-    gcLightDiagnosticType& gcLightDiagnostic;
-    using gcLightOwnerType = rr::game::original_gc_gameplay_lighting_candidate::Owner;
-    gcLightOwnerType& gcLightOwner;
-    using gcTriggerActionsType = std::unique_ptr<gc_trigger_actions50KG::Owner>;
-    gcTriggerActionsType& gcTriggerActions;
-    using gcTriggerAuthoringType = std::unique_ptr<gc_trigger_authoring50IN::Owner>;
-    gcTriggerAuthoringType& gcTriggerAuthoring;
+    using triggerAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
+    triggerAudioType& triggerAudio;
+    using graphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
+    graphicsSequenceType& graphicsSequence;
+    using lightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
+    lightDiagnosticType& lightDiagnostic;
     using humanCourseEnabledType = const bool;
     humanCourseEnabledType& humanCourseEnabled;
     using initialCollisionZoneType = const rr::game::CollectionRef50BX;
     initialCollisionZoneType& initialCollisionZone;
-    using isGbTrackType = const bool;
-    isGbTrackType& isGbTrack;
-    using isMbTrackType = const bool;
-    isMbTrackType& isMbTrack;
-    using isMcTrackType = const bool;
-    isMcTrackType& isMcTrack;
-    using isRaTrackType = const bool;
-    isRaTrackType& isRaTrack;
-    using isRcTrackType = const bool;
-    isRcTrackType& isRcTrack;
     using liveWorldType = rr::game::LiveZoneWorld50EN;
     liveWorldType& liveWorld;
     using mType = rr::game::MainBodyState49K;
     mType& m;
-    using maOriginalDiscType = const bool;
-    maOriginalDiscType& maOriginalDisc;
-    using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
-    maTriggerActionsType& maTriggerActions;
-    using maTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    maTriggerAuthoringType& maTriggerAuthoring;
     using mainMembershipType = rr::game::LiveZoneMembership50EN;
     mainMembershipType& mainMembership;
-    using mbAiViewType = const rr::game::TrackNavigationView50EU;
-    mbAiViewType& mbAiView;
-    using mbColdBoundType = bool;
-    mbColdBoundType& mbColdBound;
-    using mbCollisionWorldType = std::shared_ptr<mb_collision_world50MB::Owner>;
-    mbCollisionWorldType& mbCollisionWorld;
-    using mbOriginalDiscType = const bool;
-    mbOriginalDiscType& mbOriginalDisc;
-    using mbSourceTriggersType = std::unique_ptr<mb_source_trigger50MB::Owner>;
-    mbSourceTriggersType& mbSourceTriggers;
-    using mcCollisionWorldType = std::shared_ptr<mc_collision_world50MC::Owner>;
-    mcCollisionWorldType& mcCollisionWorld;
-    using mcNavigationOwnerType = std::shared_ptr<mc_navigation50MC::Owner>;
-    mcNavigationOwnerType& mcNavigationOwner;
-    using mcQueryBindingType = std::unique_ptr<mc_query50MC::Binding>;
-    mcQueryBindingType& mcQueryBinding;
+    using aiViewType = const common_track50CR::NavigationView;
+    aiViewType& aiView;
+    using coldNavigationBoundType = bool;
+    coldNavigationBoundType& coldNavigationBound;
     using membershipWorkType = rr::game::LiveZoneWorkspace50EN;
     membershipWorkType& membershipWork;
     using nativeOriginalFleetType = const bool;
     nativeOriginalFleetType& nativeOriginalFleet;
     using nativeSelectedLightsType = const bool;
     nativeSelectedLightsType& nativeSelectedLights;
-    using navigationAIType = const rr::game::TrackNavigation50EU*;
-    navigationAIType& navigationAI;
-    using navigationMapType = const rr::game::TrackNavigation50EU*;
-    navigationMapType& navigationMap;
     using navigationProgressType = rr::game::TrackNavigationProgress50EU;
     navigationProgressType& navigationProgress;
     using opponentDrawType = std::array<native_racer50HN::DrawOwner,maxHostRaceOpponents50HT>;
@@ -140,40 +104,12 @@ struct ContactsContext final {
     racerRigsType& racerRigs;
     using racerVisualsType = std::array<std::unique_ptr<native_racer50HW::Visual>,8>;
     racerVisualsType& racerVisuals;
-    using rcColdSourcesType = std::shared_ptr<const rc_cold_sources50LA::Owner>;
-    rcColdSourcesType& rcColdSources;
-    using rcNavigationBorrowType = const rc_navigation50RC::RuntimeBorrow;
-    rcNavigationBorrowType& rcNavigationBorrow;
-    using rcOriginalDiscType = const bool;
-    rcOriginalDiscType& rcOriginalDisc;
-    using rcTriggerActionsType = rc_trigger_actions::Owner*;
-    rcTriggerActionsType& rcTriggerActions;
-    using rcTriggerAuthoringType = std::shared_ptr<rc_trigger_authoring::Owner>;
-    rcTriggerAuthoringType& rcTriggerAuthoring;
-    using rcWorldBorrowType = std::optional<rc_collision_world50RC::Owner::Borrow>;
-    rcWorldBorrowType& rcWorldBorrow;
     interactive_frame50DU::BorrowedCall<undertrack_owners50ew_fixture::BorrowedQueries()> recoveryBorrowedQueries;
     using recoveryQueryOwnersType = undertrack_owners50ew_fixture::Owners;
     recoveryQueryOwnersType& recoveryQueryOwners;
-    interactive_frame50DU::BorrowedCall<void()> requireMbRuntimeNavigation50MB;
+    interactive_frame50DU::BorrowedCall<void()> requireRuntimeNavigation;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using commonRouteOriginalDiscType = const bool;
-    commonRouteOriginalDiscType& commonRouteOriginalDisc;
-    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    commonRouteTriggerActionsType& commonRouteTriggerActions;
-    using commonRouteTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    commonRouteTriggerAuthoringType& commonRouteTriggerAuthoring;
-    using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
-    scColdSourcesType& scColdSources;
-    using scGroundType = std::unique_ptr<sc_runtime_ground50LA::Owner>;
-    scGroundType& scGround;
-    using scOriginalDiscType = const bool;
-    scOriginalDiscType& scOriginalDisc;
-    using scTriggerActionsType = std::unique_ptr<sc_trigger_actions::Owner>;
-    scTriggerActionsType& scTriggerActions;
-    using scTriggerAuthoringType = std::shared_ptr<sc_trigger_authoring::Owner>;
-    scTriggerAuthoringType& scTriggerAuthoring;
     using secondaryFilterType = rr::game::CollisionFilter48J;
     secondaryFilterType& secondaryFilter;
     using secondaryMembershipType = rr::game::LiveZoneMembership50EN;
@@ -186,34 +122,8 @@ struct ContactsContext final {
     sessionRandomType& sessionRandom;
     using sourceAnnouncerType = std::unique_ptr<source_announcer50IE::Owner>;
     sourceAnnouncerType& sourceAnnouncer;
-    using tbAiViewType = const rr::game::TrackNavigationView50TB;
-    tbAiViewType& tbAiView;
-    using tbColdSourcesType = std::shared_ptr<const tb_cold_sources50LA::Owner>;
-    tbColdSourcesType& tbColdSources;
-    using tbCollisionWorldType = std::shared_ptr<tb_collision_world50TB::Owner>;
-    tbCollisionWorldType& tbCollisionWorld;
-    using tbMapViewType = const rr::game::TrackNavigationView50TB;
-    tbMapViewType& tbMapView;
-    using tbOriginalDiscType = const bool;
-    tbOriginalDiscType& tbOriginalDisc;
-    using tbTriggerActionsType = std::shared_ptr<tb_trigger_actions50TB::Owner>;
-    tbTriggerActionsType& tbTriggerActions;
-    using tbWorldBorrowType = std::optional<tb_collision_world50TB::Owner::Borrow>;
-    tbWorldBorrowType& tbWorldBorrow;
-    using tcAiViewType = const rr::game::TrackNavigationView50TC;
-    tcAiViewType& tcAiView;
-    using tcColdSourcesType = std::shared_ptr<const tc_cold_sources50LA::Owner>;
-    tcColdSourcesType& tcColdSources;
-    using tcCollisionWorldType = std::shared_ptr<tc_collision_world50TC::Owner>;
-    tcCollisionWorldType& tcCollisionWorld;
-    using tcMapViewType = const rr::game::TrackNavigationView50TC;
-    tcMapViewType& tcMapView;
-    using tcOriginalDiscType = const bool;
-    tcOriginalDiscType& tcOriginalDisc;
-    using tcTriggerActionsType = std::shared_ptr<tc_trigger_actions50TC::Owner>;
-    tcTriggerActionsType& tcTriggerActions;
-    using tcWorldBorrowType = std::optional<tc_collision_world50TC::Owner::Borrow>;
-    tcWorldBorrowType& tcWorldBorrow;
+    using mapViewType = const common_track50CR::NavigationView;
+    mapViewType& mapView;
     using trackCountsType = const track_runtime_storage50IG::Counts;
     trackCountsType& trackCounts;
     using trackStorageType = track_runtime_storage50IG::Storage;

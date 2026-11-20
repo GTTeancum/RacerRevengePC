@@ -1,4 +1,13 @@
 #pragma once
+// W0 common rewrite: the one track, world, stage, lap, roster, start and end owners.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "original_consumed_stage50du.h"
+#include "common_lap50cr.h"
+#include "common_roster50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
 #include "terrain_interactive_frame_types50du.h"
 #include "terrain_interactive_frame_part50du.h"
 #include "native_borrowed_call50du.h"
@@ -13,14 +22,20 @@ struct NativeCalls;
 // Construction precedes the thin local adapter; synchronous calls finish before
 // that adapter/view and the original locals retire in their unchanged order.
 struct Context final {
+    // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
+    using trackType = const common_track50CR::Track;
+    trackType& track;
+    // W0 common rewrite: one lap tracker (common_lap50cr.h)
+    using lapsType = common_lap50CR::Tracker;
+    lapsType& laps;
     using originalAiAudioEnabledType = const bool;
     originalAiAudioEnabledType& originalAiAudioEnabled;
     using originalUiActiveType = bool;
     originalUiActiveType& originalUiActive;
     using nativeSelectedLightsType = const bool;
     nativeSelectedLightsType& nativeSelectedLights;
-    using gcGraphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
-    gcGraphicsSequenceType& gcGraphicsSequence;
+    using graphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
+    graphicsSequenceType& graphicsSequence;
     using finishDriverAppliedThisFrameType = bool;
     finishDriverAppliedThisFrameType& finishDriverAppliedThisFrame;
     using audioEnabledType = const bool;
@@ -43,42 +58,12 @@ struct Context final {
     completedFramesType& completedFrames;
     using originalAiType = rr::game::AiRuntimeState50IV;
     originalAiType& originalAi;
-    using mcMapViewType = rr::game::TrackNavigationView50MC;
-    mcMapViewType& mcMapView;
-    using mcAiViewType = rr::game::TrackNavigationView50MC;
-    mcAiViewType& mcAiView;
-    using mcAiMetadataType = rr::game::AiTrackMetadataView50MC;
-    mcAiMetadataType& mcAiMetadata;
-    using gbMapViewType = rr::game::TrackNavigationView50GB;
-    gbMapViewType& gbMapView;
-    using gbAiViewType = rr::game::TrackNavigationView50GB;
-    gbAiViewType& gbAiView;
-    using gbAiMetadataType = rr::game::AiTrackMetadataView50GB;
-    gbAiMetadataType& gbAiMetadata;
-    using tbMapViewType = const rr::game::TrackNavigationView50TB;
-    tbMapViewType& tbMapView;
-    using tbAiViewType = const rr::game::TrackNavigationView50TB;
-    tbAiViewType& tbAiView;
-    using tbAiMetadataType = const rr::game::AiTrackMetadataView50TB;
-    tbAiMetadataType& tbAiMetadata;
-    using tcMapViewType = const rr::game::TrackNavigationView50TC;
-    tcMapViewType& tcMapView;
-    using tcAiViewType = const rr::game::TrackNavigationView50TC;
-    tcAiViewType& tcAiView;
-    using tcAiMetadataType = const rr::game::AiTrackMetadataView50TC;
-    tcAiMetadataType& tcAiMetadata;
-    using mbMapViewType = const rr::game::TrackNavigationView50EU;
-    mbMapViewType& mbMapView;
-    using mbAiViewType = const rr::game::TrackNavigationView50EU;
-    mbAiViewType& mbAiView;
-    using mbAiMetadataType = const rr::game::AiTrackMetadataView50IU;
-    mbAiMetadataType& mbAiMetadata;
+    using mapViewType = const common_track50CR::NavigationView;
+    mapViewType& mapView;
+    using aiViewType = const common_track50CR::NavigationView;
+    aiViewType& aiView;
     using liveWorldType = rr::game::LiveZoneWorld50EN;
     liveWorldType& liveWorld;
-    using navigationMapType = const rr::game::TrackNavigation50EU*;
-    navigationMapType& navigationMap;
-    using navigationAIType = const rr::game::TrackNavigation50EU*;
-    navigationAIType& navigationAI;
     using selectedOriginalAiMetadataType = const rr::game::AiTrackMetadata50IU;
     selectedOriginalAiMetadataType& selectedOriginalAiMetadata;
     using originalAiTuningType = rr::game::AiTrackTuning50IU;
@@ -107,16 +92,6 @@ struct Context final {
     boostStateType& boostState;
     using originalAiReceiptType = rr::game::AiRuntimeReceipt50IV;
     originalAiReceiptType& originalAiReceipt;
-    using isMcTrackType = const bool;
-    isMcTrackType& isMcTrack;
-    using isGbTrackType = const bool;
-    isGbTrackType& isGbTrack;
-    using isTbTrackType = const bool;
-    isTbTrackType& isTbTrack;
-    using isTcTrackType = const bool;
-    isTcTrackType& isTcTrack;
-    using isMbTrackType = const bool;
-    isMbTrackType& isMbTrack;
     using originalRecoveryEnabledType = const bool;
     originalRecoveryEnabledType& originalRecoveryEnabled;
     using originalResetGroundType = std::unique_ptr<original_ai_reset_ground_bridge::GroundBridge>;
@@ -135,18 +110,10 @@ struct Context final {
     trackCountsType& trackCounts;
     using selectedRuntimeHeightDomainType = rr::game::UndertrackPhysicsDomain50EW;
     selectedRuntimeHeightDomainType& selectedRuntimeHeightDomain;
-    using mcWaterOwnerType = std::shared_ptr<mc_water50MC::Owner>;
-    mcWaterOwnerType& mcWaterOwner;
     using terrainOwnerType = terrain_probe_authoring50fq_fixture::Owner;
     terrainOwnerType& terrainOwner;
-    using nativeGcWaterType = std::unique_ptr<native_gc_water_session50KG::Owner>;
-    nativeGcWaterType& nativeGcWater;
     using nativeWaterRacersType = std::array<std::unique_ptr<native_gc_water_racer50KG::Owner>,rr::game::defaultHostRaceRacers50HT>;
     nativeWaterRacersType& nativeWaterRacers;
-    using mcParticleVehiclesType = std::shared_ptr<mc_particle_vehicle50MC::Owner>;
-    mcParticleVehiclesType& mcParticleVehicles;
-    using gcLightOwnerType = rr::game::original_gc_gameplay_lighting_candidate::Owner;
-    gcLightOwnerType& gcLightOwner;
     using resetGlobalsType = rr::game::SecondaryActivationGlobals49V;
     resetGlobalsType& resetGlobals;
     using resetLifecycleType = rr::game::ResetLifecycleGlobals50AT;
@@ -234,8 +201,8 @@ struct Context final {
     liveAudioType& liveAudio;
     using boostDiagnosticType = rr::game::BoostDiagnostic50FK;
     boostDiagnosticType& boostDiagnostic;
-    using gcLightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
-    gcLightDiagnosticType& gcLightDiagnostic;
+    using lightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
+    lightDiagnosticType& lightDiagnostic;
     using dynamicConsumerFlags11050Type = const std::uint32_t;
     dynamicConsumerFlags11050Type& dynamicConsumerFlags11050;
     using allAiEnabledType = const bool;
@@ -306,22 +273,18 @@ struct Context final {
     materialAudioType& materialAudio;
     using membershipWorkType = rr::game::LiveZoneWorkspace50EN;
     membershipWorkType& membershipWork;
-    BorrowedCall<void()> requireMbRuntimeNavigation50MB;
+    BorrowedCall<void()> requireRuntimeNavigation;
     BorrowedCall<bool()> refreshAnimatedCandidates;
     BorrowedCall<rr::game::UndertrackQueryOwners50EW()> recoveryQueries;
     BorrowedCall<bool(bool,const char*)> reportNavigation;
-    BorrowedCall<std::uint32_t()> selectedMapCount50MB;
-    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNode50MB;
+    BorrowedCall<std::uint32_t()> selectedMapCount;
+    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNode;
     BorrowedCall<void()> refreshDynamicSelfActor;
     BorrowedCall<void(std::uint32_t,const char*)> dynamicBoundary;
     BorrowedCall<rr::game::DamageSpeechInput50HG()> speechInput;
     BorrowedCall<bool(const rr::game::ImpactEffectEvent50B*,std::size_t)> consumeEffects;
     using originalAiEnabledType = const bool;
     originalAiEnabledType& originalAiEnabled;
-    using isRaTrackType = const bool;
-    isRaTrackType& isRaTrack;
-    using isRcTrackType = const bool;
-    isRcTrackType& isRcTrack;
     using checkpointRequestedType = bool;
     checkpointRequestedType& checkpointRequested;
     using checkpointOutputType = checkpoint_recovery50fi_fixture::Plan;
@@ -356,38 +319,6 @@ struct Context final {
     poseHistoryType& poseHistory;
     using coldFlameType = rr::assets::PodFlameOwners50W;
     coldFlameType& coldFlame;
-    using raWorldType = std::shared_ptr<ra_cold_aggregate50LA::Owner>;
-    raWorldType& raWorld;
-    using raDiagnosticType = ra_cold_aggregate50LA::Diagnostic;
-    raDiagnosticType& raDiagnostic;
-    using rcTriggerActionsType = rc_trigger_actions::Owner*;
-    rcTriggerActionsType& rcTriggerActions;
-    using rcTriggerAuthoringType = std::shared_ptr<rc_trigger_authoring::Owner>;
-    rcTriggerAuthoringType& rcTriggerAuthoring;
-    using rcWorldBorrowType = std::optional<rc_collision_world50RC::Owner::Borrow>;
-    rcWorldBorrowType& rcWorldBorrow;
-    using tbTriggerActionsType = std::shared_ptr<tb_trigger_actions50TB::Owner>;
-    tbTriggerActionsType& tbTriggerActions;
-    using tbWorldBorrowType = std::optional<tb_collision_world50TB::Owner::Borrow>;
-    tbWorldBorrowType& tbWorldBorrow;
-    using tcTriggerActionsType = std::shared_ptr<tc_trigger_actions50TC::Owner>;
-    tcTriggerActionsType& tcTriggerActions;
-    using tcWorldBorrowType = std::optional<tc_collision_world50TC::Owner::Borrow>;
-    tcWorldBorrowType& tcWorldBorrow;
-    using scTriggerActionsType = std::unique_ptr<sc_trigger_actions::Owner>;
-    scTriggerActionsType& scTriggerActions;
-    using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
-    gaTriggerActionsType& gaTriggerActions;
-    using gcTriggerActionsType = std::unique_ptr<gc_trigger_actions50KG::Owner>;
-    gcTriggerActionsType& gcTriggerActions;
-    using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
-    maTriggerActionsType& maTriggerActions;
-    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    commonRouteTriggerActionsType& commonRouteTriggerActions;
-    using mcQueryBindingType = std::unique_ptr<mc_query50MC::Binding>;
-    mcQueryBindingType& mcQueryBinding;
-    using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;
-    gbQueryBindingType& gbQueryBinding;
     using trackStorageType = track_runtime_storage50IG::Storage;
     trackStorageType& trackStorage;
     using secondaryMembershipType = rr::game::LiveZoneMembership50EN;
@@ -520,10 +451,6 @@ struct Context final {
     mainCrossedPortalsType& mainCrossedPortals;
     using secondaryCrossedPortalsType = std::uint64_t;
     secondaryCrossedPortalsType& secondaryCrossedPortals;
-    using mbSourceTriggersType = std::unique_ptr<mb_source_trigger50MB::Owner>;
-    mbSourceTriggersType& mbSourceTriggers;
-    using mbCollisionWorldType = std::shared_ptr<mb_collision_world50MB::Owner>;
-    mbCollisionWorldType& mbCollisionWorld;
     using initialPairsType = std::vector<rr::game::SpringCumulativePair48N>;
     initialPairsType& initialPairs;
     using initialMetadataType = std::vector<rr::game::Type2PairMetadata49X>;

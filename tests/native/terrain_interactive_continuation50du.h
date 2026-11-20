@@ -1,4 +1,13 @@
 #pragma once
+// W0 common rewrite: the one track, world, stage, lap, roster, start and end owners.
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "original_consumed_stage50du.h"
+#include "common_lap50cr.h"
+#include "common_roster50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
 #include "course_trigger_sources50ct.h"
 // Borrowed declarations only. Complete providers below retain original nested
 // type identities and canonical extents; implementation imports stay in the .cpp.
@@ -9,42 +18,19 @@
 #include "terrain_interactive_frame_part50du.h"
 #include "native_borrowed_call50du.h"
 #include "terrain_interactive_cold_types50du.h"
-#include "sc_trigger_authoring_fixture.h"
 class ColdLoadDiagnostics50DU;
 namespace pod_cables50fd_fixture { class Owner; }
-namespace original_consumed_ga_stage50DU { class Owner; }
-namespace original_consumed_gc_stage50DU { class Owner; }
-namespace original_consumed_ma_stage50DU { class Owner; }
-namespace original_consumed_mb_stage50DU { class Owner; }
-namespace original_consumed_sc_stage50DU { class Owner; }
-namespace original_consumed_gb_stage50DU { class Owner; }
-namespace original_consumed_mc_stage50DU { class Owner; }
-namespace original_consumed_tb_stage50DU { class Owner; }
-namespace original_consumed_rc_stage50DU { class Owner; }
-namespace original_consumed_tc_stage50DU { class Owner; }
-namespace original_consumed_common_route_stage50DU { class Owner; }
-namespace original_consumed_ta_stage50DU { class Owner; }
-namespace gb_positional_sound50GB { class Owner; }
-namespace mc_positional_sound50MC { class Owner; }
-namespace rc_positional_sound50RC { class Owner; }
-namespace tb_positional_sound50TB { class Owner; }
 
 // These nested identities cannot be declared through incomplete owner classes.
-#include "ra_cold_aggregate50la.h"
+// W0: the RA aggregate include that used to supply the declarations below is retired.
+#include "../../src/game/control_presets49d.h"
+namespace original_camera_cycle_audio50KX { class Owner; }
+namespace original_follow_query_bridge { class QueryBridge; }
+namespace original_pause_observation50LA { class Owner; }
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "json.hpp"
 #include <filesystem>
 
-namespace gb_original_world50LM { class Owner; }
-namespace tb_original_world50LM { class Owner; }
-namespace rc_original_world50LM { class Owner; }
-namespace tc_original_world50LM { class Owner; }
-namespace mb_original_world50LM { class Owner; }
-namespace mc_original_world50LM { class Owner; }
-namespace mc_particle_attachments50MC { class Owner; }
-namespace mc_particle_runtime50MC { class Owner; struct Diagnostic; }
-namespace mc_particle_source50MC { class Owner; }
-namespace mc_track_fog50MC { class Owner; }
 namespace opponent_audio50HX { class Owner; }
 namespace original_course_targets50KX { class ColdLoadRequest; }
 namespace phase_timing50GK { struct Interval; }
@@ -82,6 +68,21 @@ using J=nlohmann::json;
 // Caller prefix remains alive until run() has returned/unwound ALL suffix owners.
 // No resources, heap allocation, or lifetime extension are owned by this view.
 struct Context final {
+    // W0 common rewrite: one track of this race (common_track50cr.h): code, files, counts, role owners
+    using trackType = const common_track50CR::Track;
+    trackType& track;
+    // W0 common rewrite: one lap tracker (common_lap50cr.h)
+    using lapsType = common_lap50CR::Tracker;
+    lapsType& laps;
+    // W0 common rewrite: one roster (common_roster50cr.h)
+    using rosterType = common_roster50CR::Owner;
+    rosterType& roster;
+    // W0 common rewrite: one race start 1A6AA0/1AC8E0 (common_race_start50cr.h)
+    using raceStartType = common_race_start50CR::Owner;
+    raceStartType& raceStart;
+    // W0 common rewrite: one end dispatch 1A7DD0 and departure (common_race_end50cr.h)
+    using raceEndType = common_race_end50CR::Owner;
+    raceEndType& raceEnd;
     BorrowedCall<bool(const rr::game::VehicleLiveQueryResult50EQ&,rr::game::Type2StaticQuery49X&,const rr::game::LiveZoneMembership50EN&,std::uint64_t&,const char*)> acceptLiveQueryCall;
     using actualHeightType = const track_height_cold50JB::Owner;
     actualHeightType& actualHeight;
@@ -176,12 +177,8 @@ struct Context final {
     checkpointRequestedType& checkpointRequested;
     using clockType = rr::game::FrameTimingState49I;
     clockType& clock;
-    BorrowedCall<bool() noexcept> closeGbCurrentCollisionCall;
-    BorrowedCall<bool() noexcept> closeMcCurrentCollisionCall;
-    BorrowedCall<bool() noexcept> closeRcCurrentCollisionCall;
-    BorrowedCall<bool() noexcept> closeScCurrentMembershipsCall;
-    BorrowedCall<bool() noexcept> closeTbCurrentCollisionCall;
-    BorrowedCall<bool() noexcept> closeTcCurrentCollisionCall;
+    BorrowedCall<bool() noexcept> closeCurrentCollisionCall;
+    BorrowedCall<bool() noexcept> closeCurrentMembershipsCall;
     using coldFlameType = rr::assets::PodFlameOwners50W;
     coldFlameType& coldFlame;
     using coldLoadDiagnosticsType = ColdLoadDiagnostics50DU;
@@ -196,32 +193,8 @@ struct Context final {
     completedFramesType& completedFrames;
     BorrowedCall<void(bool,const rr::platform::WindowInput50DQ&,std::size_t)> composePacketCall;
     BorrowedCall<bool(const rr::game::ImpactEffectEvent50B*,std::size_t)> consumeEffectsCall;
-    using consumedGaStageType = original_consumed_ga_stage50DU::Owner;
-    consumedGaStageType& consumedGaStage;
-    using consumedGcStageType = original_consumed_gc_stage50DU::Owner;
-    consumedGcStageType& consumedGcStage;
-    using consumedMaStageType = original_consumed_ma_stage50DU::Owner;
-    consumedMaStageType& consumedMaStage;
-    using consumedMbStageType = original_consumed_mb_stage50DU::Owner;
-    consumedMbStageType& consumedMbStage;
-    using consumedScStageType = original_consumed_sc_stage50DU::Owner;
-    consumedScStageType& consumedScStage;
-    using consumedGbStageType = original_consumed_gb_stage50DU::Owner;
-    consumedGbStageType& consumedGbStage;
-    using consumedMcStageType = original_consumed_mc_stage50DU::Owner;
-    consumedMcStageType& consumedMcStage;
-    using consumedTbStageType = original_consumed_tb_stage50DU::Owner;
-    consumedTbStageType& consumedTbStage;
-    using consumedRcStageType = original_consumed_rc_stage50DU::Owner;
-    consumedRcStageType& consumedRcStage;
-    using consumedTcStageType = original_consumed_tc_stage50DU::Owner;
-    consumedTcStageType& consumedTcStage;
-    using consumedRaStageType = original_consumed_ra_stage50DU::Owner;
-    consumedRaStageType& consumedRaStage;
-    using consumedCommonRouteStageType = original_consumed_common_route_stage50DU::Owner;
-    consumedCommonRouteStageType& consumedCommonRouteStage;
-    using consumedTaStageType = original_consumed_ta_stage50DU::Owner;
-    consumedTaStageType& consumedTaStage;
+    using consumedStageType = original_consumed_stage50DU::Owner;
+    consumedStageType& consumedStage;
     using controlPresetsType = rr::game::ControlPresets49D;
     controlPresetsType& controlPresets;
     using controllerType = rr::game::ControllerIngress50CX;
@@ -242,8 +215,8 @@ struct Context final {
     courseDiagnosticType& courseDiagnostic;
     using courseOutputType = rr::host::CourseDriverOutput50GK;
     courseOutputType& courseOutput;
-    using courseRaceColdType = const bool;
-    courseRaceColdType& courseRaceCold;
+    using rootedCourseRaceType = const bool;
+    rootedCourseRaceType& rootedCourseRace;
     using courseRaceLaunchedType = bool;
     courseRaceLaunchedType& courseRaceLaunched;
     using courseStateType = rr::host::CourseDriverState50GK;
@@ -252,8 +225,6 @@ struct Context final {
     courseTuningType& courseTuning;
     using destinationType = rr::game::Type2StaticDestination49X;
     destinationType& destination;
-    using directOriginalHumanType = const bool;
-    directOriginalHumanType& directOriginalHuman;
     using discardedHostNsType = std::uint64_t;
     discardedHostNsType& discardedHostNs;
     using displayWallTotalsType = GameplayDisplayWallTotals50DU;
@@ -366,98 +337,24 @@ struct Context final {
     trackAnimationPrefixArmedType& trackAnimationPrefixArmed;
     using trackAnimationDiagnosticType = track_animation_runtime50AN::Diagnostic;
     trackAnimationDiagnosticType& trackAnimationDiagnostic;
-    using gaGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
-    gaGateAudioType& gaGateAudio;
-    using gaOriginalDiscType = const bool;
-    gaOriginalDiscType& gaOriginalDisc;
-    using gaOriginalWorldType = std::shared_ptr<ga_original_world50LH::Owner>;
-    gaOriginalWorldType& gaOriginalWorld;
-    using gaTriggerActionsType = std::unique_ptr<ga_trigger_actions::Owner>;
-    gaTriggerActionsType& gaTriggerActions;
-    using gaTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    gaTriggerAuthoringType& gaTriggerAuthoring;
-    using gaTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
-    gaTriggerMembershipType& gaTriggerMembership;
+    using triggerAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
+    triggerAudioType& triggerAudio;
+    using triggerMembershipType = common_track50CR::Block<std::unique_ptr<track_runtime_storage50IG::Membership>>;
+    triggerMembershipType& triggerMembership;
     BorrowedCall<bool()> gatherRegisteredCall;
-    using gbAiMetadataType = rr::game::AiTrackMetadataView50GB;
-    gbAiMetadataType& gbAiMetadata;
-    using gbAiViewType = rr::game::TrackNavigationView50GB;
-    gbAiViewType& gbAiView;
-    using gbColdSourcesType = std::shared_ptr<const gb_cold_sources50LA::Owner>;
-    gbColdSourcesType& gbColdSources;
-    using gbCollisionCleanupDoneType = bool;
-    gbCollisionCleanupDoneType& gbCollisionCleanupDone;
-    using gbCollisionWorldType = std::shared_ptr<gb_collision_world50GB::Owner>;
-    gbCollisionWorldType& gbCollisionWorld;
-    using gbFogOwnerType = std::shared_ptr<gb_track_fog50GB::Owner>;
-    gbFogOwnerType& gbFogOwner;
-    using gbLightOwnerType = std::shared_ptr<original_gc_gameplay_lighting_candidate::Owner>;
-    gbLightOwnerType& gbLightOwner;
-    using gbMapMetadataType = rr::game::AiTrackMetadataView50GB;
-    gbMapMetadataType& gbMapMetadata;
-    using gbMapViewType = rr::game::TrackNavigationView50GB;
-    gbMapViewType& gbMapView;
-    using gbNavigationType = gb_navigation50GB::Owner;
-    gbNavigationType& gbNavigation;
-    using gbNavigationOwnerType = std::shared_ptr<gb_navigation50GB::Owner>;
-    gbNavigationOwnerType& gbNavigationOwner;
-    using gbOriginalWorldType = std::shared_ptr<gb_original_world50LM::Owner>;
-    gbOriginalWorldType& gbOriginalWorld;
-    using tbOriginalWorldType = std::shared_ptr<tb_original_world50LM::Owner>;
-    tbOriginalWorldType& tbOriginalWorld;
-    using rcOriginalWorldType = std::shared_ptr<rc_original_world50LM::Owner>;
-    rcOriginalWorldType& rcOriginalWorld;
-    using tcOriginalWorldType = std::shared_ptr<tc_original_world50LM::Owner>;
-    tcOriginalWorldType& tcOriginalWorld;
-    using gbParticleAttachmentsType = std::shared_ptr<gb_particle_attachments50GB::Owner>;
-    gbParticleAttachmentsType& gbParticleAttachments;
-    using gbParticleAuthoringType = std::shared_ptr<gb_particle_authoring50GB::Owner>;
-    gbParticleAuthoringType& gbParticleAuthoring;
-    using gbParticleRenderType = std::shared_ptr<gb_particle_render50GB::Owner>;
-    gbParticleRenderType& gbParticleRender;
-    using gbParticleRuntimeType = std::shared_ptr<gb_particle_runtime50GB::Owner>;
-    gbParticleRuntimeType& gbParticleRuntime;
-    using gbParticleRuntimeDiagnosticType = gb_particle_runtime50GB::Diagnostic;
-    gbParticleRuntimeDiagnosticType& gbParticleRuntimeDiagnostic;
-    using gbParticleWindowType = std::shared_ptr<gb_particle_visual50GB::Window>;
-    gbParticleWindowType& gbParticleWindow;
-    using gbPodSoundType = std::shared_ptr<gb_pod_sound50GB::Owner>;
-    gbPodSoundType& gbPodSound;
-    using gbPositionalAudioType = std::unique_ptr<gb_positional_sound50GB::Owner>;
-    gbPositionalAudioType& gbPositionalAudio;
-    using gbQueryBindingType = std::unique_ptr<gb_query50GB::Binding>;
-    gbQueryBindingType& gbQueryBinding;
-    BorrowedCall<std::size_t()> gbRemainingPayloadBytesCall;
-    using gbTrackParticlesType = std::shared_ptr<OriginalTrackParticleCold50LA>;
-    gbTrackParticlesType& gbTrackParticles;
-    using gbTriggerActionsType = std::shared_ptr<gb_trigger_actions50GB::Owner>;
-    gbTriggerActionsType& gbTriggerActions;
-    using gbWorldBorrowType = std::optional<gb_collision_world50GB::Owner::Borrow>;
-    gbWorldBorrowType& gbWorldBorrow;
-    using gcDrawLightsType = std::array<rr::game::NativeGcSelectedLightsCandidate,rr::game::defaultHostRaceRacers50HT>;
-    gcDrawLightsType& gcDrawLights;
-    using gcGateAudioType = std::unique_ptr<gc_gate_audio50IN::Owner>;
-    gcGateAudioType& gcGateAudio;
-    using gcGraphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
-    gcGraphicsSequenceType& gcGraphicsSequence;
-    using gcLightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
-    gcLightDiagnosticType& gcLightDiagnostic;
-    using gcLightOwnerType = rr::game::original_gc_gameplay_lighting_candidate::Owner;
-    gcLightOwnerType& gcLightOwner;
-    using gcNativeGateType = const bool;
-    gcNativeGateType& gcNativeGate;
-    using gcNativeWorldSelectedType = const bool;
-    gcNativeWorldSelectedType& gcNativeWorldSelected;
-    using gcOriginalDiscType = const bool;
-    gcOriginalDiscType& gcOriginalDisc;
-    using gcOriginalWorldType = std::shared_ptr<gc_original_world50LM::Owner>;
-    gcOriginalWorldType& gcOriginalWorld;
-    using gcTriggerActionsType = std::unique_ptr<gc_trigger_actions50KG::Owner>;
-    gcTriggerActionsType& gcTriggerActions;
-    using gcTriggerAuthoringType = std::unique_ptr<gc_trigger_authoring50IN::Owner>;
-    gcTriggerAuthoringType& gcTriggerAuthoring;
-    using gcTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_trigger_authoring50IN::count>;
-    gcTriggerMembershipType& gcTriggerMembership;
+    using aiViewType = const common_track50CR::NavigationView;
+    aiViewType& aiView;
+    using collisionCleanupDoneType = bool;
+    collisionCleanupDoneType& collisionCleanupDone;
+    using mapViewType = const common_track50CR::NavigationView;
+    mapViewType& mapView;
+    BorrowedCall<std::size_t()> remainingPayloadBytesCall;
+    using drawLightsType = std::array<rr::game::NativeGcSelectedLightsCandidate,rr::game::defaultHostRaceRacers50HT>;
+    drawLightsType& drawLights;
+    using graphicsSequenceType = std::array<std::uint64_t,rr::game::defaultHostRaceRacers50HT>;
+    graphicsSequenceType& graphicsSequence;
+    using lightDiagnosticType = rr::game::original_gc_gameplay_lighting_candidate::Diagnostic;
+    lightDiagnosticType& lightDiagnostic;
     using generatedEffectsType = rr::game::ImpactEffectEvent50B[rr::game::maxImpactEffectEvents50B];
     generatedEffectsType& generatedEffects;
     using groundType = const authored_runtime_ground50cp_fixture::ColdScene;
@@ -492,34 +389,6 @@ struct Context final {
     initialMetadataType& initialMetadata;
     using initialPairsType = std::vector<rr::game::SpringCumulativePair48N>;
     initialPairsType& initialPairs;
-    using isGaTrackType = const bool;
-    isGaTrackType& isGaTrack;
-    using isGbTrackType = const bool;
-    isGbTrackType& isGbTrack;
-    using isGcTrackType = const bool;
-    isGcTrackType& isGcTrack;
-    using maOrCommonRouteTrackType = const bool;
-    maOrCommonRouteTrackType& maOrCommonRouteTrack;
-    using isMaTrackType = const bool;
-    isMaTrackType& isMaTrack;
-    using isMbTrackType = const bool;
-    isMbTrackType& isMbTrack;
-    using isMcTrackType = const bool;
-    isMcTrackType& isMcTrack;
-    using isRaTrackType = const bool;
-    isRaTrackType& isRaTrack;
-    using isRcTrackType = const bool;
-    isRcTrackType& isRcTrack;
-    using commonRouteTrackType = const bool;
-    commonRouteTrackType& commonRouteTrack;
-    using isScTrackType = const bool;
-    isScTrackType& isScTrack;
-    using isTaTrackType = const bool;
-    isTaTrackType& isTaTrack;
-    using isTbTrackType = const bool;
-    isTbTrackType& isTbTrack;
-    using isTcTrackType = const bool;
-    isTcTrackType& isTcTrack;
     using keyboardDiagnosticType = rr::platform::KeyboardPacketDiagnostic50DR;
     keyboardDiagnosticType& keyboardDiagnostic;
     using lapContinuityType = lap_drive50GJ::Continuity;
@@ -528,8 +397,6 @@ struct Context final {
     lapOwnerType& lapOwner;
     using lastCommittedWrongWayType = bool;
     lastCommittedWrongWayType& lastCommittedWrongWay;
-    using legacyGroundType = authored_runtime_ground50cp_fixture::ColdScene;
-    legacyGroundType& legacyGround;
     using liveAudioType = std::unique_ptr<live_audio50HF::Owner>;
     liveAudioType& liveAudio;
     using liveWorldType = rr::game::LiveZoneWorld50EN;
@@ -540,18 +407,6 @@ struct Context final {
     loadedTrackType& loadedTrack;
     using mType = rr::game::MainBodyState49K;
     mType& m;
-    using maOriginalDiscType = const bool;
-    maOriginalDiscType& maOriginalDisc;
-    using maOriginalWorldType = std::shared_ptr<ma_original_world50LM::Owner>;
-    maOriginalWorldType& maOriginalWorld;
-    using scOriginalWorldType = std::shared_ptr<sc_original_world50LM::Owner>;
-    scOriginalWorldType& scOriginalWorld;
-    using maTriggerActionsType = std::unique_ptr<ma_trigger_actions::Owner>;
-    maTriggerActionsType& maTriggerActions;
-    using maTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    maTriggerAuthoringType& maTriggerAuthoring;
-    using maTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
-    maTriggerMembershipType& maTriggerMembership;
     using mainContactFramesType = std::uint64_t;
     mainContactFramesType& mainContactFrames;
     using mainCrossedPortalsType = std::uint64_t;
@@ -570,77 +425,8 @@ struct Context final {
     materialAudioType& materialAudio;
     using materialOwnerType = std::unique_ptr<pod_materials50ed_fixture::Owner>;
     materialOwnerType& materialOwner;
-    using mbAiMetadataType = const rr::game::AiTrackMetadataView50IU;
-    mbAiMetadataType& mbAiMetadata;
-    using mbAiViewType = const rr::game::TrackNavigationView50EU;
-    mbAiViewType& mbAiView;
-    using mbCollisionWorldType = std::shared_ptr<mb_collision_world50MB::Owner>;
-    mbCollisionWorldType& mbCollisionWorld;
-    using mbMapMetadataType = const rr::game::AiTrackMetadataView50IU;
-    mbMapMetadataType& mbMapMetadata;
-    using mbMapViewType = const rr::game::TrackNavigationView50EU;
-    mbMapViewType& mbMapView;
-    using mbOriginalDiscType = const bool;
-    mbOriginalDiscType& mbOriginalDisc;
-    using mbOriginalWorldType = std::shared_ptr<mb_original_world50LM::Owner>;
-    mbOriginalWorldType& mbOriginalWorld;
-    using mbSourceTriggersType = std::unique_ptr<mb_source_trigger50MB::Owner>;
-    mbSourceTriggersType& mbSourceTriggers;
-    using mcAdditionalPayloadReservedType = std::size_t;
-    mcAdditionalPayloadReservedType& mcAdditionalPayloadReserved;
-    using mcAiMetadataType = rr::game::AiTrackMetadataView50MC;
-    mcAiMetadataType& mcAiMetadata;
-    using mcAiViewType = rr::game::TrackNavigationView50MC;
-    mcAiViewType& mcAiView;
-    using mcColdSourcesType = std::shared_ptr<const mc_cold_sources50LA::Owner>;
-    mcColdSourcesType& mcColdSources;
-    using mcCollisionCleanupDoneType = bool;
-    mcCollisionCleanupDoneType& mcCollisionCleanupDone;
-    using mcCollisionWorldType = std::shared_ptr<mc_collision_world50MC::Owner>;
-    mcCollisionWorldType& mcCollisionWorld;
-    using mcFogOwnerType = std::shared_ptr<mc_track_fog50MC::Owner>;
-    mcFogOwnerType& mcFogOwner;
-    using mcLightOwnerType = std::shared_ptr<original_gc_gameplay_lighting_candidate::Owner>;
-    mcLightOwnerType& mcLightOwner;
-    using mcMapMetadataType = rr::game::AiTrackMetadataView50MC;
-    mcMapMetadataType& mcMapMetadata;
-    using mcMapViewType = rr::game::TrackNavigationView50MC;
-    mcMapViewType& mcMapView;
-    using mcNavigationType = mc_navigation50MC::Owner;
-    mcNavigationType& mcNavigation;
-    using mcNavigationOwnerType = std::shared_ptr<mc_navigation50MC::Owner>;
-    mcNavigationOwnerType& mcNavigationOwner;
-    using mcOriginalWorldType = std::shared_ptr<mc_original_world50LM::Owner>;
-    mcOriginalWorldType& mcOriginalWorld;
-    using mcParticleAttachmentsType = std::shared_ptr<mc_particle_attachments50MC::Owner>;
-    mcParticleAttachmentsType& mcParticleAttachments;
-    using mcParticleRenderType = std::shared_ptr<mc_particle_render50MC::Owner>;
-    mcParticleRenderType& mcParticleRender;
-    using mcParticleRuntimeType = std::shared_ptr<mc_particle_runtime50MC::Owner>;
-    mcParticleRuntimeType& mcParticleRuntime;
-    using mcParticleRuntimeDiagnosticType = mc_particle_runtime50MC::Diagnostic;
-    mcParticleRuntimeDiagnosticType& mcParticleRuntimeDiagnostic;
-    using mcParticleSourceType = std::shared_ptr<mc_particle_source50MC::Owner>;
-    mcParticleSourceType& mcParticleSource;
-    using mcParticleVehiclesType = std::shared_ptr<mc_particle_vehicle50MC::Owner>;
-    mcParticleVehiclesType& mcParticleVehicles;
-    using mcParticleWindowType = std::shared_ptr<mc_particle_visual50MC::Window>;
-    mcParticleWindowType& mcParticleWindow;
-    using mcPositionalAudioType = std::unique_ptr<mc_positional_sound50MC::Owner>;
-    mcPositionalAudioType& mcPositionalAudio;
-    using mcQueryBindingType = std::unique_ptr<mc_query50MC::Binding>;
-    mcQueryBindingType& mcQueryBinding;
-    BorrowedCall<std::size_t()> mcRemainingPayloadBytesCall;
-    using mcTrackParticlesType = std::shared_ptr<OriginalTrackParticleCold50LA>;
-    mcTrackParticlesType& mcTrackParticles;
-    using mcTriggerActionsType = std::shared_ptr<mc_trigger_actions50MC::Owner>;
-    mcTriggerActionsType& mcTriggerActions;
-    using mcWaterOwnerType = std::shared_ptr<mc_water50MC::Owner>;
-    mcWaterOwnerType& mcWaterOwner;
-    using mcWaterUpdateSequenceType = std::uint64_t;
-    mcWaterUpdateSequenceType& mcWaterUpdateSequence;
-    using mcWorldBorrowType = std::optional<mc_collision_world50MC::Owner::Borrow>;
-    mcWorldBorrowType& mcWorldBorrow;
+    using waterUpdateSequenceType = std::uint64_t;
+    waterUpdateSequenceType& waterUpdateSequence;
     using membershipWorkType = rr::game::LiveZoneWorkspace50EN;
     membershipWorkType& membershipWork;
     using mode1Type = std::unique_ptr<race_mode1_host50ID::Owner>;
@@ -681,19 +467,9 @@ struct Context final {
     nativeEffectsType& nativeEffects;
     using nativeFireSerialType = std::uint32_t;
     nativeFireSerialType& nativeFireSerial;
-    using nativeGbSelectionType = const bool;
-    nativeGbSelectionType& nativeGbSelection;
-    using nativeGcWaterType = std::unique_ptr<native_gc_water_session50KG::Owner>;
-    nativeGcWaterType& nativeGcWater;
     BorrowedCall<void(const char*,std::uint32_t,const rr::game::original_gc_gameplay_lighting_candidate::DrawLease&)> nativeLightFailureCall;
     using nativeLightingPolicyType = const rr::game::original_gc_gameplay_lighting_candidate::CachePolicy;
     nativeLightingPolicyType& nativeLightingPolicy;
-    using nativeMaSelectionType = const bool;
-    nativeMaSelectionType& nativeMaSelection;
-    using nativeMbSelectionType = const bool;
-    nativeMbSelectionType& nativeMbSelection;
-    using nativeMcSelectionType = const bool;
-    nativeMcSelectionType& nativeMcSelection;
     using nativeOrdinaryLaunch11258Type = std::uint32_t;
     nativeOrdinaryLaunch11258Type& nativeOrdinaryLaunch11258;
     using nativeOriginalFleetType = const bool;
@@ -704,36 +480,18 @@ struct Context final {
     nativeParticleChildSequenceType& nativeParticleChildSequence;
     using nativeParticleChildrenType = std::array<native_gc_other_particle_children50KG::Runtime,rr::game::defaultHostRaceRacers50HT>;
     nativeParticleChildrenType& nativeParticleChildren;
-    using nativeRaSelectionType = const bool;
-    nativeRaSelectionType& nativeRaSelection;
     using nativeRacerManagerType = std::unique_ptr<original_racer_manager_entity::Owner>;
     nativeRacerManagerType& nativeRacerManager;
-    using nativeRcSelectionType = const bool;
-    nativeRcSelectionType& nativeRcSelection;
     using nativeRecordActorType = std::unique_ptr<original_subtype3_record::Owner>;
     nativeRecordActorType& nativeRecordActor;
-    using nativeRosterOwnersType = std::shared_ptr<ra_cold_roster50LA::RuntimeOwners>;
-    nativeRosterOwnersType& nativeRosterOwners;
-    using nativeCommonRouteSelectionType = const bool;
-    nativeCommonRouteSelectionType& nativeCommonRouteSelection;
-    using nativeScSelectionType = const bool;
-    nativeScSelectionType& nativeScSelection;
     using nativeSelectedLightsType = const bool;
     nativeSelectedLightsType& nativeSelectedLights;
-    using nativeTaSelectionType = const bool;
-    nativeTaSelectionType& nativeTaSelection;
-    using nativeTbSelectionType = const bool;
-    nativeTbSelectionType& nativeTbSelection;
-    using nativeTcSelectionType = const bool;
-    nativeTcSelectionType& nativeTcSelection;
     using nativeVideoType = std::shared_ptr<original_main_entry50KG::Video>;
     nativeVideoType& nativeVideo;
     using nativeWaterApplicationType = native_gc_water_session50KG::Application;
     nativeWaterApplicationType& nativeWaterApplication;
     using nativeWaterRacersType = std::array<std::unique_ptr<native_gc_water_racer50KG::Owner>,rr::game::defaultHostRaceRacers50HT>;
     nativeWaterRacersType& nativeWaterRacers;
-    using navigationAIType = const rr::game::TrackNavigation50EU*;
-    navigationAIType& navigationAI;
     using navigationAIScanType = std::uint64_t;
     navigationAIScanType& navigationAIScan;
     using navigationAISequentialType = std::uint64_t;
@@ -746,8 +504,6 @@ struct Context final {
     navigationDiagnosticType& navigationDiagnostic;
     using navigationGateSkipsType = std::uint64_t;
     navigationGateSkipsType& navigationGateSkips;
-    using navigationMapType = const rr::game::TrackNavigation50EU*;
-    navigationMapType& navigationMap;
     using navigationMapScanType = std::uint64_t;
     navigationMapScanType& navigationMapScan;
     using navigationMapSequentialType = std::uint64_t;
@@ -866,21 +622,13 @@ struct Context final {
     queryRecordsType& queryRecords;
     using queryResultType = rr::game::Type2StaticResult49X;
     queryResultType& queryResult;
-    using raDiagnosticType = ra_cold_aggregate50LA::Diagnostic;
-    raDiagnosticType& raDiagnostic;
-    using raFreshProbeType = std::shared_ptr<const ra_cold_roster50LA::FreshProbe>;
-    raFreshProbeType& raFreshProbe;
-    using raRuntimeType = std::shared_ptr<ra_cold_aggregate50LA::Owner::NativeRuntimeView>;
-    raRuntimeType& raRuntime;
     // PORT STAND-IN (common-path rule): retires RA's private end-candidate
     // query producer, whose service closures each hold the actual
     // OwnershipBridge. Defined by the setup (the bridge's friend); the race
     // end calls it before the counted world close, as 1A6840 releases every
     // race-owned service before the World at race+74 (1A69A8..1A69C4).
-    using retireRaEndCandidateProducerType = std::function<bool()>;
-    retireRaEndCandidateProducerType& retireRaEndCandidateProducer;
-    using raWorldType = std::shared_ptr<ra_cold_aggregate50LA::Owner>;
-    raWorldType& raWorld;
+    using retireEndCandidateProducerType = std::function<bool()>;
+    retireEndCandidateProducerType& retireEndCandidateProducer;
     using raceAudioType = std::unique_ptr<race_audio50HQ::Owner>;
     raceAudioType& raceAudio;
     using raceEnabledType = const bool;
@@ -907,27 +655,6 @@ struct Context final {
     racerRigsType& racerRigs;
     using racerVisualsType = std::array<std::unique_ptr<native_racer50HW::Visual>,8>;
     racerVisualsType& racerVisuals;
-    using rcColdSourcesType = std::shared_ptr<const rc_cold_sources50LA::Owner>;
-    rcColdSourcesType& rcColdSources;
-    using rcCollisionCleanupDoneType = bool;
-    rcCollisionCleanupDoneType& rcCollisionCleanupDone;
-    using rcCollisionWorldType = std::shared_ptr<rc_collision_world50RC::Owner>;
-    rcCollisionWorldType& rcCollisionWorld;
-    using rcLightOwnerType = std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner>;
-    rcLightOwnerType& rcLightOwner;
-    using rcNavigationBorrowType = const rc_navigation50RC::RuntimeBorrow;
-    rcNavigationBorrowType& rcNavigationBorrow;
-    using rcOriginalDiscType = const bool;
-    rcOriginalDiscType& rcOriginalDisc;
-    using rcPositionalAudioType = std::unique_ptr<rc_positional_sound50RC::Owner>;
-    rcPositionalAudioType& rcPositionalAudio;
-    BorrowedCall<std::size_t()> rcRemainingPayloadBytesCall;
-    using rcTriggerActionsType = rc_trigger_actions::Owner*;
-    rcTriggerActionsType& rcTriggerActions;
-    using rcTriggerAuthoringType = std::shared_ptr<rc_trigger_authoring::Owner>;
-    rcTriggerAuthoringType& rcTriggerAuthoring;
-    using rcWorldBorrowType = std::optional<rc_collision_world50RC::Owner::Borrow>;
-    rcWorldBorrowType& rcWorldBorrow;
     using rebaseBoundsType = rr::game::ModelBoundsResult49O[5];
     rebaseBoundsType& rebaseBounds;
     using rebaseDiagnosticType = rr::game::PodSceneRebaseDiagnostic50FB;
@@ -976,11 +703,8 @@ struct Context final {
     requestStartMusicType& requestStartMusic;
     using requestedWindowSamplesType = const int;
     requestedWindowSamplesType& requestedWindowSamples;
-    BorrowedCall<void()> requireMbRuntimeNavigation50MBCall;
-    BorrowedCall<void(std::size_t,const char*)> reserveGbAdditionalPayloadCall;
-    BorrowedCall<void(std::size_t,const char*)> reserveMcAdditionalPayloadCall;
-    BorrowedCall<void(std::size_t,const char*)> reserveRcAdditionalPayloadCall;
-    BorrowedCall<void(std::size_t,const char*)> reserveTbAdditionalPayloadCall;
+    BorrowedCall<void()> requireRuntimeNavigationCall;
+    BorrowedCall<void(std::size_t,const char*)> reserveAdditionalPayloadCall;
     using resetEffectBindingsType = rr::game::ResetEffectBindings50BK;
     resetEffectBindingsType& resetEffectBindings;
     using resetEffectStateType = rr::game::ResetEffectState50BK;
@@ -995,37 +719,12 @@ struct Context final {
     resetLifecycleType& resetLifecycle;
     using responseType = rr::game::SpringResponseParameters48L;
     responseType& response;
-    BorrowedCall<bool() noexcept> retireGbAudioOwnersCall;
-    BorrowedCall<bool() noexcept> retireMcAudioOwnersCall;
-    BorrowedCall<bool() noexcept> retireRcAudioOwnersCall;
-    BorrowedCall<bool() noexcept> retireTbAudioOwnersCall;
+    BorrowedCall<bool() noexcept> retireAudioOwnersCall;
     using sType = rr::game::VehicleFrameState49W;
     sType& s;
-    using commonRouteOriginalDiscType = const bool;
-    commonRouteOriginalDiscType& commonRouteOriginalDisc;
-    using commonRouteWorldType = std::shared_ptr<common_route_world50LM::Owner>;
-    commonRouteWorldType& commonRouteWorld;
-    using commonRouteTriggerActionsType = std::unique_ptr<sa_trigger_actions::Owner>;
-    commonRouteTriggerActionsType& commonRouteTriggerActions;
-    using commonRouteTriggerAuthoringType = std::unique_ptr<course_trigger_sources50CT::Owner>;
-    commonRouteTriggerAuthoringType& commonRouteTriggerAuthoring;
-    using commonRouteTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,course_trigger_sources50CT::capacity>;
-    commonRouteTriggerMembershipType& commonRouteTriggerMembership;
     BorrowedCall<void(bool)> sampleControllerCall;
-    using scColdSourcesType = std::shared_ptr<const sc_cold_sources50LA::Owner>;
-    scColdSourcesType& scColdSources;
-    using scGroundType = std::unique_ptr<sc_runtime_ground50LA::Owner>;
-    scGroundType& scGround;
-    using scMembershipCleanupDoneType = bool;
-    scMembershipCleanupDoneType& scMembershipCleanupDone;
-    using scOriginalDiscType = const bool;
-    scOriginalDiscType& scOriginalDisc;
-    using scTriggerActionsType = std::unique_ptr<sc_trigger_actions::Owner>;
-    scTriggerActionsType& scTriggerActions;
-    using scTriggerAuthoringType = std::shared_ptr<sc_trigger_authoring::Owner>;
-    scTriggerAuthoringType& scTriggerAuthoring;
-    using scTriggerMembershipType = std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,sc_trigger_authoring::count>;
-    scTriggerMembershipType& scTriggerMembership;
+    using membershipCleanupDoneType = bool;
+    membershipCleanupDoneType& membershipCleanupDone;
     using sdType = rr::game::Type2StaticDestination49X;
     sdType& sd;
     using sdeType = std::vector<rr::game::TerrainCandidateEffects48J>;
@@ -1063,9 +762,9 @@ struct Context final {
     selectedAudioSettingsType& selectedAudioSettings;
     using selectedControlsType = SelectedControlPreset49D;
     selectedControlsType& selectedControls;
-    BorrowedCall<std::uint32_t()> selectedMapCount50MBCall;
-    BorrowedCall<std::uint8_t(std::uint32_t)> selectedMapIndex50MBCall;
-    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNode50MBCall;
+    BorrowedCall<std::uint32_t()> selectedMapCountCall;
+    BorrowedCall<std::uint8_t(std::uint32_t)> selectedMapIndexCall;
+    BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)> selectedMapNodeCall;
     using selectedOriginalType = const rr::game::original_racer_selection50IJ::Entry*;
     selectedOriginalType& selectedOriginal;
     using selectedOriginalAiMapMetadataType = const rr::game::AiTrackMetadata50IU;
@@ -1114,8 +813,6 @@ struct Context final {
     sourcePauseObservationType& sourcePauseObservation;
     using sourcePauseParentAttachedType = bool;
     sourcePauseParentAttachedType& sourcePauseParentAttached;
-    using sourcePauseTrackType = std::shared_ptr<const ra_cold_sources50LA::DecodedSources>;
-    sourcePauseTrackType& sourcePauseTrack;
     using sourcePositionStatsPrestageType = original_position_stats_prestage50LA::Owner;
     sourcePositionStatsPrestageType& sourcePositionStatsPrestage;
     using sourcePositionStatsPrestageDiagnosticType = original_position_stats_prestage50LA::Diagnostic;
@@ -1148,61 +845,6 @@ struct Context final {
     submittedDrawFramesType& submittedDrawFrames;
     using swType = rr::game::Type2StaticWorkspace49X;
     swType& sw;
-    using taOriginalDiscType = const bool;
-    taOriginalDiscType& taOriginalDisc;
-    using taOriginalWorldType = std::shared_ptr<ta_original_world50LE::Owner>;
-    taOriginalWorldType& taOriginalWorld;
-    using tbAiMetadataType = const rr::game::AiTrackMetadataView50TB;
-    tbAiMetadataType& tbAiMetadata;
-    using tbAiViewType = const rr::game::TrackNavigationView50TB;
-    tbAiViewType& tbAiView;
-    using tbColdSourcesType = std::shared_ptr<const tb_cold_sources50LA::Owner>;
-    tbColdSourcesType& tbColdSources;
-    using tbCollisionCleanupDoneType = bool;
-    tbCollisionCleanupDoneType& tbCollisionCleanupDone;
-    using tbCollisionWorldType = std::shared_ptr<tb_collision_world50TB::Owner>;
-    tbCollisionWorldType& tbCollisionWorld;
-    using tbLightOwnerType = std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner>;
-    tbLightOwnerType& tbLightOwner;
-    using tbMapMetadataType = const rr::game::AiTrackMetadataView50TB;
-    tbMapMetadataType& tbMapMetadata;
-    using tbMapViewType = const rr::game::TrackNavigationView50TB;
-    tbMapViewType& tbMapView;
-    using tbOriginalDiscType = const bool;
-    tbOriginalDiscType& tbOriginalDisc;
-    using tbPodSoundType = std::shared_ptr<tb_pod_sound50TB::Owner>;
-    tbPodSoundType& tbPodSound;
-    using tbPositionalAudioType = std::unique_ptr<tb_positional_sound50TB::Owner>;
-    tbPositionalAudioType& tbPositionalAudio;
-    BorrowedCall<std::size_t()> tbRemainingPayloadBytesCall;
-    using tbTriggerActionsType = std::shared_ptr<tb_trigger_actions50TB::Owner>;
-    tbTriggerActionsType& tbTriggerActions;
-    using tbWorldBorrowType = std::optional<tb_collision_world50TB::Owner::Borrow>;
-    tbWorldBorrowType& tbWorldBorrow;
-    using tcAiMetadataType = const rr::game::AiTrackMetadataView50TC;
-    tcAiMetadataType& tcAiMetadata;
-    using tcAiViewType = const rr::game::TrackNavigationView50TC;
-    tcAiViewType& tcAiView;
-    using tcColdSourcesType = std::shared_ptr<const tc_cold_sources50LA::Owner>;
-    tcColdSourcesType& tcColdSources;
-    using tcCollisionCleanupDoneType = bool;
-    tcCollisionCleanupDoneType& tcCollisionCleanupDone;
-    using tcCollisionWorldType = std::shared_ptr<tc_collision_world50TC::Owner>;
-    tcCollisionWorldType& tcCollisionWorld;
-    using tcGlobalSoundType = std::shared_ptr<tc_global_sound50TC::Owner>;
-    tcGlobalSoundType& tcGlobalSound;
-    using tcLightOwnerType = std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner>;
-    tcLightOwnerType& tcLightOwner;
-    using tcMapMetadataType = const rr::game::AiTrackMetadataView50TC;
-    tcMapMetadataType& tcMapMetadata;
-    using tcMapViewType = const rr::game::TrackNavigationView50TC;
-    tcMapViewType& tcMapView;
-    using tcOriginalDiscType = const bool;
-    tcOriginalDiscType& tcOriginalDisc;
-    using tcTriggerActionsType = std::shared_ptr<tc_trigger_actions50TC::Owner>;
-    tcTriggerActionsType& tcTriggerActions;
-    using tcWorldBorrowType = std::optional<tc_collision_world50TC::Owner::Borrow>;
-    tcWorldBorrowType& tcWorldBorrow;
     using terrainBindingsType = terrain_probe_authoring50fq_fixture::Bindings;
     terrainBindingsType& terrainBindings;
     using terrainContextType = live_terrain_probe50fr::Context;
