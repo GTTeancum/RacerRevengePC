@@ -3,18 +3,16 @@
 #include "original_race_constructor50la.h"
 #include "original_race_hud_scope50la.h"
 #include "native_ai_session50iv_fixture.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_race_world_join50la.h"
 #include "race_music50ie_fixture.h"
 #include "source_announcer50ie_fixture.h"
 #include <bit>
 
 namespace original_camera_session50KX {
-// RA always; the other consumed course races once their counted Camera34
-// and end HUD are both bound. An unengaged Session keeps the previous end policy below.
+// Every counted race (every course) once its counted Camera34 and end HUD are
+// both bound. An unengaged Session keeps the previous end policy below.
 bool Session::canonicalCourseEndRoute()const noexcept {
     if(!nativeTaIssuance_)return false;
-    if(nativeTaIssuance_->course==OriginalCameraStartCourse::ra)return true;
-    // Every consumed course race (TA/GA/SA/MA/GC) once engaged.
     return nativeTaIssuance_->issuer&&
         nativeTaIssuance_->issuer->consumedTaCamera34Engaged(*this,true);
 }
@@ -108,7 +106,7 @@ bool Registration::endStateCurrent(const rr::game::OriginalRaceConstructor50LA& 
        race.endHud_.lock().get()!=this||!race.anyWorld())return false;
     const auto& issued=session.nativeTaIssuance_;
     if(!issued||issued->issuer!=application_||issued->generation!=generation_||
-       !race.raceCameraCourse34(issued->course)||!session.coldBound_||!session.readsBound_||
+       !race.raceCamera34Issued(session)||!session.coldBound_||!session.readsBound_||
        session.closed_||session.abandoned_||session.generation_!=generation_||!session.displayInputs_||
        &session.actual_.bank!=bank_||&session.actual_.all8Manager!=&manager_->manager||
        &session.actual_.race94!=&race.field94_||session.actual_.humanCount34!=1u||

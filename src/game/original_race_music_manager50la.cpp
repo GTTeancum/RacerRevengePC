@@ -974,15 +974,19 @@ bool Session::advanceNativeMusicListenerConsumedStep(std::uint64_t beforeMix,
     bool heldSourceScene,std::uint32_t& pc)const noexcept {
     pc=0x1a4440;
     if(!onOwnerThread())return false;
-    // Other courses have no joined counted RA10C route. Do not fabricate one.
-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)return true;
+    // 1A4440 -> 1030B0 for every counted race (B-C06): the issued Session's
+    // race music10C listener. No issued counted race: nothing to commit.
+    if(!nativeTaIssuance_)return true;
     if(!nativeTaIssuance_->issuer)return false;
+    // The existing native no-audio route (no 10C was ever prepared) commits nothing.
+    if(nativeTaIssuance_->issuer->consumedRaMusicNativeOnlyNoPreparation(*this))return true;
     return nativeTaIssuance_->issuer->advanceConsumedRaMusicListenerNative(*this,beforeMix,heldSourceScene,pc);
 }
 bool Session::completeCountedRaceMusicNative10C(std::uint32_t& pc)noexcept {
     pc=0x1a6c90;
     if(f8Intro_.ownerThread_!=std::this_thread::get_id())return false;
-    if(!nativeTaIssuance_||nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)return true;
+    // The 10C completion at 1A6C90 for every counted race (B-C06).
+    if(!nativeTaIssuance_)return true;
     std::uint32_t pause=0;
     if(!nativeTaIssuance_->issuer||!actual_.applicationAnimation.readPause11C(pause))return false;
     return nativeTaIssuance_->issuer->completeConsumedRaMusicNative10C(*this,pc);

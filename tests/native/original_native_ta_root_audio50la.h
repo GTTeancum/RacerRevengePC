@@ -1,7 +1,9 @@
 #pragma once
-// Include after the genuine consumed TA/RA typed race/world owner definitions.
-// Legacy method names remain stable; actual consumed track/world identity owns admission.
+// Include after the race's one World definitions (original_race_world_join50la.h).
+// Legacy method names remain stable (W0 3.2); the race's one World owns admission
+// on every course.
 #include "original_race_constructor50la.h"
+#include "original_race_world_join50la.h"
 #include <bit>
 #include <cmath>
 #include <thread>

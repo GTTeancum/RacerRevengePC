@@ -1,6 +1,7 @@
 #include "original_race_display_lifetime50la.h"
 #include "original_race_constructor50la.h"
-#include "ra_cold_aggregate50la.h"
+#include "original_race_world_join50la.h"
+#include "original_camera_session50kx.h"
 #include <bit>
 #include <exception>
 #include <limits>
@@ -114,32 +115,33 @@ bool Application::layoutConsumedF81994B0(rr::game::OriginalRaceF8Diagnostic50LA&
        display->generation_!=raceDisplayGeneration50LA_||!race->f8Attached_||!race->f8Owner_||
        race->f8Source_!=race->f8Owner_.get()||
        !race->f8Owner_->belongsTo(entitiesOwner_,race->entity_.sessionGeneration))
-        return reject(0x1994c0,"F8 layout requires the same consumed RA/Race/Application Display");
+        return reject(0x1994c0,"F8 layout requires the same consumed Race/World/Application Display");
     const auto* f8=race->f8Owner_->entity();
     if(!f8||f8->parent1C!=&race->entity_||f8->mask20!=0xffffffffu||f8->firstChild18||f8->descendants24)
         return reject(0x1994b0,"F8 layout requires its actual attached empty child");
-    // Existing aggregate borrow increments runtimeCameraBorrows_ and retains
-    // every backing world/query/model owner; close/abandon reject while held.
-    const auto world=race->world74_;ra_cold_aggregate50LA::Diagnostic wd;
-    const auto camera=world->borrowRuntimeSourceCamera(world,wd);
+    // 1994B0 for every race (B-C06): the Application-issued Session bound as
+    // the race's Camera34, issued for this race and its one World. The
+    // synchronous borrow keeps it alive; close/abandon reject while held.
+    const auto* world=race->world74_.get();
+    const auto camera=race->borrowRaceCamera34();
     if(!camera||camera->generation_!=race->entity_.sessionGeneration||
        camera->actual_.applicationEntities!=entitiesOwner_||camera->actual_.humanCount34!=1||
        !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
        camera->nativeTaIssuance_->generation!=camera->generation_||
-       camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra)
-        return reject(0x1994c8,"F8 requires actual retained one-human RA factory Camera/issuer");
+       !race->raceCamera34Issued(*camera))
+        return reject(0x1994c8,"F8 requires the actual retained one-human course Camera/issuer");
     std::array<std::int32_t,4> rectangle{},after{};std::uint64_t revision=0,afterRevision=0;
     if(!display->readGameplayViewport115990(*camera,rectangle,revision))
         return reject(0x115990,"F8 requires this Display's actual current gameplay Camera");
     // Deliberately uncalled by the live root. This is CPU layout only: no
     // draw, queue, GL, renderer service, acknowledgment or end/input mutation.
     if(!race->f8Owner_->layout198CF0(rectangle,d))return false;
-    if(sourceRace28COwner_!=race||race->world74_!=world||race->loadDisplay_!=display||
+    if(sourceRace28COwner_!=race||race->world74_.get()!=world||race->loadDisplay_!=display||
        raceDisplayOwner50LA_.lock()!=display||raceDisplayGeneration50LA_!=display->generation_||
        display->application_!=this||camera->generation_!=race->entity_.sessionGeneration||
        !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
        camera->nativeTaIssuance_->generation!=camera->generation_||
-       camera->nativeTaIssuance_->course!=rr::game::OriginalCameraStartCourse::ra||
+       !race->raceCamera34Issued(*camera)||
        !display->readGameplayViewport115990(*camera,after,afterRevision)||
        afterRevision!=revision||after!=rectangle)
         return reject(0x1994e8,"F8 owner/selection changed after CPU stores; effects retained");

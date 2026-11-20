@@ -2,27 +2,28 @@
 #include "../../src/game/original_results104_50la.h"
 #include "original_race_constructor50la.h"
 #include "original_results_roster_read50la.h"
-#include "ra_cold_aggregate_prefix50la.h"
+#include "original_race_world_join50la.h"
+#include "common_roster50cr.h"
 #include <new>
 #include <utility>
 
 namespace original_main_entry50KG {
 bool Application::loadConsumedPauseResultsBeforeCollector50LA(
     rr::game::OriginalRaceConstructor50LA& race,original_pause_cold50LA::Owner& pause,
-    std::shared_ptr<ra_cold_roster50LA::Operation> operation,
+    const common_roster50CR::Owner& roster,
     rr::game::OriginalResults104Diagnostic50LA& diagnostic)const noexcept {
-    return loadPauseResultsBeforeCollectorImpl50LA(race,pause,std::move(operation),nullptr,diagnostic);
+    return loadPauseResultsBeforeCollectorImpl50LA(race,pause,roster,nullptr,diagnostic);
 }
 bool Application::loadHumanTournamentPauseResultsBeforeCollector50LA(
     rr::game::OriginalRaceConstructor50LA& race,original_pause_cold50LA::Owner& pause,
-    std::shared_ptr<ra_cold_roster50LA::Operation> operation,
+    const common_roster50CR::Owner& roster,
     const std::array<std::uint32_t,8>& actualRacer60,
     rr::game::OriginalResults104Diagnostic50LA& diagnostic)const noexcept {
-    return loadPauseResultsBeforeCollectorImpl50LA(race,pause,std::move(operation),&actualRacer60,diagnostic);
+    return loadPauseResultsBeforeCollectorImpl50LA(race,pause,roster,&actualRacer60,diagnostic);
 }
 bool Application::loadPauseResultsBeforeCollectorImpl50LA(
     rr::game::OriginalRaceConstructor50LA& race,original_pause_cold50LA::Owner& pause,
-    std::shared_ptr<ra_cold_roster50LA::Operation> operation,
+    const common_roster50CR::Owner& roster,
     const std::array<std::uint32_t,8>* actualHumanRacer60,
     rr::game::OriginalResults104Diagnostic50LA& diagnostic)const noexcept {
     using Results=rr::game::OriginalResults10450LA;
@@ -42,23 +43,18 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
             return fail(Status::owner,0x1A8AB0u,"same consumed Race/Application/Video required");
         const auto table=standardMaterialDomainOwner_->materials382B38();
         const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
-        // The RA world join has its own load order to respect; every other
-        // course's world is already loaded when its race loads (1A8A40 runs
-        // for every race). Both must precede the one combined collector.
-        if(race.world74_){
-            const auto prefix=original_results_roster50LA::Read::completedWorldPrefixes(race);
-            if(!prefix.staticWorld||!prefix.staticModelResources||!prefix.staticModelObservers||
-               !prefix.runtimeQueryWorldOwners||!prefix.trackParticleManager||
-               prefix.staticWorldImages||prefix.staticWorldDrawPlan)
-                return fail(Status::phase,0x1A8AB0u,"connected loading must precede the combined collector");
-        }
+        // The race's one World and its Track are loaded when its race loads
+        // (1A8A40 runs for every race after 1A9EE0); both precede the one
+        // combined collector. Same rule on every course.
+        if(!race.world74_||!race.world74_->trackData())
+            return fail(Status::phase,0x1A8AB0u,"connected loading (1A9EE0 track) must precede the combined collector");
         if(!table||!provider||!provider->sealed()||
            table->coldCollectorCurrent(standardMaterialDomainOwner_->coldCollector14D440()))
             return fail(Status::phase,0x1A8AB0u,"connected loading must precede the combined collector");
-        original_results_roster50LA::Read roster(*this,race,std::move(operation),actualHumanRacer60);
+        original_results_roster50LA::Read rosterRead(*this,race,roster,actualHumanRacer60);
         std::size_t count=0;
-        if(!roster.current(count))return fail(Status::owner,0x1A8AB0u,actualHumanRacer60?
-            "actual retained human Tournament roster unavailable":"actual retained ALL8 roster unavailable");
+        if(!rosterRead.current(count))return fail(Status::owner,0x1A8AB0u,actualHumanRacer60?
+            "actual retained human race roster unavailable":"actual retained ALL8 roster unavailable");
         //1A8A6C/1A8AA0 selects the same actual directory across BOTH loads;
         //1A90CC restores it. The nested legacy Pause scope restores this value.
         { //Retain1A8A40 directory scope only through its actual UI loads.
@@ -75,11 +71,11 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
         race.results104_.reset(new Results(entitiesOwner_,race.entity_.sessionGeneration));
         if(!race.results104_->constructed())
             return fail(Status::owner,0x1A8AF8u,"Results constructor prefix retained but incomplete");
-        if(!race.results104_->load1BEEB0(roster,standardMaterialDomainOwner_,materialContextOwner_,
+        if(!race.results104_->load1BEEB0(rosterRead,standardMaterialDomainOwner_,materialContextOwner_,
                 fonts328(),pauseSourceDataForResults50LA(pause),materialDirectory36B970_,fontDirectory36B420_,
                 static_cast<std::uint32_t>(videoOwner_->packetZMaximum),diagnostic))return false;
         std::size_t after=0;
-        if(!roster.current(after)||after!=count||
+        if(!rosterRead.current(after)||after!=count||
            table->coldCollectorCurrent(standardMaterialDomainOwner_->coldCollector14D440()))
             return fail(Status::owner,0x1A8B1Cu,"Results lost actual roster or pre-collector custody");
         if(!race.results104_->disable1A8B1C()||!race.results104_->loadedDisabled())
@@ -106,15 +102,15 @@ bool Application::loadPauseResultsBeforeCollectorImpl50LA(
             if(!race.f8Owner_->initialVisibility1A9170())
                 return fail(Status::phase,0x1A9170u,"F8 actual initial199770 rejected");
             std::size_t afterF8=0;
-            if(!roster.current(afterF8)||afterF8!=count||
+            if(!rosterRead.current(afterF8)||afterF8!=count||
                table->coldCollectorCurrent(standardMaterialDomainOwner_->coldCollector14D440()))
                 return fail(Status::owner,0x1AAF54u,"F8 lost same cold roster/pre-collector custody");
             if(!race.attachF8Cold1AAF54())
                 return fail(Status::phase,0x1AAF54u,"F8 actual cold Race child attachment rejected");
         }
         // The race's SimpleVCR (race78, 1A6DF4) is part of every race's load;
-        // the end dispatch 1AB520 reads it. Every race produces it here (RA
-        // included: 1A6DF4 reads no track id).
+        // the end dispatch 1AB520 reads it. Every race produces it here
+        // (1A6DF4 reads no track id).
         {
             rr::game::OriginalSimpleVCRDiagnostic50LA vcr;
             if(!race.constructVcr78At1A6DF4(vcr))
