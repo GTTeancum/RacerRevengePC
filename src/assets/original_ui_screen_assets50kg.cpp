@@ -3,6 +3,7 @@
 #include "original_ui_unlock_background50pd.h"
 #include "original_ui_controls_specmap50kg.h"
 #include "original_ui_screen_assets50kg.h"
+#include "original_ui_image_bank50kg.h" // OriginalUiImageBankAddonLimits50DL (one place)
 #include <new>
 #include <string>
 #include <utility>
@@ -42,7 +43,14 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
     d={};using Error=OriginalUiScreenAssetError50KG;
     try {
         if(storage_)return fail(d,Error::alreadyLoaded);
-        if(sources.empty()||sources.size()>256)return fail(d,Error::sources);
+        // The stock owner capacity is 256 images. PORT EXTENSION, NOT ORIGINAL (DLC):
+        // images whose member belongs to an add-on package archive take their own
+        // capacity (OriginalUiImageBankAddonLimits50DL::sources) on top of it.
+        // Without add-on images this is exactly the stock 256 check.
+        std::size_t addonSources=0;
+        for(const auto& s:sources)if(originalUiAddonMemberArchive50DL(s.member.identity))++addonSources;
+        if(sources.empty()||sources.size()-addonSources>256||
+           addonSources>OriginalUiImageBankAddonLimits50DL::sources)return fail(d,Error::sources);
         // Validate all ranges and font association before cold allocations.
         for(std::size_t i=0;i<sources.size();++i){
             const auto& s=sources[i];

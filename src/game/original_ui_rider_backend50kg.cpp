@@ -332,7 +332,9 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         if(auto* addon=s.input.addonModels){
             for(std::size_t i=0;i<addon->size();++i){const auto* row=addon->row(i);
                 if(!row||!row->ready||!row->materials||!row->materials->images())continue;
-                if(population.owners.size()>=std::numeric_limits<std::uint32_t>::max()-2)return fail(E::bank);
+                if(population.owners.size()>=std::numeric_limits<std::uint32_t>::max()-2){
+                    std::fprintf(stderr,"dlc_rider_bank status=refused reason=\"owner index overflow\" owners=%zu\n",population.owners.size());
+                    return fail(E::bank);}
                 addonOwners.emplace_back(i,static_cast<std::uint32_t>(population.owners.size()));
                 population.owners.push_back(row->materials->images());
                 // Step B: the character's own images, right after its pod's.
@@ -346,16 +348,21 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         }
         auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();
         if(!bank->load(population,d.bank)){
-            if(!addonOwners.empty())std::fprintf(stderr,"dlc_rider_bank status=refused error=%u owner=%u image=%u addon_owners=%zu owners=%zu\n",
-                unsigned(d.bank.error),d.bank.owner,d.bank.image,addonOwners.size(),population.owners.size());
+            if(!addonOwners.empty())std::fprintf(stderr,"dlc_rider_bank status=refused error=%u owner=%u image=%u images_error=%u images_image=%zu addon_owners=%zu character_owners=%zu owners=%zu archives=%zu\n",
+                unsigned(d.bank.error),d.bank.owner,d.bank.image,unsigned(d.bank.images.error),d.bank.images.image,
+                addonOwners.size(),addonCharacterOwners.size(),population.owners.size(),population.addonArchives.size());
             return fail(E::bank);
         }
-        if(!addonOwners.empty())std::fprintf(stderr,"dlc_rider_bank status=sealed addon_owners=%zu owners=%zu images=%u\n",
-            addonOwners.size(),population.owners.size(),bank->images()&&bank->images()->textures()?bank->images()->textures()->textureCount():0u);
+        if(!addonOwners.empty())std::fprintf(stderr,"dlc_rider_bank status=sealed addon_owners=%zu character_owners=%zu owners=%zu images=%u\n",
+            addonOwners.size(),addonCharacterOwners.size(),population.owners.size(),bank->images()&&bank->images()->textures()?bank->images()->textures()->textureCount():0u);
         for(const auto& [row,owner]:addonOwners)
-            if(!bank->mapping(owner,0)||!s.input.addonModels->setImageOwner(row,owner))return fail(E::bank);
+            if(!bank->mapping(owner,0)||!s.input.addonModels->setImageOwner(row,owner)){
+                std::fprintf(stderr,"dlc_rider_bank status=refused reason=\"pod owner not mapped\" row=%zu owner=%u\n",row,owner);
+                return fail(E::bank);}
         for(const auto& [row,owner]:addonCharacterOwners)
-            if(!bank->mapping(owner,0)||!s.input.addonModels->setCharacterImageOwner(row,owner))return fail(E::bank);
+            if(!bank->mapping(owner,0)||!s.input.addonModels->setCharacterImageOwner(row,owner)){
+                std::fprintf(stderr,"dlc_rider_bank status=refused reason=\"character owner not mapped\" row=%zu owner=%u\n",row,owner);
+                return fail(E::bank);}
         // Explicit preview pairs require complete private candidates before seal.
         // Mapping alone never implies descriptor/material readiness.
         for(const auto rider:originalUiRiderRoster50KG)
