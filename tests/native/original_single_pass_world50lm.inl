@@ -23,7 +23,6 @@ struct Identity {
     std::string sha{archiveSha};           // stock SHA, or the registry row's listed SHA
     std::size_t bytes=archiveBytes;
     std::uint64_t asset=assetIdentity;     // texture identity namespace (asset<<48)
-    track_source_fixture::Track track=selectedTrack;
     bool stockRow=true;                    // stock pins/counts exist for this row
     // inherit.particles (registry row only; PORT EXTENSION, NOT ORIGINAL): the
     // particle closure members (particle\demoprt.prt/.pst/.psm) of the stock
@@ -34,6 +33,11 @@ struct Identity {
     std::string particleContainer,particleSha;
     std::size_t particleBytes=0;
     std::shared_ptr<const a::ResArchive48C> particleArchive;
+    // Common rewrite (R3): the race's Track already mounted the course archive (and any
+    // inherited particle closure) at step 04 (common_track50CR::Archive::open, 12CEA0/
+    // 132A20/132E40) under the race mount lease. The racer population then only reseals
+    // the namespace (pods mounted since) and binds the resolver; it never mounts twice.
+    bool mountedByTrack=false;
 };
 // Row of a course whose code is not stock: names spelled as the stock row spells
 // its own ("TRACKS/SA.RES" -> "TRACKS/NV.RES"); asset identity = the two code
@@ -47,7 +51,7 @@ inline bool registryIdentity(const char* code,const char* listedSha,std::size_t 
     Identity next;next.code=upper;next.container="TRACKS/"+upper+".RES";next.scb="TRACKS/"+upper+".SCB";
     next.sha=listedSha;next.bytes=listedBytes;
     next.asset=(std::uint64_t(std::uint8_t(upper[0]))<<8)|std::uint8_t(upper[1]);
-    next.track=track_source_fixture::Track::course;next.stockRow=false;
+    next.stockRow=false;
     out=std::move(next);return true;
 }
 namespace detail {
@@ -202,10 +206,15 @@ inline Bytes image(const std::string& member,const Bytes& source,std::uint32_t& 
 // then compare every typed/source-provenance field with a fresh exact decode.
 inline void validateBorrowedWorld(const Bytes& scb,const a::World48F& world,a::DecodeError48C& error){
     Bytes roundtrip;a::World48F canonical;
+    // Common rewrite (R3): the strict shared reader first; an SCB that retains duplicate
+    // unused labels (the original 270900 reader takes the first) is re-read by the tolerant
+    // reader the Track used (mc_world_semantics50mc.h), never admitted unchecked.
+    const bool strict=a::decodeWorld48F(scb,canonical,error)&&a::validateWorldSemantics48F(world,error);
+    if(!strict){canonical={};error={};}
     shared::need(world.parameters.original_bytes==scb&&
         a::encodeParameters48F(world.parameters,roundtrip,error)&&roundtrip==scb&&
-        a::decodeWorld48F(scb,canonical,error)&&a::validateWorldSemantics48F(world,error),
-        "Original MA/SA borrowed world fields differ from authenticated SCB");
+        (strict||mc_world_semantics50MC::decodeWorld(scb,canonical,error)),
+        "Original single-pass borrowed world fields differ from authenticated SCB");
     const auto& actual=world.parameters;const auto& source=canonical.parameters;
     shared::need(actual.version==source.version&&actual.header_table_offset==source.header_table_offset&&
         actual.preservesDuplicateLabels==source.preservesDuplicateLabels&&actual.blocks.size()==source.blocks.size(),
@@ -307,6 +316,8 @@ public:
     const std::vector<a::TrackProjectedUv>* projectionUvs()const noexcept{return storage_?&storage_->projectionUvs:nullptr;}
 
     bool load(const Bytes& original,const a::World48F& world,Diagnostic& d)noexcept;
+    // Common rewrite (R3): the Track's decoded archive (no second decode of the raw file).
+    bool loadDecoded(const a::ResArchive48C& archive,const a::World48F& world,Diagnostic& d)noexcept;
 
     // Runs inside populateCanonicalRacers after the racer sources are admitted
     // and before the single population, as on TA/GA: the original race load
@@ -324,13 +335,16 @@ public:
             shared::need(canonical==bool(request.canonicalContext)&&canonical==(request.canonicalMaterialPath.actualPrefix36B970!=nullptr),
                 "MA/SA canonical Application/Video/path must be supplied together");
             if(!canonical){shared::need(request.canonicalRacerModels.empty(),"MA/SA racer sources lack their canonical domain");return true;}
-            shared::need(request.track==identity_.track&&request.canonicalDomain->prepared()&&
+            shared::need(request.canonicalDomain->prepared()&&
                 request.canonicalContext->live()&&*request.canonicalMaterialPath.actualPrefix36B970=="textures\\",
                 "MA/SA canonical racers require their actual gameplay directory and live Video");
             storage_->canonicalAttempted=true;storage_->canonicalDomain=request.canonicalDomain;
             const auto& provider=request.canonicalDomain->archiveProvider3E1A70();
             a::OriginalStandardArchiveProvider50LA::Diagnostic mounted;d.stage="ma_sa_original_archive_mount";
-            shared::need(provider&&provider->mountAuthenticatedRes(identity_.container,::rr::assets::originalTrackMountDigest50LA(identity_.container,identity_.sha.c_str()),::rr::assets::originalTrackMountBytes50LA(identity_.container,identity_.bytes),storage_->archive,mounted)&&
+            if(identity_.mountedByTrack)shared::need(provider&&(provider->sealed()||provider->sealNativeMounts(mounted))&&
+                request.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,d.canonical.texture),
+                "Original single-pass canonical provider reseal/bind rejected");
+            else shared::need(provider&&provider->mountAuthenticatedRes(identity_.container,::rr::assets::originalTrackMountDigest50LA(identity_.container,identity_.sha.c_str()),::rr::assets::originalTrackMountBytes50LA(identity_.container,identity_.bytes),storage_->archive,mounted)&&
                 (!identity_.particleArchive||provider->mountAuthenticatedRes(identity_.particleContainer,
                     ::rr::assets::originalTrackMountDigest50LA(identity_.particleContainer,identity_.particleSha.c_str()),
                     ::rr::assets::originalTrackMountBytes50LA(identity_.particleContainer,identity_.particleBytes),*identity_.particleArchive,mounted))&&

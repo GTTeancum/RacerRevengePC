@@ -1,8 +1,5 @@
 #pragma once
 #include "../../src/assets/track_height_descriptor50jb.h"
-#include "rc_cold_sources50la.h"
-#include "tb_cold_sources50la.h"
-#include "gb_cold_sources50la.h"
 #include <type_traits>
 #include "water_resources50jc_fixture.h"
 #include "../../src/game/undertrack_reset50ew.h"
@@ -21,10 +18,8 @@ struct Owner {
     std::vector<std::uint8_t> waterSource;
     std::shared_ptr<water_resources50JC::Owner> nativeWaterResources;
     // Resource storage alone never sets waterNativeQueryBound.
-    // RC typed path pins the SAME immutable source; legacy paths leave empty.
-    std::shared_ptr<const rc_cold_sources50LA::Owner> rcSource;
-    std::shared_ptr<const tb_cold_sources50LA::Owner> tbSource;
-    std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource;
+    // (Common rewrite R3: the per-course rc/tb/gb cold-source pins are gone; the one
+    // Track's archive is the source for every course.)
     bool sourceBound=false;
     bool waterNativeQueryBound=false;
 };
@@ -43,33 +38,15 @@ inline bool sameAscii(const std::string& a,const std::string& b) noexcept {
 // A catalog hit is usable without pretending this archive is the entire
 // resource manager. A miss remains unknown, never synthetic Absent.
 namespace detail {
-using RcSource=std::shared_ptr<const rc_cold_sources50LA::Owner>;
-using TbSource=std::shared_ptr<const tb_cold_sources50LA::Owner>;
-using GbSource=std::shared_ptr<const gb_cold_sources50LA::Owner>;
 inline const auto& entries(const rr::assets::ResArchive48C& archive)noexcept{return archive.entries;}
-inline const auto& entries(const RcSource& archive)noexcept{return archive->archive().entries();}
-inline const auto& entries(const TbSource& archive)noexcept{return archive->archive().entries();}
-inline const auto& entries(const GbSource& archive)noexcept{return archive->archive().entries();}
 inline bool extract(const rr::assets::ResArchive48C& archive,const std::string& name,
     std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& d){return rr::assets::extractResMember48C(archive,name,out,d);}
-inline bool extract(const RcSource& archive,const std::string& name,
-    std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& d){return archive->extractMember(name,out,d,8u*1024u*1024u);}
-inline bool extract(const TbSource& archive,const std::string& name,
-    std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& d){return archive->extractMember(name,out,d,8u*1024u*1024u);}
-inline bool extract(const GbSource& archive,const std::string& name,
-    std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& d){return archive->extractMember(name,out,d,8u*1024u*1024u);}
-template<class Archive> requires (std::is_same_v<Archive,rr::assets::ResArchive48C>||std::is_same_v<Archive,RcSource>||std::is_same_v<Archive,TbSource>||std::is_same_v<Archive,GbSource>)
+template<class Archive> requires (std::is_same_v<Archive,rr::assets::ResArchive48C>)
 inline bool prepareFreshShared(const rr::assets::World48F& world,
     const Archive& archive,const std::string& sceneMember,
     Owner& out,std::string& error) {
     using namespace rr::assets;using rr::game::UndertrackHeightOwner50EW;
-    if constexpr(std::is_same_v<Archive,RcSource>||std::is_same_v<Archive,TbSource>||std::is_same_v<Archive,GbSource>){
-        if(!archive||!archive->ready()||&world!=&archive->world()){error="RC height requires same ready retained source";return false;}
-    }
     Owner staged{};
-    if constexpr(std::is_same_v<Archive,RcSource>)staged.rcSource=archive;
-    if constexpr(std::is_same_v<Archive,TbSource>)staged.tbSource=archive;
-    if constexpr(std::is_same_v<Archive,GbSource>)staged.gbSource=archive;
     if(readTrackHeightDescriptor50JB(world.parameters,staged.descriptor)!=
         TrackHeightReadStatus50JB::Complete){error="original Environment height strings unavailable";return false;}
     //1B38C4 splitpath and1B38DC drive+directory, retained relative/no-drive
@@ -108,21 +85,4 @@ inline bool prepareFreshShared(const rr::assets::World48F& world,
 inline bool prepareFreshGameTrack(const rr::assets::World48F& world,
     const rr::assets::ResArchive48C& archive,const std::string& sceneMember,
     Owner& out,std::string& error){return detail::prepareFreshShared(world,archive,sceneMember,out,error);}
-inline bool prepareFreshGameTrack(std::shared_ptr<const rc_cold_sources50LA::Owner> source,
-    const std::string& sceneMember,Owner& out,std::string& error){
-    if(!source||!source->ready()){error="RC height requires ready retained source";return false;}
-    return detail::prepareFreshShared(source->world(),source,sceneMember,out,error);
-}
-inline bool prepareFreshGameTrack(std::shared_ptr<const tb_cold_sources50LA::Owner> source,
-    const std::string& sceneMember,Owner& out,std::string& error){
-    if(!source||!source->ready()){error="TB height requires ready retained source";return false;}
-    return detail::prepareFreshShared(source->world(),source,sceneMember,out,error);
-}
-
-inline bool prepareFreshGameTrack(std::shared_ptr<const gb_cold_sources50LA::Owner> source,
-    const std::string& sceneMember,Owner& out,std::string& error){
-    if(!source||!source->ready()){error="GB height requires ready retained source";return false;}
-    return detail::prepareFreshShared(source->world(),source,sceneMember,out,error);
-}
-
 } // namespace track_height_cold50JB
