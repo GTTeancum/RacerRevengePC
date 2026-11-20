@@ -2386,6 +2386,13 @@ void Context::run() {
         sourcePauseObservation.bindHost(originalMainApplication,sourcePause.storage(),sourceCameraSession,trackTitles[course.course]));
     if(registryTitle)std::cerr<<"course_route_pause_title code="<<titleRow.code<<" name=\""<<titleRow.name<<"\" stock=0\n";
     std::cerr<<"original_pause_host bound="<<bound<<" course="<<course.course<<" subtype="<<course.subtype<<"\n";
+    // 149p: the counted race that owns this SAME Pause100 (every course,
+    // add-on courses included) takes the original Pause owner: 1A87A0 Start,
+    // 1BE8A0 open, 1BD7C0/1BD8CC rows. Absent a counted race (or when its
+    // owner refuses an open) the host Pause above stays the fallback.
+    const bool counted=bound&&sourcePauseObservation.attachCountedRace();
+    std::cerr<<"original_pause_owner counted="<<counted<<" course="<<course.course<<" addon="<<registryTitle
+        <<" subtype="<<course.subtype<<" mode34="<<(originalMainApplication.riderProfile?originalMainApplication.riderProfile->stamp().mode34:99u)<<"\n";
    }
    if(sourceSpeedBoost.owner){
     original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;

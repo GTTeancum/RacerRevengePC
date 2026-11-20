@@ -1244,6 +1244,11 @@ public:
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool pauseConsumedRaceEntity142040(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
     bool pauseConsumedRaceWorld1ACF50(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
+    // 149p: the two leaves 1A87A0 reaches on a human Start before it sets the
+    // race1B1 pause request: 199770(F8,0,1,1,1,1) on the race's own attached
+    // F8 and 1AD230 through the race's live HUD scope. Each reports whether
+    // its private owner accepted; neither refusal stops the request.
+    void countedPauseRequest1A87A0_149p(rr::game::OriginalRaceConstructor50LA&,bool& f8,bool& hud)const noexcept;
     bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
     bool constructConsumedTaRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,

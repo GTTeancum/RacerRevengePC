@@ -721,3 +721,23 @@ ra_source_camera50LA::OwnershipBridge* OriginalRaceConstructor50LA::borrowEndRun
 }
 
 }
+
+namespace original_main_entry50KG {
+// 149p: 1A87A0's two reached leaves on a human Start (before the race1B1
+// request). 1A8860 199770(F8,0,1,1,1,1): the race's own attached F8, the same
+// leaf the finish (1A7DF8) uses. 1A8868 1AD230(race): the race's live HUD
+// scope (Registration::stop1AD230 authenticates race/camera/HUD itself).
+void Application::countedPauseRequest1A87A0_149p(rr::game::OriginalRaceConstructor50LA& race,
+    bool& f8,bool& hud)const noexcept {
+    f8=hud=false;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||sourceRace28COwner_.get()!=&race||
+       race.application_!=entitiesOwner_||!race.counted_||race.rolledBack_)return;
+    if(race.f8Attached_&&race.f8Owner_&&race.f8Source_==race.f8Owner_.get()&&
+       race.f8Source_->belongsTo(race.application_,race.entity_.sessionGeneration)){
+        const auto* entity=race.f8Source_->entity();
+        if(entity&&entity->parent1C==&race.entity_&&entity->mask20==0xffffffffu)
+            f8=race.f8Source_->visibility199770(0,1,1,1,1);
+    }
+    if(const auto scope=race.endHud_.lock())hud=scope->stop1AD230(race);
+}
+}

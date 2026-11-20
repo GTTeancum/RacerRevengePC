@@ -277,9 +277,13 @@ def main():
                              '--env RR_DLC_ROOT=<DLC folder>; use with --addon-course <same key> --results-exit main '
                              '[--hold-results-hall]')
     parser.add_argument('--pause-quit', type=float, default=0.0, metavar='SECONDS',
-                        help='Test only: after SECONDS of racing open Pause, step to its QUIT row (row 10) and confirm, '
-                             'as a player would (sets RR_TEST_PAUSE_QUIT). Free Play: the original 1BDA74 row '
+                        help='Test only: after SECONDS of racing press Start (Escape), step Down to the original '
+                             'Pause QUIT row (row 10) and press Cross (Enter), one key per poll, as a player would '
+                             '(sets RR_TEST_PAUSE_QUIT). Free Play: the original 1BDA74 row '
                              '(Course; a Time Trial asks its record first)')
+    parser.add_argument('--pause-restart', type=float, default=0.0, metavar='SECONDS',
+                        help='Test only: as --pause-quit, but the RESTART row (row 1, 1BD990) '
+                             '(sets RR_TEST_PAUSE_RESTART)')
     parser.add_argument('--seed-save', type=Path,
                         help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
     parser.add_argument('--player-racer', type=int, choices=ORIGINAL_RACERS,
@@ -438,7 +442,7 @@ def main():
     # A --hold-rider / --hold-course / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
     logs_only = (args.logs_only and not args.hold_rider and not args.hold_course and not args.hold_results and
                  not args.hold_results_hall and args.eyecheck_dlc_hall is None and
-                 not (args.pause_quit and '--logs-only' not in __import__('sys').argv))
+                 not ((args.pause_quit or args.pause_restart) and '--logs-only' not in __import__('sys').argv))
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
@@ -448,11 +452,13 @@ def main():
     # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
     # from pausing or releasing those inputs; a real minimise/close still does.
     injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or args.hold_results or
-                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None or args.pause_quit)
+                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None or args.pause_quit or args.pause_restart)
     if injected:
         env['RR_TEST_IGNORE_FOCUS'] = '1'
     if args.pause_quit:
         env['RR_TEST_PAUSE_QUIT'] = str(args.pause_quit)
+    elif args.pause_restart:
+        env['RR_TEST_PAUSE_RESTART'] = str(args.pause_restart)
     if args.hold_throttle:
         env['RR_TEST_HOLD_THROTTLE'] = '1'
     if args.repair:
@@ -522,9 +528,9 @@ def main():
     # A run that must reach Results (and what follows it) keeps racing past
     # the FPS evidence: --results-exit / --hold-results / --hold-results-hall
     # imply --race-full (otherwise the race stops before its finish).
-    if (args.results_exit or args.hold_results or args.hold_results_hall or args.pause_quit) and not args.race_full:
+    if (args.results_exit or args.hold_results or args.hold_results_hall or args.pause_quit or args.pause_restart) and not args.race_full:
         args.race_full = True
-        print('race_full implied by --results-exit/--hold-results/--hold-results-hall/--pause-quit', flush=True)
+        print('race_full implied by --results-exit/--hold-results/--hold-results-hall/--pause-quit/--pause-restart', flush=True)
     if args.race_full:
         env['RR_TEST_RACE_FULL_BUDGET'] = '1'
     if args.all_ai:
@@ -746,9 +752,11 @@ def main():
                 seededSlowHall=args.seed_slow_dlc_hall)
         quit_texts = log_text + ''.join((output / name).read_text(errors='replace')
                                         for name in ('stderr.log', 'stdout.log') if (output / name).is_file())
-        quit_lines = re.findall(r'(?:test_pause_quit|pause_quit|time_trial_restart) [^\r\n]*', quit_texts)
-        if args.pause_quit or quit_lines:
-            result['pauseQuit'] = dict(seconds=args.pause_quit, lines=quit_lines)
+        quit_lines = re.findall(r'(?:test_pause_quit|pause_quit|pause_quit_admission|pause_request|pause_open|pause_row|pause_close|'
+                                r'pause_owner|pause_navigation|original_pause_owner|time_trial_restart) [^\r\n]*', quit_texts)
+        if args.pause_quit or args.pause_restart or quit_lines:
+            result['pauseQuit'] = dict(seconds=args.pause_quit or args.pause_restart,
+                                       row=1 if (args.pause_restart and not args.pause_quit) else 10, lines=quit_lines)
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

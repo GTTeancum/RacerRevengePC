@@ -92,7 +92,14 @@ double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::t
 // the next iteration's restart point. Host memory, owner thread only.
 bool timeTrialRestartPending148=false;
 // Test only (148r): RR_TEST_PAUSE_QUIT=<seconds of racing>; one Pause -> row 10 QUIT per process.
-double testPauseQuitSeconds148(){static const double v=[]{const char* s=std::getenv("RR_TEST_PAUSE_QUIT");return s?std::atof(s):0.0;}();return v;}
+// Test only (149p): RR_TEST_PAUSE_RESTART=<seconds> takes row 1 RESTART instead.
+// Both press the player's keys (Escape = Start, Down, Enter = Cross) on the
+// original pad path, one key per poll, as a player would.
+double testPauseQuitSeconds148(){static const double v=[]{
+    const char* s=std::getenv("RR_TEST_PAUSE_QUIT");const char* r=std::getenv("RR_TEST_PAUSE_RESTART");
+    return s?std::atof(s):r?std::atof(r):0.0;}();return v;}
+unsigned testPauseRow149(){static const unsigned v=[]{
+    return std::getenv("RR_TEST_PAUSE_QUIT")?10u:std::getenv("RR_TEST_PAUSE_RESTART")?1u:10u;}();return v;}
 unsigned testPauseQuitStage148=0;std::uint64_t testPauseQuitStartNs148=0;
 void require50DU(bool ok, const char* message) {
     if(!ok){native_last_failure50PD::record(message);std::cerr<<"require_failed "<<(message?message:"")<<std::endl;throw std::runtime_error(message);}
@@ -558,16 +565,17 @@ void Context::run() {
     }
    }
    {
-    // Unattended test only (148r): RR_TEST_PAUSE_QUIT=<seconds> opens Pause after
-    // that many seconds of racing (the host Pause request a player's key makes);
-    // the original Pause rows then step to row 10 QUIT and confirm (below).
+    // Unattended test only (148r/149p): RR_TEST_PAUSE_QUIT / _RESTART=<seconds>
+    // presses Start (keyboard Escape) after that many seconds of racing; the
+    // original Pause rows then step down to row 10 QUIT (or row 1 RESTART) and
+    // confirm with Enter (below), one key per poll.
     if(testPauseQuitSeconds148()>0.0&&captureRun.unattended()&&testPauseQuitStage148==0u&&
        race.phase==race_session50HM::Phase::Racing&&!sessionMenu.open()){
      const auto nowNs=monotonicNow50DU();
      if(!testPauseQuitStartNs148)testPauseQuitStartNs148=nowNs;
      if(double(nowNs-testPauseQuitStartNs148)>=testPauseQuitSeconds148()*1e9){
-      hostInput.pauseRequested=true;testPauseQuitStage148=1u;
-      std::cerr<<"test_pause_quit open_pause seconds="<<testPauseQuitSeconds148()<<'\n';
+      hostInput.keys.pressed[41]=1;testPauseQuitStage148=1u;
+      std::cerr<<"test_pause_quit press=start seconds="<<testPauseQuitSeconds148()<<" row="<<testPauseRow149()<<'\n';
      }
     }
    }
@@ -1226,7 +1234,10 @@ void Context::run() {
     // sole ownership; UI arrows/Space never count as attempted manual driving.
     platform::releaseSelectedKeyboard50KY(input,humanControlInput);
    }
-   const bool menuWasOpen=sessionMenu.open();
+   // 149p: the counted race's original Pause (every course) is a modal of
+   // its own; the host menu keeps its own pages and Application11C writes.
+   const bool hostMenuWasOpen=sessionMenu.open();
+   const bool menuWasOpen=hostMenuWasOpen||sourcePauseObservation.countedOpen();
    const auto menuRevision=sessionMenu.revision();
    if(!sourcePauseParentAttached&&input.focused&&!input.minimized&&!input.activityLost&&!input.eventBudgetExhausted&&
        (!sourceCameraSession||!sourceCameraSession->pendingDisplayWork())){
@@ -1273,7 +1284,99 @@ void Context::run() {
     const bool originalPauseShown=sourcePauseObservation.hostOpen()&&sessionMenu.open()&&
         sessionMenu.page()==platform::HostSessionMenu50IF::Page::Pause;
     auto action=MenuResult::None;
-    if(!originalPauseShown)action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
+    // Pause QUIT row 10 on a counted Free Play race, every course: 1BDA74.
+    // App2E0 (1 outside the debug boot); P+34 == 0. 11258 == 3 (Time
+    // Trial) first asks 1ABFC0(race,1) at 1BDAB4 and, on a record, opens
+    // Results page 3 (1CA8E0(Results,3)) -> 1CA6A4 1AC440 -> Hall 1CA6F0.
+    // PORT STAND-IN (flagged): that record page over the paused race is not
+    // owned yet, so a Time Trial takes the no-record row too. Otherwise
+    // (1BDB5C): 26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60 500 ms,
+    // 1BE830, 17DE10(App,6,6,1) -> Course. The audio stop/fade leaves are
+    // the native race teardown's (stand-in); the request is the same
+    // 17DE10(6,6,1) row the 1AB908 race return queues, so the same native
+    // Course receiver takes it. false = not admitted or refused (the caller
+    // then takes the former port Quit, logged).
+    const auto queuePauseCourse1BDA74=[&](const char* owner)->bool {
+     std::cerr<<"pause_quit_admission row=10 owner="<<owner<<" ui="<<originalUiStarted<<" camera="<<originalCameraEnabled
+         <<" root="<<native_common_results50PD::state().rootPublished<<" fallback="<<native_common_results50PD::state().fallback
+         <<" profile="<<bool(originalMainApplication.riderProfile)
+         <<" mode34="<<(originalMainApplication.riderProfile?originalMainApplication.riderProfile->stamp().mode34:99u)<<'\n';
+     if(!(originalUiStarted&&originalCameraEnabled&&
+          native_common_results50PD::state().rootPublished&&!native_common_results50PD::state().fallback&&
+          originalMainApplication.riderProfile&&originalMainApplication.riderProfile->stamp().mode34==0u))return false;
+     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection quitRace;
+     const bool timeTrial=originalMainApplication.riderProfile->courseRaceSnapshot(quitRace)&&quitRace.subtype==3u;
+     rr::game::OriginalRaceAckDestination50PD quit;
+     quit.route=rr::game::OriginalRaceAckRoute50PD::course;quit.flags=6u;quit.screen=6u;quit.page=1u;
+     quit.sourcePC=0x1bdbfcu;
+     const auto& owned=originalMainApplication.sourceRace28COwner_;
+     const bool queued=owned&&originalMainApplication.commitRaceAcknowledgementTransfer50PD(*owned,quit);
+     std::cerr<<"pause_quit row=10 site=1BDA74 owner="<<owner<<" subtype="<<quitRace.subtype<<" record_check="
+         <<(timeTrial?"pending_1BDAB4":"not_reached")<<" route=course pc=1bdbfc queued="<<queued<<'\n';
+     return queued;
+    };
+    // 149p: the original Pause owner on the counted race, every course (add-on
+    // courses included): this poll's pad edges on native device 0 (keyboard
+    // and first pad, the same physical aliases as the spectator producer:
+    // Escape/Start = 8, Up 12, Down 14, Enter/Cross 2, Left 15, Right 13) go
+    // to the race's 1A87A0 and then the Pause's 1BD7C0/1BD8CC, never to the
+    // host menu. The loop only performs a row's departure (restart, main,
+    // course). A refused open leaves the Start to the host Pause (fallback,
+    // PORT STAND-IN, logged).
+    using CountedRow=original_pause_observation50LA::Owner::CountedInput::Row;
+    original_pause_observation50LA::Owner::CountedInput counted;
+    bool countedOwnsPoll=false;
+    if(!originalPauseShown&&!sessionMenu.open()&&sourcePauseObservation.countedBound()){
+     auto& keys=hostInput.keys;
+     if(testPauseQuitStage148==1u&&captureRun.unattended()&&sourcePauseObservation.countedOpen()){
+      // Test only (149p): one key per poll on the open original Pause: Down
+      // until the target row, then Enter. The test driver's held steering and
+      // pitch keys are released from this poll first, as a player's would be.
+      for(const unsigned k:{40u,79u,80u,81u,82u})keys.pressed[k]=0;
+      const auto row=sourcePauseObservation.hostSelection();
+      if(row!=testPauseRow149())keys.pressed[81]=1;
+      else{keys.pressed[40]=1;testPauseQuitStage148=2u;}
+      std::cerr<<"test_pause_quit row="<<row<<" press="<<(row!=testPauseRow149()?"down":"cross")<<'\n';
+     }
+     const auto& pad=keys.controllers[0];
+     const bool padOn=usePhysicalGameController&&keys.gameControllersEnabled&&pad.connected&&pad.instanceId>=0;
+     const auto edge=[&](unsigned a,unsigned b,unsigned button){
+      return keys.pressed[a]!=0||(b&&keys.pressed[b]!=0)||(padOn&&pad.pressed[button]!=0);};
+     const bool edges[6]={edge(41,0,6)||hostInput.pauseRequested,edge(82,0,11),edge(81,0,12),edge(40,88,0),edge(80,0,13),edge(79,0,14)};
+     constexpr std::uint32_t codes[6]={8,12,14,2,15,13};
+     std::array<rr::game::InputEvent48Z,6> events{};std::array<rr::game::DeviceButtonRecord48Y,6> records{};
+     std::size_t count=0;
+     for(std::size_t i=0;i<6;++i)if(edges[i]){events[count]={codes[i],2,0,1,0};records[count]={1,1.f,0,0,0,0};++count;}
+     const bool dispatched=sourcePauseObservation.dispatchCountedRaceInput(events.data(),records.data(),count,counted);
+     std::uint32_t openGate=0;
+     if(dispatched&&sourcePauseObservation.countedPending())
+      sourcePauseObservation.updateCountedRace1A7C1C(openGate);
+     const bool refused=!dispatched||(openGate&&openGate!=2u);
+     if(refused){
+      static std::uint32_t reportedGate=0;
+      const auto gate=!dispatched?counted.gate:100u+openGate;
+      if(gate!=reportedGate){reportedGate=gate;
+       std::cerr<<"pause_owner refused gate="<<gate<<" pc="<<std::hex<<counted.sourcePC<<std::dec
+           <<" fallback=host\n";}
+     }
+     countedOwnsPoll=!refused&&(counted.startConsumed||counted.closed||counted.row!=CountedRow::none||
+         sourcePauseObservation.countedOpen()||sourcePauseObservation.countedPending());
+     if(countedOwnsPoll){
+      // This poll's Start/Cross/D-pad belong wholly to the original owner.
+      hostInput.pauseRequested=hostInput.resumeRequested=false;
+      if(counted.closed){composePacket(false,input);sampleController();}
+     }
+     if(counted.row==CountedRow::restart)action=MenuResult::Restart;
+     else if(counted.row==CountedRow::main)action=MenuResult::ReturnOriginalMain;
+     else if(counted.row==CountedRow::course){
+      if(queuePauseCourse1BDA74("original")){
+       forceSceneRender=true;continue; // the next iteration departs (beginNativeResultsHallDeparture50LA)
+      }
+      action=MenuResult::Quit; // transfer refused: the former port Quit, logged above
+     }
+    }
+    if(countedOwnsPoll){}
+    else if(!originalPauseShown)action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready,
         nativeMenuCommand);
     else{
      // Original Pause rows: 0 CONTINUE, 1 RESTART RACE, 2..4 HUD, 5..8
@@ -1281,13 +1384,13 @@ void Context::run() {
      // host HUD/audio pages and the same session actions as its rows.
      auto in=sessionMenu.pollOriginalPause(hostInput);
      if(testPauseQuitStage148==1u&&captureRun.unattended()){
-      // Test only (148r): Down until row 10 QUIT, then Confirm, as a player would.
-      for(unsigned guard=0;guard<16u&&sourcePauseObservation.hostSelection()!=10u;++guard)
+      // Test only (148r): Down until the target row, then Confirm, as a player would.
+      for(unsigned guard=0;guard<16u&&sourcePauseObservation.hostSelection()!=testPauseRow149();++guard)
        sourcePauseObservation.moveHostSelection(true);
       // The held test throttle (W) also reads as menu Up here; a player releases it.
       in.up=in.down=in.left=in.right=false;
-      in.confirm=sourcePauseObservation.hostSelection()==10u;in.back=false;testPauseQuitStage148=2u;
-      std::cerr<<"test_pause_quit row="<<sourcePauseObservation.hostSelection()<<" confirm="<<in.confirm<<'\n';
+      in.confirm=sourcePauseObservation.hostSelection()==testPauseRow149();in.back=false;testPauseQuitStage148=2u;
+      std::cerr<<"test_pause_quit owner=host row="<<sourcePauseObservation.hostSelection()<<" confirm="<<in.confirm<<'\n';
      }     if(in.up!=in.down)sourcePauseObservation.moveHostSelection(in.down);
      const auto row=sourcePauseObservation.hostSelection();
      if(in.left!=in.right&&row>=2&&row<=4&&nativeHudAvailable){
@@ -1309,44 +1412,17 @@ void Context::run() {
       sourcePauseObservation.hostSettingFeedback(true,in.right);
      }
      const bool canResume=!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready;
-     if(in.confirm&&row==10)
-      std::cerr<<"pause_quit_admission row=10 ui="<<originalUiStarted<<" camera="<<originalCameraEnabled
-          <<" root="<<native_common_results50PD::state().rootPublished<<" fallback="<<native_common_results50PD::state().fallback
-          <<" profile="<<bool(originalMainApplication.riderProfile)
-          <<" mode34="<<(originalMainApplication.riderProfile?originalMainApplication.riderProfile->stamp().mode34:99u)<<'\n';     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
+     if((in.back||(in.confirm&&row==0))&&canResume)sessionMenu.closeExternal();
      else if(in.confirm&&row==1)action=MenuResult::Restart;
      else if(in.confirm&&row==9)action=MenuResult::ReturnOriginalMain;
-     else if(in.confirm&&row==10&&originalUiStarted&&originalCameraEnabled&&
-             native_common_results50PD::state().rootPublished&&!native_common_results50PD::state().fallback&&
-             originalMainApplication.riderProfile&&originalMainApplication.riderProfile->stamp().mode34==0u){
-      // Pause QUIT row 10 on a counted Free Play race, every course: 1BDA74.
-      // App2E0 (1 outside the debug boot); P+34 == 0. 11258 == 3 (Time
-      // Trial) first asks 1ABFC0(race,1) at 1BDAB4 and, on a record, opens
-      // Results page 3 (1CA8E0(Results,3)) -> 1CA6A4 1AC440 -> Hall 1CA6F0.
-      // PORT STAND-IN (flagged): that record page over the paused race is not
-      // owned yet, so a Time Trial takes the no-record row too. Otherwise
-      // (1BDB5C): 26D070, 1A4AB0(0.5), 1A4B90(2), 267BE0, 2AED60 500 ms,
-      // 1BE830, 17DE10(App,6,6,1) -> Course. The audio stop/fade leaves are
-      // the native race teardown's (stand-in); the request is the same
-      // 17DE10(6,6,1) row the 1AB908 race return queues, so the same native
-      // Course receiver takes it.
-      rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection quitRace;
-      const bool timeTrial=originalMainApplication.riderProfile->courseRaceSnapshot(quitRace)&&quitRace.subtype==3u;
-      rr::game::OriginalRaceAckDestination50PD quit;
-      quit.route=rr::game::OriginalRaceAckRoute50PD::course;quit.flags=6u;quit.screen=6u;quit.page=1u;
-      quit.sourcePC=0x1bdbfcu;
-      const auto& owned=originalMainApplication.sourceRace28COwner_;
-      const bool queued=owned&&originalMainApplication.commitRaceAcknowledgementTransfer50PD(*owned,quit);
-      std::cerr<<"pause_quit row=10 site=1BDA74 subtype="<<quitRace.subtype<<" record_check="
-          <<(timeTrial?"pending_1BDAB4":"not_reached")<<" route=course pc=1bdbfc queued="<<queued<<'\n';
-      if(queued){
+     else if(in.confirm&&row==10){
+      if(queuePauseCourse1BDA74("host")){
        sessionMenu.closeExternal();originalMainApplication.setExplicitAnimationPause(false);
        composePacket(false,input);sampleController();
        forceSceneRender=true;continue; // the next iteration departs (beginNativeResultsHallDeparture50LA)
       }
-      action=MenuResult::Quit; // transfer refused: the former port Quit, logged above
+      action=MenuResult::Quit; // transfer refused or not admitted: the former port Quit, logged above
      }
-     else if(in.confirm&&row==10)action=MenuResult::Quit;
     }
     // Every-track original Pause follows the host Pause page's lifetime.
     {
@@ -1357,11 +1433,13 @@ void Context::run() {
        std::cerr<<"original_pause_host open_rejected; host menu retained\n";
        sourcePauseObservation.unbind();
       }
-     }else if(!wanted&&sourcePauseObservation.hostOpen())sourcePauseObservation.closeHost();
+     }else if(!wanted&&sourcePauseObservation.hostOpen()&&!sourcePauseObservation.countedOpen())
+      sourcePauseObservation.closeHost();
     }
     // Only accepted explicit native menu commands map to Application11C.
     // Focus/minimize/recovery/controller-loss suppression never writes it.
-    if(menuWasOpen!=sessionMenu.open())
+    // The counted original Pause writes its own (1BE8A0 / 1BE830).
+    if(hostMenuWasOpen!=sessionMenu.open())
      originalMainApplication.setExplicitAnimationPause(sessionMenu.open());
     if(action==platform::HostSessionMenu50IF::Result::HudPrevious||
        action==platform::HostSessionMenu50IF::Result::HudNext){
@@ -1416,7 +1494,7 @@ void Context::run() {
         <<" mixed_frames="<<liveAudio->mixedFrames()<<'\n';
     reportUiState("transition");
    }
-   if(menuWasOpen&&!sessionMenu.open()){
+   if(menuWasOpen&&!sessionMenu.open()&&!sourcePauseObservation.countedOpen()){
     suppressResumeKeys=true;forceSceneRender=true;
     // Never spend the time in any host menu as catch-up simulation.
     hostClock.pause(monotonicNow50DU());
@@ -1425,7 +1503,7 @@ void Context::run() {
     displayWallTotals.reportAndReset("menu_resume");
     phaseTiming.resetInterval();for(auto& total:simulationTotals)total={};renderDiagnostics.resetInterval();
    }
-   if(hostInput.checkpointRequested&&!sessionMenu.open()){
+   if(hostInput.checkpointRequested&&!sessionMenu.open()&&!sourcePauseObservation.countedOpen()){
     composePacket(false,input);sampleController();
     if(raceEnabled){
      std::cerr<<"Race restart requested: checkpoint rebuild restarts every racer and countdown together.\n";
@@ -1456,7 +1534,7 @@ void Context::run() {
    capturePending=capturePending||hostInput.captureRequested;
    const auto now=monotonicNow50DU();
    const auto& info=host.info();
-   if(sessionMenu.open()){
+   if(sessionMenu.open()||sourcePauseObservation.countedOpen()){
     discardTrackBaseline();
     if(sourceCameraSession&&!humanCourseEnabled)require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
         "camera-only menu release failed");

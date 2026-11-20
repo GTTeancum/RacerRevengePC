@@ -1,0 +1,70 @@
+149p item (2): the original Pause owner on every counted race
+================================================================
+Branch pause-149 (base 8ec161e). Build wt-149p-1 (relink of wt-148r-7).
+
+What runs now (every course, add-on courses included, no course/pod key)
+- Publication: after the host Pause binding (bindHost / bindHostNamed), the
+  counted race that owns the SAME Pause100 (race28C, pause100_ from 1A8AB8) is
+  attached to the original owner: Owner::attachCountedRace.
+  Log: original_pause_owner counted=1 course=N addon=0|1 subtype=S mode34=M
+- Each focused poll (Pause closed or open, host menu closed): the poll's pad
+  edges on native device 0 (Escape/Start 8, Up 12, Down 14, Enter/Cross 2,
+  Left 15, Right 13 - the spectator producer's aliases) go to
+  Owner::dispatchCountedRaceInput: the race's 1A87A0 first, then Pause 1BD7C0.
+  * 1A87A0 Start, Pause closed: gate race B4+58 (not finished, racing or bit2),
+    device < race1B0&3, race1B1 pending clear; then 199770(F8,0,1,1,1,1) and
+    1AD230 (Application::countedPauseRequest1A87A0_149p), race1A4/1B1 request.
+    Log: pause_request site=1A87A0 device=0 f8_199770=1 hud_1AD230=1
+         (refused: pause_request site=1A8890 refused flags58=..)
+  * 1A7C1C (same poll, before the world step): race1B0 bit3 clear, 142040(race,1),
+    1BE8A0 (App11C, row 0, opening .25, 1A4B90(2), activity, +200, +884,
+    1ACF50 world 4D8 group).
+    Log: pause_open owner=original site=1BE8A0 device=0 course=N subtype=S mode34=M world_1ACF50=0|1 humans=1
+  * 1A87A0 Start, Pause open on +884's device: 1BE830 + 1BA100(2).
+    Log: pause_close site=1A88D4 row=start
+  * 1BD7C0 Up/Down/Left/Right: the existing pressNavigation1BD7C0 (rows 2..4 HUD
+    slot stores, rows 5..8 race->adjustPauseAudio1BD7C0).
+    Log on a setting change: pause_row row=R site=PC setting=1
+  * 1BD8CC Cross: row 0 1BD908 (close + feedback), row 1 1BD934 (close,
+    feedback, then the loop's restart), row 9 1BD9B8 / row 10 1BDA74 (App2E0
+    gate, feedback, close, then the loop's departure).
+    Logs: pause_row row=0 site=1BD908 closed=1 / pause_row row=1 site=1BD990
+          restart=port_rebuild / pause_row row=9 site=1BD9B8 /
+          pause_row row=10 site=1BDA74, then
+          pause_quit_admission row=10 owner=original ... and
+          pause_quit row=10 site=1BDA74 owner=original subtype=S ... queued=1
+- A refused owner (custody/lifecycle gate) leaves the Start to the host Pause
+  (fallback): pause_owner refused gate=G pc=.. fallback=host; the host Pause's
+  logs say owner=host.
+- RA ALL8 spectator: unchanged (bindRace / dispatchNativeInputBatch /
+  beginNativePauseReturn50LA); counted_ is never set on that binding.
+
+Generalised gates (one rule, RA kept as it was)
+- Owner lifecycle: counted_ uses the race's own camera adapter34
+  (nativeCameraAdapter34LifetimeCurrent / ownsNativeCameraAdapter34, the
+  custody the common Results route uses) instead of the RA map identity and
+  consumedRaAll8CameraCustodyNative34Current. Track 7/order 4/class A/RA map
+  remain only on the RA ALL8 binding.
+- Race 1ACF50 / Pause row 5 (effects volume): any course's counted world
+  reaches the race-audio World4D8 group; the RA world keeps its same-world
+  authority.
+
+Stand-ins (flagged in code)
+- Row 1: the in-place 1AC8E0 restart is item (3); the loop's rebuild restart.
+- Rows 9/10: 26D070 / 1A4AB0 / 267BE0 and the 500 ms 2AED60 fade are the race
+  teardown's and the frontend's; row 9's 17DE10(6,4,1) is the port's
+  ReturnOriginalMain; row 10 queues 17DE10(6,6,1) through the 1AB908
+  race-return transfer (Free Play with a published Results root; otherwise
+  the former port Quit, logged). Time Trial's 1BDAB4 1ABFC0 record page is
+  item (4).
+- 1ACF50 on a world whose 4D8 group the port does not own: logged
+  world_1ACF50=0, the open continues and 1BE830 skips that resume.
+- 1AF770 (human pad vibration stop): the loop's stopFeedbackTransport.
+- Start after the finish (race B4+58 bit0): left to the host menus.
+- The 1A7C1C open runs in the same poll right after 1A87A0 (the race update
+  follows the input in the same frame).
+
+Runner
+- --pause-quit SECONDS: Escape (Start) after SECONDS of racing, then Down one
+  per poll to row 10, then Enter (Cross). --pause-restart SECONDS: row 1.
+  Lines: test_pause_quit press=start ..., test_pause_quit row=R press=down|cross.

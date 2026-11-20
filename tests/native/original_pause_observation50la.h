@@ -29,6 +29,14 @@ class Owner final {
     bool host_=false;std::size_t hostTrackText_=0;
     // Registry (add-on) course: the row's track name; empty = the LOC title above.
     std::string hostTrackName_;
+    // 149p: the original Pause owner on the counted race of every course
+    // (add-on courses included). The race's own camera custody (the counted
+    // race's camera adapter34, as Results) replaces the RA ALL8 aggregate.
+    // counted_ is set only by attachCountedRace() after bindHost; the RA ALL8
+    // spectator binding (bindRace) never sets it.
+    bool counted_=false;
+    mutable bool countedPending_=false,countedOwnsOpen_=false,countedWorldPaused_=false;
+    mutable std::uint32_t countedDevice_=0;
     const original_main_entry50KG::Application* application_=nullptr;
     std::weak_ptr<rr::game::OriginalPauseStorage50LA> pause_;
     std::weak_ptr<rr::game::ControlPresets49D> controls_;
@@ -156,9 +164,9 @@ public:
         Result result;
         if(lifecycleRejected_||!application_||!cameraGeneration_)return result;
         const auto pause=pause_.lock();const auto controls=controls_.lock();
-        const auto camera=camera_.lock();const auto track=track_.lock();
-        if(!pause||!controls||!camera||!track||camera->generation_!=cameraGeneration_||
-           application_->controlsProfile!=controls||!raceIdentity(*camera,*track,*pause,*controls)||
+        const auto camera=camera_.lock();
+        if(!pause||!controls||!camera||camera->generation_!=cameraGeneration_||
+           application_->controlsProfile!=controls||!identityCurrent(*camera,*pause,*controls)||
            !pause->entity_||!pause->entity_->initialized||pause->entity_->releasing||
            pause->entity_->application!=application_->entities()||
            pause->entity_->component.sessionGeneration!=cameraGeneration_)return result;
@@ -297,6 +305,34 @@ public:
         return true;
     }
     bool hostBound()const noexcept{return host_;}
+    // 149p: attach the counted race that owns this SAME Pause100 (race28C,
+    // pause100_ published by 1A8AB8). Every course: no course or pod key.
+    bool attachCountedRace()noexcept {
+        if(!host_||counted_||!application_||!cameraGeneration_)return false;
+        const auto pause=pause_.lock();const auto& race=application_->sourceRace28COwner_;
+        if(!pause||!race||race->pause100_!=pause||!race->counted_||race->rolledBack_)return false;
+        race_=race;counted_=true;countedPending_=countedOwnsOpen_=countedWorldPaused_=false;return true;
+    }
+    bool countedBound()const noexcept{return counted_;}
+    bool countedOpen()const noexcept{
+        const auto pause=pause_.lock();return counted_&&countedOwnsOpen_&&pause&&pause->active200_;
+    }
+    bool countedPending()const noexcept{return counted_&&countedPending_;}
+    // One counted-race input batch (original pad events, in poll order):
+    // the race's 1A87A0 first, then Pause 1BD7C0, as the App10 sibling chain
+    // Race -> Pause100 orders them. A row whose body leaves the race (1, 9,
+    // 10) ends the batch; the loop then performs that row's departure.
+    struct CountedInput {
+        enum class Row : std::uint8_t { none,restart,main,course };
+        Row row=Row::none;
+        bool startConsumed=false,refused=false,closed=false,navigated=false;
+        std::uint32_t sourcePC=0,gate=0,selection=0;
+    };
+    bool dispatchCountedRaceInput(rr::game::InputEvent48Z* events,rr::game::DeviceButtonRecord48Y* records,
+        std::size_t count,CountedInput& out)const noexcept;
+    // 1A7C1C..1A7C74: the race update after 1A87A0 set race1B1 bit0 opens
+    // Pause (race slot50 142040, then 1BE8A0). false = refused (gate set).
+    bool updateCountedRace1A7C1C(std::uint32_t& gate)const noexcept;
     bool hostOpen()const noexcept{
         const auto pause=pause_.lock();return host_&&pause&&pause->active200_;
     }
@@ -305,7 +341,7 @@ public:
     }
     bool openHost()const noexcept {
         const auto pause=pause_.lock();const auto camera=camera_.lock();
-        if(!host_||!pause||!camera||camera->generation_!=cameraGeneration_||pause->active200_||
+        if(!host_||countedOwnsOpen_||!pause||!camera||camera->generation_!=cameraGeneration_||pause->active200_||
            pause->mode1F0_||!pause->entity_)return false;
         pause->selection880_=0;pause->opening30_=.25f; //1BE8C8 opening slide.
         camera->actual_.cycleAudio.dispatchPauseFeedback(2);
@@ -316,13 +352,21 @@ public:
     bool closeHost()const noexcept {
         const auto pause=pause_.lock();
         if(!host_||!pause||!pause->active200_||!pause->entity_)return false;
+        if(countedOwnsOpen_){
+            // 149p: the counted owner's own 1BE830. Teardown (window close
+            // while paused) after its custody already ended keeps the host
+            // close below so the Pause entity's activity is still retired.
+            Diagnostic d;if(closeLifecycle1BE830(d))return true;
+            countedOwnsOpen_=false;countedWorldPaused_=false;lifecycleRejected_=false;
+            if(application_)application_->setExplicitAnimationPause(false);
+        }
         pause->active200_=0;
         return pause->entity_->setActivity141630(false);
     }
     // 1BD7C0 vertical navigation: rows 0..10 wrap, same feedback cues.
     bool moveHostSelection(bool down)const noexcept {
         const auto pause=pause_.lock();const auto camera=camera_.lock();
-        if(!host_||!pause||!camera||!pause->active200_||pause->selection880_>=11)return false;
+        if(!host_||countedOwnsOpen_||!pause||!camera||!pause->active200_||pause->selection880_>=11)return false;
         if(down)pause->selection880_=pause->selection880_==10u?0u:pause->selection880_+1u;
         else pause->selection880_=pause->selection880_?pause->selection880_-1u:10u;
         camera->actual_.cycleAudio.dispatchPauseFeedback(down?4u:3u);
@@ -386,6 +430,7 @@ public:
     bool resetNativePresentationClock()const noexcept;
     void unbind()noexcept {
         host_=false;hostTrackText_=0;hostTrackName_.clear();
+        counted_=countedPending_=countedOwnsOpen_=countedWorldPaused_=false;countedDevice_=0;
         race_.reset();camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
@@ -396,6 +441,29 @@ private:
     bool closeLifecycle1BE830(Diagnostic&)const noexcept;
     bool retainedAttachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
     bool attachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
+    bool countedPressRace1A87A0(rr::game::InputEvent48Z&,CountedInput&)const noexcept;
+    bool countedConfirm1BD8CC(rr::game::InputEvent48Z&,rr::game::DeviceButtonRecord48Y&,CountedInput&)const noexcept;
+    // 149p counted-race identity: this SAME race28C/Pause100, its own camera
+    // adapter34 lifetime (live: ownsNativeCameraAdapter34, the custody Results
+    // uses), a human race (race1B0&3 >= 1) and the Pause's loaded subtype.
+    bool countedIdentity(const Camera& c,const rr::game::OriginalPauseStorage50LA& p,
+        const rr::game::ControlPresets49D& controls,bool live)const noexcept {
+        if(!counted_||!application_)return false;
+        const auto& race=application_->sourceRace28COwner_;
+        if(!race||race_.lock()!=race||race->pause100_.get()!=&p||!race->counted_||race->rolledBack_||
+           !race->nativeCameraAdapter34LifetimeCurrent(c)||(live&&!race->ownsNativeCameraAdapter34(c)))return false;
+        return !c.closed_&&!c.abandoned_&&c.generation_&&c.generation_==cameraGeneration_&&
+            p.stage_==rr::game::OriginalPauseStorage50LA::Stage::derivedResources&&
+            p.context_&&p.context_->live()&&p.context_->materialApplication()==application_->materialApplication&&
+            &c.actual_.preferences==&controls&&c.actual_.humanCount34>=1u&&
+            c.actual_.launchKind11258==static_cast<std::uint32_t>(p.subtype11258_);
+    }
+    // Either route: counted race (149p) or the RA ALL8 aggregate.
+    bool identityCurrent(const Camera& c,const rr::game::OriginalPauseStorage50LA& p,
+        const rr::game::ControlPresets49D& controls)const noexcept {
+        if(counted_)return countedIdentity(c,p,controls,true);
+        const auto track=track_.lock();return track&&raceIdentity(c,*track,p,controls);
+    }
     bool raceIdentity(const Camera& c,const Track& track,
         const rr::game::OriginalPauseStorage50LA& p,const rr::game::ControlPresets49D& controls)const noexcept {
         return retainedRaceIdentity(c,track,p,controls)&&
