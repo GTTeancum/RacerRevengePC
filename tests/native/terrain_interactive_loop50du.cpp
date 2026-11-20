@@ -532,6 +532,26 @@ void Context::run() {
     }
    }
    {
+    // Unattended test only: RR_TEST_RESULTS_HOLD=1 stays on whichever Results
+    // screen the race ends on (native free-play panel or the Results replay)
+    // and requests ONE window capture 3 s after it appears (the F12 path, as
+    // a player pressing it at a focused window). The run then holds there.
+    static const bool resultsHold50PD=[]{const char* v=std::getenv("RR_TEST_RESULTS_HOLD");return v&&std::string(v)=="1";}();
+    static std::uint64_t holdStartNs50PD=0;static bool holdCaptured50PD=false;
+    if(resultsHold50PD&&captureRun.unattended()&&!holdCaptured50PD&&!sessionMenu.open()&&
+       (humanResultsReady||native_common_results50PD::state().replayActive)){
+     auto& holdInput50PD=rr::platform::testResultsInput50PD();
+     holdInput50PD.focus=true;
+     const auto nowNs=monotonicNow50DU();
+     if(!holdStartNs50PD)holdStartNs50PD=nowNs;
+     if(nowNs>=holdStartNs50PD+3000000000ull){
+      holdInput50PD.capture=true;holdCaptured50PD=true;
+      std::cerr<<"test_results_hold capture_requested screen="
+          <<(native_common_results50PD::state().replayActive?"results104":"native_panel")<<'\n';
+     }
+    }
+   }
+   {
     // Unattended test only: hold keyboard throttle (W) once the race is green,
     // so the human launch at the start light is exercised like a real player.
     static const bool holdThrottle50DU=[]{const char* v=std::getenv("RR_TEST_HOLD_THROTTLE");return v&&std::string(v)=="1";}();
@@ -1794,6 +1814,15 @@ void Context::run() {
       std::cerr<<"NATIVE HUMAN RESULTS: genuine source end predicate, countdown, audio wait and displayed fade complete; "
           "source standings retained. Native presentation substitutes at1A7DD0 before retail end dispatch; "
           "HUD-stop1AD230 and retail result/profile/save/progression owners were not executed.\n";
+      // PORT STAND-IN (DLC D7 b): this flow has no 1AC440/save moment. A
+      // latched free-play add-on run records to the DLC side file here (the
+      // profile owner gates it; stock runs: nothing happens, nothing logged).
+      if(originalMainApplication.riderProfile){
+       rr::game::OriginalRaceRecordQualificationRacerObservation50KG row0{};
+       row0.records={lapContinuity.timing.bestLapCB4,lapContinuity.timing.timeCB8,lapContinuity.timing.countCD0};
+       row0.retirementCD4=race.racers[0].retirementCD4;
+       (void)originalMainApplication.riderProfile->commitAddonFreePlayRecordAtNativeResults(row0);
+      }
       break;
      }else require50DU(ending.status==OriginalHumanEndClockStatus50KG::advanced||
          ending.status==OriginalHumanEndClockStatus50KG::unchanged,"actual human ending root remains at a source boundary");

@@ -362,7 +362,8 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
         {auto& test=testResultsInput50PD(); //Unattended test only; inert otherwise.
          if(test.focus){input.keys.focused=true;input.keys.activityLost=false;}
          if(test.enter){input.keys.pressed[40]=1;input.keys.down[40]=1;test.enter=false;}
-         if(test.down){input.keys.pressed[81]=1;input.keys.down[81]=1;test.down=false;}}
+         if(test.down){input.keys.pressed[81]=1;input.keys.down[81]=1;test.down=false;}
+         if(test.capture){input.keys.pressed[69]=1;test.capture=false;}}
         resultsInput50LA_.observeWindow(input.keys,info_.inputConnected,resultsLoadingBarrier);
         {static int reportedAvailable=-1;const int available=resultsInput50LA_.available_[0]?1:0;
          if(available!=reportedAvailable){reportedAvailable=available;

@@ -173,6 +173,11 @@ def main():
                              'not the tournament Results replay), choose Main Menu and confirm it, as a player '
                              'would (Down, Enter, Down, Enter, 1 s apart; sets RR_TEST_RESULTS_EXIT). The race '
                              'returns to the original Main and the run then idles at Main until --seconds')
+    parser.add_argument('--hold-results', action='store_true',
+                        help='Test only: stay on the Results screen the race ends on (native free-play panel or '
+                             'the tournament Results replay) and write ONE frame of it as an image 3 s after it '
+                             'appears (sets RR_TEST_RESULTS_HOLD=1; turns logs-only off for this run). The run then '
+                             'holds there until --seconds. Not with --results-exit or --results-confirm')
     parser.add_argument('--ieee-subnormals', action='store_true',
                         help='Reproduction only: disable the PS2 no-subnormal float mode')
     parser.add_argument('--window', help='Open a resizable window at WIDTHxHEIGHT (widescreen tests)')
@@ -234,6 +239,8 @@ def main():
             parser.error('--addon-rider and --player-racer cannot be combined')
     if args.hold_rider and args.route not in ADDON_RIDER_ROUTES:
         parser.error('--hold-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
+    if args.hold_results and (args.results_exit or args.results_confirm):
+        parser.error('--hold-results holds the Results screen; it cannot be combined with --results-exit or --results-confirm')
     if args.eyecheck_dlc_hall is not None:
         if not addon_key.fullmatch(args.eyecheck_dlc_hall):
             parser.error('--eyecheck-dlc-hall expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
@@ -299,7 +306,7 @@ def main():
         # tests/native/original_ui_capture_navigation50la.h HallRoute).
         env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
     # A --hold-rider / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
-    logs_only = args.logs_only and not args.hold_rider and args.eyecheck_dlc_hall is None
+    logs_only = args.logs_only and not args.hold_rider and not args.hold_results and args.eyecheck_dlc_hall is None
     if logs_only:
         env['RR_EVIDENCE_LOGS_ONLY'] = '1'
     if args.camera_trace:
@@ -308,7 +315,7 @@ def main():
     # in-process (RR_TEST_* read by the game), so the run must not depend on
     # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
     # from pausing or releasing those inputs; a real minimise/close still does.
-    injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or
+    injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or args.hold_results or
                 args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None)
     if injected:
         env['RR_TEST_IGNORE_FOCUS'] = '1'
@@ -337,6 +344,8 @@ def main():
         env['RR_TEST_RESULTS_CONFIRM'] = str(args.results_confirm)
     if args.results_exit:
         env['RR_TEST_RESULTS_EXIT'] = args.results_exit
+    if args.hold_results:
+        env['RR_TEST_RESULTS_HOLD'] = '1'
     if args.camera_cycle:
         env['RR_TEST_CAMERA_CYCLE'] = '1'
     if args.ieee_subnormals:
@@ -391,7 +400,8 @@ def main():
                   nativeSaveDirectory=str(saves), audioCapturePath=str(output / 'audio.wav'),
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
-                  eyecheckDlcHall=args.eyecheck_dlc_hall,
+                  eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results,
+                  resultsExit=args.results_exit,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
                   serializedGpuStageProfiling=args.profile_gpu_stages)
