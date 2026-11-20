@@ -244,6 +244,16 @@ def name_character(c):
     return c == ' ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9') or c in NAME_PUNCTUATION
 
 
+# The Rider screen's large Huttese name font (font\swhutt44, 29 glyphs) draws a
+# pod's ui.huttese_name_key string (default name_key). Same set as
+# dlcHutteseNameCharacter in src/assets/dlc_name_font50dl.h.
+HUTTESE_SET_TEXT = "space, ( ) and A-Z"
+
+
+def huttese_character(c):
+    return c in ' ()' or ('A' <= c <= 'Z')
+
+
 def read_res(path, cap):
     """RES3 names and decoded storage (layout of src/assets/import_decode48c.cpp)."""
     b = Path(path).read_bytes()
@@ -420,6 +430,22 @@ def read_items(p, d):
                 n = int(ls) if isinstance(ls, str) and ls.isdigit() and 1 <= len(ls) <= 2 else ls if isinstance(ls, int) and not isinstance(ls, bool) else None
                 need(n is not None, f'{uw}: layout_slot must be a stock racer 01..26')
                 need(1 <= n <= 26 and n not in (5, 6, 13), f'{uw}: layout_slot must be a stock Rider-screen racer (not 5, 6, 13)')
+            hk = txt(ui, 'huttese_name_key', uw, False) or nk
+            hn = eng(hk, uw, 'huttese_name_key')
+            for c in hn:
+                shown = 'double quote' if c == '"' else f"'{c}'"
+                need(huttese_character(c), f"{uw}: huttese_name_key \"{hk}\" uses {shown} (0x{ord(c):02x}), which the Rider screen's "
+                     f"Huttese name font (font\\swhutt44) cannot draw (allowed: {HUTTESE_SET_TEXT}; give ui.huttese_name_key a string in that set)")
+            if 'colors' in ui:  # optional: Rider-screen accent/secondary colours, packed 0xRRGGBB like the stock profile words
+                co = ui['colors']
+                need(isinstance(co, dict), f'{uw}: colors must be an object {{"accent": [r,g,b], "secondary": [r,g,b]}}')
+                for k in co:
+                    need(k in ('accent', 'secondary'), f'{uw}: colors has an unknown field "{k}" (accent, secondary)')
+                for k in ('accent', 'secondary'):
+                    v = co.get(k)
+                    need(isinstance(v, list) and len(v) == 3, f'{uw}: colors.{k} must be [r, g, b]')
+                    need(all(isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 255 for x in v),
+                         f'{uw}: colors.{k} values must be whole numbers 0-255')
             pod['loose'] = []
             v = o.get('voice')
             if v is not None:

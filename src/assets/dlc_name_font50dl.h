@@ -27,4 +27,16 @@ inline constexpr bool dlcNameCharacter(char c) noexcept {
 // Human-readable form for refusal reasons and the report.
 inline constexpr const char* dlcNameCharacterSetText="space, A-Z, a-z, 0-9 and ! ' ( ) + , - . / : ;";
 
+// The Rider screen draws every rider name a second time, large, in the Huttese
+// font font\swhutt44 (UI/UIFONTS.RES; its CEL has 29 glyphs: space, ( ) and
+// A-Z). The string an add-on pod gives that widget (ui.huttese_name_key, default
+// name_key) must use only those characters: a narrower set than the one above.
+// A character outside it is refused by the registry and tools\dlc\dlc_pack.py,
+// never dropped; the Rider draw also lays it out with the real font and draws
+// nothing (logged) if a glyph is missing.
+inline constexpr bool dlcHutteseNameCharacter(char c) noexcept {
+    return c==' '||c=='('||c==')'||(c>='A'&&c<='Z');
+}
+inline constexpr const char* dlcHutteseNameCharacterSetText="space, ( ) and A-Z";
+
 } // namespace rr::assets::dlc50DL

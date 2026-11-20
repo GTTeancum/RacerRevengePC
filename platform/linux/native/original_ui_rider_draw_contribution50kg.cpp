@@ -1146,8 +1146,9 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
                 s.addonCharacterValid=false;
                 continue;
             }
-            const auto* descriptor=id==addon->nameWidget?widgets.textDescriptor(id):nullptr;
-            if(!descriptor)continue; // the anchor's large name: nothing drawn for it
+            const auto* addonLines=id==addon->nameWidget?&addon->lines:id==addon->hutteseWidget?&addon->hutteseLines:nullptr;
+            const auto* descriptor=addonLines?widgets.textDescriptor(id):nullptr;
+            if(!descriptor)continue; // not a name widget of the anchor control: nothing drawn for it
             const auto materialIndex=s.resources->widgetMaterial(id);
             const auto* font=s.resources->textFont(id);const auto* atlas=s.resources->textAtlas(id);
             if(!font||!atlas||materialIndex>=materials.size()||materials[materialIndex].images.size()!=1)return fail(d,E::resource);
@@ -1155,7 +1156,7 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
             if(!map)return fail(d,E::bank);const auto binding=s.find(&material.material.passes[0],map->combinedIndex);
             if(binding==unresolved)return fail(d,E::material);float z=0;if(!s.resources->textPacketDepth(id,z))return fail(d,E::geometry);
             float below=0; // further lines (none today) go one font line under the name
-            for(const auto& line:addon->lines){
+            for(const auto& line:*addonLines){
                 // A line whose glyphs the authored font lacks is skipped (logged by the
                 // session), never drawn with invented glyphs and never a frame failure.
                 const std::string* text=nullptr;game::OriginalUiTextDiagnostic50KG probe;

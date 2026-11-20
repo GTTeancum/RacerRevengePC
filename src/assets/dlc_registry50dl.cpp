@@ -320,6 +320,36 @@ bool readPod(const Package& p,const Json& o,PackageItems& items,AddonPod& pod,st
         if(n<1||n>26||n==5||n==6||n==13)return fail(reason,uw+": layout_slot must be a stock Rider-screen racer (not 5, 6, 13)");
         pod.ui.layoutSlot=static_cast<unsigned>(n);
     }
+    // Rider-screen Huttese name (dlc_name_font50dl.h): its own key or name_key.
+    if(!text(*ui,"huttese_name_key",pod.ui.hutteseNameKey,false,uw,reason))return false;
+    if(pod.ui.hutteseNameKey.empty())pod.ui.hutteseNameKey=pod.nameKey;
+    if(!englishKey(items,pod.ui.hutteseNameKey,pod.ui.hutteseName))
+        return fail(reason,uw+": huttese_name_key \""+pod.ui.hutteseNameKey+"\" has no English string");
+    for(const char c:pod.ui.hutteseName)if(!dlcHutteseNameCharacter(c)){
+        static constexpr char hex[]="0123456789abcdef";
+        const std::string code{'0','x',hex[(unsigned char)c>>4],hex[(unsigned char)c&15]};
+        const std::string shown=c=='"'?std::string("double quote"):"'"+std::string(1,c)+"'";
+        return fail(reason,uw+": huttese_name_key \""+pod.ui.hutteseNameKey+"\" uses "+shown+" ("+code+
+            "), which the Rider screen's Huttese name font (font\\swhutt44) cannot draw (allowed: "+dlcHutteseNameCharacterSetText+
+            "; give ui.huttese_name_key a string in that set)");
+    }
+    if(const Json* colors=field(*ui,"colors")){
+        if(!colors->is_object())return fail(reason,uw+": colors must be an object {\"accent\": [r,g,b], \"secondary\": [r,g,b]}");
+        for(auto k=colors->begin();k!=colors->end();++k)
+            if(k.key()!="accent"&&k.key()!="secondary")return fail(reason,uw+": colors has an unknown field \""+k.key()+"\" (accent, secondary)");
+        const auto rgb=[&](const char* name,std::uint32_t& out){
+            const Json* v=field(*colors,name);
+            if(!v||!v->is_array()||v->size()!=3)return fail(reason,uw+": colors."+name+" must be [r, g, b]");
+            std::uint32_t packed=0;
+            for(const auto& c:*v){
+                if(!c.is_number_unsigned()||c.get<std::uint64_t>()>255)return fail(reason,uw+": colors."+name+" values must be whole numbers 0-255");
+                packed=(packed<<8)|static_cast<std::uint32_t>(c.get<std::uint64_t>());
+            }
+            out=packed;return true;
+        };
+        if(!rgb("accent",pod.ui.accentColor)||!rgb("secondary",pod.ui.secondaryColor))return false;
+        pod.ui.colorsAuthored=true;
+    }
     // character = psg, mcf, vut and the six motions (original_ui_rider_character_assets50kg).
     {
         std::string base;

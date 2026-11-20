@@ -32,6 +32,11 @@ struct Overlay {
     // The pilot name only, as on a stock control: package and source game stay in the
     // logs and dlc.json, never on screen.
     std::array<Line,1> lines{};
+    // suppressed[2]: the large swhutt44 name widget. A stock control draws its rider's
+    // name there too; the add-on draws its Huttese name (ui.huttese_name_key) with that
+    // widget's own font, colour, depth and position.
+    std::uint16_t hutteseWidget=0;
+    std::array<Line,1> hutteseLines{};
     std::uint32_t statRider=0;                   // the add-on's registry number the stats input carries
     std::uint32_t anchorRider=0;                 // the stock rider the add-on block follows (draw-order reference)
     // Menu-art step A: add-on model table row drawn in place of the anchor pod

@@ -195,7 +195,24 @@ struct OriginalUiRiderSession50KG::Storage {
         std::array<std::uint16_t,4> ids{};
         return addonSlot&&controlWidgets(state.slot4C8,state.rider4C4,ids)?ids[3]:0;
     }
-    std::array<std::string,3> addonText{}; // name, short name, package name of the highlighted add-on
+    std::array<std::string,4> addonText{}; // name, short name, package name, Huttese name of the highlighted add-on
+    bool addonColorsLogged=false;
+    // PORT EXTENSION (DLC): the colours the highlighted rider shows. Stock: that
+    // rider's profile colours (unchanged path). Add-on: its package ui.colors, else
+    // the layout_slot rider's, else (PORT STAND-IN, logged) the anchor's.
+    bool riderColors(OriginalUiRiderProfileColors50KG& out) noexcept {
+        const auto* pod=addonPod();
+        if(!addonSlot||!pod)return cold.profile->colors(state.rider4C4,out);
+        const char* source="package";
+        if(pod->ui.colorsAuthored)out={pod->ui.accentColor,pod->ui.secondaryColor};
+        else if(pod->ui.layoutSlot&&cold.profile->colors(pod->ui.layoutSlot,out))source="layout_slot";
+        else if(cold.profile->colors(state.rider4C4,out))source="anchor_stand_in";
+        else return false;
+        if(!addonColorsLogged){addonColorsLogged=true;
+            std::fprintf(stderr,"dlc_rider_colors key=%s number=%u source=%s rider=%u accent=%06X secondary=%06X\n",pod->key.c_str(),pod->number,source,
+                pod->ui.colorsAuthored?0u:(pod->ui.layoutSlot?pod->ui.layoutSlot:state.rider4C4),unsigned(out.accent17FA00),unsigned(out.secondary17FA10));}
+        return true;
+    }
     riderAddon50DL::Overlay addonOverlay{};
     const assets::dlc50DL::AddonPod* addonPod() const noexcept {
         return addonSlot?game::dlc50DL::addonRiderAt(addonSlot-1):nullptr; // registry bounds-checks the index
@@ -250,9 +267,10 @@ struct OriginalUiRiderSession50KG::Storage {
         const auto* pod=addonPod();
         if(slot&&!pod){addonSlot=previous;return false;}
         addonModelLogged=false;addonCharacterLogged=false;addonSelectLogged=false;addonPageLogged=false;
-        try{addonText={pod?pod->name:std::string(),pod?pod->shortName:std::string(),pod?pod->packageName:std::string()};}
+        try{addonText={pod?pod->name:std::string(),pod?pod->shortName:std::string(),pod?pod->packageName:std::string(),
+            pod?pod->ui.hutteseName:std::string()};}
         catch(...){addonText={};}
-        addonSkipLogged=false;
+        addonSkipLogged=false;addonColorsLogged=false;
         game::dlc50DL::setHighlightedAddonRider(addonPlayer,pod?pod->number:0u);
         return true;
     }
@@ -710,7 +728,7 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     bool pageColors() noexcept {
         OriginalUiRiderProfileColors50KG colors;
-        if(!cold.profile->colors(state.rider4C4,colors)){fault(Status::profile,0x1EB674);return false;}
+        if(!riderColors(colors)){fault(Status::profile,0x1EB674);return false;}
         // First source1EB640 affects live DAT objects; custom stat objects are
         //then updated by collector.projectPage at its unchanged source point.
         for(auto id:{2,1,7,6})if(!widgets().setColor(static_cast<std::uint16_t>(id),colors.secondary17FA10,callbackFault.widget)){
@@ -1717,8 +1735,8 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         // (current = [BaseAbilities], maximum = [MaxAbilities], lanes in the original
         // order), unlocked, no medals, identity = the add-on's own registry number
         // (the stats code accepts 32..99 and projects no stock portrait for it).
-        // PORT STAND-IN: accent/secondary colours stay the anchor's (an add-on
-        // package has no authored rider colours in contract 2).
+        // Colours: Storage::riderColors (package ui.colors, else the layout_slot
+        // rider's, else the anchor's as a logged PORT STAND-IN), as pageColors uses.
         const auto* pod=s->addonPod();std::array<std::uint16_t,4> ids{};
         if(!pod||!s->controlWidgets(s->state.slot4C8,s->state.rider4C4,ids))return result(d,Status::unavailableDestination,0x1EBBF0);
         stats.selectedRider=stats.observedRider=pod->number;
@@ -1729,6 +1747,10 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         auto& overlay=s->addonOverlay;overlay={};
         overlay.collector=&s->collector;overlay.suppressed=ids;overlay.nameWidget=ids[1];
         overlay.lines[0]={&s->addonText[0],&s->addonText[1]}; // name only (the package name is logged, not drawn)
+        overlay.hutteseWidget=ids[2];overlay.hutteseLines[0]={&s->addonText[3],nullptr};
+        {OriginalUiRiderProfileColors50KG colors;
+            if(!s->riderColors(colors))return result(d,Status::profile,0x1EBBF0);
+            stats.accentColor17FA00=colors.accent17FA00;}
         overlay.statRider=pod->number;overlay.anchorRider=s->state.rider4C4;
         // Menu-art step A: the add-on's own pod model in place of the anchor pod.
         if(s->addonModelRow(s->addonSlot))overlay.modelRow=s->addonSlot-1;
@@ -1794,8 +1816,9 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     }
     if(s->addonSlot&&!s->addonSkipLogged&&(s->addonOverlay.drawnLines||s->addonOverlay.skippedLines)){
         s->addonSkipLogged=true;const auto* pod=s->addonPod();
-        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u package=\"%s\" stats=pod_phy model=pod portrait=own background=own character=own\n",
-            pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines,pod?pod->packageName.c_str():"-");
+        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u huttese=\"%s\" package=\"%s\" stats=pod_phy model=pod portrait=own background=own character=own\n",
+            pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines,
+            pod?pod->ui.hutteseName.c_str():"-",pod?pod->packageName.c_str():"-");
     }
     ++s->state.renders;s->state.framePublished=true;return result(d,Status::ok);
 }

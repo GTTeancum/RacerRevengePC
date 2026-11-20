@@ -65,6 +65,17 @@ struct AddonPodUi {
     // slot its menu members were converted for). 0 = absent: the Rider screen uses
     // the anchor stock rider's widgets. PORT EXTENSION: a package has no widgets.
     unsigned layoutSlot=0;
+    // Optional "huttese_name_key" (default name_key): the string the Rider
+    // screen's large Huttese-font name widget draws, as a stock rider's two name
+    // widgets both draw its one name string. Only dlcHutteseNameCharacter
+    // characters (dlc_name_font50dl.h). hutteseName is its English text.
+    std::string hutteseNameKey,hutteseName;
+    // Optional "colors": {"accent": [r,g,b], "secondary": [r,g,b]}, whole numbers
+    // 0..255, packed 0xRRGGBB like the stock profile colour words (17FA00 accent,
+    // 17FA10 secondary; no alpha). Absent: the layout_slot rider's colours, else
+    // the anchor's (PORT STAND-IN).
+    bool colorsAuthored=false;
+    std::uint32_t accentColor=0,secondaryColor=0;
 };
 struct AddonPod {
     unsigned number=0;                   // 32..99
