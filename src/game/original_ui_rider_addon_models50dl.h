@@ -49,6 +49,17 @@ public:
         std::uint32_t characterImageOwner=noOwner;
         bool characterReady=false;
         std::string characterRefused;
+        // Menu-art step C: the portrait (ui.portraits) and the background
+        // (ui.background) from the add-on archive, one image owner (index 0 =
+        // portrait, 1 = background when present). Materials are the original
+        // constructions: portrait = ScreenTexture missing-PSM fallback, background
+        // = its own PSM, as the stock NN_flrg / NN_bkg rows.
+        std::shared_ptr<assets::OriginalUiScreenAssets50KG> pageImages;
+        assets::OriginalUiMaterial50KG portraitMaterial,backgroundMaterial;
+        std::string portraitName,backgroundName;  // registered "ui/textures/<leaf>"
+        std::uint32_t portraitImage=noOwner,backgroundImage=noOwner,pageImageOwner=noOwner;
+        bool portraitReady=false,backgroundReady=false;
+        std::string pageRefused;
     };
     struct Input {
         std::shared_ptr<const assets::OriginalUiArchive50KG> stockRider,appStart,podTextures;
@@ -73,6 +84,7 @@ public:
     // Backend seal only: record the bank owner of row `index` (bounds-checked).
     bool setImageOwner(std::size_t index,std::uint32_t owner) noexcept;
     bool setCharacterImageOwner(std::size_t index,std::uint32_t owner) noexcept;
+    bool setPageImageOwner(std::size_t index,std::uint32_t owner) noexcept;
     // Build the row's character graph (entry motion sampled, attached, IK bound)
     // with the same shared motion/IK/libm owners the stock characters use, or
     // destroy it. start refuses a row without a ready character or a live graph.

@@ -484,6 +484,17 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
                 bindings.back().addon=true;bindings.back().addonShared=m->addonShared(slot);
                 ++addonBindings;
             }
+            // Step C: portrait and background, static add-on rows of their own.
+            if(row->pageImages){
+                const auto page=[&](bool ready,const std::string& name,const assets::OriginalUiMaterial50KG& material,std::uint32_t image){
+                    if(!ready)return true;
+                    if(material.passes.size()!=1)return false;
+                    const auto* map=s.backend->addonPageImage(r,image);
+                    if(!map||!s.add(name,material.passes[0],*row->pageImages,image,map,bindings,d))return false;
+                    bindings.back().addon=true;++addonBindings;return true;};
+                if(!page(row->portraitReady,row->portraitName,row->portraitMaterial,row->portraitImage)||
+                   !page(row->backgroundReady,row->backgroundName,row->backgroundMaterial,row->backgroundImage))return fail(d,E::material);
+            }
             // Step B: the character's own materials (character pages), same static rows.
             if(!row->characterReady||!row->characterAssets||!row->characterMaterials)continue;
             const auto* cscene=row->characterAssets->scene();const auto* cm=row->characterMaterials.get();
@@ -1041,17 +1052,22 @@ bool OriginalUiRiderDrawContribution50KG::addonCharacter(std::size_t index,D& d)
     auto* row=table?table->row(index):nullptr;auto* scene=table?table->liveCharacter(index):nullptr;
     if(!row||!row->characterReady||!row->characterAssets||!row->characterMaterials)return refuse("add-on character row not ready");
     if(!scene)return refuse("add-on character graph not attached");
-    if((s.addonCharacterFlags191&1u)==0)return refuse("anchor character culled");
+    // The Rider page two-light registry (the same projection the stock character
+    // receives) and the Rider camera context; selected, unclipped (flags 1).
+    constexpr std::uint8_t flags=1;
+    game::original_racer_lighting50KM::LightMatrices lights{};game::OriginalUiLightManagerLifetimeDiagnostic50KG ld;
+    const auto archive=s.backend->riderArchive();
+    if(!s.light||!s.light->addonRiderCharacterLights50DL(lights,ld))return refuse("Rider character lights");
     const auto& assets=*row->characterAssets;const auto* materials=row->characterMaterials.get();
     const auto* model=assets.scene();
     if(!model||!assets.hierarchy()||scene->scene()!=model||model->lods.size()!=1||model->materials.size()!=materials->materialCount())
         return refuse("add-on character shape");
     game::OriginalUiRiderModelPacket50KG packet{};
-    packet.context=s.addonCharacterContext;
-    if(!scene->projectPalette(s.addonCharacterFlags191,packet.palette,d.model))return refuse("palette");
+    if(!archive||!game::prepareOriginalUiRiderLitContext50KG(*archive,s.render,lights,packet.context))return refuse("camera context");
+    if(!scene->projectPalette(flags,packet.palette,d.model))return refuse("palette");
     if(!game::prepareOriginalUiRiderModelFog50KG(*assets.hierarchy(),scene->graph(),s.render.cameraAfterFog.position,
         s.render.fogStart,packet.fog))return refuse("fog bounds");
-    packet.scene=model;packet.sourceModelFlags191=s.addonCharacterFlags191;
+    packet.scene=model;packet.sourceModelFlags191=flags;
     const auto& surfaces=model->lods[0].surfaces;std::uint32_t emitted=0;
     for(std::uint32_t surface=0;surface<surfaces.size();++surface){
         const auto materialIndex=surfaces[surface].material_index;
@@ -1120,8 +1136,9 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
                 s.addonFlagsValid=false;
                 if(state.kind==game::OriginalUiRiderWidgetKind50KG::character&&id==addon->suppressed[3]&&
                    addon->modelRow!=riderAddon50DL::Overlay::noRow){
-                    if(!s.addonCharacterValid)addon->characterRefused="anchor character not selected this frame";
-                    else if(!addonCharacter(addon->modelRow,d))return false;
+                    // Drawn because the add-on row is highlighted, independent of the
+                    // hidden anchor character's own selection this frame.
+                    if(!addonCharacter(addon->modelRow,d))return false;
                 }
                 s.addonCharacterValid=false;
                 continue;
@@ -1284,7 +1301,50 @@ bool OriginalUiRiderDrawContribution50KG::projectPage(const game::OriginalUiRide
         s.w.insert(s.w.end(),std::size_t(packet.quadCount)*4,1.f);s.fog.insert(s.fog.end(),std::size_t(packet.quadCount)*4,0.f);
         s.packets.push_back({first,packet.quadCount,binding,static_cast<std::uint32_t>(s.packets.size())});
     }
-    if(addon){guard.complete=true;return true;}
+    if(addon){
+        // PORT EXTENSION, NOT ORIGINAL (DLC step C): the add-on's own portrait (the
+        // stat page's riderPortrait spot, 250/300+panelY, texture size, depth of the
+        // stat objects) and its own NN_bkg-style background (the four mirrored
+        // 320x224 quadrants, depth 16777200). A page that cannot draw is skipped.
+        const auto* table=s.backend->addonModels();
+        const auto* row=table&&addon->modelRow!=riderAddon50DL::Overlay::noRow?table->row(addon->modelRow):nullptr;
+        const auto bound=[&](const std::string& name,const assets::OriginalUiMaterial50KG& material,std::uint32_t image,
+            std::uint32_t& binding,const assets::Texture48B*& texture)->bool{
+            const auto* map=row?s.backend->addonPageImage(addon->modelRow,image):nullptr;
+            if(!map||material.passes.size()!=1)return false;
+            binding=s.find(&material.passes[0],map->combinedIndex);
+            const auto* t=s.bank->images()->textures()->texture(map->combinedIndex);
+            texture=t?&t->texture:nullptr;(void)name;
+            return binding!=unresolved&&texture&&texture->width&&texture->height;};
+        const auto emit=[&](const std::array<game::OriginalUiOverlayVertex50KG,4>& v,std::uint32_t binding,float z)->bool{
+            if(!s.capacity(1))return false;
+            std::array<assets::Vertex48B,4> vertices{};constexpr unsigned order[]={0,1,3,2};
+            for(unsigned i=0;i<4;++i){const auto& p=v[order[i]];auto& out=vertices[i];
+                out.position[0]=p.x;out.position[1]=p.y;out.position[2]=z;out.uv[0]=p.u;out.uv[1]=p.v;
+                out.color[0]=127;out.color[1]=127;out.color[2]=127;out.color[3]=63;}
+            const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+            s.vertices.insert(s.vertices.end(),vertices.begin(),vertices.end());s.w.insert(s.w.end(),4,1.f);s.fog.insert(s.fog.end(),4,0.f);
+            s.packets.push_back({first,1,binding,static_cast<std::uint32_t>(s.packets.size())});return true;};
+        if(row&&row->portraitReady){std::uint32_t binding=unresolved;const assets::Texture48B* t=nullptr;
+            if(!bound(row->portraitName,row->portraitMaterial,row->portraitImage,binding,t))addon->pageRefused="portrait not bound";
+            else{const float x=250.f,y=300.f+input.panelY4DC,w=float(t->width),h=float(t->height);
+                if(!std::isfinite(y)||!emit({{{x,y,0,0},{x+w,y,1,0},{x,y+h,0,1},{x+w,y+h,1,1}}},binding,16777214.f))return fail(d,E::capacity);
+                addon->portraitDrawn=true;}
+        }
+        if(row&&row->backgroundReady){std::uint32_t binding=unresolved;const assets::Texture48B* t=nullptr;
+            if(!bound(row->backgroundName,row->backgroundMaterial,row->backgroundImage,binding,t))addon->pageRefused="background not bound";
+            else{const float u=319.f/float(t->width),v=223.f/float(t->height);
+                const std::array<std::array<float,8>,4> q{{{0,0,320,224,0,0,u,v},{320,0,320,224,u,0,0,v},
+                    {0,224,320,224,0,v,u,0},{320,224,320,224,u,v,0,0}}};
+                for(const auto& e:q){
+                    const std::array<game::OriginalUiOverlayVertex50KG,4> vv{{{e[0],e[1],e[4],e[5]},{e[0]+e[2],e[1],e[6],e[5]},
+                        {e[0],e[1]+e[3],e[4],e[7]},{e[0]+e[2],e[1]+e[3],e[6],e[7]}}};
+                    if(!emit(vv,binding,16777200.f))return fail(d,E::capacity);
+                }
+                addon->backgroundDrawn=true;}
+        }
+        guard.complete=true;return true;
+    }
     const auto* background=s.resources->background(static_cast<std::uint8_t>(input.selectedRider));
     if(!background)return fail(d,E::resource);
     for(const auto& quad:background->quadrants)if(!append(quad,background->material,16777200.f,d))return false;
@@ -1398,7 +1458,7 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
             if(!input[i].addonShared){
                 for(std::size_t k=0;k<names.size()&&k<0x100000u;++k)
                     if(same(input[i].registeredName,names[k].c_str())){ranks[i]=3235u+static_cast<std::uint32_t>(k);break;}
-                continue;
+                if(ranks[i]!=unresolved)continue; // else (a PSM-less page such as the portrait): extra list
             }
             std::size_t k=0;for(;k<shared.size();++k)if(same(input[i].registeredName,shared[k].c_str()))break;
             if(k==shared.size()){if(shared.size()>=0x10000u)return fail(d,E::schedule);shared.push_back(input[i].registeredName);}

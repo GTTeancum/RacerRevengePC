@@ -9,6 +9,7 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_program_table50la.h"
 #include "dlc_registry50dl.h"
+#include "original_ui_addon_material50dl.h"
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
@@ -928,6 +929,33 @@ bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& ri
         provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
         provenance.creationPC=0x2475c0;
         auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiAddonPortraitFallbackMaterial50DL(const OriginalUiArchive50KG& addonUi,
+    const std::string& registered,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see original_ui_addon_material50dl.h.
+    d={};
+    try {
+        if(!addonUi.loaded()||!addonUi.addon()||!addonUi.identity())
+            return fail(d,Error::archive,"add-on menu archive",0x1e9448);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=addonUi.find(registered+".pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||addonUi.find(registered+".psm").identity)
+            return fail(d,Error::fallbackSource,"add-on portrait and absent PSM",0x1e9448);
+        const auto slash=registered.find_last_of("\\/");
+        const auto name=registered.substr(slash==std::string::npos?0:slash+1);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback;
+        provenance.archive=addonUi.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=texture.identity;provenance.sourceCallerPC=0x1e9448;
+        provenance.registeredName=registered;provenance.attemptedPsmMember=registered+".psm";
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,name.c_str(),*inherited,runtime);
         output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }

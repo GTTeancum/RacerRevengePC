@@ -2,6 +2,7 @@
 // PORT EXTENSION, NOT ORIGINAL BEHAVIOUR: see original_ui_rider_addon_models50dl.h.
 #include "../assets/dlc_files50dl.h"
 #include "../assets/dlc_registry50dl.h"
+#include "../assets/original_ui_addon_material50dl.h"
 #include <cstdio>
 #include <fstream>
 #include <system_error>
@@ -86,6 +87,56 @@ bool OriginalUiRiderAddonModels50DL::load(const Input& input) noexcept {
                         else{row.characterAssets=std::move(assetsC);row.characterMaterials=std::move(materialsC);row.characterReady=true;}
                     }
                 }
+                // Step C: portrait and background pages.
+                try{
+                    const auto pick=[](const std::vector<std::string>& list,const char* extension){
+                        for(const auto& m:list){const auto dot=m.find_last_of('.');
+                            if(dot==std::string::npos)continue;std::string e=m.substr(dot);
+                            for(auto& c:e)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
+                            if(e==extension)return m;}
+                        return std::string();};
+                    const auto stemOf=[](const std::string& m){
+                        const auto dot=m.find_last_of('.');const auto slash=m.find_last_of("\\/");
+                        return std::make_pair(m.substr(0,dot),m.substr(slash==std::string::npos?0:slash+1,
+                            dot-(slash==std::string::npos?0:slash+1)));};
+                    assets::OriginalUiMaterialTemplates50KG templates;assets::OriginalUiMaterialDiagnostic50KG md;
+                    std::vector<assets::OriginalUiImageSource50KG> sources;
+                    const auto add=[&](const assets::OriginalUiMemberView50KG& member)->std::uint32_t{
+                        assets::OriginalUiImageSource50KG s{};s.member=member;s.pstBytes=member.size;
+                        s.identity=0x5047000000000000ull|std::uint64_t(sources.size()+1);
+                        sources.push_back(s);return static_cast<std::uint32_t>(sources.size()-1);};
+                    if(!templates.load(*input.appStart,md))row.pageRefused="ScreenMT templates";
+                    else{
+                        const auto portrait=pick(pod->ui.portraits,".pst");
+                        if(!portrait.empty()){const auto [path,leaf]=stemOf(portrait);
+                            const auto member=archive->find(portrait);
+                            if(member.identity&&assets::readOriginalUiAddonPortraitFallbackMaterial50DL(*archive,path,templates,
+                                assets::OriginalUiTemplate50KG::screenMt,input.materialRuntime,row.portraitMaterial,md)&&
+                               row.portraitMaterial.passes.size()==1){
+                                row.portraitName="ui/textures/"+leaf;row.portraitImage=add(member);}
+                            else row.pageRefused="portrait "+portrait+" material refused";
+                        }
+                        const auto bkgPst=pick(pod->ui.background,".pst");const auto bkgPsm=pick(pod->ui.background,".psm");
+                        if(!bkgPst.empty()&&!bkgPsm.empty()){const auto [path,leaf]=stemOf(bkgPst);
+                            const auto member=archive->find(bkgPst);
+                            if(member.identity&&assets::readOriginalUiMaterial50KG(*archive,bkgPsm,templates,
+                                assets::OriginalUiTemplate50KG::screenMt,input.materialRuntime,row.backgroundMaterial,md)&&
+                               row.backgroundMaterial.passes.size()==1){
+                                row.backgroundName="ui/textures/"+leaf;row.backgroundImage=add(member);}
+                            else row.pageRefused+=(row.pageRefused.empty()?"":"; ")+std::string("background ")+bkgPsm+" material refused";
+                        }
+                        if(!sources.empty()){
+                            auto images=std::make_shared<assets::OriginalUiScreenAssets50KG>();assets::OriginalUiScreenAssetDiagnostic50KG id;
+                            if(images->load(sources,id,input.ipumCache)){row.pageImages=std::move(images);
+                                row.portraitReady=row.portraitImage!=noOwner;row.backgroundReady=row.backgroundImage!=noOwner;}
+                            else{row.pageRefused="portrait/background images do not decode (error "+std::to_string(unsigned(id.error))+")";
+                                row.portraitImage=row.backgroundImage=noOwner;}
+                        }
+                    }
+                }catch(...){row.pageRefused="allocation";row.portraitReady=row.backgroundReady=false;}
+                std::fprintf(stderr,"dlc_rider_page_prepare key=%s number=%u portrait=%s background=%s%s%s%s\n",
+                    row.key.c_str(),row.number,row.portraitReady?"ready":"none",row.backgroundReady?"ready":"none",
+                    row.pageRefused.empty()?"":" reason=\"",row.pageRefused.c_str(),row.pageRefused.empty()?"":"\"");
                 std::fprintf(stderr,"dlc_rider_character_prepare key=%s number=%u mcf=%s status=%s%s%s%s\n",
                     row.key.c_str(),row.number,mcf.empty()?"-":mcf.c_str(),row.characterReady?"ready":"refused",
                     row.characterReady?"":" reason=\"",row.characterRefused.c_str(),row.characterReady?"":"\"");
@@ -114,6 +165,10 @@ bool OriginalUiRiderAddonModels50DL::setImageOwner(std::size_t index,std::uint32
 bool OriginalUiRiderAddonModels50DL::setCharacterImageOwner(std::size_t index,std::uint32_t owner) noexcept {
     if(index>=rows_.size()||!rows_[index].characterReady||rows_[index].characterImageOwner!=noOwner)return false;
     rows_[index].characterImageOwner=owner;return true;
+}
+bool OriginalUiRiderAddonModels50DL::setPageImageOwner(std::size_t index,std::uint32_t owner) noexcept {
+    if(index>=rows_.size()||!rows_[index].pageImages||rows_[index].pageImageOwner!=noOwner)return false;
+    rows_[index].pageImageOwner=owner;return true;
 }
 bool OriginalUiRiderAddonModels50DL::startCharacter(std::size_t index,ModelMotionSharedState49T& motion,
     ModelMode0IkShared50KG& ik,SourceLibmState49T& libm,OriginalUiRiderModelDiagnostic50KG& d) noexcept {

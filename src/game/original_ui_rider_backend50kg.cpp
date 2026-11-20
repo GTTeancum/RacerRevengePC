@@ -328,7 +328,7 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         }
         // PORT EXTENSION, NOT ORIGINAL (DLC): ready add-on model rows, after every
         // stock owner (stock indices unchanged; nothing appended without add-ons).
-        std::vector<std::pair<std::size_t,std::uint32_t>> addonOwners,addonCharacterOwners;
+        std::vector<std::pair<std::size_t,std::uint32_t>> addonOwners,addonCharacterOwners,addonPageOwners;
         if(auto* addon=s.input.addonModels){
             for(std::size_t i=0;i<addon->size();++i){const auto* row=addon->row(i);
                 if(!row||!row->ready||!row->materials||!row->materials->images())continue;
@@ -341,6 +341,11 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
                 if(row->characterReady&&row->characterMaterials&&row->characterMaterials->images()){
                     addonCharacterOwners.emplace_back(i,static_cast<std::uint32_t>(population.owners.size()));
                     population.owners.push_back(row->characterMaterials->images());
+                }
+                // Step C: portrait/background images.
+                if(row->pageImages){
+                    addonPageOwners.emplace_back(i,static_cast<std::uint32_t>(population.owners.size()));
+                    population.owners.push_back(row->pageImages);
                 }
                 // The add-on archive is pinned once in the bank's own add-on list (no stock archive slot).
                 population.addonArchives.push_back(row->archive);
@@ -358,6 +363,10 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         for(const auto& [row,owner]:addonOwners)
             if(!bank->mapping(owner,0)||!s.input.addonModels->setImageOwner(row,owner)){
                 std::fprintf(stderr,"dlc_rider_bank status=refused reason=\"pod owner not mapped\" row=%zu owner=%u\n",row,owner);
+                return fail(E::bank);}
+        for(const auto& [row,owner]:addonPageOwners)
+            if(!bank->mapping(owner,0)||!s.input.addonModels->setPageImageOwner(row,owner)){
+                std::fprintf(stderr,"dlc_rider_bank status=refused reason=\"page owner not mapped\" row=%zu owner=%u\n",row,owner);
                 return fail(E::bank);}
         for(const auto& [row,owner]:addonCharacterOwners)
             if(!bank->mapping(owner,0)||!s.input.addonModels->setCharacterImageOwner(row,owner)){
@@ -526,6 +535,12 @@ const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::addonC
     const auto* r=storage_->input.addonModels->row(row);
     return r&&r->characterReady&&r->characterImageOwner!=OriginalUiRiderAddonModels50DL::noOwner?
         storage_->bank->mapping(r->characterImageOwner,image):nullptr;
+}
+const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::addonPageImage(std::size_t row,std::uint32_t image)const noexcept {
+    if(!storage_||!storage_->bank||!storage_->coldSealed||!storage_->input.addonModels)return nullptr;
+    const auto* r=storage_->input.addonModels->row(row);
+    return r&&r->pageImages&&r->pageImageOwner!=OriginalUiRiderAddonModels50DL::noOwner?
+        storage_->bank->mapping(r->pageImageOwner,image):nullptr;
 }
 const OriginalUiRiderAddonModels50DL* OriginalUiRiderBackend50KG::addonModels()const noexcept {
     return storage_?storage_->input.addonModels:nullptr;

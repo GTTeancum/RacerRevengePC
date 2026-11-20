@@ -177,7 +177,7 @@ struct OriginalUiRiderSession50KG::Storage {
     bool addonAnchorLast=true;          // entered by Next past the last (true) or Previous past the first (false) stock rider
     std::uint32_t addonConfirmRider=0;  // stock rider an add-on Confirm records (the last stock Confirm's rider)
     bool addonSkipLogged=false,addonRestoreTried=false,addonModelLogged=false,addonAdvanceLogged=false;
-    bool addonCharacterLogged=false,addonSelectLogged=false;
+    bool addonCharacterLogged=false,addonSelectLogged=false,addonPageLogged=false;
     std::string addonCharacterNote;
     // The shown add-on character (step B), or nullptr.
     game::OriginalUiRiderCharacterScene50KG* addonCharacter() noexcept {
@@ -244,7 +244,7 @@ struct OriginalUiRiderSession50KG::Storage {
         addonSlot=slot;
         const auto* pod=addonPod();
         if(slot&&!pod){addonSlot=previous;return false;}
-        addonModelLogged=false;addonCharacterLogged=false;addonSelectLogged=false;
+        addonModelLogged=false;addonCharacterLogged=false;addonSelectLogged=false;addonPageLogged=false;
         try{addonText={pod?pod->name:std::string(),pod?pod->shortName:std::string(),pod?pod->packageName:std::string()};}
         catch(...){addonText={};}
         addonSkipLogged=false;
@@ -1752,6 +1752,15 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         s->cpuDrain();d=s->callbackFault;return d.status;}
     if(s->state.renders==std::numeric_limits<std::uint64_t>::max()){
         s->fault(Status::unsupportedState,0x1ECE20);s->cpuDrain();d=s->callbackFault;return d.status;}
+    if(s->addonSlot&&!s->addonPageLogged){
+        // One line per add-on page asset (first rendered frame of the highlight).
+        s->addonPageLogged=true;const auto* pod=s->addonPod();const auto* row=s->addonModelRow(s->addonSlot);
+        std::fprintf(stderr,"dlc_rider_page key=%s portrait=%s background=%s%s%s%s\n",pod?pod->key.c_str():"-",
+            s->addonOverlay.portraitDrawn?"drawn":(row&&row->portraitReady?"refused":"none"),
+            s->addonOverlay.backgroundDrawn?"drawn":(row&&row->backgroundReady?"refused":"none"),
+            s->addonOverlay.pageRefused?" reason=\"":"",s->addonOverlay.pageRefused?s->addonOverlay.pageRefused:"",
+            s->addonOverlay.pageRefused?"\"":"");
+    }
     if(s->addonSlot&&!s->addonCharacterLogged){
         s->addonCharacterLogged=true;const auto* pod=s->addonPod();
         const bool drawn=s->addonOverlay.characterPackets&&!s->addonOverlay.characterRefused;
@@ -1772,7 +1781,7 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     }
     if(s->addonSlot&&!s->addonSkipLogged&&(s->addonOverlay.drawnLines||s->addonOverlay.skippedLines)){
         s->addonSkipLogged=true;const auto* pod=s->addonPod();
-        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u stats=pod_phy model=pod portrait=none background=none character=own\n",
+        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u stats=pod_phy model=pod portrait=own background=own character=own\n",
             pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines);
     }
     ++s->state.renders;s->state.framePublished=true;return result(d,Status::ok);

@@ -303,6 +303,17 @@ bool OriginalUiLightManagerLifetime50KG::selectRiderCharacter(
         return fail(d,status==original_racer_lighting50KM::Status::arithmetic?Error::arithmetic:Error::registry,0x149BB0);
     return true;
 }
+bool OriginalUiLightManagerLifetime50KG::addonRiderCharacterLights50DL(
+    original_racer_lighting50KM::LightMatrices& output,Diagnostic& d) const noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x14A0E8);
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)return fail(d,Error::untrackedLifetime,0x14A0E8);
+    if(!same(activeUi_,Archive::rider)||!riderRegistryReady_||riderRegistry_.count!=2)return fail(d,Error::registry,0x14A128);
+    const auto status=original_racer_lighting50KM::projectSmallDirectionalRegistry(riderRegistry_,output);
+    if(status!=original_racer_lighting50KM::Status::complete)
+        return fail(d,status==original_racer_lighting50KM::Status::arithmetic?Error::arithmetic:Error::registry,0x149BB0);
+    return true;
+}
 bool OriginalUiLightManagerLifetime50KG::beginNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
     d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148B60);
     if(cacheState_!=Cache::absentSinceApplicationConstruction)

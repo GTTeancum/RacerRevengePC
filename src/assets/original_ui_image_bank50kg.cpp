@@ -50,7 +50,7 @@ bool OriginalUiImageBank50KG::load(const OriginalUiImageBankInput50KG& input,D& 
     using AddonLimits=OriginalUiImageBankAddonLimits50DL;
     if(input.archives.empty()||input.archives.size()>11||input.owners.empty()||
        input.addonArchives.size()>AddonLimits::archives||
-       input.owners.size()>128+2*input.addonArchives.size()) // pod + character owner per add-on archive on top of the stock 128
+       input.owners.size()>128+3*input.addonArchives.size()) // pod, character and page owners per add-on archive on top of the stock 128
         return fail(d,E::input);
     try {
         for(std::size_t i=0;i<input.addonArchives.size();++i){const auto& a=input.addonArchives[i];

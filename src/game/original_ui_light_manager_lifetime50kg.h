@@ -102,6 +102,11 @@ public:
         const OriginalUiRiderModelSelection50KG&,
         original_racer_lighting50KM::LightMatrices&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) const noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC): the same Rider two-light registry
+    // projection for an add-on character, which has no stock visibility
+    // membership. Same lifetime/cache/registry gates; no membership gate.
+    bool addonRiderCharacterLights50DL(original_racer_lighting50KM::LightMatrices&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) const noexcept;
     // Native integration policy only: the complete native race uses a separate
     // canonical lighting manager with no borrow of this application cacheA4.
     // Begin after actual UI-manager release; end only after the full native

@@ -38,6 +38,8 @@ struct Overlay {
     mutable std::uint32_t modelPackets=0;        // add-on model packets emitted this frame
     mutable std::uint32_t characterPackets=0;    // step B: add-on character packets this frame
     mutable const char* characterRefused=nullptr;
+    mutable bool portraitDrawn=false,backgroundDrawn=false; // step C, this frame
+    mutable const char* pageRefused=nullptr;
     mutable const char* modelRefused=nullptr;    // why the add-on model drew nothing (static text)
     mutable std::uint32_t drawnLines=0;          // this frame (logged once per highlighted add-on)
     mutable std::uint32_t skippedLines=0;        // lines the font could not draw
