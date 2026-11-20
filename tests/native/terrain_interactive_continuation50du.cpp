@@ -28,62 +28,43 @@
 #include "player_loading_session50du.h"
 #include "cold_load_diagnostics50du.h"
 #include "pod_cables50fd_fixture.h"
-#include "original_consumed_ra_stage50du.h"
+// Common rewrite: the one stage, track, roster, lap tracker, race start/end.
+#include "original_consumed_stage50du.h"
+#include "common_track50cr.h"
+#include "common_race_world50cr.h"
+#include "common_roster50cr.h"
+#include "common_lap50cr.h"
+#include "common_race_start50cr.h"
+#include "common_race_end50cr.h"
+#include "common_race_log50cr.h"
+// NEW types of the common rewrite (R3/R5/R7; names frozen by W0) and the one
+// racer cold-visibility retirement (W0 request i3: generalised tb/tc/gb/mc_cold_visibility).
+#include "track_collision_world50cr.h"
+#include "single_pass_world50lm.h"
+#include "track_atm50cr.h"
+#include "positional_sound_rows50sr.h"
+#include "racer_cold_visibility50cr.h"
+#include "selected_grid_navigation50ig.h"
+#include "source_grid50ig_fixture.h"
+#include "native_water_runtime50jc_fixture.h"
+#include "water_resources50jc_fixture.h"
+#include "../../src/game/original_track_particle_cold50la.h"
+#include "../../src/game/original_track_fog50cr.h"
+#include "../../src/game/original_gc_gameplay_lighting_candidate.h"
+#include "original_track_sky50kx_fixture.h"
+#include "native_racer_model_lifetime50la_fixture.h"
 #include "original_results_feedback_scope50la.h"
 #include "original_race_hud_scope50la.h"
 #include "original_position_stats_adapter50la.h"
-#include "original_consumed_ga_stage50du.h"
-#include "original_consumed_gc_stage50du.h"
-#include "original_consumed_ma_stage50du.h"
-#include "original_consumed_mb_stage50du.h"
-#include "original_consumed_sc_stage50du.h"
-#include "original_consumed_gb_stage50du.h"
-#include "original_consumed_mc_stage50du.h"
-#include "original_consumed_tb_stage50du.h"
-#include "original_consumed_rc_stage50du.h"
-#include "original_consumed_tc_stage50du.h"
-#include "original_consumed_sa_stage50du.h"
-#include "original_consumed_ta_stage50du.h"
 #include "original_native_ta_root_audio50la.h"
-#include "rc_positional_sound50rc.h"
-#include "tb_positional_sound50tb.h"
-#include "gb_positional_sound50gb.h"
-#include "mc_positional_sound50mc.h"
-#include "mc_camera_assets50mc.h"
-#include "mc_static_model_params50mc.h"
-#include "mc_cold_visibility50mc.h"
-#include "mc_query50mc.h"
-#include "gb_cold_visibility50gb.h"
-#include "gb_static_model_params50gb.h"
-#include "source_grid50gb_fixture.h"
-#include "source_grid50tc_fixture.h"
-#include "source_grid50tb_fixture.h"
-#include "tb_static_model_params50tb.h"
-#include "rc_crystal50rc.h"
-#include "rc_static_model_params50rc.h"
-#include "tc_static_model_params50tc.h"
-#include "sc_static_model_params_fixture.h"
-#include "mb_static_model_params_fixture.h"
-#include "mb_collision_world50mb.h"
-#include "mb_source_trigger50mb.h"
 #include "track_animation_binding50an.h"
-#include "tb_cold_visibility50tb.h"
-#include "tc_cold_visibility50tc.h"
 #include "native_cold_model_retirement50lh.h"
-#include "ra_native_session50la.h"
 #include "original_ai_physical_recovery.h"
 #include "original_human_physical_recovery.h"
 #include "gc_particle_materials50kg_fixture.h"
 #include "track_normals50hk_fixture.h"
-#include "sc_runtime_ground50la.h"
-#include "ma_static_model_params_fixture.h"
 #include "original_position_stats_prestage50la.h"
-#include "gc_static_model_params50kg_fixture.h"
 #include "../../src/game/original_static_model_params50ps.h"
-#include "ga_trigger_actions_fixture.h"
-#include "sa_trigger_actions_fixture.h"
-#include "ma_trigger_actions_fixture.h"
-#include "sc_trigger_actions_fixture.h"
 #include <fstream>
 #include <iomanip>
 
@@ -131,6 +112,11 @@ constexpr std::uint32_t raceOpponentCapacity=raceRacerCapacity-1;
 } // namespace
 
 SessionExit50DU Context::run() {
+ auto& track=this->track;
+ auto& laps=this->laps;
+ auto& roster=this->roster;
+ auto& raceStart=this->raceStart;
+ auto& raceEnd=this->raceEnd;
  const auto& acceptLiveQuery=this->acceptLiveQueryCall;
  auto& actualHeight=this->actualHeight;
  auto& actualWorld=this->actualWorld;
@@ -180,12 +166,8 @@ SessionExit50DU Context::run() {
  auto& checkpointOutput=this->checkpointOutput;
  auto& checkpointRequested=this->checkpointRequested;
  auto& clock=this->clock;
- const auto& closeGbCurrentCollision=this->closeGbCurrentCollisionCall;
- const auto& closeMcCurrentCollision=this->closeMcCurrentCollisionCall;
- const auto& closeRcCurrentCollision=this->closeRcCurrentCollisionCall;
- const auto& closeScCurrentMemberships=this->closeScCurrentMembershipsCall;
- const auto& closeTbCurrentCollision=this->closeTbCurrentCollisionCall;
- const auto& closeTcCurrentCollision=this->closeTcCurrentCollisionCall;
+ const auto& closeCurrentCollision=this->closeCurrentCollisionCall;
+ const auto& closeCurrentMemberships=this->closeCurrentMembershipsCall;
  auto& coldFlame=this->coldFlame;
  auto& coldLoadDiagnostics=this->coldLoadDiagnostics;
  const auto& collectRegistered=this->collectRegisteredCall;
@@ -195,19 +177,7 @@ SessionExit50DU Context::run() {
  auto& completedFrames=this->completedFrames;
  const auto& composePacket=this->composePacketCall;
  const auto& consumeEffects=this->consumeEffectsCall;
- auto& consumedGaStage=this->consumedGaStage;
- auto& consumedGcStage=this->consumedGcStage;
- auto& consumedMaStage=this->consumedMaStage;
- auto& consumedMbStage=this->consumedMbStage;
- auto& consumedScStage=this->consumedScStage;
- auto& consumedGbStage=this->consumedGbStage;
- auto& consumedMcStage=this->consumedMcStage;
- auto& consumedTbStage=this->consumedTbStage;
- auto& consumedRcStage=this->consumedRcStage;
- auto& consumedTcStage=this->consumedTcStage;
- auto& consumedRaStage=this->consumedRaStage;
- auto& consumedCommonRouteStage=this->consumedCommonRouteStage;
- auto& consumedTaStage=this->consumedTaStage;
+ auto& consumedStage=this->consumedStage;
  auto& controlPresets=this->controlPresets;
  auto& controller=this->controller;
  auto& controllerActions=this->controllerActions;
@@ -218,12 +188,11 @@ SessionExit50DU Context::run() {
  auto& courseColdLoad=this->courseColdLoad;
  auto& courseDiagnostic=this->courseDiagnostic;
  auto& courseOutput=this->courseOutput;
- auto& courseRaceCold=this->courseRaceCold;
+ auto& rootedCourseRace=this->rootedCourseRace;
  auto& courseRaceLaunched=this->courseRaceLaunched;
  auto& courseState=this->courseState;
  auto& courseTuning=this->courseTuning;
  auto& destination=this->destination;
- auto& directOriginalHuman=this->directOriginalHuman;
  auto& discardedHostNs=this->discardedHostNs;
  auto& displayWallTotals=this->displayWallTotals;
  auto& drawAssets=this->drawAssets;
@@ -281,50 +250,16 @@ SessionExit50DU Context::run() {
  auto& trackAnimationBindingDiagnostic=this->trackAnimationBindingDiagnostic;
  auto& trackAnimationPrefixArmed=this->trackAnimationPrefixArmed;
  auto& trackAnimationDiagnostic=this->trackAnimationDiagnostic;
- auto& gaGateAudio=this->gaGateAudio;
- auto& gaOriginalDisc=this->gaOriginalDisc;
- auto& gaOriginalWorld=this->gaOriginalWorld;
- auto& gaTriggerActions=this->gaTriggerActions;
- auto& gaTriggerAuthoring=this->gaTriggerAuthoring;
- auto& gaTriggerMembership=this->gaTriggerMembership;
+ auto& triggerAudio=this->triggerAudio;
+ auto& triggerMembership=this->triggerMembership;
  const auto& gatherRegistered=this->gatherRegisteredCall;
- auto& gbAiMetadata=this->gbAiMetadata;
- auto& gbAiView=this->gbAiView;
- auto& gbColdSources=this->gbColdSources;
- auto& gbCollisionCleanupDone=this->gbCollisionCleanupDone;
- auto& gbCollisionWorld=this->gbCollisionWorld;
- auto& gbFogOwner=this->gbFogOwner;
- auto& gbLightOwner=this->gbLightOwner;
- auto& gbMapMetadata=this->gbMapMetadata;
- auto& gbMapView=this->gbMapView;
- auto& gbNavigation=this->gbNavigation;
- auto& gbNavigationOwner=this->gbNavigationOwner;
- auto& gbOriginalWorld=this->gbOriginalWorld;
- auto& gbParticleAttachments=this->gbParticleAttachments;
- auto& gbParticleAuthoring=this->gbParticleAuthoring;
- auto& gbParticleRender=this->gbParticleRender;
- auto& gbParticleRuntime=this->gbParticleRuntime;
- auto& gbParticleRuntimeDiagnostic=this->gbParticleRuntimeDiagnostic;
- auto& gbParticleWindow=this->gbParticleWindow;
- auto& gbPodSound=this->gbPodSound;
- auto& gbPositionalAudio=this->gbPositionalAudio;
- auto& gbQueryBinding=this->gbQueryBinding;
- const auto& gbRemainingPayloadBytes=this->gbRemainingPayloadBytesCall;
- auto& gbTrackParticles=this->gbTrackParticles;
- auto& gbTriggerActions=this->gbTriggerActions;
- auto& gbWorldBorrow=this->gbWorldBorrow;
- auto& gcDrawLights=this->gcDrawLights;
- auto& gcGateAudio=this->gcGateAudio;
- auto& gcGraphicsSequence=this->gcGraphicsSequence;
- auto& gcLightDiagnostic=this->gcLightDiagnostic;
- auto& gcLightOwner=this->gcLightOwner;
- auto& gcNativeGate=this->gcNativeGate;
- auto& gcNativeWorldSelected=this->gcNativeWorldSelected;
- auto& gcOriginalDisc=this->gcOriginalDisc;
- auto& gcOriginalWorld=this->gcOriginalWorld;
- auto& gcTriggerActions=this->gcTriggerActions;
- auto& gcTriggerAuthoring=this->gcTriggerAuthoring;
- auto& gcTriggerMembership=this->gcTriggerMembership;
+ auto& aiView=this->aiView;
+ auto& collisionCleanupDone=this->collisionCleanupDone;
+ auto& mapView=this->mapView;
+ const auto& remainingPayloadBytes=this->remainingPayloadBytesCall;
+ auto& drawLights=this->drawLights;
+ auto& graphicsSequence=this->graphicsSequence;
+ auto& lightDiagnostic=this->lightDiagnostic;
  auto& generatedEffects=this->generatedEffects;
  auto& ground=this->ground;
  auto& groundStack=this->groundStack;
@@ -336,13 +271,13 @@ SessionExit50DU Context::run() {
  auto& humanControlInput=this->humanControlInput;
  auto& humanCourseEnabled=this->humanCourseEnabled;
  auto& humanResultsActive=this->humanResultsActive;
- // The exact consumed human-RA Race already owns constructor1A6660's4.f.
- // Bind existing manager/camera/ending-clock users to THAT scalar; never copy
- // the Setup timer or reset94 here. Other routes retain their previous owner.
- // Keep physical storage alive through all nested borrowers and close/unwind;
- // this native shared reference does not retain its source counted authority.
+ // The consumed Race of every course owns constructor1A6660's +94 ending
+ // clock. Bind the manager/camera/ending-clock users to THAT scalar; never copy
+ // the Setup timer or reset94 here. One fail-closed contract for every course:
+ // the race must be the current counted race whose World at race+74 holds this
+ // session's Track (1A6BC0 -> 1B2870).
  const auto humanEndRace94Candidate=!humanCourseEnabled?std::shared_ptr<OriginalRaceConstructor50LA>{}:
-     consumedRaStage.race()?consumedRaStage.race():native_common_race50PD::race(*this);
+     consumedStage.race();
  const auto humanEndRace94Current=[&](const OriginalRaceConstructor50LA& race){
   return race.resultsFeedbackThread_==std::this_thread::get_id()&&this->nativeOriginalFleet&&
       this->originalMainApplication.race28C()==&race&&
@@ -350,59 +285,27 @@ SessionExit50DU Context::run() {
       race.profile_==this->originalMainApplication.riderProfile&&
       race.counted_&&!race.rolledBack_&&race.constructorSuffix_&&
       race.entity_.sessionGeneration==this->sessionIndex+1&&
-      (this->isRaTrack?race.world74_&&race.world74_==this->raWorld:
-          !race.world74_&&(race.taWorld74_?race.taWorld74_==this->taOriginalWorld:
-              native_common_race50PD::worldCurrent(*this,race)));
+      race.world74_&&race.world74_->trackData()==&this->track;
  };
- // RA and TA keep their fail-closed contract. The other consumed course
- // races (GA/SA/MA/GC, the same race class) use the race's own 94 when it
- // is current, else the previous owner (logged).
- const bool humanEndRace94Strict=humanEndRace94Candidate&&(this->isRaTrack||this->isTaTrack);
- if(humanEndRace94Strict)
+ if(humanEndRace94Candidate)
   require50DU(humanEndRace94Current(*humanEndRace94Candidate),
       "human ending94 requires its actual current consumed Race/Application/world");
- const auto humanEndRace94=humanEndRace94Candidate&&(humanEndRace94Strict||humanEndRace94Current(*humanEndRace94Candidate))?
-     humanEndRace94Candidate:std::shared_ptr<OriginalRaceConstructor50LA>{};
- if(humanEndRace94Candidate&&!humanEndRace94)std::cerr<<"common_race_ending94 owner=previous reason=race not current\n";
+ const auto& humanEndRace94=humanEndRace94Candidate;
  auto& humanResultsCountdown=humanEndRace94?humanEndRace94->field94_:this->humanResultsCountdown;
  auto& humanResultsReady=this->humanResultsReady;
  auto& initial=this->initial;
  auto& initialCollisionZone=this->initialCollisionZone;
  auto& initialMetadata=this->initialMetadata;
  auto& initialPairs=this->initialPairs;
- auto& isGaTrack=this->isGaTrack;
- auto& isGbTrack=this->isGbTrack;
- auto& isGcTrack=this->isGcTrack;
- auto& maOrCommonRouteTrack=this->maOrCommonRouteTrack;
- auto& isMaTrack=this->isMaTrack;
- auto& isMbTrack=this->isMbTrack;
- auto& isMcTrack=this->isMcTrack;
- auto& isRaTrack=this->isRaTrack;
- auto& isRcTrack=this->isRcTrack;
- auto& commonRouteTrack=this->commonRouteTrack;
- auto& isScTrack=this->isScTrack;
- auto& isTaTrack=this->isTaTrack;
- auto& isTbTrack=this->isTbTrack;
- auto& isTcTrack=this->isTcTrack;
  auto& keyboardDiagnostic=this->keyboardDiagnostic;
  auto& lapContinuity=this->lapContinuity;
  auto& lapOwner=this->lapOwner;
  auto& lastCommittedWrongWay=this->lastCommittedWrongWay;
- auto& legacyGround=this->legacyGround;
  auto& liveAudio=this->liveAudio;
  auto& liveWorld=this->liveWorld;
  auto& loadedAudioSettings=this->loadedAudioSettings;
  auto& loadedTrack=this->loadedTrack;
  auto& m=this->m;
- auto& maOriginalDisc=this->maOriginalDisc;
- auto& maOriginalWorld=this->maOriginalWorld;
- auto& scOriginalWorld=this->scOriginalWorld;
- auto& rcOriginalWorld=this->rcOriginalWorld;
- auto& tcOriginalWorld=this->tcOriginalWorld;
- auto& tbOriginalWorld=this->tbOriginalWorld;
- auto& maTriggerActions=this->maTriggerActions;
- auto& maTriggerAuthoring=this->maTriggerAuthoring;
- auto& maTriggerMembership=this->maTriggerMembership;
  auto& mainContactFrames=this->mainContactFrames;
  auto& mainCrossedPortals=this->mainCrossedPortals;
  auto& mainLiveQuery=this->mainLiveQuery;
@@ -412,42 +315,7 @@ SessionExit50DU Context::run() {
  auto& managerRuntimeSelection=this->managerRuntimeSelection;
  auto& materialAudio=this->materialAudio;
  auto& materialOwner=this->materialOwner;
- auto& mbAiMetadata=this->mbAiMetadata;
- auto& mbAiView=this->mbAiView;
- auto& mbCollisionWorld=this->mbCollisionWorld;
- auto& mbMapMetadata=this->mbMapMetadata;
- auto& mbMapView=this->mbMapView;
- auto& mbOriginalDisc=this->mbOriginalDisc;
- auto& mbOriginalWorld=this->mbOriginalWorld;
- auto& mbSourceTriggers=this->mbSourceTriggers;
- auto& mcAdditionalPayloadReserved=this->mcAdditionalPayloadReserved;
- auto& mcAiMetadata=this->mcAiMetadata;
- auto& mcAiView=this->mcAiView;
- auto& mcColdSources=this->mcColdSources;
- auto& mcCollisionCleanupDone=this->mcCollisionCleanupDone;
- auto& mcCollisionWorld=this->mcCollisionWorld;
- auto& mcFogOwner=this->mcFogOwner;
- auto& mcLightOwner=this->mcLightOwner;
- auto& mcMapMetadata=this->mcMapMetadata;
- auto& mcMapView=this->mcMapView;
- auto& mcNavigation=this->mcNavigation;
- auto& mcNavigationOwner=this->mcNavigationOwner;
- auto& mcOriginalWorld=this->mcOriginalWorld;
- auto& mcParticleAttachments=this->mcParticleAttachments;
- auto& mcParticleRender=this->mcParticleRender;
- auto& mcParticleRuntime=this->mcParticleRuntime;
- auto& mcParticleRuntimeDiagnostic=this->mcParticleRuntimeDiagnostic;
- auto& mcParticleSource=this->mcParticleSource;
- auto& mcParticleVehicles=this->mcParticleVehicles;
- auto& mcParticleWindow=this->mcParticleWindow;
- auto& mcPositionalAudio=this->mcPositionalAudio;
- auto& mcQueryBinding=this->mcQueryBinding;
- const auto& mcRemainingPayloadBytes=this->mcRemainingPayloadBytesCall;
- auto& mcTrackParticles=this->mcTrackParticles;
- auto& mcTriggerActions=this->mcTriggerActions;
- auto& mcWaterOwner=this->mcWaterOwner;
- auto& mcWaterUpdateSequence=this->mcWaterUpdateSequence;
- auto& mcWorldBorrow=this->mcWorldBorrow;
+ auto& waterUpdateSequence=this->waterUpdateSequence;
  auto& membershipWork=this->membershipWork;
  auto& mode1=this->mode1;
  auto& mode1Effects=this->mode1Effects;
@@ -468,40 +336,25 @@ SessionExit50DU Context::run() {
  auto& nativeEffectCount=this->nativeEffectCount;
  auto& nativeEffects=this->nativeEffects;
  auto& nativeFireSerial=this->nativeFireSerial;
- auto& nativeGbSelection=this->nativeGbSelection;
- auto& nativeGcWater=this->nativeGcWater;
  const auto& nativeLightFailure=this->nativeLightFailureCall;
  auto& nativeLightingPolicy=this->nativeLightingPolicy;
- auto& nativeMaSelection=this->nativeMaSelection;
- auto& nativeMbSelection=this->nativeMbSelection;
- auto& nativeMcSelection=this->nativeMcSelection;
  auto& nativeOrdinaryLaunch11258=this->nativeOrdinaryLaunch11258;
  auto& nativeOriginalFleet=this->nativeOriginalFleet;
  auto& nativeParticleAuthoring=this->nativeParticleAuthoring;
  auto& nativeParticleChildSequence=this->nativeParticleChildSequence;
  auto& nativeParticleChildren=this->nativeParticleChildren;
- auto& nativeRaSelection=this->nativeRaSelection;
  auto& nativeRacerManager=this->nativeRacerManager;
- auto& nativeRcSelection=this->nativeRcSelection;
  auto& nativeRecordActor=this->nativeRecordActor;
- auto& nativeRosterOwners=this->nativeRosterOwners;
- auto& nativeCommonRouteSelection=this->nativeCommonRouteSelection;
- auto& nativeScSelection=this->nativeScSelection;
  auto& nativeSelectedLights=this->nativeSelectedLights;
- auto& nativeTaSelection=this->nativeTaSelection;
- auto& nativeTbSelection=this->nativeTbSelection;
- auto& nativeTcSelection=this->nativeTcSelection;
  auto& nativeVideo=this->nativeVideo;
  auto& nativeWaterApplication=this->nativeWaterApplication;
  auto& nativeWaterRacers=this->nativeWaterRacers;
- auto& navigationAI=this->navigationAI;
  auto& navigationAIScan=this->navigationAIScan;
  auto& navigationAISequential=this->navigationAISequential;
  auto& navigationCA0=this->navigationCA0;
  auto& navigationCA0Copies=this->navigationCA0Copies;
  auto& navigationDiagnostic=this->navigationDiagnostic;
  auto& navigationGateSkips=this->navigationGateSkips;
- auto& navigationMap=this->navigationMap;
  auto& navigationMapScan=this->navigationMapScan;
  auto& navigationMapSequential=this->navigationMapSequential;
  auto& navigationProgress=this->navigationProgress;
@@ -563,11 +416,7 @@ SessionExit50DU Context::run() {
  auto& query=this->query;
  auto& queryRecords=this->queryRecords;
  auto& queryResult=this->queryResult;
- auto& raDiagnostic=this->raDiagnostic;
- auto& raFreshProbe=this->raFreshProbe;
- auto& raRuntime=this->raRuntime;
- auto& retireRaEndCandidateProducer=this->retireRaEndCandidateProducer;
- auto& raWorld=this->raWorld;
+ auto& retireEndCandidateProducer=this->retireEndCandidateProducer;
  auto& raceAudio=this->raceAudio;
  auto& raceEnabled=this->raceEnabled;
  auto& raceMusic=this->raceMusic;
@@ -581,17 +430,6 @@ SessionExit50DU Context::run() {
  auto& racerNames=this->racerNames;
  auto& racerRigs=this->racerRigs;
  auto& racerVisuals=this->racerVisuals;
- auto& rcColdSources=this->rcColdSources;
- auto& rcCollisionCleanupDone=this->rcCollisionCleanupDone;
- auto& rcCollisionWorld=this->rcCollisionWorld;
- auto& rcLightOwner=this->rcLightOwner;
- auto& rcNavigationBorrow=this->rcNavigationBorrow;
- auto& rcOriginalDisc=this->rcOriginalDisc;
- auto& rcPositionalAudio=this->rcPositionalAudio;
- const auto& rcRemainingPayloadBytes=this->rcRemainingPayloadBytesCall;
- auto& rcTriggerActions=this->rcTriggerActions;
- auto& rcTriggerAuthoring=this->rcTriggerAuthoring;
- auto& rcWorldBorrow=this->rcWorldBorrow;
  auto& rebaseBounds=this->rebaseBounds;
  auto& rebaseDiagnostic=this->rebaseDiagnostic;
  auto& rebaseModelCount=this->rebaseModelCount;
@@ -619,11 +457,8 @@ SessionExit50DU Context::run() {
  auto& requestIntroMusicFade=this->requestIntroMusicFade;
  auto& requestStartMusic=this->requestStartMusic;
  auto& requestedWindowSamples=this->requestedWindowSamples;
- const auto& requireMbRuntimeNavigation50MB=this->requireMbRuntimeNavigation50MBCall;
- const auto& reserveGbAdditionalPayload=this->reserveGbAdditionalPayloadCall;
- const auto& reserveMcAdditionalPayload=this->reserveMcAdditionalPayloadCall;
- const auto& reserveRcAdditionalPayload=this->reserveRcAdditionalPayloadCall;
- const auto& reserveTbAdditionalPayload=this->reserveTbAdditionalPayloadCall;
+ const auto& requireRuntimeNavigation=this->requireRuntimeNavigationCall;
+ const auto& reserveAdditionalPayload=this->reserveAdditionalPayloadCall;
  auto& resetEffectBindings=this->resetEffectBindings;
  auto& resetEffectState=this->resetEffectState;
  auto& resetEffectWorkspace=this->resetEffectWorkspace;
@@ -631,24 +466,10 @@ SessionExit50DU Context::run() {
  auto& resetHumanCamera=this->resetHumanCamera;
  auto& resetLifecycle=this->resetLifecycle;
  auto& response=this->response;
- const auto& retireGbAudioOwners=this->retireGbAudioOwnersCall;
- const auto& retireMcAudioOwners=this->retireMcAudioOwnersCall;
- const auto& retireRcAudioOwners=this->retireRcAudioOwnersCall;
- const auto& retireTbAudioOwners=this->retireTbAudioOwnersCall;
+ const auto& retireAudioOwners=this->retireAudioOwnersCall;
  auto& s=this->s;
- auto& commonRouteOriginalDisc=this->commonRouteOriginalDisc;
- auto& commonRouteWorld=this->commonRouteWorld;
- auto& commonRouteTriggerActions=this->commonRouteTriggerActions;
- auto& commonRouteTriggerAuthoring=this->commonRouteTriggerAuthoring;
- auto& commonRouteTriggerMembership=this->commonRouteTriggerMembership;
  const auto& sampleControllerView=this->sampleControllerCall;
- auto& scColdSources=this->scColdSources;
- auto& scGround=this->scGround;
- auto& scMembershipCleanupDone=this->scMembershipCleanupDone;
- auto& scOriginalDisc=this->scOriginalDisc;
- auto& scTriggerActions=this->scTriggerActions;
- auto& scTriggerAuthoring=this->scTriggerAuthoring;
- auto& scTriggerMembership=this->scTriggerMembership;
+ auto& membershipCleanupDone=this->membershipCleanupDone;
  auto& sd=this->sd;
  auto& sde=this->sde;
  auto& secondaryContactFrames=this->secondaryContactFrames;
@@ -668,9 +489,9 @@ SessionExit50DU Context::run() {
  const auto& selectedAiCount50MB=this->selectedAiCount50MBCall;
  auto& selectedAudioSettings=this->selectedAudioSettings;
  auto& selectedControls=this->selectedControls;
- const auto& selectedMapCount50MB=this->selectedMapCount50MBCall;
- const auto& selectedMapIndex50MB=this->selectedMapIndex50MBCall;
- const auto& selectedMapNode50MB=this->selectedMapNode50MBCall;
+ const auto& selectedMapCount=this->selectedMapCountCall;
+ const auto& selectedMapIndex=this->selectedMapIndexCall;
+ const auto& selectedMapNode=this->selectedMapNodeCall;
  auto& selectedOriginal=this->selectedOriginal;
  auto& selectedOriginalAiMapMetadata=this->selectedOriginalAiMapMetadata;
  auto& selectedOriginalAiMetadata=this->selectedOriginalAiMetadata;
@@ -695,7 +516,6 @@ SessionExit50DU Context::run() {
  auto& sourcePause=this->sourcePause;
  auto& sourcePauseObservation=this->sourcePauseObservation;
  auto& sourcePauseParentAttached=this->sourcePauseParentAttached;
- auto& sourcePauseTrack=this->sourcePauseTrack;
  auto& sourcePositionStatsPrestage=this->sourcePositionStatsPrestage;
  auto& sourcePositionStatsPrestageDiagnostic=this->sourcePositionStatsPrestageDiagnostic;
  auto& sourceRaceHud=this->sourceRaceHud;
@@ -713,34 +533,6 @@ SessionExit50DU Context::run() {
  const auto& stopFeedbackTransport=this->stopFeedbackTransportCall;
  auto& submittedDrawFrames=this->submittedDrawFrames;
  auto& sw=this->sw;
- auto& taOriginalDisc=this->taOriginalDisc;
- auto& taOriginalWorld=this->taOriginalWorld;
- auto& tbAiMetadata=this->tbAiMetadata;
- auto& tbAiView=this->tbAiView;
- auto& tbColdSources=this->tbColdSources;
- auto& tbCollisionCleanupDone=this->tbCollisionCleanupDone;
- auto& tbCollisionWorld=this->tbCollisionWorld;
- auto& tbLightOwner=this->tbLightOwner;
- auto& tbMapMetadata=this->tbMapMetadata;
- auto& tbMapView=this->tbMapView;
- auto& tbOriginalDisc=this->tbOriginalDisc;
- auto& tbPodSound=this->tbPodSound;
- auto& tbPositionalAudio=this->tbPositionalAudio;
- const auto& tbRemainingPayloadBytes=this->tbRemainingPayloadBytesCall;
- auto& tbTriggerActions=this->tbTriggerActions;
- auto& tbWorldBorrow=this->tbWorldBorrow;
- auto& tcAiMetadata=this->tcAiMetadata;
- auto& tcAiView=this->tcAiView;
- auto& tcColdSources=this->tcColdSources;
- auto& tcCollisionCleanupDone=this->tcCollisionCleanupDone;
- auto& tcCollisionWorld=this->tcCollisionWorld;
- auto& tcGlobalSound=this->tcGlobalSound;
- auto& tcLightOwner=this->tcLightOwner;
- auto& tcMapMetadata=this->tcMapMetadata;
- auto& tcMapView=this->tcMapView;
- auto& tcOriginalDisc=this->tcOriginalDisc;
- auto& tcTriggerActions=this->tcTriggerActions;
- auto& tcWorldBorrow=this->tcWorldBorrow;
  auto& terrainBindings=this->terrainBindings;
  auto& terrainContext=this->terrainContext;
  auto& terrainHitFrames=this->terrainHitFrames;
@@ -807,192 +599,87 @@ SessionExit50DU Context::run() {
   std::cerr<<"race_display_bring_up course_cold=1\n";
  }
  native_racer50HN::Bank racerBank;
- auto closeRcBankCollision=[&]() noexcept -> bool {try{
-  if(rcCollisionCleanupDone)return true;
+ // The one lighting owner of this race's track (05.13 SCB Lights, R6).
+ require50DU(static_cast<bool>(track.roles.lights),"race track lighting owner missing");
+ auto& lightOwner=*track.roles.lights;
+ // One bank collision close and one trigger-membership close for every course
+ // (the one collision world, track.roles.collision; R3).
+ auto closeBankCollision=[&]() noexcept -> bool {try{
+  if(collisionCleanupDone)return true;
   if(racerBank.count()){
    for(std::size_t slot=0;slot<racerBank.count();++slot)
-    if(!racerBank.visit(slot,closeRcCurrentCollision))return false;
-  }else if(!closeRcCurrentCollision())return false;
-  rcCollisionCleanupDone=true;return true;
+    if(!racerBank.visit(slot,closeCurrentCollision))return false;
+  }else if(!closeCurrentCollision())return false;
+  collisionCleanupDone=true;return true;
  }catch(...){return false;}};
- struct RcBankCollisionGuard {
-  decltype(closeRcBankCollision)& close;
-  ~RcBankCollisionGuard()noexcept{if(!close())std::terminate();}
- } rcBankCollisionGuard{closeRcBankCollision};
- auto closeScTriggerMemberships=[&]() noexcept -> bool {try{
-  if(scMembershipCleanupDone)return true;
+ struct BankCollisionGuard {
+  decltype(closeBankCollision)& close;
+  ~BankCollisionGuard()noexcept{if(!close())std::terminate();}
+ } bankCollisionGuard{closeBankCollision};
+ auto closeTriggerMemberships=[&]() noexcept -> bool {try{
+  if(membershipCleanupDone)return true;
   if(racerBank.count()){
    for(std::size_t slot=0;slot<racerBank.count();++slot)
-    if(!racerBank.visit(slot,closeScCurrentMemberships))return false;
-  }else if(!closeScCurrentMemberships())return false;
-  scMembershipCleanupDone=true;return true;
+    if(!racerBank.visit(slot,closeCurrentMemberships))return false;
+  }else if(!closeCurrentMemberships())return false;
+  membershipCleanupDone=true;return true;
  }catch(...){return false;}};
- auto closeTbBankCollision=[&]() noexcept -> bool {try{
-  if(tbCollisionCleanupDone)return true;
-  if(racerBank.count()){
-   for(std::size_t slot=0;slot<racerBank.count();++slot)
-    if(!racerBank.visit(slot,closeTbCurrentCollision))return false;
-  }else if(!closeTbCurrentCollision())return false;
-  tbCollisionCleanupDone=true;return true;
- }catch(...){return false;}};
- struct TbBankCollisionGuard {
-  decltype(closeTbBankCollision)& close;
-  ~TbBankCollisionGuard()noexcept{if(!close())std::terminate();}
- } tbBankCollisionGuard{closeTbBankCollision};
- auto closeTcBankCollision=[&]() noexcept -> bool {try{
-  if(tcCollisionCleanupDone)return true;
-  if(racerBank.count()){
-   for(std::size_t slot=0;slot<racerBank.count();++slot)
-    if(!racerBank.visit(slot,closeTcCurrentCollision))return false;
-  }else if(!closeTcCurrentCollision())return false;
-  tcCollisionCleanupDone=true;return true;
- }catch(...){return false;}};
- struct TcBankCollisionGuard {
-  decltype(closeTcBankCollision)& close;
-  ~TcBankCollisionGuard()noexcept{if(!close())std::terminate();}
- } tcBankCollisionGuard{closeTcBankCollision};
  // Destroyed after the later model retirement guard, before the actual Bank.
- struct ScBankMembershipGuard {
-  decltype(closeScTriggerMemberships)& close;
-  ~ScBankMembershipGuard()noexcept{if(!close())std::terminate();}
- } scBankMembershipGuard{closeScTriggerMemberships};
- // Canonical models borrow this Bank, while their shared RuntimeOwners was
- // allocated much earlier. Retire them before Bank destruction even if cold
- // construction throws before the later renderer/closeWindow try boundary.
- // RA keeps its separate Session/aggregate retirement obligation unchanged.
- native_racer50HN::BankBoundModelRetirement50LH<ra_cold_roster50LA::RuntimeOwners>
-     nativeColdModelRetirement(*nativeRosterOwners,!isRaTrack);
- // This guard begins before any Bank enrollment and captures only owners
- // already declared. The later full-session guard retires contacts first and
- // marks this predecessor complete; an early failure has no live query yet.
- bool gbBankPrefixClosed=!isGbTrack;
- auto closeGbBankRegistries=[&]()noexcept->bool {try{
-  if(!gbLightOwner||&gcLightOwner!=gbLightOwner.get())return false;
-  if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return false;
+ struct BankMembershipGuard {
+  decltype(closeTriggerMemberships)& close;
+  ~BankMembershipGuard()noexcept{if(!close())std::terminate();}
+ } bankMembershipGuard{closeTriggerMemberships};
+ // The racers' native model owners (chariot, bottom-left/right, left, right per
+ // slot), filled by the cold owners at the real Rig.install for every course.
+ // Canonical models borrow this Bank; retire them before Bank destruction even if
+ // cold construction throws before the later renderer/closeWindow boundary.
+ struct NativeRosterModels50DU {
+  std::array<std::unique_ptr<native_racer_model50LA::Owner>,8> right,left,bottomRight,bottomLeft,chariot;
+ } nativeRosterModels;
+ native_racer50HN::BankBoundModelRetirement50LH<NativeRosterModels50DU>
+     nativeColdModelRetirement(nativeRosterModels,true);
+ // One cold racer prefix for every course (the MC/GB aggregate shape). This
+ // guard begins before any Bank enrollment and captures only owners already
+ // declared. The later full-session guard retires contacts first and marks this
+ // predecessor complete; an early failure has no live query yet.
+ bool bankPrefixClosed=false;
+ auto closeBankRegistries=[&]()noexcept->bool {try{
+  if(track.roles.lights.get()!=&lightOwner)return false;
+  // Track-animation rows hold the lighting static-busy prefix. Before any 7F0
+  // retirement, remove those registrations while their backing still lives.
   if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
   if(!nativeColdModelRetirement.close())return false;
   for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
    const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
-       gb_cold_visibility50GB::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
-           *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
-       gb_cold_visibility50GB::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
-   return visibilityRetired&&closeGbCurrentCollision();
+       racer_cold_visibility50CR::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
+           *racerRigs[slot],*racerCables[slot],lightOwner,lightDiagnostic):
+       racer_cold_visibility50CR::Retirement::untouchedSlot(racerBank,slot,lightOwner,lightDiagnostic);
+   return visibilityRetired&&closeCurrentCollision();
   }))return false;
-  if(!racerBank.count()&&!closeGbCurrentCollision())return false;
-  gbCollisionCleanupDone=true;return true;
+  if(!racerBank.count()&&!closeCurrentCollision())return false;
+  collisionCleanupDone=true;return true;
  }catch(...){return false;}};
- auto closeGbBankPrefix=[&]()noexcept->bool {try{
-  if(gbBankPrefixClosed)return true;
-  if(gbQueryBinding&&gbQueryBinding->enrolled())return false;
-  if(!closeGbBankRegistries())return false;
-  gbQueryBinding.reset();
+ auto closeBankPrefix=[&]()noexcept->bool {try{
+  if(bankPrefixClosed)return true;
+  if(!closeBankRegistries())return false;
   if(!racerBank.retireNativeBacking())return false;
-  gbBankPrefixClosed=true;return true;
+  bankPrefixClosed=true;return true;
  }catch(...){return false;}};
- struct GbBankPrefixGuard {
-  decltype(closeGbBankPrefix)& close;
-  ~GbBankPrefixGuard()noexcept{if(!close()){
-   std::fputs("GB Bank prefix retirement rejected; backing retained until fail-stop\n",stderr);std::terminate();}}
- } gbBankPrefixGuard{closeGbBankPrefix};
- bool mcBankPrefixClosed=!isMcTrack;
- auto closeMcBankRegistries=[&]()noexcept->bool {try{
-  if(!mcLightOwner||&gcLightOwner!=mcLightOwner.get())return false;
-  if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return false;
-  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
-  if(!nativeColdModelRetirement.close())return false;
-  for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
-   const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
-       mc_cold_visibility50MC::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
-           *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
-       mc_cold_visibility50MC::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
-   return visibilityRetired&&closeMcCurrentCollision();
-  }))return false;
-  if(!racerBank.count()&&!closeMcCurrentCollision())return false;
-  mcCollisionCleanupDone=true;return true;
- }catch(...){return false;}};
- auto closeMcBankPrefix=[&]()noexcept->bool {try{
-  if(mcBankPrefixClosed)return true;
-  if(mcQueryBinding&&mcQueryBinding->enrolled())return false;
-  if(!closeMcBankRegistries())return false;
-  mcQueryBinding.reset();
-  if(!racerBank.retireNativeBacking())return false;
-  mcBankPrefixClosed=true;return true;
- }catch(...){return false;}};
- struct McBankPrefixGuard {
-  decltype(closeMcBankPrefix)& close;
-  ~McBankPrefixGuard()noexcept{if(!close()){
-   std::fputs("MC Bank prefix retirement rejected; backing retained until fail-stop\n",stderr);std::terminate();}}
- } mcBankPrefixGuard{closeMcBankPrefix};
- bool tbColdPrefixClosed=!isTbTrack;
- auto closeTbColdPrefix=[&]() noexcept -> bool {try{
-  if(tbColdPrefixClosed)return true;
-  if(!tbLightOwner||&gcLightOwner!=tbLightOwner.get())return false;
-  // Track-animation rows hold the lighting static-busy prefix. Before any 7F0
-  // retirement, remove those registrations while their backing still lives.
-  // Here the early path has no GPU/camera; normal close has retired them above.
-  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
-  if(!nativeColdModelRetirement.close())return false;
-  // Slot count remains zero until seal succeeds. No racer lighting prefix can
-  // exist before the actual serial installation loop below.
-  for(std::size_t slot=0;slot<racerBank.count();++slot){
-   if(!racerBank.visit(slot,[&](){
-    const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
-        tb_cold_visibility50TB::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
-            *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
-        tb_cold_visibility50TB::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
-    return visibilityRetired&&closeTbCurrentCollision();
-   }))return false;
-  }
-  if(!racerBank.count()&&!closeTbCurrentCollision())return false;
-  tbCollisionCleanupDone=true;tbColdPrefixClosed=true;return true;
- }catch(...){return false;}};
- struct TbColdPrefixGuard {
-  decltype(closeTbColdPrefix)& close;bool armed=true;
-  ~TbColdPrefixGuard()noexcept{if(armed&&!close()){
-   std::fputs("TB cold racer retirement rejected; owner backing retained\n",stderr);
-   std::terminate();
-  }}
- } tbColdPrefixGuard{closeTbColdPrefix};
- bool tcColdPrefixClosed=!isTcTrack;
- auto closeTcColdPrefix=[&]() noexcept -> bool {try{
-  if(tcColdPrefixClosed)return true;
-  if(!tcLightOwner||&gcLightOwner!=tcLightOwner.get())return false;
-  // Track-animation rows hold the lighting static-busy prefix. Before any 7F0
-  // retirement, remove those registrations while their backing still lives.
-  // Here the early path has no GPU/camera; normal close has retired them above.
-  if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))return false;
-  if(!nativeColdModelRetirement.close())return false;
-  // Slot count remains zero until seal succeeds. No racer lighting prefix can
-  // exist before the actual serial installation loop below.
-  for(std::size_t slot=0;slot<racerBank.count();++slot){
-   if(!racerBank.visit(slot,[&](){
-    const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
-        tc_cold_visibility50TC::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
-            *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
-        tc_cold_visibility50TC::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
-    return visibilityRetired&&closeTcCurrentCollision();
-   }))return false;
-  }
-  if(!racerBank.count()&&!closeTcCurrentCollision())return false;
-  tcCollisionCleanupDone=true;tcColdPrefixClosed=true;return true;
- }catch(...){return false;}};
- struct TcColdPrefixGuard {
-  decltype(closeTcColdPrefix)& close;bool armed=true;
-  ~TcColdPrefixGuard()noexcept{if(armed&&!close()){
-   std::fputs("TC cold racer retirement rejected; owner backing retained\n",stderr);
-   std::terminate();
-  }}
- } tcColdPrefixGuard{closeTcColdPrefix};
+ struct BankPrefixGuard {
+  decltype(closeBankPrefix)& close;
+  ~BankPrefixGuard()noexcept{if(!close()){
+   std::fputs("race Bank prefix retirement rejected; backing retained until fail-stop\n",stderr);std::terminate();}}
+ } bankPrefixGuard{closeBankPrefix};
 
- std::unique_ptr<ra_native_session50LA::Join> raSession;
- ra_native_session50LA::Diagnostic raSessionDiagnostic;
  // Non-owning frame view: retain references to the same locals, including
  // owner/callback variables that are populated later in this cold session.
  interactive_frame50DU::Context frameContext50DU{
+  .track=track,
+  .laps=laps,
   .originalAiAudioEnabled=originalAiAudioEnabled,
   .originalUiActive=originalUiActive,
   .nativeSelectedLights=nativeSelectedLights,
-  .gcGraphicsSequence=gcGraphicsSequence,
+  .graphicsSequence=graphicsSequence,
   .finishDriverAppliedThisFrame=finishDriverAppliedThisFrame,
   .audioEnabled=audioEnabled,
   .opponentFrame=opponentFrame,
@@ -1004,24 +691,9 @@ SessionExit50DU Context::run() {
   .m=m,
   .completedFrames=completedFrames,
   .originalAi=originalAi,
-  .mcMapView=mcMapView,
-  .mcAiView=mcAiView,
-  .mcAiMetadata=mcAiMetadata,
-  .gbMapView=gbMapView,
-  .gbAiView=gbAiView,
-  .gbAiMetadata=gbAiMetadata,
-  .tbMapView=tbMapView,
-  .tbAiView=tbAiView,
-  .tbAiMetadata=tbAiMetadata,
-  .tcMapView=tcMapView,
-  .tcAiView=tcAiView,
-  .tcAiMetadata=tcAiMetadata,
-  .mbMapView=mbMapView,
-  .mbAiView=mbAiView,
-  .mbAiMetadata=mbAiMetadata,
+  .mapView=mapView,
+  .aiView=aiView,
   .liveWorld=liveWorld,
-  .navigationMap=navigationMap,
-  .navigationAI=navigationAI,
   .selectedOriginalAiMetadata=selectedOriginalAiMetadata,
   .originalAiTuning=originalAiTuning,
   .originalAiSession=originalAiSession,
@@ -1036,11 +708,6 @@ SessionExit50DU Context::run() {
   .navigationCA0=navigationCA0,
   .boostState=boostState,
   .originalAiReceipt=originalAiReceipt,
-  .isMcTrack=isMcTrack,
-  .isGbTrack=isGbTrack,
-  .isTbTrack=isTbTrack,
-  .isTcTrack=isTcTrack,
-  .isMbTrack=isMbTrack,
   .originalRecoveryEnabled=originalRecoveryEnabled,
   .originalResetGround=originalResetGround,
   .racerCables=racerCables,
@@ -1050,12 +717,8 @@ SessionExit50DU Context::run() {
   .zoneScratch=zoneScratch,
   .trackCounts=trackCounts,
   .selectedRuntimeHeightDomain=selectedRuntimeHeightDomain,
-  .mcWaterOwner=mcWaterOwner,
   .terrainOwner=terrainOwner,
-  .nativeGcWater=nativeGcWater,
   .nativeWaterRacers=nativeWaterRacers,
-  .mcParticleVehicles=mcParticleVehicles,
-  .gcLightOwner=gcLightOwner,
   .resetGlobals=resetGlobals,
   .resetLifecycle=resetLifecycle,
   .originalRecoveryModels=originalRecoveryModels,
@@ -1099,7 +762,7 @@ SessionExit50DU Context::run() {
   .opponentBoostAudio=opponentBoostAudio,
   .liveAudio=liveAudio,
   .boostDiagnostic=boostDiagnostic,
-  .gcLightDiagnostic=gcLightDiagnostic,
+  .lightDiagnostic=lightDiagnostic,
   .dynamicConsumerFlags11050=dynamicConsumerFlags11050,
   .allAiEnabled=allAiEnabled,
   .playerSource5C=playerSource5C,
@@ -1135,19 +798,17 @@ SessionExit50DU Context::run() {
   .audioListener=audioListener,
   .materialAudio=materialAudio,
   .membershipWork=membershipWork,
-  .requireMbRuntimeNavigation50MB=interactive_frame50DU::BorrowedCall<void()>{requireMbRuntimeNavigation50MB},
+  .requireRuntimeNavigation=interactive_frame50DU::BorrowedCall<void()>{requireRuntimeNavigation},
   .refreshAnimatedCandidates=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
   .recoveryQueries=interactive_frame50DU::BorrowedCall<rr::game::UndertrackQueryOwners50EW()>{recoveryQueries},
   .reportNavigation=interactive_frame50DU::BorrowedCall<bool(bool,const char*)>{reportNavigation},
-  .selectedMapCount50MB=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedMapCount50MB},
-  .selectedMapNode50MB=interactive_frame50DU::BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)>{selectedMapNode50MB},
+  .selectedMapCount=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedMapCount},
+  .selectedMapNode=interactive_frame50DU::BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)>{selectedMapNode},
   .refreshDynamicSelfActor=interactive_frame50DU::BorrowedCall<void()>{refreshDynamicSelfActor},
   .dynamicBoundary=interactive_frame50DU::BorrowedCall<void(std::uint32_t,const char*)>{dynamicBoundary},
   .speechInput=interactive_frame50DU::BorrowedCall<rr::game::DamageSpeechInput50HG()>{speechInput},
   .consumeEffects=interactive_frame50DU::BorrowedCall<bool(const rr::game::ImpactEffectEvent50B*,std::size_t)>{consumeEffects},
   .originalAiEnabled=originalAiEnabled,
-  .isRaTrack=isRaTrack,
-  .isRcTrack=isRcTrack,
   .checkpointRequested=checkpointRequested,
   .checkpointOutput=checkpointOutput,
   .ground=ground,
@@ -1165,22 +826,6 @@ SessionExit50DU Context::run() {
   .baseWorkspace=baseWorkspace,
   .poseHistory=poseHistory,
   .coldFlame=coldFlame,
-  .raWorld=raWorld,
-  .raDiagnostic=raDiagnostic,
-  .rcTriggerActions=rcTriggerActions,
-  .rcTriggerAuthoring=rcTriggerAuthoring,
-  .rcWorldBorrow=rcWorldBorrow,
-  .tbTriggerActions=tbTriggerActions,
-  .tbWorldBorrow=tbWorldBorrow,
-  .tcTriggerActions=tcTriggerActions,
-  .tcWorldBorrow=tcWorldBorrow,
-  .scTriggerActions=scTriggerActions,
-  .gaTriggerActions=gaTriggerActions,
-  .gcTriggerActions=gcTriggerActions,
-  .maTriggerActions=maTriggerActions,
-  .commonRouteTriggerActions=commonRouteTriggerActions,
-  .mcQueryBinding=mcQueryBinding,
-  .gbQueryBinding=gbQueryBinding,
   .trackStorage=trackStorage,
   .secondaryMembership=secondaryMembership,
   .qfilter=qfilter,
@@ -1247,8 +892,6 @@ SessionExit50DU Context::run() {
   .terrainSupportedFrames=terrainSupportedFrames,
   .mainCrossedPortals=mainCrossedPortals,
   .secondaryCrossedPortals=secondaryCrossedPortals,
-  .mbSourceTriggers=mbSourceTriggers,
-  .mbCollisionWorld=mbCollisionWorld,
   .initialPairs=initialPairs,
   .initialMetadata=initialMetadata,
   .sip=sip,
@@ -1276,15 +919,12 @@ SessionExit50DU Context::run() {
  // serial execution arena, never tuning, poses, contacts or progression histories.
 
  // These stable source owners close through the SAME bank before it dies.
- // Ordinary host/other-course paths do not acquire this bounded TA lifecycle.
- auto& nativeRightModels=nativeRosterOwners->right;
- auto& nativeLeftModels=nativeRosterOwners->left;
- auto& nativeBottomRightModels=nativeRosterOwners->bottomRight;
- auto& nativeBottomLeftModels=nativeRosterOwners->bottomLeft;
- // Declaration order also preserves C/BL/BR/L/R release during an exception
- // before the explicit Session/window cleanup has been installed. The lower
- // arrays stay empty for the ordinary three-model roster members.
- auto& nativeChariotModels=nativeRosterOwners->chariot;
+ // The lower arrays stay empty for the ordinary three-model roster members.
+ auto& nativeRightModels=nativeRosterModels.right;
+ auto& nativeLeftModels=nativeRosterModels.left;
+ auto& nativeBottomRightModels=nativeRosterModels.bottomRight;
+ auto& nativeBottomLeftModels=nativeRosterModels.bottomLeft;
+ auto& nativeChariotModels=nativeRosterModels.chariot;
  std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> nativeModelDomain;
  // Course can reuse this exact cold roster after leaving the frontend.
  // Construct its owners now at the real Rig.install, including UI-active
@@ -1352,7 +992,8 @@ SessionExit50DU Context::run() {
   projectDynamicActorsForSlot(slot);
  };
  auto requireOriginalAiFleetAtBoundary=[&](const original_all8_frame::Schedule* schedule){
-  if(isRcTrack)requireMbRuntimeNavigation50MB();
+  // The one navigation store must be runtime-valid for every course (2A1260/1ACF70).
+  requireRuntimeNavigation();
   // Every actual racer is an input to the joined source manager. A failed
   // native frame is retained by Bank::visit, but is not a manager observation.
   // Check the entire fleet before any observation, timing or rank mutation;
@@ -1394,12 +1035,8 @@ SessionExit50DU Context::run() {
  auto observeOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   requireOriginalAiFleetAtBoundary(schedule);
   for(std::size_t slot=0;slot<racerBank.count();++slot){
-   if(isMcTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mcMapView,mcMapMetadata);
-   else if(isGbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,gbMapView,gbMapMetadata);
-   else if(isTbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,tbMapView,tbMapMetadata);
-   else if(isTcTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,tcMapView,tcMapMetadata);
-   else if(isMbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mbMapView,mbMapMetadata);
-   else originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,*navigationMap,selectedOriginalAiMapMetadata);
+   // One map view for every course (common_track50CR::NavigationView, sized from m<code>.spl).
+   originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mapView,selectedOriginalAiMapMetadata);
   }
  };
  // Manager passes only consume their current arena and stable shared owners.
@@ -1452,7 +1089,7 @@ SessionExit50DU Context::run() {
  };
  auto reportOriginalAiFleet=[&](const char* reason){
   if(!originalAiEnabled)return;
-  std::cerr<<"original_ai_selection track="<<trackSession->world->code
+  std::cerr<<"original_ai_selection track="<<track.code()
       <<" track_id1125F="<<static_cast<unsigned>(originalAiCreateSelection.selectedTrackId1125F)
       <<" course_order187B10="<<originalAiCreateSelection.selectedOrder187B10
       <<" create_class="<<static_cast<unsigned>(originalAiCreateSelection.actualRaceClass)
@@ -1605,21 +1242,14 @@ SessionExit50DU Context::run() {
  // Audio ownership is explicit: ALL8 can use genuine AI D40 at the native
  // audio phase. Full original application/child RNG chronology is unclaimed.
 
- race_session50HM::Session legacyRace{};
- race_session50HM::MbSession mbRace{};
- race_session50HM::TcSession tcRace{};
- race_session50HM::GbSession gbRace{};
- race_session50HM::McSession mcRace{};
- race_session50HM::TbSession tbRace{};
- auto& race=isMcTrack?static_cast<race_session50HM::SessionRows&>(mcRace):isGbTrack?static_cast<race_session50HM::SessionRows&>(gbRace):isTbTrack?static_cast<race_session50HM::SessionRows&>(tbRace):isTcTrack?static_cast<race_session50HM::SessionRows&>(tcRace):isMbTrack?static_cast<race_session50HM::SessionRows&>(mbRace):static_cast<race_session50HM::SessionRows&>(legacyRace);
- const race_session50HM::SessionBorrow raceBorrow=isMcTrack?race_session50HM::SessionBorrow(mcRace):isGbTrack?race_session50HM::SessionBorrow(gbRace):isTbTrack?race_session50HM::SessionBorrow(tbRace):isTcTrack?race_session50HM::SessionBorrow(tcRace):isMbTrack?race_session50HM::SessionBorrow(mbRace):race_session50HM::SessionBorrow(legacyRace);
+ // One race session for every course, its node arrays sized from the map
+ // view's node count (race_session50HM::CourseSession, R4).
+ race_session50HM::CourseSession raceSession{};
+ auto& race=raceSession;
+ const race_session50HM::SessionBorrow raceBorrow(raceSession);
  const auto withRace=[&](auto&& operation)->decltype(auto){
-  if(isRcTrack)requireMbRuntimeNavigation50MB();
-  if(isMcTrack){requireMbRuntimeNavigation50MB();return operation(mcRace);}
-  if(isGbTrack){requireMbRuntimeNavigation50MB();return operation(gbRace);}
-  if(isTbTrack){requireMbRuntimeNavigation50MB();return operation(tbRace);}
-  if(isTcTrack)return operation(tcRace);
-  if(isMbTrack)return operation(mbRace);return operation(legacyRace);
+  requireRuntimeNavigation();
+  return operation(raceSession);
  };
  // One cold-owned contact world, outside every racer snapshot. Geometry and
  // scratch never borrow an opponent arena pointer across a bank visit.
@@ -1780,45 +1410,15 @@ SessionExit50DU Context::run() {
          <<" listener_to_player_xz="<<std::sqrt(dx*dx+dz*dz)<<"\n";
     }
    }
-   // The positional owner exists exactly when the AUB authors soul-tree sounds.
-   if(isRcTrack&&rcPositionalAudio){
-    require50DU(rcPositionalAudio->ready()&&
-        rcPositionalAudio->sourceIdentity()==rcColdSources.get(),
-        "RC positional audio lost its actual retained source");
-    // Actual committed selected-body listener, shared World4D8 and process RNG.
-    // Runs once at the existing countdown/world audio boundary before shared mix.
-    const auto positional=rcPositionalAudio->service(&listener,1,s.noiseOwner());
-    require50DU(positional.complete,"RC positional audio service rejected");
-   }
-   // The positional owner exists exactly when the AUB authors soul-tree sounds.
-   if(isTbTrack&&tbPositionalAudio){
-    require50DU(tbPositionalAudio->ready()&&
-        tbPositionalAudio->sourceIdentity()==tbColdSources.get(),
-        "TB positional audio lost its actual retained source");
-    // Existing countdown/committed-world boundary, once before shared mix.
-    // Pause exits before this boundary; the adapter also respects World4D8.
-    const auto positional=tbPositionalAudio->service(&listener,1,s.noiseOwner());
-    require50DU(positional.complete,"TB positional audio service rejected");
-   }
-   // GB positional / ambient owner exists exactly when the AUB authors sounds.
-   if(isGbTrack&&gbPositionalAudio){
-    require50DU(gbPositionalAudio->ready()&&
-        gbPositionalAudio->sourceIdentity()==gbColdSources.get(),
-        "GB positional audio lost its actual retained source");
-    // Existing countdown/committed-world boundary, once before shared mix.
-    // Pause exits before this boundary; the adapter also respects World4D8.
-    const auto positional=gbPositionalAudio->service(&listener,1,s.noiseOwner());
-    require50DU(positional.complete,"GB positional audio service rejected");
-   }
-   // The positional owner exists exactly when the AUB authors soul-tree sounds.
-   if(isMcTrack&&mcPositionalAudio){
-    require50DU(mcPositionalAudio->ready()&&
-        mcPositionalAudio->sourceIdentity()==mcColdSources.get(),
-        "MC positional audio lost its actual retained source");
-    // Existing countdown/committed-world boundary, once before shared mix.
-    // Pause exits before this boundary; the adapter also respects World4D8.
-    const auto positional=mcPositionalAudio->service(&listener,1,s.noiseOwner());
-    require50DU(positional.complete,"MC positional audio service rejected");
+   // One positional-sound owner (AUB/SCB sound rows, 271600; R7). It exists
+   // exactly when the track's files author positional sounds. Actual committed
+   // listener, shared World4D8 and process RNG; runs once at the existing
+   // countdown/committed-world boundary before the shared mix. Pause exits
+   // before this boundary.
+   if(track.roles.sounds){
+    require50DU(track.roles.sounds->ready(),"track positional audio lost its actual retained source");
+    const auto positional=track.roles.sounds->service(&listener,1,s.noiseOwner());
+    require50DU(positional.complete,"track positional audio service rejected");
    }
    require50DU(originalAiAudio->setListener(listener)&&originalAiAudio->mixBoundary(s.noiseOwner()),
        "native AI Aural service rejected");return;
@@ -1836,110 +1436,36 @@ SessionExit50DU Context::run() {
   require50DU(::allocations==beforeOpponentAudio,"opponent engine audio update allocated C++ storage");
  };
  std::function<void()> activateColdRace;
- bool gbColdPrefixClosed=!isGbTrack;
- auto closeGbColdPrefix=[&]()noexcept->bool {try{
-  if(gbColdPrefixClosed)return true;
-  if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return false;
-  if(!closeGbBankRegistries())return false;
-  if(!lapOwner.releaseGbTrack())return false;
-  gbRace={};gbMapView={};gbAiView={};gbMapMetadata={};gbAiMetadata={};gbWorldBorrow.reset();
-  if(gbQueryBinding&&gbQueryBinding->enrolled()){
-   if(!gbQueryBinding->retireContacts()||!gbQueryBinding->close())return false;
-  }else if(!gbNavigation.close())return false;
-  gbQueryBinding.reset();
-  if(gbTriggerActions&&!gbTriggerActions->close())return false;
-  if(gbParticleRuntime&&!gbParticleRuntime->quiesce())return false;
-  if(gbTrackParticles&&!gbTrackParticles->close())return false;
-  if(gbParticleRuntime&&!gbParticleRuntime->closeAfterPool())return false;
+ // One cold prefix for every course (the MC/GB aggregate shape): the
+ // collision world's query fence, the Bank registries, the lap tracker's view
+ // of the track, then the Bank's native backing. Role owners themselves are
+ // released once, by the Track (common_track50CR::Track::release, R3).
+ bool coldPrefixClosed=false;
+ auto closeColdPrefix=[&]()noexcept->bool {try{
+  if(coldPrefixClosed)return true;
+  // Fence the one collision world (its trigger/query service stops; 1B2870 retire order).
+  if(track.roles.collision&&!track.roles.collision->beginRetirement())return false;
+  if(!closeBankRegistries())return false;
+  if(!lapOwner.releaseTrack())return false;
+  laps.release();
   if(!racerBank.retireNativeBacking())return false;
-  gbBankPrefixClosed=true;gbColdPrefixClosed=true;return true;
+  bankPrefixClosed=true;coldPrefixClosed=true;return true;
  }catch(...){return false;}};
- struct GbColdPrefixGuard {
-  decltype(closeGbColdPrefix)& close;bool armed=true;
-  ~GbColdPrefixGuard()noexcept {if(armed&&!close()){
-   std::fputs("GB actual Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
- } gbColdPrefixGuard{closeGbColdPrefix};
- bool mcColdPrefixClosed=!isMcTrack;
- auto closeMcColdPrefix=[&]()noexcept->bool {try{
-  if(mcColdPrefixClosed)return true;
-  if(mcQueryBinding&&mcQueryBinding->enrolled()&&!mcQueryBinding->fence())return false;
-  if(!closeMcBankRegistries())return false;
-  if(!lapOwner.releaseMcTrack())return false;
-  mcRace={};mcMapView={};mcAiView={};mcMapMetadata={};mcAiMetadata={};mcWorldBorrow.reset();
-  if(mcQueryBinding&&mcQueryBinding->enrolled()){
-   if(!mcQueryBinding->retireContacts()||!mcQueryBinding->close())return false;
-  }else if(!mcNavigation.close())return false;
-  mcQueryBinding.reset();
-  if(mcTriggerActions&&!mcTriggerActions->close())return false;
-  if(mcParticleRuntime&&!mcParticleRuntime->quiesce())return false;
-  if(mcTrackParticles&&!mcTrackParticles->close())return false;
-  if(mcParticleRuntime&&!mcParticleRuntime->closeAfterPool())return false;
-  mcParticleVehicles.reset();
-  if(!racerBank.retireNativeBacking())return false;
-  mcBankPrefixClosed=true;mcColdPrefixClosed=true;return true;
- }catch(...){return false;}};
- struct McColdPrefixGuard {
-  decltype(closeMcColdPrefix)& close;bool armed=true;
-  ~McColdPrefixGuard()noexcept {if(armed&&!close()){
-   std::fputs("MC actual Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
- } mcColdPrefixGuard{closeMcColdPrefix};
-
- // This interval precedes renderer/camera construction and closeWindow's
- // exception boundary. All captured owner backing predates this guard.
- bool mbColdBound=false;
- auto closeMbColdPrefix=[&]() noexcept -> bool {try {
-  if(!mbColdBound)return true;
-  if(!mbSourceTriggers||!mbCollisionWorld)return false;
-  if(mbSourceTriggers->pending()&&!mbSourceTriggers->retireSuspended([&](std::size_t slot){
-   require50DU(slot<racerCables.size()&&racerCables[slot]&&racerRigs[slot],
-       "MB cold pending cleanup requires actual slot owners");
-   return mb_source_trigger50MB::RetirementBorrow{s,x.bindings,x.parameters,gcLightOwner,
-       racerCables[slot]->visibility50(),recoveryQueries(),zoneLifecycle,liveWorld,membershipWork,
-       slot==0?playerRacer60:originalAi.racer60};
-  }))return false;
-  // Pending source borrows have closed before model retirement can visit Bank.
-  if(!nativeColdModelRetirement.close())return false;
-  for(std::size_t slot=0;slot<racerBank.count();++slot){
-   if(!racerBank.visit(slot,[&](){
-    if(!racerCables[slot]||!racerRigs[slot])return false;
-    if(!mbSourceTriggers->retireColdVisibility(slot,s,x.bindings,x.parameters,gcLightOwner,
-        racerCables[slot]->visibility50(),gcLightDiagnostic))return false;
-    const auto queries=recoveryQueries();
-    for(std::size_t index=0;index<4;++index){const auto& q=queries.query[index];
-     if(!q.membership||!q.object||(q.membership->attached&&q.membership->object!=q.object))return false;
-     const auto removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*q.membership,membershipWork);
-     if(removed.status!=LiveZoneStatus50EN::Complete||q.membership->attached||q.membership->object)return false;
-     if(index==1)s.shape.registrationE0=0;
-    }
-    //This slot's own 364 row (shared world: not slot 0's).
-    const auto secondaryRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::secondary364);
-    if(!secondaryRow)return false;
-    auto removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
-    if(removed.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
-    for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){auto* member=mbCollisionWorld->triggerMembership(i);if(!member)return false;
-     removed=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,member->state,membershipWork);
-     if(removed.status!=LiveZoneStatus50EN::Complete||member->state.attached||member->state.object)return false;
-    }
-    return true;
-   }))return false;
-  }
-  if(!mbSourceTriggers->unbind())return false;
-  mbSourceTriggers.reset();mbColdBound=false;return true;
- }catch(...){return false;}};
- struct MbColdPrefixGuard {
-  decltype(closeMbColdPrefix)& close;bool armed=true;
-  ~MbColdPrefixGuard() noexcept {if(armed&&!close()){
-   std::fputs("MB cold prefix retirement rejected; owners retained until fail-stop\n",stderr);
-   std::terminate();
-  }}
- } mbColdPrefixGuard{closeMbColdPrefix};
+ struct ColdPrefixGuard {
+  decltype(closeColdPrefix)& close;bool armed=true;
+  ~ColdPrefixGuard()noexcept {if(armed&&!close()){
+   std::fputs("race Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
+ } coldPrefixGuard{closeColdPrefix};
+ // Set by the cold contacts once the navigation store is bound to the live
+ // collision world (1ACF70); its membership close is the one bank guard above.
+ bool coldNavigationBound=false;
  if(raceEnabled){
   std::array<native_racer_contact50HW::Binding,raceRacerCapacity> contactBindings{};
   // The actual Tournament profile and authenticated field authorize ranks;
   // manager/Bank slot identity is never reordered to obtain a start position.
   const bool canonicalTournamentGrid=[&](){
    if(!originalUiStarted||originalUiActive||!humanCourseEnabled||
-      !(directOriginalHuman||isRaTrack))return false;
+      !rootedCourseRace)return false;
    using Profile=rr::platform::OriginalUiRiderProfileOwner50KG;
    const auto* profile=originalMainApplication.riderProfile.get();
    Profile::CourseRaceSelection selected{};
@@ -1949,7 +1475,7 @@ SessionExit50DU Context::run() {
    const auto stamp=profile->stamp();
    Profile::TournamentCareerSnapshot career{};
    OriginalUiCourseRememberedProfile50KG course{};
-   require50DU(courseRaceCold&&profile->selectedTournamentCourseSnapshot(career,course)&&
+   require50DU(rootedCourseRace&&profile->selectedTournamentCourseSnapshot(career,course)&&
        stamp.mode34==2&&career.stamp.mode34==2&&course.mode34==2&&
        stamp.generation==career.stamp.generation&&
        selected.subtype==1&&selected.rider==playerRacer60&&career.career100C0==playerRacer60&&
@@ -1978,263 +1504,208 @@ SessionExit50DU Context::run() {
   }();
   // Execute the original cold owners stage synchronously against these same locals.
   interactive_cold50DU::OwnersContext{
-   .canonicalTournamentGrid=canonicalTournamentGrid,
-   .actualRacer60ForResults=dynamicRacer60,
-   .allAiEnabled=allAiEnabled,
-   .announcerRequestsUnjoined=announcerRequestsUnjoined,
-   .applicationEvents=applicationEvents,
-   .authored=authored,
-   .authoredFinishSteering10A4=authoredFinishSteering10A4,
-   .authoredTrackName=authoredTrackName,
-   .autoDriveEnabled=autoDriveEnabled,
-   .autoStopReported=autoStopReported,
-   .baseGlobals=baseGlobals,
-   .baseTail=baseTail,
-   .bindColdNativeEffects=interactive_frame50DU::BorrowedCall<void()>{bindColdNativeEffects},
-   .boostCoolingCF8=boostCoolingCF8,
-   .boostDiagnostic=boostDiagnostic,
-   .boostParameters=boostParameters,
-   .boostState=boostState,
-   .candidates=candidates,
-   .checkpointOutput=checkpointOutput,
-   .checkpointRequested=checkpointRequested,
-   .clock=clock,
-   .coldFlame=coldFlame,
-   .collectedCalls=collectedCalls,
-   .completedFrames=completedFrames,
-   .consumedRaStage=consumedRaStage,
-   .contactBindings=contactBindings,
-   .controller=controller,
-   .controllerActions=controllerActions,
-   .controllerEventStorage=controllerEventStorage,
-   .controllerEvents=controllerEvents,
-   .controllerPresses=controllerPresses,
-   .controllerReleases=controllerReleases,
-   .courseDiagnostic=courseDiagnostic,
-   .courseOutput=courseOutput,
-   .courseState=courseState,
-   .courseTuning=courseTuning,
-   .dynamicContactEnabled=dynamicContactEnabled,
-   .dynamicMusicProfile=dynamicMusicProfile,
-   .effectCommands=effectCommands,
-   .endpointScenes=endpointScenes,
-   .endpoints=endpoints,
-   .freshMainProbe=freshMainProbe,
-   .freshProbe100=freshProbe100,
-   .freshTerrainProbe=freshTerrainProbe,
-   .trackAnimationMembership=trackAnimationMembership,
-   .trackAnimationBinding=trackAnimationBinding,
-   .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
-   .gaTriggerMembership=gaTriggerMembership,
-   .gbAiMetadata=gbAiMetadata,
-   .gbAiView=gbAiView,
-   .gbCollisionWorld=gbCollisionWorld,
-   .gbMapMetadata=gbMapMetadata,
-   .gbMapView=gbMapView,
-   .gbWorldBorrow=gbWorldBorrow,
-   .gcTriggerActions=gcTriggerActions,
-   .gcTriggerMembership=gcTriggerMembership,
-   .humanBaseUndertrack=humanBaseUndertrack,
-   .humanCourseEnabled=humanCourseEnabled,
-   .initial=initial,
-   .initialMetadata=initialMetadata,
-   .initialPairs=initialPairs,
-   .isGaTrack=isGaTrack,
-   .isGbTrack=isGbTrack,
-   .maOrCommonRouteTrack=maOrCommonRouteTrack,
-   .isMbTrack=isMbTrack,
-   .isMcTrack=isMcTrack,
-   .isRaTrack=isRaTrack,
-   .isRcTrack=isRcTrack,
-   .isScTrack=isScTrack,
-   .isTbTrack=isTbTrack,
-   .isTcTrack=isTcTrack,
-   .keyboardDiagnostic=keyboardDiagnostic,
-   .lapContinuity=lapContinuity,
-   .lapOwner=lapOwner,
-   .legacyGround=legacyGround,
-   .m=m,
-   .maTriggerMembership=maTriggerMembership,
-   .mainContactFrames=mainContactFrames,
-   .mainCrossedPortals=mainCrossedPortals,
-   .mbAiMetadata=mbAiMetadata,
-   .mbAiView=mbAiView,
-   .mbCollisionWorld=mbCollisionWorld,
-   .mbMapMetadata=mbMapMetadata,
-   .mbMapView=mbMapView,
-   .mcAiMetadata=mcAiMetadata,
-   .mcAiView=mcAiView,
-   .mcCollisionWorld=mcCollisionWorld,
-   .mcMapMetadata=mcMapMetadata,
-   .mcMapView=mcMapView,
-   .mcWorldBorrow=mcWorldBorrow,
-   .movement=movement,
-   .movementFlag=movementFlag,
-   .movementInitial=movementInitial,
-   .movementResult=movementResult,
-   .movementSource=movementSource,
-   .namesForEffects=namesForEffects,
-   .nativeBottomLeftModels=nativeBottomLeftModels,
-   .nativeBottomRightModels=nativeBottomRightModels,
-   .nativeCalls=nativeCalls,
-   .nativeChariotModels=nativeChariotModels,
-   .nativeEffectCount=nativeEffectCount,
-   .nativeEffects=nativeEffects,
-   .nativeLeftModels=nativeLeftModels,
-   .nativeModelDomain=nativeModelDomain,
-   .nativeOrdinaryLaunch11258=nativeOrdinaryLaunch11258,
-   .nativeRightModels=nativeRightModels,
-   .nativeRosterOwners=nativeRosterOwners,
-   .nativeVideo=nativeVideo,
-   .navigationAI=navigationAI,
-   .navigationAIScan=navigationAIScan,
-   .navigationAISequential=navigationAISequential,
-   .navigationCA0=navigationCA0,
-   .navigationCA0Copies=navigationCA0Copies,
-   .navigationDiagnostic=navigationDiagnostic,
-   .navigationGateSkips=navigationGateSkips,
-   .navigationMap=navigationMap,
-   .navigationMapScan=navigationMapScan,
-   .navigationMapSequential=navigationMapSequential,
-   .navigationProgress=navigationProgress,
-   .navigationUpdates=navigationUpdates,
-   .openNativeVideo=interactive_frame50DU::BorrowedCall<void()>{openNativeVideo},
-   .opponentBoostAudio=opponentBoostAudio,
-   .originalAi=originalAi,
-   .originalAiAuthoringDiagnostic=originalAiAuthoringDiagnostic,
-   .originalAiCreateSelection=originalAiCreateSelection,
-   .originalAiEnabled=originalAiEnabled,
-   .originalAiHumanCount=originalAiHumanCount,
-   .originalAiOwnsSlot=interactive_frame50DU::BorrowedCall<bool(std::size_t) noexcept>{originalAiOwnsSlot},
-   .originalAiReads=originalAiReads,
-   .originalAiReceipt=originalAiReceipt,
-   .originalAiSession=originalAiSession,
-   .originalHumanRecovery=originalHumanRecovery,
-   .originalMainApplication=originalMainApplication,
-   .originalRecovery=originalRecovery,
-   .originalRecoveryEnabled=originalRecoveryEnabled,
-   .originalRecoveryModels=originalRecoveryModels,
-   .packet=packet,
-   .packetLive=packetLive,
-   .peakCollected=peakCollected,
-   .pendingSpeech=pendingSpeech,
-   .playerEnvironment=playerEnvironment,
-   .playerEventChild=playerEventChild,
-   .playerEvents=playerEvents,
-   .playerUsesRosterRig=playerUsesRosterRig,
-   .poseHistory=poseHistory,
-   .qfilter=qfilter,
-   .query=query,
-   .queryResult=queryResult,
-   .raDiagnostic=raDiagnostic,
-   .raFreshProbe=raFreshProbe,
-   .raSession=raSession,
-   .raSessionDiagnostic=raSessionDiagnostic,
-   .raWorld=raWorld,
-   .raceRacerCount=raceRacerCount,
-   .racerBank=racerBank,
-   .racerCables=racerCables,
-   .racerCollisions=racerCollisions,
-   .racerContactIds=racerContactIds,
-   .racerContactMaterials=racerContactMaterials,
-   .racerFrameReads=racerFrameReads,
-   .racerHudNames=racerHudNames,
-   .racerNames=racerNames,
-   .racerRigs=racerRigs,
-   .racerVisuals=racerVisuals,
-   .rcCollisionWorld=rcCollisionWorld,
-   .rcWorldBorrow=rcWorldBorrow,
-   .rebaseBounds=rebaseBounds,
-   .rebaseDiagnostic=rebaseDiagnostic,
-   .rebaseModelCount=rebaseModelCount,
-   .rebaseModels=rebaseModels,
-   .rebaseNodes=rebaseNodes,
-   .rebaseWorkspace=rebaseWorkspace,
-   .records=records,
-   .recoveryPaused=recoveryPaused,
-   .recoveryPodLive=recoveryPodLive,
-   .recoveryQueryOwners=recoveryQueryOwners,
-   .repairActiveTicks=repairActiveTicks,
-   .requireMbRuntimeNavigation50MB=interactive_frame50DU::BorrowedCall<void()>{requireMbRuntimeNavigation50MB},
-   .resetEffectBindings=resetEffectBindings,
-   .resetEffectState=resetEffectState,
-   .resetEffectWorkspace=resetEffectWorkspace,
-   .response=response,
-   .s=s,
-   .commonRouteTriggerMembership=commonRouteTriggerMembership,
-   .scColdSources=scColdSources,
-   .scGround=scGround,
-   .scTriggerMembership=scTriggerMembership,
-   .secondaryContactFrames=secondaryContactFrames,
-   .secondaryCrossedPortals=secondaryCrossedPortals,
-   .secondaryFilter=secondaryFilter,
-   .secondaryQuery=secondaryQuery,
-   .secondaryRecords=secondaryRecords,
-   .secondaryResponse=secondaryResponse,
-   .secondaryResult=secondaryResult,
-   .secondarySettings=secondarySettings,
-   .secondarySpring=secondarySpring,
-   .selectedOriginalAiMapMetadata=selectedOriginalAiMapMetadata,
-   .selectedOriginalAiMetadata=selectedOriginalAiMetadata,
-   .selection=selection,
-   .sessionIndex=sessionIndex,
-   .settings=settings,
-   .si=si,
-   .sim=sim,
-   .sip=sip,
-   .sourceConsumedPauseActivation=sourceConsumedPauseActivation,
-   .sourceDamage=sourceDamage,
-   .sourcePause=sourcePause,
-   .sourcePositionStatsPrestage=sourcePositionStatsPrestage,
-   .sourcePositionStatsPrestageDiagnostic=sourcePositionStatsPrestageDiagnostic,
-   .sourceSpeedBoost=sourceSpeedBoost,
-   .sourceTimeStats=sourceTimeStats,
-   .speechCues=speechCues,
-   .speechEvents=speechEvents,
-   .speechState=speechState,
-   .spring=spring,
-   .tbAiMetadata=tbAiMetadata,
-   .tbAiView=tbAiView,
-   .tbCollisionWorld=tbCollisionWorld,
-   .tbMapMetadata=tbMapMetadata,
-   .tbMapView=tbMapView,
-   .tbWorldBorrow=tbWorldBorrow,
-   .tcAiMetadata=tcAiMetadata,
-   .tcAiView=tcAiView,
-   .tcCollisionWorld=tcCollisionWorld,
-   .tcMapMetadata=tcMapMetadata,
-   .tcMapView=tcMapView,
-   .tcWorldBorrow=tcWorldBorrow,
-   .terrainBindings=terrainBindings,
-   .terrainHitFrames=terrainHitFrames,
-   .terrainLiveOwner=terrainLiveOwner,
-   .terrainOwner=terrainOwner,
-   .terrainQueries=terrainQueries,
-   .terrainSupportedFrames=terrainSupportedFrames,
-   .trackStorage=trackStorage,
-   .unavailableEffect=unavailableEffect,
-   .wrongWayActiveTicks=wrongWayActiveTicks,
-   .wrongWayContinuation=wrongWayContinuation,
-   .wrongWayDiagnostic=wrongWayDiagnostic,
-   .wrongWayReceipt=wrongWayReceipt,
-   .wrongWayUpdates=wrongWayUpdates,
-   .x=x,
-   .nativeHumanAudio=audioEnabled&&originalUiStarted&&consumedRaStage.race()?liveAudio.get():nullptr,
-   .nativeHumanSpeechCounts=&speechCounts,
-  }.run();
+  .track=track,
+  .roster=roster,
+  .laps=laps,
+  .canonicalTournamentGrid=canonicalTournamentGrid,
+  .actualRacer60ForResults=dynamicRacer60,
+  .allAiEnabled=allAiEnabled,
+  .announcerRequestsUnjoined=announcerRequestsUnjoined,
+  .applicationEvents=applicationEvents,
+  .authored=authored,
+  .authoredFinishSteering10A4=authoredFinishSteering10A4,
+  .authoredTrackName=authoredTrackName,
+  .autoDriveEnabled=autoDriveEnabled,
+  .autoStopReported=autoStopReported,
+  .baseGlobals=baseGlobals,
+  .baseTail=baseTail,
+  .bindColdNativeEffects=interactive_frame50DU::BorrowedCall<void()>{bindColdNativeEffects},
+  .boostCoolingCF8=boostCoolingCF8,
+  .boostDiagnostic=boostDiagnostic,
+  .boostParameters=boostParameters,
+  .boostState=boostState,
+  .candidates=candidates,
+  .checkpointOutput=checkpointOutput,
+  .checkpointRequested=checkpointRequested,
+  .clock=clock,
+  .coldFlame=coldFlame,
+  .collectedCalls=collectedCalls,
+  .completedFrames=completedFrames,
+  .consumedStage=consumedStage,
+  .contactBindings=contactBindings,
+  .controller=controller,
+  .controllerActions=controllerActions,
+  .controllerEventStorage=controllerEventStorage,
+  .controllerEvents=controllerEvents,
+  .controllerPresses=controllerPresses,
+  .controllerReleases=controllerReleases,
+  .courseDiagnostic=courseDiagnostic,
+  .courseOutput=courseOutput,
+  .courseState=courseState,
+  .courseTuning=courseTuning,
+  .dynamicContactEnabled=dynamicContactEnabled,
+  .dynamicMusicProfile=dynamicMusicProfile,
+  .effectCommands=effectCommands,
+  .endpointScenes=endpointScenes,
+  .endpoints=endpoints,
+  .freshMainProbe=freshMainProbe,
+  .freshProbe100=freshProbe100,
+  .freshTerrainProbe=freshTerrainProbe,
+  .trackAnimationMembership=trackAnimationMembership,
+  .trackAnimationBinding=trackAnimationBinding,
+  .trackAnimationBindingDiagnostic=trackAnimationBindingDiagnostic,
+  .triggerMembership=triggerMembership,
+  .aiView=aiView,
+  .mapView=mapView,
+  .humanBaseUndertrack=humanBaseUndertrack,
+  .humanCourseEnabled=humanCourseEnabled,
+  .initial=initial,
+  .initialMetadata=initialMetadata,
+  .initialPairs=initialPairs,
+  .keyboardDiagnostic=keyboardDiagnostic,
+  .lapContinuity=lapContinuity,
+  .lapOwner=lapOwner,
+  .m=m,
+  .mainContactFrames=mainContactFrames,
+  .mainCrossedPortals=mainCrossedPortals,
+  .movement=movement,
+  .movementFlag=movementFlag,
+  .movementInitial=movementInitial,
+  .movementResult=movementResult,
+  .movementSource=movementSource,
+  .namesForEffects=namesForEffects,
+  .nativeBottomLeftModels=nativeBottomLeftModels,
+  .nativeBottomRightModels=nativeBottomRightModels,
+  .nativeCalls=nativeCalls,
+  .nativeChariotModels=nativeChariotModels,
+  .nativeEffectCount=nativeEffectCount,
+  .nativeEffects=nativeEffects,
+  .nativeLeftModels=nativeLeftModels,
+  .nativeModelDomain=nativeModelDomain,
+  .nativeOrdinaryLaunch11258=nativeOrdinaryLaunch11258,
+  .nativeRightModels=nativeRightModels,
+  .nativeVideo=nativeVideo,
+  .navigationAIScan=navigationAIScan,
+  .navigationAISequential=navigationAISequential,
+  .navigationCA0=navigationCA0,
+  .navigationCA0Copies=navigationCA0Copies,
+  .navigationDiagnostic=navigationDiagnostic,
+  .navigationGateSkips=navigationGateSkips,
+  .navigationMapScan=navigationMapScan,
+  .navigationMapSequential=navigationMapSequential,
+  .navigationProgress=navigationProgress,
+  .navigationUpdates=navigationUpdates,
+  .openNativeVideo=interactive_frame50DU::BorrowedCall<void()>{openNativeVideo},
+  .opponentBoostAudio=opponentBoostAudio,
+  .originalAi=originalAi,
+  .originalAiAuthoringDiagnostic=originalAiAuthoringDiagnostic,
+  .originalAiCreateSelection=originalAiCreateSelection,
+  .originalAiEnabled=originalAiEnabled,
+  .originalAiHumanCount=originalAiHumanCount,
+  .originalAiOwnsSlot=interactive_frame50DU::BorrowedCall<bool(std::size_t) noexcept>{originalAiOwnsSlot},
+  .originalAiReads=originalAiReads,
+  .originalAiReceipt=originalAiReceipt,
+  .originalAiSession=originalAiSession,
+  .originalHumanRecovery=originalHumanRecovery,
+  .originalMainApplication=originalMainApplication,
+  .originalRecovery=originalRecovery,
+  .originalRecoveryEnabled=originalRecoveryEnabled,
+  .originalRecoveryModels=originalRecoveryModels,
+  .packet=packet,
+  .packetLive=packetLive,
+  .peakCollected=peakCollected,
+  .pendingSpeech=pendingSpeech,
+  .playerEnvironment=playerEnvironment,
+  .playerEventChild=playerEventChild,
+  .playerEvents=playerEvents,
+  .playerUsesRosterRig=playerUsesRosterRig,
+  .poseHistory=poseHistory,
+  .qfilter=qfilter,
+  .query=query,
+  .queryResult=queryResult,
+  .raceRacerCount=raceRacerCount,
+  .racerBank=racerBank,
+  .racerCables=racerCables,
+  .racerCollisions=racerCollisions,
+  .racerContactIds=racerContactIds,
+  .racerContactMaterials=racerContactMaterials,
+  .racerFrameReads=racerFrameReads,
+  .racerHudNames=racerHudNames,
+  .racerNames=racerNames,
+  .racerRigs=racerRigs,
+  .racerVisuals=racerVisuals,
+  .rebaseBounds=rebaseBounds,
+  .rebaseDiagnostic=rebaseDiagnostic,
+  .rebaseModelCount=rebaseModelCount,
+  .rebaseModels=rebaseModels,
+  .rebaseNodes=rebaseNodes,
+  .rebaseWorkspace=rebaseWorkspace,
+  .records=records,
+  .recoveryPaused=recoveryPaused,
+  .recoveryPodLive=recoveryPodLive,
+  .recoveryQueryOwners=recoveryQueryOwners,
+  .repairActiveTicks=repairActiveTicks,
+  .requireRuntimeNavigation=interactive_frame50DU::BorrowedCall<void()>{requireRuntimeNavigation},
+  .resetEffectBindings=resetEffectBindings,
+  .resetEffectState=resetEffectState,
+  .resetEffectWorkspace=resetEffectWorkspace,
+  .response=response,
+  .s=s,
+  .secondaryContactFrames=secondaryContactFrames,
+  .secondaryCrossedPortals=secondaryCrossedPortals,
+  .secondaryFilter=secondaryFilter,
+  .secondaryQuery=secondaryQuery,
+  .secondaryRecords=secondaryRecords,
+  .secondaryResponse=secondaryResponse,
+  .secondaryResult=secondaryResult,
+  .secondarySettings=secondarySettings,
+  .secondarySpring=secondarySpring,
+  .selectedOriginalAiMapMetadata=selectedOriginalAiMapMetadata,
+  .selectedOriginalAiMetadata=selectedOriginalAiMetadata,
+  .selection=selection,
+  .sessionIndex=sessionIndex,
+  .settings=settings,
+  .si=si,
+  .sim=sim,
+  .sip=sip,
+  .sourceConsumedPauseActivation=sourceConsumedPauseActivation,
+  .sourceDamage=sourceDamage,
+  .sourcePause=sourcePause,
+  .sourcePositionStatsPrestage=sourcePositionStatsPrestage,
+  .sourcePositionStatsPrestageDiagnostic=sourcePositionStatsPrestageDiagnostic,
+  .sourceSpeedBoost=sourceSpeedBoost,
+  .sourceTimeStats=sourceTimeStats,
+  .speechCues=speechCues,
+  .speechEvents=speechEvents,
+  .speechState=speechState,
+  .spring=spring,
+  .terrainBindings=terrainBindings,
+  .terrainHitFrames=terrainHitFrames,
+  .terrainLiveOwner=terrainLiveOwner,
+  .terrainOwner=terrainOwner,
+  .terrainQueries=terrainQueries,
+  .terrainSupportedFrames=terrainSupportedFrames,
+  .trackStorage=trackStorage,
+  .unavailableEffect=unavailableEffect,
+  .wrongWayActiveTicks=wrongWayActiveTicks,
+  .wrongWayContinuation=wrongWayContinuation,
+  .wrongWayDiagnostic=wrongWayDiagnostic,
+  .wrongWayReceipt=wrongWayReceipt,
+  .wrongWayUpdates=wrongWayUpdates,
+  .x=x,
+  // B-C06: the counted race of every course carries the human race audio.
+  .nativeHumanAudio=audioEnabled&&originalUiStarted&&consumedStage.race()?liveAudio.get():nullptr,
+  .nativeHumanSpeechCounts=&speechCounts,
+ }.run();
  // Original 1A7450: after racers/pods (1750A0/1752D0) and audio\announce.res.
  rr::platform::loading_progress50DU::step(.1f,0x1a7450);
  // Bind once to the selected authenticated map representation. Placement is
  // shared across human/opponents; no per-racer track dispatch or null fallback.
  source_grid50IG::SelectedMapGrid selectedGridNavigation;
  if(trackSession->originalStaticCandidates||canonicalTournamentGrid){
-  requireMbRuntimeNavigation50MB();
-  const bool bound=isMcTrack?selectedGridNavigation.bindView(mcMapView):
-      isGbTrack?selectedGridNavigation.bindView(gbMapView):
-      isTbTrack?selectedGridNavigation.bindView(tbMapView):
-      isTcTrack?selectedGridNavigation.bindView(tcMapView):
-      isMbTrack?selectedGridNavigation.bindView(mbMapView):
-      selectedGridNavigation.bindLegacy(navigationMap);
+  requireRuntimeNavigation();
+  // One map view for every course (m<code>.spl through 2A1260).
+  const bool bound=selectedGridNavigation.bindView(mapView);
   require50DU(bound,"selected authenticated map has no cold grid capability");
  }
  //1AE9EC requests rank0 from the same authenticated course, not the
@@ -2245,8 +1716,10 @@ SessionExit50DU Context::run() {
       (managerRuntimeSelection.packed1125C>>11u)==rr::game::dlc50DL::profileRider(playerRacer60),
       "record actor requires its actual selected rider and singleton bank");
   source_grid50IG::SelectedMapGrid recordGrid=selectedGridNavigation;
-  if(!trackSession->originalStaticCandidates)
-   require50DU(recordGrid.bindLegacy(navigationMap),"record actor original rank0 map unavailable");
+  if(!trackSession->originalStaticCandidates){
+   requireRuntimeNavigation();
+   require50DU(recordGrid.bindView(mapView),"record actor original rank0 map unavailable");
+  }
   racerBank.visit(0,[&](){
    BodyMatrix48G rankZero{},groundedRankZero{};UndertrackDiagnostic50ET diagnostic{};
    const float selectedLift=x.parameters.visual.verticalLimit7EC;
@@ -2264,7 +1737,8 @@ SessionExit50DU Context::run() {
   });
  }
 #include "native_racer_grid50hn.inc"
-  if(!isRaTrack&&playerUsesRosterRig)coldRacerStage50DU(playerPodId,"human grounded grid placement",[&](){
+  // One grounded grid placement for every course and every slot (B-C18).
+  if(playerUsesRosterRig)coldRacerStage50DU(playerPodId,"human grounded grid placement",[&](){
    placeOpponentAtGrid50HN(0);
    if(humanCourseEnabled)initializeOriginalHumanResetTimers50LC(playerEvents);
    require50DU(query.resource==&racerCollisions[0]->main()&&
@@ -2273,119 +1747,69 @@ SessionExit50DU Context::run() {
        secondaryMembership.lastType2Resource==secondaryQuery.resource,
        "selected human retains another racer's static contact resource");
   });
-  if(!isRaTrack)for(std::size_t racer=1;racer<racerBank.count();++racer)
+  for(std::size_t racer=1;racer<racerBank.count();++racer)
    coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){placeOpponentAtGrid50HN(racer);});
   // Execute the original cold contacts stage synchronously against these same locals.
   interactive_cold50DU::ContactsContext{
-   .allAiEnabled=allAiEnabled,
-   .applicationClock=applicationClock,
-   .audioEnabled=audioEnabled,
-   .completedFrames=completedFrames,
-   .contactBindings=contactBindings,
-   .directOriginalHuman=directOriginalHuman,
-   .dynamicContactEnabled=dynamicContactEnabled,
-   .dynamicRacer60=dynamicRacer60,
-   .dynamicRegistry=dynamicRegistry,
-   .trackAnimations=trackAnimations,
-   .gaGateAudio=gaGateAudio,
-   .gaTriggerActions=gaTriggerActions,
-   .gaTriggerAuthoring=gaTriggerAuthoring,
-   .gbCollisionWorld=gbCollisionWorld,
-   .gbNavigationOwner=gbNavigationOwner,
-   .gbQueryBinding=gbQueryBinding,
-   .gcGateAudio=gcGateAudio,
-   .gcGraphicsSequence=gcGraphicsSequence,
-   .gcLightDiagnostic=gcLightDiagnostic,
-   .gcLightOwner=gcLightOwner,
-   .gcTriggerActions=gcTriggerActions,
-   .gcTriggerAuthoring=gcTriggerAuthoring,
-   .humanCourseEnabled=humanCourseEnabled,
-   .initialCollisionZone=initialCollisionZone,
-   .isGbTrack=isGbTrack,
-   .isMbTrack=isMbTrack,
-   .isMcTrack=isMcTrack,
-   .isRaTrack=isRaTrack,
-   .isRcTrack=isRcTrack,
-   .liveWorld=liveWorld,
-   .m=m,
-   .maOriginalDisc=maOriginalDisc,
-   .maTriggerActions=maTriggerActions,
-   .maTriggerAuthoring=maTriggerAuthoring,
-   .mainMembership=mainMembership,
-   .mbAiView=mbAiView,
-   .mbColdBound=mbColdBound,
-   .mbCollisionWorld=mbCollisionWorld,
-   .mbOriginalDisc=mbOriginalDisc,
-   .mbSourceTriggers=mbSourceTriggers,
-   .mcCollisionWorld=mcCollisionWorld,
-   .mcNavigationOwner=mcNavigationOwner,
-   .mcQueryBinding=mcQueryBinding,
-   .membershipWork=membershipWork,
-   .nativeOriginalFleet=nativeOriginalFleet,
-   .nativeSelectedLights=nativeSelectedLights,
-   .navigationAI=navigationAI,
-   .navigationMap=navigationMap,
-   .navigationProgress=navigationProgress,
-   .opponentDraw=opponentDraw,
-   .opponentUvs=opponentUvs,
-   .originalAiEnabled=originalAiEnabled,
-   .originalAiHumanCount=originalAiHumanCount,
-   .originalAiOpponentCount=originalAiOpponentCount,
-   .originalRecoveryEnabled=originalRecoveryEnabled,
-   .publishRecoveryQueries=interactive_frame50DU::BorrowedCall<bool()>{publishRecoveryQueries},
-   .qfilter=qfilter,
-   .query=query,
-   .raceOpponentCount=raceOpponentCount,
-   .raceRacerCount=raceRacerCount,
-   .racerBank=racerBank,
-   .racerContactIds=racerContactIds,
-   .racerContactOwner=racerContactOwner,
-   .racerContactsEnabled=racerContactsEnabled,
-   .racerRigs=racerRigs,
-   .racerVisuals=racerVisuals,
-   .rcColdSources=rcColdSources,
-   .rcNavigationBorrow=rcNavigationBorrow,
-   .rcOriginalDisc=rcOriginalDisc,
-   .rcTriggerActions=rcTriggerActions,
-   .rcTriggerAuthoring=rcTriggerAuthoring,
-   .rcWorldBorrow=rcWorldBorrow,
-   .recoveryBorrowedQueries=interactive_frame50DU::BorrowedCall<undertrack_owners50ew_fixture::BorrowedQueries()>{recoveryBorrowedQueries},
-   .recoveryQueryOwners=recoveryQueryOwners,
-   .requireMbRuntimeNavigation50MB=interactive_frame50DU::BorrowedCall<void()>{requireMbRuntimeNavigation50MB},
-   .s=s,
-   .commonRouteOriginalDisc=commonRouteOriginalDisc,
-   .commonRouteTriggerActions=commonRouteTriggerActions,
-   .commonRouteTriggerAuthoring=commonRouteTriggerAuthoring,
-   .scColdSources=scColdSources,
-   .scGround=scGround,
-   .scOriginalDisc=scOriginalDisc,
-   .scTriggerActions=scTriggerActions,
-   .scTriggerAuthoring=scTriggerAuthoring,
-   .secondaryFilter=secondaryFilter,
-   .secondaryMembership=secondaryMembership,
-   .secondaryQuery=secondaryQuery,
-   .selectedOriginal=selectedOriginal,
-   .sessionRandom=sessionRandom,
-   .sourceAnnouncer=sourceAnnouncer,
-   .tbAiView=tbAiView,
-   .tbColdSources=tbColdSources,
-   .tbCollisionWorld=tbCollisionWorld,
-   .tbMapView=tbMapView,
-   .tbOriginalDisc=tbOriginalDisc,
-   .tbTriggerActions=tbTriggerActions,
-   .tbWorldBorrow=tbWorldBorrow,
-   .tcAiView=tcAiView,
-   .tcColdSources=tcColdSources,
-   .tcCollisionWorld=tcCollisionWorld,
-   .tcMapView=tcMapView,
-   .tcOriginalDisc=tcOriginalDisc,
-   .tcTriggerActions=tcTriggerActions,
-   .tcWorldBorrow=tcWorldBorrow,
-   .trackCounts=trackCounts,
-   .trackStorage=trackStorage,
-   .x=x,
-   .zoneLifecycle=zoneLifecycle,
-  }.run();
+  .track=track,
+  .roster=roster,
+  .allAiEnabled=allAiEnabled,
+  .applicationClock=applicationClock,
+  .audioEnabled=audioEnabled,
+  .completedFrames=completedFrames,
+  .contactBindings=contactBindings,
+  .rootedCourseRace=rootedCourseRace,
+  .dynamicContactEnabled=dynamicContactEnabled,
+  .dynamicRacer60=dynamicRacer60,
+  .dynamicRegistry=dynamicRegistry,
+  .trackAnimations=trackAnimations,
+  .triggerAudio=triggerAudio,
+  .graphicsSequence=graphicsSequence,
+  .lightDiagnostic=lightDiagnostic,
+  .humanCourseEnabled=humanCourseEnabled,
+  .initialCollisionZone=initialCollisionZone,
+  .liveWorld=liveWorld,
+  .m=m,
+  .mainMembership=mainMembership,
+  .aiView=aiView,
+  .coldNavigationBound=coldNavigationBound,
+  .membershipWork=membershipWork,
+  .nativeOriginalFleet=nativeOriginalFleet,
+  .nativeSelectedLights=nativeSelectedLights,
+  .navigationProgress=navigationProgress,
+  .opponentDraw=opponentDraw,
+  .opponentUvs=opponentUvs,
+  .originalAiEnabled=originalAiEnabled,
+  .originalAiHumanCount=originalAiHumanCount,
+  .originalAiOpponentCount=originalAiOpponentCount,
+  .originalRecoveryEnabled=originalRecoveryEnabled,
+  .publishRecoveryQueries=interactive_frame50DU::BorrowedCall<bool()>{publishRecoveryQueries},
+  .qfilter=qfilter,
+  .query=query,
+  .raceOpponentCount=raceOpponentCount,
+  .raceRacerCount=raceRacerCount,
+  .racerBank=racerBank,
+  .racerContactIds=racerContactIds,
+  .racerContactOwner=racerContactOwner,
+  .racerContactsEnabled=racerContactsEnabled,
+  .racerRigs=racerRigs,
+  .racerVisuals=racerVisuals,
+  .recoveryBorrowedQueries=interactive_frame50DU::BorrowedCall<undertrack_owners50ew_fixture::BorrowedQueries()>{recoveryBorrowedQueries},
+  .recoveryQueryOwners=recoveryQueryOwners,
+  .requireRuntimeNavigation=interactive_frame50DU::BorrowedCall<void()>{requireRuntimeNavigation},
+  .s=s,
+  .secondaryFilter=secondaryFilter,
+  .secondaryMembership=secondaryMembership,
+  .secondaryQuery=secondaryQuery,
+  .selectedOriginal=selectedOriginal,
+  .sessionRandom=sessionRandom,
+  .sourceAnnouncer=sourceAnnouncer,
+  .mapView=mapView,
+  .trackCounts=trackCounts,
+  .trackStorage=trackStorage,
+  .x=x,
+  .zoneLifecycle=zoneLifecycle,
+ }.run();
   // Race activation begins here, AFTER genuine cold rig/grid/contact/draw
   // owners are loaded. The neutral setup tick is real native physics, not
   // asset preparation. Main-only retains these assets but cannot activate a
@@ -2449,33 +1873,29 @@ SessionExit50DU Context::run() {
        originalMainApplication.lightManager->beginNativeGameplay(sessionIndex+1,lightDiagnostic),
        "native race must borrow the dormant application lighting lifetime after real UI release");
   }
-  if(isMcTrack){
-   require50DU(mcParticleVehicles&&mcParticleVehicles->ready(),"MC actual retained racer producers absent");
-   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    std::string error;require50DU(mcParticleVehicles->initializeRacer(slot,nativeEffects,nativeEffectCount,x.bindings.visual.bottomLeft1C4!=SceneNodeIndex49P::none,
-      s,x.bindings,x.diagnostic,nativeWaterApplication.initialStep434630,s.noiseOwner().sharedRandomState,error),error.c_str());
-    auto* racer=mcParticleVehicles->racer(slot);require50DU(racer,"MC completed racer water owner absent");resetEffectBindings.table81CPresent=true;
-    for(unsigned side=0;side<2;++side){resetEffectBindings.owners81C[side]=0;resetEffectBindings.controls81C[side]=&racer->spray(side).controls();}
-   });
-   require50DU(mcParticleVehicles->constructorsComplete()&&mcParticleVehicles->expectedRacers()==raceRacerCount&&
-       mcParticleVehicles->initializedRacers()==raceRacerCount,"MC actual eight-racer constructor coverage");
-  }
-  if(nativeGcWater){
-   require50DU(nativeGcWater->activate(s.noiseOwner().sharedRandomState,sessionRandom,applicationClock),
-       "actual GC gameplay fog population rejected");
+  // A9: the original branches on the track's own data. With water named in the
+  // SCB Environment (2745D4 water factory) every racer gets its two sprays and
+  // its 14/8 particle children over the one water runtime and the one 1B4DC0
+  // particle manager; without water (274570) nothing is constructed.
+  if(track.hasWater()){
+   require50DU(track.roles.water&&track.roles.waterResources&&track.roles.particles&&track.roles.particles->particles(),
+       "track water named but its water/particle owners are absent");
+   auto& water=*track.roles.water;
+   auto& particles=*track.roles.particles->particles();
+   require50DU(water.activate(s.noiseOwner().sharedRandomState,sessionRandom,applicationClock),
+       "actual water gameplay population rejected");
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(!nativeWaterRacers[slot],"native water racer construction repeated");
     nativeWaterRacers[slot]=std::make_unique<native_gc_water_racer50KG::Owner>();
     // Register the actual14/8 source children before the two sprays, in the
     // same constructor/list order used by every later component visit.
     require50DU(nativeParticleChildren[slot].bindCold(nativeParticleAuthoring,nativeEffects,nativeEffectCount,
-        x.bindings.visual.bottomLeft1C4!=SceneNodeIndex49P::none,nativeGcWater->particles()).okay(),
+        x.bindings.visual.bottomLeft1C4!=SceneNodeIndex49P::none,particles).okay(),
         "actual stopped particle child ownership rejected");
-    // Explicit native source-owner namespace backed by these actual objects.
-    require50DU(nativeWaterRacers[slot]->constructSprays(nativeGcWater->water(),nativeGcWater->particles(),
+    require50DU(nativeWaterRacers[slot]->constructSprays(water,particles,
         0xf5000001u+static_cast<std::uint32_t>(slot),0xf3000001u,
         0xf4000001u+static_cast<std::uint32_t>(slot),
-        nativeWaterApplication.initialStep434630,nativeGcWater->sprayBytes(),s.noiseOwner().sharedRandomState).okay(),
+        nativeWaterApplication.initialStep434630,track.roles.waterResources->podSprayEmt(),s.noiseOwner().sharedRandomState).okay(),
         "actual two-spray constructor rejected");
     require50DU(nativeWaterRacers[slot]->finishConstructor(s,x.bindings,x.diagnostic).okay(),
         "actual BE0/terrain water constructor join rejected");
@@ -2484,37 +1904,32 @@ SessionExit50DU Context::run() {
     resetEffectBindings.table81CPresent=true;
     for(unsigned side=0;side<2;++side){resetEffectBindings.owners81C[side]=0;
      resetEffectBindings.controls81C[side]=&nativeWaterRacers[slot]->spray(side).controls();}
-
    });
-   std::cerr<<"GC NATIVE WATER: shared lattice, exact height/reset/force/spray owners; "
-       "native post-prefix/pre-lap scheduling and completed-track-span fire visibility. "
-       "NativeUndefinedCarryPolicy enabled; actual dust/smoke, spark and fire children share the scene pool.\n";
+   std::cerr<<"track_water racers="<<racerBank.count()<<" course="<<track.code()<<'\n';
   }
   const auto retainActualSpeechOwners=[&](){
-   // Any consumed original race (RA, TA, MA, SA, GA, GC) publishes the same
-   // Application race28C and session generation the speech owners bind to.
-   const auto actualRace=consumedRaStage.race()?consumedRaStage.race():consumedTaStage.race()?consumedTaStage.race():
-       consumedMaStage.race()?consumedMaStage.race():consumedMbStage.race()?consumedMbStage.race():consumedScStage.race()?consumedScStage.race():consumedGbStage.race()?consumedGbStage.race():consumedRcStage.race()?consumedRcStage.race():consumedTcStage.race()?consumedTcStage.race():consumedMcStage.race()?consumedMcStage.race():consumedTbStage.race()?consumedTbStage.race():consumedCommonRouteStage.race()?consumedCommonRouteStage.race():
-       consumedGaStage.race()?consumedGaStage.race():consumedGcStage.race();
+   // The consumed race of every course publishes the same Application race28C
+   // and session generation the speech owners bind to.
+   const auto actualRace=consumedStage.race();
    if(!audioEnabled||!originalUiStarted||!humanCourseEnabled||!actualRace)return;
    // Consumed races join when their identities match and otherwise keep the
    // existing speech path (logged).
    if(!(originalMainApplication.race28C()==actualRace.get()&&
       originalMainApplication.state&&&s.noiseOwner()==&originalMainApplication.state->sharedNoise308030)){
     std::cerr<<"native_human_speech_join_unavailable session="<<actualRace->entity_.sessionGeneration
-        <<" ra="<<(actualRace==consumedRaStage.race())<<" race28C="<<(originalMainApplication.race28C()==actualRace.get())
+        <<" race28C="<<(originalMainApplication.race28C()==actualRace.get())
         <<" state="<<bool(originalMainApplication.state)
         <<" noise="<<(originalMainApplication.state&&&s.noiseOwner()==&originalMainApplication.state->sharedNoise308030)<<'\n';
     return;
    }
    //This is the actual successful native speech producer, not Scope capture
    //or a future event's claim. All initialization draws already happened once.
-   // RA's human cold roster load already bound the native player speech
-   // forward (22A210) and ran 2C1000 through the same live audio owner
-   // (NativePlayerLoadCaller50LA); that owner refuses a second retain.
-   const bool raForwardBound=actualRace==consumedRaStage.race()&&!allAiEnabled;
-   if(raForwardBound)std::cerr<<"native_human_speech ra_forward_bound_by_cold_roster=1\n";
-   require50DU(raForwardBound||liveAudio->retainNativeHumanSpeechInitialization(originalMainApplication,racerBank,
+   // The human pod load of every course (1ADF80, common roster) already bound
+   // the native player speech forward (22A210) and ran 2C1000 through the same
+   // live audio owner; that owner refuses a second retain.
+   const bool forwardBound=!allAiEnabled;
+   if(forwardBound)std::cerr<<"native_human_speech forward_bound_by_human_load=1\n";
+   require50DU(forwardBound||liveAudio->retainNativeHumanSpeechInitialization(originalMainApplication,racerBank,
            actualRace->entity_.sessionGeneration,playerRacer60,speechCounts,speechState,
            originalMainApplication.state->rawRandom308030),
        "actual human speech initializer/provider/App/Bank identity unavailable");
@@ -2549,28 +1964,29 @@ SessionExit50DU Context::run() {
   const platform::WindowInput50DQ noKeys{};
   raceSetupFrame=true;
   if(originalAiEnabled){
-   requireMbRuntimeNavigation50MB();
-   require50DU(!originalAiSession.managerBound&&selectedMapCount50MB()>1&&
-       (isMcTrack?mcMapMetadata.matches(mcMapView):isGbTrack?gbMapMetadata.matches(gbMapView):isTbTrack?tbMapMetadata.matches(tbMapView):isTcTrack?tcMapMetadata.matches(tcMapView):isMbTrack?mbMapMetadata.matches(mbMapView):selectedOriginalAiMapMetadata.bound),
+   requireRuntimeNavigation();
+   require50DU(!originalAiSession.managerBound&&selectedMapCount()>1&&
+       mapView.runtimeValid()&&mapView.metadata(),
        "source manager create/reset requires the actual cold MAP owner");
-   //Only the actual consumed RA uses the counted B4/native same-state join.
-   //A rejected/partial canonical prefix never falls through to legacy reset.
-   if(isRaTrack&&consumedRaStage.race()){
+   // B-C06: the counted race of every course uses the B0 (1AA548) / B4
+   // (1A7710) native same-state join. A rejected/partial canonical prefix never
+   // falls through to legacy reset.
+   if(consumedStage.race()){
     // Native roster backing already exists. Give its B0 role one counted
     // owner before the B4 association, except the actual subtype3 record
     // route which already owns a distinct source manager. No second roster.
     if(!nativeRacerManager){
      std::uint32_t b0PC=0;
-     require50DU(consumedRaStage.race()->initializeNativeRacerB0(*this,racerBank,b0PC),
+     require50DU(consumedStage.race()->initializeNativeRacerB0(*this,racerBank,b0PC),
          "actual counted B0/native roster cold join rejected");
     }
     std::uint32_t b4PC=0;
-    require50DU(consumedRaStage.race()->initializeNativeTimingB4(*this,racerBank,b4PC),
+    require50DU(consumedStage.race()->initializeNativeTimingB4(*this,racerBank,b4PC),
         "actual counted B4/native manager cold join rejected");
    }else require50DU(initializeOriginalAiManager(originalAiSession.manager,originalAiSession.finished44,
        originalAiSession.retired40,racerBank.count(),dynamicContactEnabled?dynamicMusicProfile.mode11258:2u,
-       isMcTrack?mcMapMetadata.nodes()[1].distanceToFinish60:isGbTrack?gbMapMetadata.nodes()[1].distanceToFinish60:isTbTrack?tbMapMetadata.nodes()[1].distanceToFinish60:isTcTrack?tcMapMetadata.nodes()[1].distanceToFinish60:isMbTrack?mbMapMetadata.nodes()[1].distanceToFinish60:selectedOriginalAiMapMetadata.nodes[1].distanceToFinish60,
-       selectedMapNode50MB(0).position,selectedMapNode50MB(1).position,originalAiSession.trackLength38)==OriginalAiFinishStatus::Complete,
+       mapView.metadata()[1].distanceToFinish60,
+       selectedMapNode(0).position,selectedMapNode(1).position,originalAiSession.trackLength38)==OriginalAiFinishStatus::Complete,
        "original1AF7F0/1AF960/1AFC70 manager lifecycle rejected");
    originalAiSession.managerBound=true;
   }
@@ -2597,8 +2013,8 @@ SessionExit50DU Context::run() {
   }
   captureDynamicBeforeFrame(0);
   if(originalAiEnabled)observeOriginalAiFleet();
-  if(isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)racerBank.visit(0,[&](){initializeGraphics(0);});
-  else initializeGraphics(0);
+  // Slot 0 runs inside its Bank visit on every course (one shared arena).
+  racerBank.visit(0,[&](){initializeGraphics(0);});
   raceSetupFrame=false;
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
@@ -2608,8 +2024,8 @@ SessionExit50DU Context::run() {
   }
   race_session50HM::Config racePresentationConfig;
   racePresentationConfig.lapTarget=originalAiSettings1125C&31u;
-  if(isRcTrack)requireMbRuntimeNavigation50MB();
-  require50DU((isMcTrack?race_session50HM::initialize(mcRace,mcMapView,lapOwner.mcTrack(),raceRacerCount,racePresentationConfig):isGbTrack?race_session50HM::initialize(gbRace,gbMapView,lapOwner.gbTrack(),raceRacerCount,racePresentationConfig):isTbTrack?race_session50HM::initialize(tbRace,tbMapView,lapOwner.tbTrack(),raceRacerCount,racePresentationConfig):isTcTrack?race_session50HM::initialize(tcRace,tcMapView,lapOwner.tcTrack(),raceRacerCount,racePresentationConfig):isMbTrack?race_session50HM::initialize(mbRace,mbMapView,lapOwner.mbTrack(),raceRacerCount,racePresentationConfig):race_session50HM::initialize(legacyRace,*navigationMap,lapOwner.track,raceRacerCount,racePresentationConfig)),
+  requireRuntimeNavigation();
+  require50DU(race_session50HM::initialize(raceSession,mapView,laps,raceRacerCount,racePresentationConfig),
       "authored race route/markers rejected");
   std::uint32_t gridOrder[maxHostRaceRacers50HT]{};
   for(std::uint32_t index=0;index<raceOpponentCount;++index)gridOrder[index]=index+1;
@@ -2660,7 +2076,11 @@ SessionExit50DU Context::run() {
       "ALL8 vehicle58=1 follows the original222D34 skip. "
       "Native serial world timing is explicit; no full original scheduler claim.\n";
   };
-  if(!originalUiActive&&!isGbTrack&&!isMcTrack)activateColdRace();
+  // One activation point for every course, after the cold rig/grid/contact/draw
+  // owners above (publication keeps only its phase-guarded no-op re-check).
+  // PORT STAND-IN: the host's neutral activation tick; GB/MC used to defer it
+  // until after renderer/query admission, now one point for every course.
+  if(!originalUiActive)activateColdRace();
  }
  if(originalUiActive){
   // Read actual retained owners without changing a counter or fabricating
@@ -2764,69 +2184,24 @@ SessionExit50DU Context::run() {
   require50DU(sourceAnnouncer->update(.016f,leader),"mode1 shared announcer update unresolved");
  };
 
- // Actual selected visual mesh, authenticated by its selected source profile.
- // Visual and collision member closures remain separate admissions.
- rr::assets::Mesh48B trackMesh;std::string trackLoadError;
- if(taOriginalDisc){
-  require50DU(taOriginalWorld&&taOriginalWorld->mesh(),"retained TA original world unavailable");
-  trackMesh=*taOriginalWorld->mesh();
- }
- if(gcOriginalDisc){
-  require50DU(gcOriginalWorld&&gcOriginalWorld->mesh(),"retained GC original mesh publication missing");
-  trackMesh=*gcOriginalWorld->mesh();
- }
- if(gaOriginalDisc){
-  require50DU(gaOriginalWorld&&gaOriginalWorld->mesh(),"retained GA original mesh publication missing");
-  trackMesh=*gaOriginalWorld->mesh();
- }
- if(maOriginalDisc){
-  require50DU(maOriginalWorld&&maOriginalWorld->mesh(),"retained MA original mesh publication missing");
-  trackMesh=*maOriginalWorld->mesh();
- }
- if(commonRouteOriginalDisc){
-  require50DU(commonRouteWorld&&commonRouteWorld->mesh(),"retained common-route original mesh publication missing");
-  trackMesh=*commonRouteWorld->mesh();
- }
- if(scOriginalDisc){
-  // Decoded in the world stage (before counted audio) and retained there.
-  require50DU(scOriginalWorld&&scOriginalWorld->mesh(),"retained SC original mesh publication missing");
-  trackMesh=*scOriginalWorld->mesh();
- }
- // The TB world is built in the world stage (before counted audio).
- if(isTbTrack){
-  require50DU(tbOriginalWorld&&tbOriginalWorld->mesh()&&tbColdSources&&
-      tbColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
-      "retained TB original mesh publication missing");
-  trackMesh=*tbOriginalWorld->mesh();
- }
- // RC and TC worlds are built in the world stage (before counted audio); the
- // RC raw crystal reservation was booked there once.
- if(isRcTrack){
-  require50DU(rcOriginalWorld&&rcOriginalWorld->mesh()&&rcColdSources&&
-      rcColdSources->world().parameters.original_bytes==actualWorld.parameters.original_bytes,
-      "retained RC original mesh publication missing");
-  trackMesh=*rcOriginalWorld->mesh();
- }
- if(tcOriginalDisc){
-  require50DU(tcOriginalWorld&&tcOriginalWorld->mesh(),"retained TC original mesh publication missing");
-  trackMesh=*tcOriginalWorld->mesh();
- }
- if(mbOriginalDisc){
-  require50DU(mbOriginalWorld&&mbOriginalWorld->loaded()&&mbOriginalWorld->mesh(),
-      "MB retained original visual owner missing");
-  trackMesh=*mbOriginalWorld->mesh();
- }
- const bool trackLoaded=isRaTrack||directOriginalHuman||rr::assets::loadMesh48B(
-     trackSession->visualMesh,trackMesh,trackLoadError);
- require50DU(trackLoaded,trackLoadError.empty()?"selected-track visual mesh load failed":trackLoadError.c_str());
+ // The one static world of this race's track (05.07/05.08: instances, standard
+ // models and the single-pass material decoder, R3/R7). Its mesh, normals,
+ // bank, spans and selections are read from the track's own files for every
+ // course; no per-course world owner, decoder or texture budget remains.
+ require50DU(track.loaded()&&track.roles.staticWorld&&track.roles.staticWorld->loaded()&&
+     track.roles.staticWorld->mesh()&&track.roles.staticWorld->normals(),
+     "race track static world (mesh/normals) unavailable");
+ rr::assets::Mesh48B trackMesh=*track.roles.staticWorld->mesh();
  namespace trackTextures=track_materials50fa_fixture;
+ // PORT STAND-IN: an unloaded legacy material owner kept only because the W0
+ // publication context still carries trackMaterialOwner; the static world above
+ // is the one material owner (single-pass decoder).
  auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
- const auto trackSource=isMcTrack?track_source_fixture::Track::mc:isGbTrack?track_source_fixture::Track::gb:isTbTrack?track_source_fixture::Track::tb:isRcTrack?track_source_fixture::Track::rc:isTcTrack?track_source_fixture::Track::tc:isScTrack?track_source_fixture::Track::sc:isMbTrack?track_source_fixture::Track::mb:isRaTrack?track_source_fixture::Track::ra:isMaTrack?track_source_fixture::Track::ma:
-     // The common race route: stock SA keeps its own source row (its pins are
-     // receipts); a registry course is Track::course (no stock row).
-     commonRouteTrack?(trackSession->registry?track_source_fixture::Track::course:track_source_fixture::Track::sa):
-     isGaTrack?track_source_fixture::Track::ga:
-     isGcTrack?track_source_fixture::Track::gc:track_source_fixture::Track::ta;
+ // Course data route for every course: the stock source rows are receipts in the
+ // readers (stock_course_receipts50cr.h), never a selector.
+ // PORT STAND-IN: trackSource stays only because the W0 publication context
+ // carries it; it is the data route (Track::course) for every course.
+ const auto trackSource=track_source_fixture::Track::course;
  trackTextures::Request trackMaterialRequest{};
  trackMaterialRequest.track=trackSource;
  trackMaterialRequest.root=trackSession->visualRoot;
@@ -2834,12 +2209,12 @@ SessionExit50DU Context::run() {
  trackMaterialRequest.choice={1,1,trackSession->originalStaticCandidates?rr::assets::MaterialTextureRequirement50EA::required:
      rr::assets::MaterialTextureRequirement50EA::optionalUntextured,
      trackTextures::MipMode::largestRetained,0};
- trackMaterialRequest.coldSourceByteCapacity=maOrCommonRouteTrack?64u*1024u*1024u:32u*1024u*1024u;
+ // One cold source budget, sized from the loaded archive: no texture source can
+ // be larger than the course archive that holds it.
+ trackMaterialRequest.coldSourceByteCapacity=static_cast<std::size_t>(track.archive.bytes());
  trackMaterialRequest.sourceArchive=trackSession->archive;
- trackMaterialRequest.decodeSourceTexture=isMcTrack?&mc_original_world50LM::decodeSourceTexture:isGbTrack?&gb_original_world50LM::decodeSourceTexture:isTbTrack?&tb_original_world50LM::decodeSourceTexture:isRcTrack?&rc_original_world50LM::decodeSourceTexture:tcOriginalDisc?&tc_original_world50LM::decodeSourceTexture:scOriginalDisc?&sc_original_world50LM::decodeSourceTexture:mbOriginalDisc?&mb_original_world50LM::decodeSourceTexture:taOriginalDisc?&ta_original_world50LE::decodeSourceTexture:gaOriginalDisc?&ga_original_world50LH::decodeSourceTexture:
-     maOriginalDisc?&ma_original_world50LM::decodeSourceTexture:commonRouteOriginalDisc?&common_route_world50LM::decodeSourceTexture:isRaTrack?nullptr:isMaTrack?&source_texture50fc_fixture::decodeSourceTextureMa:
-     commonRouteTrack?&source_texture50fc_fixture::decodeSourceTextureSa:isGaTrack?&source_texture50fc_fixture::decodeSourceTextureGa:
-     isGcTrack?&source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
+ // The one decoder is the static world's own single-pass decoder (05.08).
+ trackMaterialRequest.decodeSourceTexture=nullptr;
  trackMaterialRequest.includeAllAuthoredPasses=trackSession->originalStaticCandidates;
  trackMaterialRequest.allowStaticAnimationFrame=true;
  // One texture budget for every course. The original sizes its material table (382B38) and
@@ -2866,224 +2241,89 @@ SessionExit50DU Context::run() {
   require50DU(rr::game::applyStaticModelParams50PS(actualWorld,staticShadowReceiving,receipt,error),
       error.empty()?"original static-model parameters rejected":error.c_str());
   require50DU(staticShadowReceiving.size()==actualWorld.instances.size(),"static shadow receiver table extent");
-  std::cerr<<"shadow_receivers course="<<trackSession->world->code<<" instances="<<receipt.instances
+  std::cerr<<"shadow_receivers course="<<track.code()<<" instances="<<receipt.instances
       <<" standard="<<receipt.standardInstances<<" receiving="<<receipt.receiving
       <<" rows="<<receipt.declaredRows<<" applied="<<receipt.rowsApplied<<" stores="<<receipt.stores
       <<" unmatched="<<receipt.rowsUnmatched<<" missing_section="<<receipt.rowsMissingSection
       <<" missing_fields="<<receipt.rowsMissingFields<<" unknown_value="<<receipt.rowsUnknownValue
       <<" name_rule_differs="<<receipt.nameRuleDiffers<<'\n';
  }
- std::vector<rr::assets::WorldNormal50HK> legacyTrackNormals;
- const auto& trackNormals=mcOriginalWorld?*mcOriginalWorld->normals():gbOriginalWorld?*gbOriginalWorld->normals():tbOriginalWorld?*tbOriginalWorld->normals():rcOriginalWorld?*rcOriginalWorld->normals():tcOriginalWorld?*tcOriginalWorld->normals():scOriginalWorld?*scOriginalWorld->normals():mbOriginalWorld?*mbOriginalWorld->normals():taOriginalWorld?*taOriginalWorld->normals():gcOriginalWorld?*gcOriginalWorld->normals():gaOriginalWorld?*gaOriginalWorld->normals():
-     maOriginalWorld?*maOriginalWorld->normals():commonRouteWorld?*commonRouteWorld->normals():legacyTrackNormals;
- track_normals50hk_fixture::Diagnostic trackNormalDiagnostic{};
- require50DU(isRaTrack||directOriginalHuman||track_normals50hk_fixture::load(trackMaterialRequest.root,
-     trackMaterialRequest.exportReport,trackMesh,legacyTrackNormals,trackNormalDiagnostic,trackSource),
-     trackNormalDiagnostic.message.empty()?"selected-track authored normal load failed":trackNormalDiagnostic.message.c_str());
- std::cerr<<trackSession->world->code<<" source normals "<<trackNormalDiagnostic.normals
-     <<" zero/fallback "<<trackNormalDiagnostic.zeroNormals<<'\n';
- auto advanceNativeGcWater=[&](){
-  if(mcWaterOwner){
-   require50DU(mcWaterOwner->ready()&&mcWaterOwner->sourceIdentity()==mcColdSources.get()&&
-       mcWaterUpdateSequence<std::numeric_limits<std::uint64_t>::max(),"MC actual water update owner rejected");
-   const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
-   require50DU(node<s.sceneNodeCount,"MC followed water anchor scene missing");
-   float position[3];std::memcpy(position,s.nodes[node].localC0.v+12,12);
-   const WaterPresentationView50JC view{position,0,true,true};
-   require50DU(mcWaterOwner->runtime().anchor(view).status==native_water_runtime50JC::Status::Complete&&
-       mcWaterOwner->runtime().advance(++mcWaterUpdateSequence,.016f,0u).status==native_water_runtime50JC::Status::Complete,
-       "MC actual water root update rejected");
-  }
-  if(!nativeGcWater)return;
+ const auto& trackNormals=*track.roles.staticWorld->normals();
+ std::cerr<<track.code()<<" source normals "<<trackNormals.size()<<'\n';
+ auto advanceWater=[&](){
+  // A9: the water runtime exists exactly when the SCB names water (2745D4).
+  if(!track.roles.water)return;
+  require50DU(waterUpdateSequence<std::numeric_limits<std::uint64_t>::max(),"track water update sequence exhausted");
   // Outside every bank lease, the canonical live arena is actual followed
   // racer0. Copy the lanes before lending them to shared world owners.
   const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
   require50DU(node<s.sceneNodeCount,"followed water anchor scene missing");
   float position[3];std::memcpy(position,s.nodes[node].localC0.v+12,12);
-  require50DU(nativeGcWater->advance(.016f,0u,position,s.noiseOwner().sharedRandomState,
-      nativeFireSerial,sessionRandom,applicationClock),"native GC particle/water root update rejected");
+  const WaterPresentationView50JC view{position,0,true,true};
+  std::uint32_t actualPause11C=0;
+  require50DU(originalMainApplication.animationClock().readPause11C(actualPause11C),"water Application pause owner unavailable");
+  require50DU(track.roles.water->anchor(view).status==native_water_runtime50JC::Status::Complete&&
+      track.roles.water->advance(++waterUpdateSequence,.016f,actualPause11C).status==native_water_runtime50JC::Status::Complete,
+      "track water root update rejected");
  };
  std::vector<std::uint32_t> nativeFireSpanIds;
  std::vector<std::uint8_t> nativeFireSpanDrawn,nativeFireSpanOwner;
- sc_zero_sky50KX::Owner scZeroSky;
  // The original branches on [Environment].NumberOfSkyCubes (276C4C/276C60), not
- // the course: zero cubes -> the authenticated zero-sky owner; one or more ->
- // the common course-data sky loader and zone selection below.
- // FLAG stand-in: only SC's cold owner reaches the course-data loader so far;
- // the other courses' sky sources are still their pinned stock rows.
- const auto* scSkyReceipt=isScTrack&&scColdSources?scColdSources->zeroSkyReceipt():nullptr;
- require50DU(!isScTrack||scSkyReceipt,"SC sky authoring receipt missing");
- const bool scAuthoredSky=scSkyReceipt&&scSkyReceipt->authoredSkyCubes()!=0;
- const auto* scSkyData=scAuthoredSky?scColdSources->sourcesDecoded():nullptr;
- require50DU(!scAuthoredSky||scSkyData,"SC decoded course sources missing for its authored sky");
- if(isScTrack&&!scAuthoredSky){
-  std::string error;const bool ready=scZeroSky.prepare(scColdSources,error);
-  require50DU(ready,error.empty()?"SC zero-sky authoring rejected":error.c_str());
- }
- // Every course with a course world owner takes the same data branch: the
- // owner holds the archive it admitted and actualWorld is that archive's SCB.
- // [Environment] NumberOfSkyCubes (default 1) decides; the cube (the CUB's
- // own base cube), its tiles and the clear colour come from the data
- // (sky_course_data50gw.inl), zone rows from CubeFileForZoneN
- // (original_track_sky50kx prepareFromCourseData). Decoded archives: MA, SA,
- // GA, MB, TC, TA, GC; indexed (compact) archives: GB, TB, RC. The legacy
- // export route (no course world owner) keeps the stock rows.
- // PORT STAND-IN (flagged): MC keeps its own sky owner (mc_sky50MC, its own
- // payload ledger and clear-colour route) and RA its own route this round.
- const rr::assets::ResArchive48C* courseWorldArchive=
-     isMaTrack&&maOriginalWorld?maOriginalWorld->archive():commonRouteTrack&&commonRouteWorld?commonRouteWorld->archive():
-     isGaTrack&&gaOriginalWorld?gaOriginalWorld->archive():isMbTrack&&mbOriginalWorld?mbOriginalWorld->archive():
-     isTcTrack&&tcOriginalWorld?tcOriginalWorld->archive():isTaTrack&&taOriginalWorld?taOriginalWorld->archive():
-     isGcTrack&&gcOriginalWorld?gcOriginalWorld->archive():nullptr;
- const rr::assets::IndexedResArchive48C* courseIndexedArchive=
-     isGbTrack&&gbColdSources?&gbColdSources->archive():isTbTrack&&tbColdSources?&tbColdSources->archive():
-     isRcTrack&&rcColdSources?&rcColdSources->archive():nullptr;
- const bool courseDataSky=courseWorldArchive||courseIndexedArchive;
- bool courseZoneSkyRows=false;
- if(courseDataSky){
+ // the course: zero cubes -> no sky cube is drawn; one or more -> the course-data
+ // sky loader below. The cube (the CUB's own base cube), its tiles and the clear
+ // colour come from the data (sky_course_data50gw.inl); the zone rows
+ // (CubeFileForZoneN) are the one zone->cube selection the track load prepared
+ // (05.11 274AE0, track.roles.sky, R6).
+ const rr::assets::ResArchive48C* courseArchive=track.archive.decoded();
+ require50DU(courseArchive,"race track archive is not decoded");
+ long courseSkyCubes=1;
+ {
   const rr::assets::ParameterBlock48F* environment=nullptr;
   for(const auto& b:actualWorld.parameters.blocks)if(b.name=="environment")environment=&b;
-  long cubes=1;
   if(environment)for(const auto& f:environment->fields){
-   if(f.name=="numberofskycubes"){char* end=nullptr;cubes=std::strtol(f.value.c_str(),&end,10);
-    require50DU(!f.value.empty()&&end&&!*end,"course NumberOfSkyCubes unreadable");}
-   if(f.name.rfind("cubefileforzone",0)==0)courseZoneSkyRows=true;
+   if(f.name=="numberofskycubes"){char* end=nullptr;courseSkyCubes=std::strtol(f.value.c_str(),&end,10);
+    require50DU(!f.value.empty()&&end&&!*end&&courseSkyCubes>=0,"course NumberOfSkyCubes unreadable");}
   }
-  // PORT STAND-IN (flagged): the zero-sky owner is built from SC's cold source
-  // only; another course archive authoring zero cubes is refused, not misdrawn.
-  require50DU(cubes>0,"course archive authors zero sky cubes: zero-sky owner for this course not built");
  }
- // Late environment storage participates in the parent's same MC payload ledger.
- const auto reserveMcEnvironment=[&](std::size_t bytes,const char* reason){
-  require50DU(isMcTrack&&bytes<=mcRemainingPayloadBytes(),reason);
-  mcAdditionalPayloadReserved+=bytes;
+ // Late environment storage joins the one race payload ledger.
+ // PORT STAND-IN: the race payload ledger (remainingPayloadBytes/
+ // reserveAdditionalPayload, formerly MC/GB only) is a host allocation guard for
+ // every course; the original has no such budget.
+ const auto reserveEnvironment=[&](std::size_t bytes,const char* reason){
+  require50DU(bytes<=remainingPayloadBytes(),reason);
+  reserveAdditionalPayload(bytes,reason);
  };
- std::unique_ptr<mc_sky50MC::Owner> mcSkyOwner;
- if(isMcTrack){
-  reserveMcEnvironment(sizeof(mc_sky50MC::Owner),"MC sky owner exceeds remaining payload");
-  mcSkyOwner=std::make_unique<mc_sky50MC::Owner>();
- }
  auto skyOwner=std::make_unique<sky50gw_fixture::Owner>();
- sky50gw_fixture::Request skyRequest{};skyRequest.track=trackSource;
- skyRequest.archive=trackSession->archive;
- skyRequest.textureRoot=trackSession->skyTextureRoot;
- skyRequest.decodeOriginalImages=directOriginalHuman;
- skyRequest.retainedMbWorld=isMbTrack?mbOriginalWorld.get():nullptr;
- skyRequest.retainedTcWorld=isTcTrack?tcOriginalWorld.get():nullptr;
- skyRequest.retainedRcSource=isRcTrack?rcColdSources.get():nullptr;
- skyRequest.retainedTbSource=isTbTrack?tbColdSources.get():nullptr;
- skyRequest.retainedGbSource=isGbTrack?gbColdSources:nullptr;
  sky50gw_fixture::Diagnostic skyDiagnostic{};
- if(isRaTrack){
-  ra_cold_aggregate50LA::Diagnostic raSkyDiagnostic;
-  require50DU(raWorld&&raWorld->prepareSkyImages(
-      runtime_asset_paths50LB::resolve("evidence/skyRA"),raSkyDiagnostic),
-      "actual retained RA authored sky image preparation failed");
- }else if(isMcTrack){
-  // Bounded native texture load; all decoded images remain with this owner
-  // through the existing renderer/GPU-texture shutdown fence.
-  require50DU(mcRemainingPayloadBytes()>=48u*(65552u+65536u)+194342u,
-      "MC sky decoded/source bytes exceed remaining payload");
-  const bool loaded=mcSkyOwner->prepare(mcColdSources,skyDiagnostic);
-  require50DU(loaded,skyDiagnostic.message.c_str());
-  reserveMcEnvironment(mcSkyOwner->retainedPayloadBytes(),"MC retained sky exceeds remaining payload");
- }else if(courseDataSky){
-  const bool loaded=courseWorldArchive?skyOwner->loadFromCourseData(*courseWorldArchive,actualWorld,skyDiagnostic):
-      skyOwner->loadFromCourseData(*courseIndexedArchive,actualWorld,skyDiagnostic);
+ if(courseSkyCubes>0){
+  const bool loaded=skyOwner->loadFromCourseData(*courseArchive,actualWorld,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
-  std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
+  std::cerr<<"course_sky_data track="<<track.code()<<" cubes="<<courseSkyCubes<<" tiles="<<skyOwner->spans()->size()
       <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
-  // Stock comparison receipt: every value the stock sky row pinned, against
-  // what the data path read (a stock archive must report match=1 on each).
-  // Receipt only: a course whose stock sky was never pinned (GB, TC, ...)
-  // has no stock row; that is logged, never a refusal.
-  const sky50gw_fixture::detail::Source* stockSkyRow=nullptr;
-  try{stockSkyRow=&sky50gw_fixture::detail::source(trackSource);}catch(const std::exception&){stockSkyRow=nullptr;}
-  if(!stockSkyRow)std::cerr<<"course_sky_stock_compare track="<<trackSession->world->code<<" stock_row=none\n";
-  else{
-   const auto& row=*stockSkyRow;
-   const rr::assets::ParameterBlock48F* environment=nullptr;const rr::assets::ParameterBlock48F* fog=nullptr;
-   for(const auto& b:actualWorld.parameters.blocks){if(b.name=="environment")environment=&b;if(b.name=="fog")fog=&b;}
-   const auto value=[](const rr::assets::ParameterBlock48F* b,const char* key)->std::string{
-    if(b)for(const auto& f:b->fields)if(f.name==key)return f.value;return {};};
-   std::string cube=value(environment,"cubefile1");if(cube.empty())cube=value(environment,"cubefile");
-   std::string member="skies\\"+cube,stockMember=row.cubMember;
-   const auto lower=[](std::string t){for(auto& c:t)if(c>='A'&&c<='Z')c=static_cast<char>(c+32);return t;};
-   std::vector<std::uint8_t> cub;rr::assets::DecodeError48C cubError;
-   const bool cubRead=courseWorldArchive?rr::assets::extractResMember48C(*courseWorldArchive,member,cub,cubError):
-       courseIndexedArchive->extractMember(member,cub,cubError,8u*1024u*1024u);
-   const bool cubMatch=cubRead&&cub.size()==row.cubBytes&&pod_materials50ed_fixture::detail::sha256(cub)==row.cubSha;
-   const bool scbMatch=actualWorld.parameters.original_bytes.size()==row.sceneBytes&&
-       pod_materials50ed_fixture::detail::sha256(actualWorld.parameters.original_bytes)==row.sceneSha;
-   const auto fogText=value(fog,"colorrgb");
-   const float* clear=skyOwner->clearRgba();
-   std::array<float,4> stockClear{};bool stockClearRead=true;
-   try{sky50gw_fixture::detail::parseFogRgb(row.fogRgb,stockClear);}catch(...){stockClearRead=false;}
-   const bool clearMatch=clear&&stockClearRead&&clear[0]==stockClear[0]&&clear[1]==stockClear[1]&&
-       clear[2]==stockClear[2]&&clear[3]==stockClear[3];
-   std::cerr<<"course_sky_stock_compare track="<<trackSession->world->code<<" scb_match="<<scbMatch
-       <<" cube="<<member<<" stock_cube="<<stockMember<<" cube_match="<<(lower(member)==lower(stockMember))
-       <<" cub_match="<<cubMatch<<" fog="<<fogText<<" stock_fog="<<row.fogRgb<<" fog_match="<<(fogText==row.fogRgb)
-       <<" clear_match="<<clearMatch<<" tiles="<<skyOwner->spans()->size()<<" stock_tiles="<<sky50gw_fixture::tileCount
-       <<" zone_rows="<<courseZoneSkyRows<<"\n";
-  }
- }else if(scAuthoredSky){
-  // Same cold archive and world the SC owner decoded; borrowed for this call only.
-  const bool loaded=skyOwner->loadFromCourseData(scSkyData->archive,scSkyData->world,skyDiagnostic);
-  require50DU(loaded,skyDiagnostic.message.empty()?"course-data sky load failed":skyDiagnostic.message.c_str());
-  std::cerr<<"course_sky_data track="<<trackSession->world->code<<" tiles="<<skyOwner->spans()->size()
-      <<" textures="<<skyOwner->bank()->textureCount()<<"\n";
- }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
-  // Legacy export route of a compact course (no course world owner).
-  const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
-  require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
- }else if(!isScTrack)require50DU(skyOwner->load(skyRequest,skyDiagnostic),
-     skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
- original_track_sky50KX::Owner sourceSkySelection;
- // MA/SA/MB/TC/RC/TB/GB/MC always select per zone (rows default to cube 1);
- // GA, TA and GC join when their data authors CubeFileForZone rows.
- if(maOrCommonRouteTrack||((isGaTrack||isTaTrack||isGcTrack)&&courseDataSky&&courseZoneSkyRows)||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack||scAuthoredSky){
-  std::string skySelectionError;
-  const bool skySelected=scAuthoredSky?sourceSkySelection.prepareFromCourseData(scSkyData->world,skySelectionError):
-      courseDataSky?sourceSkySelection.prepareFromCourseData(actualWorld,skySelectionError):isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
-      (isMbTrack?sourceSkySelection.prepareMbSource(*mbOriginalWorld,skySelectionError):
-      sourceSkySelection.prepare(actualWorld,trackSource,skySelectionError));
-  require50DU(skySelected,skySelectionError.empty()?"source zone-selected sky authoring rejected":skySelectionError.c_str());
- }
+ }else std::cerr<<"course_sky_data track="<<track.code()<<" cubes=0\n";
+ require50DU(static_cast<bool>(track.roles.sky),"race track zone sky selection (274AE0) missing");
+ auto& sourceSkySelection=*track.roles.sky;
  // Borrow the same application Video on each cold race. Local renderer/GPU
  // owners still close before its real host; a later session reopens that host
  // only after cleanup, without replacing the application's Video identity.
 
  track_animation_window50AN::Owner trackAnimationWindow; // the common track-animation window
- gc_atm_window_fixture::Owner gcAtm;
- ga_atm_window_fixture::Owner gaAtm;
- ma_sa_atm_window_fixture::Owner maCommonRouteAtm;
  track_uv_animation50uv_fixture::Owner trackUvAnimation; // every course (29A310/29A490 data rule)
- tb_atm_window_fixture::Owner tbAtm;
- gb_atm_window_fixture::Owner gbAtm;
- mc_atm_window_fixture::Owner mcAtm;
- rc_atm_window_fixture::Owner rcAtm;
- std::shared_ptr<rc_crystal50RC::Owner> rcCrystal;
- tc_atm_window_fixture::Owner tcAtm;
- sc_atm_window_fixture::Owner scAtm;
- mb_atm_window_fixture::Owner mbAtm;
  gameplay_binder_window_candidate_fixture::Owner gameplayBinder;
- gc_particle_materials50kg_fixture::Owner gcParticleMaterials;
- OriginalGcParticleRenderOwner50KG gcParticleRender;
+ // One particle material/render owner over the one 1B4DC0 particle manager.
+ gc_particle_materials50kg_fixture::Owner particleMaterials;
+ OriginalGcParticleRenderOwner50KG particleRender;
  // Same process normal-material mode AND retained APPSTART template objects
  // as Main. Direct gameplay prepares them on first use from its admitted disc
  // tree. These local handles borrow immutable application-lifetime backing;
  // they never create a replacement ScreenMT or reset it on race restart.
  const bool gameplayBinderEnabled=raceEnabled&&playerUsesRosterRig&&nativeSelectedLights&&
-     !checkpointInput&&(!originalUiActive||courseRaceCold);
+     !checkpointInput&&(!originalUiActive||rootedCourseRace);
  rr::assets::OriginalUiMaterialTemplates50KG gameplayBinderTemplates;
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
  if(gameplayBinderEnabled){
-  // GA admits its ordinary session by its course world owner (animations are
-  // data: absent [Animations] = no animated owner).
-  require50DU(((isGaTrack&&gaOriginalWorld)||(isGcTrack&&trackAnimations)||
-      (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(commonRouteTrack&&nativeCommonRouteSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||(isGbTrack&&nativeGbSelection)||(isMcTrack&&nativeMcSelection)||
-      (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==raceRacerCount,
+  // One admission for every course: the loaded track and the full field.
+  require50DU(track.loaded()&&racerBank.count()==raceRacerCount,
       "Binder requires an actual eight-racer authenticated ordinary session");
   gameplayBinderAppStart=originalMainApplication.appStart(
       runtime_asset_paths50LB::resolve("work/native/project/disc"));
@@ -3099,15 +2339,17 @@ SessionExit50DU Context::run() {
    require50DU(bound,diagnostic.message.empty()?"actual racer Binder source join failed":diagnostic.message.c_str());
   });
  }
- if(nativeGcWater){
+ // The one 1B4DC0 particle manager of the track (05.06, R7) draws through one
+ // material/render owner on every course that prepared it.
+ if(track.roles.particles&&track.roles.particles->prepared()&&track.roles.particles->particles()){
   require50DU(gameplayBinderEnabled&&gameplayBinder.loaded(),
-      "GC particles require the actual gameplay DefaultMT/runtime owners");
+      "track particles require the actual gameplay DefaultMT/runtime owners");
   gc_particle_materials50kg_fixture::Diagnostic diagnostic;
-  require50DU(gcParticleMaterials.load(nativeGcWater->particlePsm(),nativeGcWater->particlePst(),
+  require50DU(particleMaterials.load(track.roles.particles->particlePsm(),track.roles.particles->particlePst(),
       gameplayBinderTemplates,originalMainApplication.materialRuntime,diagnostic),
-      diagnostic.message.empty()?"original GC particle material/atlas rejected":diagnostic.message.c_str());
-  require50DU(gcParticleRender.prepare(nativeGcWater->particles())==OriginalGcParticleRenderStatus50KG::complete,
-      "actual GC shared-manager render allocation rejected");
+      diagnostic.message.empty()?"original track particle material/atlas rejected":diagnostic.message.c_str());
+  require50DU(particleRender.prepare(*track.roles.particles->particles())==OriginalGcParticleRenderStatus50KG::complete,
+      "actual track shared-manager render allocation rejected");
  }
 
  // Common track-animation window: the course's own PSM/PST for every span (absent owner = none).
@@ -3131,34 +2373,26 @@ SessionExit50DU Context::run() {
  // One application publication survives frontend/race destruction. These
  // consumers only borrow its live view; no runSession-local clock authority.
  const auto sourceApplicationClock=originalMainApplication.animationClock();
- std::uint64_t trackAnimationSteps=0,gbWorldServiceStep=0,mcWorldServiceStep=0;
+ std::uint64_t trackAnimationSteps=0,worldServiceStep=0;
  auto advanceWorldAnimations=[&](){
-  if(!isGbTrack&&!isMcTrack&&!isRcTrack&&!trackAnimationBinding){
-  if(!trackAnimations&&!gaAtm.loaded()&&!maCommonRouteAtm.loaded()&&!mbAtm.loaded()&&!scAtm.loaded()&&!tcAtm.loaded()&&!rcAtm.loaded()&&!tbAtm.loaded()&&!gameplayBinder.loaded())return;
-  }
   // Source1AAD98 registers the complete racer group before1B4A58's animation
   // service. Current HOST participant order stays explicit; world service runs
   // once after that group, including enabled countdown world traversal.
-  // TA has no owner in these animated-world collections; its real Binder
-  // still consumes this shared timestamp publication at render preparation.
   const auto before=::allocations;
   std::uint32_t sourceApplicationTimestamp=0;
   require50DU(originalMainApplication.sampleAnimationTimestamp(sourceApplicationTimestamp),
       "shared source application timestamp rejected");
-  if(isGbTrack){
-   std::uint32_t actualPause=0;
-   require50DU(sourceApplicationClock.readPause11C(actualPause),"GB actual world pause unavailable");
-   require50DU(gbLightOwner&&gbLightOwner->serviceGbTimedLights(.016f,s.noiseOwner().sharedRandomState,
-       actualPause!=0,gcLightDiagnostic),"GB actual timed light service rejected");
-  }
+  std::uint32_t actualPause=0;
+  require50DU(sourceApplicationClock.readPause11C(actualPause),"track world pause unavailable");
+  // The SCB's timed lights and flashers (one lighting owner, every light type).
+  require50DU(lightOwner.serviceTimedLights(.016f,s.noiseOwner().sharedRandomState,actualPause!=0,lightDiagnostic),
+      "track timed light service rejected");
   // The ONE track-animation service (101860): no course test; absent owner = nothing to do.
   // dt = the step's frame time (.016, the same object-system frame time every world child gets);
-  // after GB's timed lights and before every emitter service (the same shared-RNG order as the
-  // retired per-course services). The lane route publishes the moved rows' visual and collision
-  // memberships through the binding; the static route's collision refresh is the setup's.
+  // after the timed lights and before every emitter service. The lane route publishes the moved
+  // rows' visual and collision memberships through the binding; the static route's collision
+  // refresh is the setup's.
   if(trackAnimations){
-   std::uint32_t actualPause=0;
-   require50DU(sourceApplicationClock.readPause11C(actualPause),"track animation world pause unavailable");
    const bool advanced=trackAnimationBinding?
      trackAnimationBinding->service(.016f,actualPause!=0,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
        sessionRandom,s.animationShared.motion,trackAnimationBindingDiagnostic):
@@ -3167,49 +2401,16 @@ SessionExit50DU Context::run() {
    const auto& message=trackAnimationBinding?trackAnimationBindingDiagnostic.message:trackAnimationDiagnostic.message;
    require50DU(advanced,message.empty()?"track animation world service rejected":message.c_str());
   }
-  if(isGbTrack){
-   const bool particlesAdvanced=!gbParticleRuntime||(gbParticleRender&&gbParticleRender->advance(.016f,gbParticleRuntimeDiagnostic));
-   require50DU(particlesAdvanced,gbParticleRuntimeDiagnostic.message.empty()?"GB actual shared manager and source-order emitter service rejected":gbParticleRuntimeDiagnostic.message.c_str());
-   require50DU(gbWorldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&gbQueryBinding&&
-       gbQueryBinding->serviceWorld(++gbWorldServiceStep),"GB actual trigger exit service rejected");
+  // One authored animated-texture owner (29B1D0 family, R5).
+  if(track.roles.atm&&track.roles.atm->loaded())
+   require50DU(track.roles.atm->advance(sourceApplicationTimestamp),"track ATM time update rejected");
+  // The one 2A0B30 trigger exit service over committed COL poses (one trigger
+  // group, one collision world; R3/R5).
+  if(track.roles.collision){
+   requireRuntimeNavigation();
+   require50DU(worldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&
+       track.roles.collision->serviceWorld(++worldServiceStep),"track trigger exit service rejected");
   }
-  if(isMcTrack){
-   const bool particlesAdvanced=mcParticleRender&&mcParticleRender->advance(.016f,mcParticleRuntimeDiagnostic);
-   require50DU(particlesAdvanced,mcParticleRuntimeDiagnostic.message.empty()?"MC actual shared manager/source-order40 emitter service rejected":mcParticleRuntimeDiagnostic.message.c_str());
-  }
-  if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
-  if(gaAtm.loaded())require50DU(gaAtm.advance(sourceApplicationTimestamp),"original GA ATM time update rejected");
-  if(maCommonRouteAtm.loaded())require50DU(maCommonRouteAtm.advance(sourceApplicationTimestamp),"original MA/common-route ATM time update rejected");
-  if(mbAtm.loaded())require50DU(mbAtm.advance(sourceApplicationTimestamp),"original MB ATM time update rejected");
-  if(scAtm.loaded())require50DU(scAtm.advance(sourceApplicationTimestamp),"original SC ATM time update rejected");
-  if(tbAtm.loaded())require50DU(tbAtm.advance(sourceApplicationTimestamp),"original TB ATM time update rejected");
-  if(mcAtm.loaded())require50DU(mcAtm.advance(sourceApplicationTimestamp),"MC actual ATM time update rejected");
-  if(isMcTrack)require50DU(mcWorldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&mcQueryBinding&&mcQueryBinding->serviceWorld(++mcWorldServiceStep),"MC actual trigger exit service rejected");
-  if(gbAtm.loaded())require50DU(gbAtm.advance(sourceApplicationTimestamp),"original GB ATM time update rejected");
-  if(rcAtm.loaded())require50DU(rcAtm.advance(sourceApplicationTimestamp),"original RC ATM time update rejected");
-  if(tcAtm.loaded())require50DU(tcAtm.advance(sourceApplicationTimestamp),"original TC ATM time update rejected");
-  if(isRaTrack)require50DU(raWorld->serviceRuntimeTriggers(racerBank,raDiagnostic),
-      "RA original trigger exit service rejected actual committed COL poses");
-  if(gcTriggerActions)require50DU(gcTriggerActions->serviceWorld()==gc_trigger_actions50KG::Status::Complete,
-      "GC original coarse trigger exit service rejected actual COL poses");
-  if(mbSourceTriggers)require50DU(mbSourceTriggers->serviceWorld(),"MB actual source trigger exit service rejected");
-  if(tbTriggerActions)require50DU(tbTriggerActions->serviceWorld()==tb_trigger_actions50TB::Status::Complete,
-      "TB actual trigger exit service rejected; terminal action prefixes retained");
-  if(tcTriggerActions)require50DU(tcTriggerActions->serviceWorld()==tc_trigger_actions50TC::Status::Complete,
-      "TC actual trigger exit service rejected; terminal action prefixes retained");
-  if(isRcTrack){
-   requireMbRuntimeNavigation50MB();
-   require50DU(rcTriggerActions&&rcTriggerActions->serviceWorld()==rc_trigger_actions::Status::Complete,
-       "RC actual trigger exit service rejected prepared COL poses");
-  }
-  if(scTriggerActions)require50DU(scTriggerActions->serviceWorld()==sc_trigger_actions::Status::Complete,
-      "SC actual trigger exit service rejected prepared COL poses");
-  if(maTriggerActions)require50DU(maTriggerActions->serviceWorld()==ma_trigger_actions::Status::Complete,
-      "MA actual trigger exit service rejected COL poses");
-  if(commonRouteTriggerActions)require50DU(commonRouteTriggerActions->serviceWorld()==sa_trigger_actions::Status::Complete,
-      "common-route actual trigger exit service rejected COL poses");
-  if(gaTriggerActions)require50DU(gaTriggerActions->serviceWorld()==ga_trigger_actions::Status::Complete,
-      "GA original coarse trigger exit service rejected actual COL poses");
   require50DU(::allocations==before,"successful original world animation allocated C++ storage");
   if(trackAnimations)++trackAnimationSteps;
  };
@@ -3222,72 +2423,32 @@ SessionExit50DU Context::run() {
  // Borrowed by Session cold teardown, including partial-construction unwind.
  platform::VehicleWindowDiagnostic50DS rendererDiagnostic{},completionDiagnostic{};
  // The canonical TA4A0 provider outlives every Session racer borrowing it.
- const bool humanOriginalHud=directOriginalHuman&&humanCourseEnabled&&originalCameraEnabled&&bool(nativeModelDomain);
- require50DU(!directOriginalHuman||humanOriginalHud,"direct human world requires the real canonical HUD/material domain");
- std::shared_ptr<rc_particle_visual50RC::Window> rcParticleWindow;
- OriginalTrackParticleCold50LA nativeTaParticles;
- OriginalTrackParticleColdDiagnostic50LA nativeTaParticleDiagnostic;
- // TB has no declared ambient emitter list. The real Session racers borrow
- // this one canonical track pool; its existing fixed5000 atlas/pool domain is unchanged.
- std::unique_ptr<OriginalTrackParticleCold50LA> tbTrackParticles;
- std::size_t tbParticleRegistryPayloadCharged=0;
- bool tbParticleRegistryFinalAccounted=false;
- const auto accountTbParticleRegistry=[&](){
-  require50DU(isTbTrack&&tbTrackParticles&&tbTrackParticles->prepared()&&tbTrackParticles->particles(),
-      "TB registry accounting requires the actual canonical pool");
-  const auto actual=tbTrackParticles->particles()->emitterStoragePayloadBytes();
-  require50DU(actual>=tbParticleRegistryPayloadCharged,"TB shared registry capacity regressed before retirement");
-  reserveTbAdditionalPayload(actual-tbParticleRegistryPayloadCharged,"TB actual shared registry exceeds remaining payload");
-  tbParticleRegistryPayloadCharged=actual;
+ const bool humanOriginalHud=rootedCourseRace&&humanCourseEnabled&&originalCameraEnabled&&bool(nativeModelDomain);
+ require50DU(!rootedCourseRace||humanOriginalHud,"direct human world requires the real canonical HUD/material domain");
+ // The one particle manager (1B4DC0) of the track; its emitter registry payload
+ // is accounted once into the race payload ledger and serviced once per world step.
+ OriginalTrackParticleColdDiagnostic50LA particleDiagnostic;
+ std::size_t particleRegistryPayloadCharged=0;
+ const auto accountParticleRegistry=[&](){
+  if(!track.roles.particles)return;
+  require50DU(track.roles.particles->prepared()&&track.roles.particles->particles(),
+      "track particle registry accounting requires the actual shared pool");
+  const auto actual=track.roles.particles->particles()->emitterStoragePayloadBytes();
+  require50DU(actual>=particleRegistryPayloadCharged,"track particle registry capacity regressed before retirement");
+  reserveAdditionalPayload(actual-particleRegistryPayloadCharged,"track particle registry exceeds remaining payload");
+  particleRegistryPayloadCharged=actual;
  };
- const auto advanceTbTrackParticles=[&](){
-  if(!isTbTrack)return;
-  requireMbRuntimeNavigation50MB();
-  require50DU(tbTrackParticles&&tbTrackParticles->prepared()&&tbTrackParticles->particles()&&
-      tbParticleRegistryFinalAccounted&&
-      tbTrackParticles->particles()->emitterStoragePayloadBytes()==tbParticleRegistryPayloadCharged,
-      "TB actual canonical particle pool service is unavailable");
+ const auto advanceTrackParticles=[&](){
+  if(!track.roles.particles)return;
+  require50DU(track.roles.particles->prepared()&&track.roles.particles->particles()&&
+      track.roles.particles->particles()->emitterStoragePayloadBytes()==particleRegistryPayloadCharged,
+      "track particle pool service is unavailable");
   std::uint32_t actualPause11C=0;
-  require50DU(sourceApplicationClock.readPause11C(actualPause11C),"TB actual Application pause owner unavailable");
-  const auto advanced=tbTrackParticles->particles()->advance(.016f,actualPause11C!=0);
-  require50DU(advanced.okay(),"TB actual canonical particle manager advance rejected");
- };
- // RC uses one actual canonical pool for Session racer borrows and all
- // source emitters. These handles precede service/cleanup lambdas; preparation
- // happens only inside the existing closeWindow-protected setup interval.
- std::shared_ptr<OriginalTrackParticleCold50LA> rcTrackParticles;
- std::shared_ptr<rc_particle_authoring50RC::Owner> rcParticleAuthoring;
- std::shared_ptr<rc_particle_attachments50RC::Owner> rcParticleAttachments;
- std::shared_ptr<rc_particle_runtime50RC::Owner> rcParticleRuntime;
- std::shared_ptr<rc_particle_render50RC::Owner> rcParticleRender;
- rc_particle_authoring50RC::Diagnostic rcParticleAuthoringDiagnostic;
- rc_particle_attachments50RC::Diagnostic rcParticleAttachmentDiagnostic;
- rc_particle_runtime50RC::Diagnostic rcParticleRuntimeDiagnostic;
- rc_particle_render50RC::Diagnostic rcParticleRenderDiagnostic;
- gb_particle_render50GB::Diagnostic gbParticleRenderDiagnostic;
- mc_particle_render50MC::Diagnostic mcParticleRenderDiagnostic;
- bool mcParticleFrame152Notice=false;
- std::size_t rcParticleWindowPayloadReservation=0;
- std::size_t rcParticleRegistryPayloadCharged=0;
- bool rcParticleRegistryFinalAccounted=false;
- const auto accountRcParticleRegistry=[&](){
-  require50DU(isRcTrack&&rcTrackParticles&&rcTrackParticles->prepared()&&rcTrackParticles->particles(),
-      "RC registry accounting requires the actual shared pool");
-  const auto actual=rcTrackParticles->particles()->emitterStoragePayloadBytes();
-  require50DU(actual>=rcParticleRegistryPayloadCharged,"RC shared registry capacity regressed before retirement");
-  reserveRcAdditionalPayload(actual-rcParticleRegistryPayloadCharged,"RC actual shared registry exceeds remaining payload");
-  rcParticleRegistryPayloadCharged=actual;
- };
- const auto advanceRcTrackParticles=[&](){
-  if(!isRcTrack)return;
-  require50DU(rcParticleRuntime&&rcParticleRuntime->active()&&rcParticleWindow&&rcParticleWindow->ready()&&
-      rcParticleRegistryFinalAccounted,"RC actual emitter/Window/pool service is unavailable");
-  const bool advanced=rcParticleRuntime->advance(.016f,rcParticleRuntimeDiagnostic);
-  if(!advanced)std::cerr<<"rc_emitter_update_rejected child="<<rcParticleRuntimeDiagnostic.child
-      <<" source_pc="<<rcParticleRuntimeDiagnostic.source.sourcePC
-      <<" status="<<static_cast<unsigned>(rcParticleRuntimeDiagnostic.source.status)
-      <<" message="<<rcParticleRuntimeDiagnostic.message<<'\n';
-  require50DU(advanced,"RC actual source emitter update failed; prefixes retained for cleanup");
+  require50DU(sourceApplicationClock.readPause11C(actualPause11C),"track particle Application pause owner unavailable");
+  auto& particles=*track.roles.particles->particles();
+  require50DU(particles.advance(.016f,actualPause11C!=0).okay(),"track particle manager advance rejected");
+  require50DU(particles.advanceFogPhases(.016f)==OriginalGcParticleStatus50KG::complete,
+      "track particle fog phase advance rejected");
  };
  namespace sourceCamera=original_camera_session50KX;
  // Explicit native root policy: genuine ALL8 controls, recovered single-view
@@ -3308,31 +2469,14 @@ SessionExit50DU Context::run() {
  if(!sourceModelRenderGlobals)sourceModelRenderGlobals=
      std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
  OriginalAttachedGlobals sourceAttachedGlobals;
- OriginalRaceFogFields legacySourceTrackFog;
- require50DU(!isGbTrack||(gbFogOwner&&gbFogOwner->ready()&&gbFogOwner->sourceOwner()==gbColdSources.get()&&gbFogOwner->cameraFields()),
-     "GB actual source-bound fog owner unavailable");
- require50DU(!isMcTrack||(mcFogOwner&&mcFogOwner->ready()&&mcFogOwner->sourceOwner()==mcColdSources.get()&&mcFogOwner->cameraFields()),
-     "MC actual source-bound fog owner unavailable");
- auto& sourceTrackFog=isMcTrack?*mcFogOwner->cameraFields():isGbTrack?*gbFogOwner->cameraFields():legacySourceTrackFog;
- std::unique_ptr<mc_camera_assets50MC::Owner> mcSourceCameraAssets;
- if(isMcTrack){
-  reserveMcEnvironment(sizeof(mc_camera_assets50MC::Owner),"MC camera owner exceeds remaining payload");
-  mcSourceCameraAssets=std::make_unique<mc_camera_assets50MC::Owner>();
- }
- sourceCamera::AuthoredStorage legacySourceCameraAssets;
- std::unique_ptr<sourceCamera::AuthoredStorage> gbSourceCameraAssets;
- if(isGbTrack){
-  reserveGbAdditionalPayload(sizeof(sourceCamera::AuthoredStorage),"GB camera descriptor exceeds remaining payload");
-  gbSourceCameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
- }
- std::unique_ptr<sourceCamera::AuthoredStorage> tbSourceCameraAssets;
- if(isTbTrack){
-  reserveTbAdditionalPayload(sizeof(sourceCamera::AuthoredStorage),"TB camera descriptor exceeds remaining payload");
-  tbSourceCameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
- }
- std::unique_ptr<sourceCamera::AuthoredStorage> rcSourceCameraAssets;
- if(isRcTrack)rcSourceCameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
- auto& sourceCameraAssets=isGbTrack?*gbSourceCameraAssets:isTbTrack?*tbSourceCameraAssets:isRcTrack?*rcSourceCameraAssets:legacySourceCameraAssets;
+ // Camera fog fields; the camera session fills them from the one 273C30 fog
+ // runtime of the track (track.roles.fog, R6) for every course.
+ OriginalRaceFogFields sourceTrackFog;
+ require50DU(static_cast<bool>(track.roles.fog),"race track fog runtime (273C30) missing");
+ // One authored camera storage (TOB from the track, CAM from the selected pod; R2).
+ reserveAdditionalPayload(sizeof(sourceCamera::AuthoredStorage),"camera descriptor exceeds remaining payload");
+ auto cameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
+ auto& sourceCameraAssets=*cameraAssets;
  std::unique_ptr<sourceCamera::DisplayInputs> sourceCameraDisplay;
  std::shared_ptr<sourceCamera::Session> sourceCameraSession;
  audioListenerCamera50DU=&sourceCameraSession;
@@ -3362,26 +2506,16 @@ SessionExit50DU Context::run() {
  std::uint64_t sourceCameraTick=0,renderedCameraPublication=0;
  // A synchronous source skip can suspend inside a real camera child call.
  // Resume that same call, never manufacture another scene update or tick.
- std::optional<std::uint64_t> suspendedTaCameraFrame;
- std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> taIntroAuthoring;
- std::shared_ptr<const rr::assets::AudioBank50HC> taIntroPcm;
- original_ui_source_timing50LH::Owner taRootTiming;
- original_ui_source_timing50LH::PublicationView taRootPublication;
- std::uint64_t taRootTimelineNs=0;
- bool taRootTimingInitialized=false,taRootActive=false;
+ std::optional<std::uint64_t> suspendedCameraFrame;
+ std::shared_ptr<const rr::assets::OriginalTaIntroAuthoringCandidate> introAuthoring;
+ std::shared_ptr<const rr::assets::AudioBank50HC> introPcm;
+ original_ui_source_timing50LH::Owner raceRootTiming;
+ original_ui_source_timing50LH::PublicationView raceRootPublication;
+ std::uint64_t raceRootTimelineNs=0;
+ bool raceRootTimingInitialized=false,raceRootActive=false;
+ // The counted race of every course owns the intro/root controller slot48.
  auto nativeIntroRace=[&]() -> rr::game::OriginalRaceConstructor50LA* {
-  return consumedTaStage.race()?consumedTaStage.race().get():
-      consumedRaStage.race()?consumedRaStage.race().get():
-      consumedMaStage.race()?consumedMaStage.race().get():
-      consumedMbStage.race()?consumedMbStage.race().get():
-      consumedScStage.race()?consumedScStage.race().get():
-      consumedGbStage.race()?consumedGbStage.race().get():
-      consumedMcStage.race()?consumedMcStage.race().get():
-      consumedTbStage.race()?consumedTbStage.race().get():
-      consumedRcStage.race()?consumedRcStage.race().get():
-      consumedTcStage.race()?consumedTcStage.race().get():
-      consumedCommonRouteStage.race()?consumedCommonRouteStage.race().get():
-      consumedGaStage.race()?consumedGaStage.race().get():consumedGcStage.race().get();
+  return consumedStage.race().get();
  };
  auto nativeIntroController=[&]() -> const rr::game::OriginalWreckComponent50LA* {
   // Slot custody survives a failed camera prepare; do not ask a live-camera
@@ -3389,48 +2523,48 @@ SessionExit50DU Context::run() {
   if(const auto* race=nativeIntroRace())if(const auto* controller=race->nativeIntroControllerSlot48())return controller;
   return sourceCameraSession?sourceCameraSession->taControllerEntity174A30():nullptr;
  };
- auto finishTaRoot=[&](){
-  if(!taRootActive)return true;
+ auto finishRaceRoot=[&](){
+  if(!raceRootActive)return true;
   std::string error;
   if(!nativeIntroRace()||!sourceCameraSession||!nativeIntroController()||
      !originalMainApplication.finishNativeTaRaceRoot140CFC(*nativeIntroRace(),
-       *nativeIntroController(),taRootPublication,error)||!taRootTiming.commit())return false;
-  taRootActive=false;return true;
+       *nativeIntroController(),raceRootPublication,error)||!raceRootTiming.commit())return false;
+  raceRootActive=false;return true;
  };
- auto beginTaRoot=[&](){
+ auto beginRaceRoot=[&](){
   // Root 140CE0 runs on the race slot48 controller of EVERY counted race
-  // (authored intro or zero cuts). Routes without that controller (RA Free
-  // Play, ALL8 spectator, legacy) keep their existing no-root behaviour.
-  if(!taIntroAuthoring&&!nativeIntroController())return true;
-  if(taRootActive||!nativeIntroRace()||!sourceCameraSession||!nativeIntroController())return false;
+  // (authored intro or zero cuts, 174E58/174A30). A race without that
+  // controller (ALL8 spectator before its controller binds) has no root.
+  if(!introAuthoring&&!nativeIntroController())return true;
+  if(raceRootActive||!nativeIntroRace()||!sourceCameraSession||!nativeIntroController())return false;
   original_ui_source_timing50LH::Sample sample;
-  if(!taRootTimingInitialized){
-   if(!taRootTiming.retainPublication(taRootPublication)||!taRootTiming.prepare(0,true,sample)||
-      !taRootTiming.commit())return false;
-   taRootTimingInitialized=true;
+  if(!raceRootTimingInitialized){
+   if(!raceRootTiming.retainPublication(raceRootPublication)||!raceRootTiming.prepare(0,true,sample)||
+      !raceRootTiming.commit())return false;
+   raceRootTimingInitialized=true;
   }
-  taRootTimelineNs+=16000000u;
+  raceRootTimelineNs+=16000000u;
   std::string error;
-  if(!taRootTiming.prepare(taRootTimelineNs,false,sample)||
+  if(!raceRootTiming.prepare(raceRootTimelineNs,false,sample)||
      !originalMainApplication.beginNativeTaRaceRoot140CE0(*nativeIntroRace(),
-       *nativeIntroController(),taRootPublication,error))return false;
-  taRootActive=true;
-  if(!liveAudio->groupsForProviders()->serviceTaIntro235720(taRootPublication))return false;
+       *nativeIntroController(),raceRootPublication,error))return false;
+  raceRootActive=true;
+  if(!liveAudio->groupsForProviders()->serviceTaIntro235720(raceRootPublication))return false;
   // Same accepted Root23C, once before Camera175D70. The original child list
   // places F8 before controller48. A suspended skip resumes that same Camera
-  // call without beginTaRoot, so this timer cannot replay during fade polls.
+  // call without beginRaceRoot, so this timer cannot replay during fade polls.
   // This native cut does not certify the absent full141ED0 renderer dispatcher.
   return originalMainApplication.updateNativeTaRaceF8BeforeCamera50LA(*nativeIntroRace(),
-      *nativeIntroController(),taRootPublication,error);
+      *nativeIntroController(),raceRootPublication,error);
  };
  // Called ONLY from the two successful ordered native callback-return cuts,
  // never by the generic normal/early-return RAII guard.
- auto finishTaRootWithResults=[&](){
-  if(!taRootActive)return true;
+ auto finishRaceRootWithResults=[&](){
+  if(!raceRootActive)return true;
   std::string error;
   if(!nativeIntroRace()||!sourceCameraSession||!nativeIntroController()||
      !originalMainApplication.finishNativeTaRaceRoot140CFC(*nativeIntroRace(),
-       *nativeIntroController(),taRootPublication,error)){
+       *nativeIntroController(),raceRootPublication,error)){
    static bool rootReported=false;
    if(native_common_results50PD::state().replayActive&&!rootReported&&(rootReported=true))
     std::cerr<<"race_replay root_finish_rejected error="<<error<<'\n';
@@ -3446,14 +2580,14 @@ SessionExit50DU Context::run() {
   }
   // Commit the same real prepared sample even when a bounded capture rejects;
   // it must not remain available for a replay or a later fabricated Frame.
-  const bool committed=taRootTiming.commit();taRootActive=false;
+  const bool committed=raceRootTiming.commit();raceRootActive=false;
   return captured&&committed;
  };
  bool sourceMainBaseReady=false;
  original_course_targets50KX::Catalog courseTargets;
  original_main_entry50KG::Frontend originalMain;
 
- bool restartRequested=false,returnOriginalMainRequested=false;
+ bool returnOriginalMainRequested=false;
  // Private same-thread borrow of the actual setup devices and this Bank.
  // Declared after RA/camera owners: fallback revokes before their destruction.
  original_results_feedback50LA::Scope sourceResultsFeedback{*this,racerBank};
@@ -3490,24 +2624,14 @@ SessionExit50DU Context::run() {
        <<" position_error="<<static_cast<unsigned>(sourcePositionStatsResources.diagnostic.error)
        <<" position_material_status="<<static_cast<unsigned>(sourcePositionStatsResources.diagnostic.material.status)
        <<" position_material_pc="<<sourcePositionStatsResources.diagnostic.material.sourcePC
-       <<" consumed_material_status="<<static_cast<unsigned>(consumedRaStage.closeMaterialDiagnostic.status)
-       <<" consumed_material_pc="<<consumedRaStage.closeMaterialDiagnostic.sourcePC
-       <<" consumed_material_field="<<(consumedRaStage.closeMaterialDiagnostic.field?consumedRaStage.closeMaterialDiagnostic.field:"")
-       <<" consumed_audio_error="<<static_cast<unsigned>(consumedRaStage.closeAudioDiagnostic.error)
+       <<" consumed_material_status="<<static_cast<unsigned>(consumedStage.closeMaterialDiagnostic.status)
+       <<" consumed_material_pc="<<consumedStage.closeMaterialDiagnostic.sourcePC
+       <<" consumed_material_field="<<(consumedStage.closeMaterialDiagnostic.field?consumedStage.closeMaterialDiagnostic.field:"")
+       <<" consumed_audio_error="<<static_cast<unsigned>(consumedStage.closeAudioDiagnostic.error)
        <<" position_pc="<<sourcePositionStatsResources.diagnostic.sourcePC
        <<" position_renderer_operation="<<(sourcePositionStatsResources.diagnostic.renderer.operation?
            sourcePositionStatsResources.diagnostic.renderer.operation:"")
-       <<" ra_failure="<<(raSessionDiagnostic.failure?raSessionDiagnostic.failure:"")<<'\n';
-   if(raWorld){const auto& world=raWorld->nativeCloseDiagnostic();
-    std::cerr<<"native_world_close_rejected gate="<<(world.gate?world.gate:"")
-        <<" counted="<<world.counted<<" retire_counted="<<world.retireCounted
-        <<" topology_attempted="<<world.topologyAttempted<<" topology_closed="<<world.topologyClosed
-        <<" camera_borrows="<<world.cameraBorrows<<" world_borrows="<<world.worldBorrows
-        <<" runtime_owners="<<world.runtimeOwners<<" navigation_owners="<<world.navigationOwners
-        <<" lighting_owners="<<world.lightingOwners<<" expected_lighting_owners="<<world.expectedLightingOwners
-        <<" particle_owners="<<world.particleOwners<<" pc="<<world.sourcePC
-        <<" world_refs="<<world.worldReferences<<" world_flags="<<world.worldFlags<<" world_mask="<<world.worldMask<<'\n';
-   }
+       <<'\n';
    return false;
   };
   const auto closeAccumulated=[](const char* gate){
@@ -3522,16 +2646,10 @@ SessionExit50DU Context::run() {
    if(!feedbackHost->rumbleController50KZ(playerSource5C,feedbackPhysicalDevice.instanceId,
        0,0,stopped,stopDiagnostic))return closeRejected("retained_window_rumble_stop");
   }
-  if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return closeRejected("gb_query_terminal_fence");
-  if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return closeRejected("gb_real_renderer_borrow_retirement");
-  if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return closeRejected("mc_real_renderer_borrow_retirement");
   // The track-animation binding retires its visual and collision memberships (every
   // course on the lane route) before camera and racer cleanup; backing stays live.
   if(trackAnimationBinding&&trackAnimationBinding->needsClose()&&!trackAnimationBinding->close(trackAnimationBindingDiagnostic))
    return closeRejected("track_animation_membership_retirement");
-  // Stop new RC numerical/scheduling borrows on normal and setup-failure
-  // cleanup, before Session racer prefixes or renderer/Window owners retire.
-  if(rcParticleRuntime&&!rcParticleRuntime->quiesce())return closeRejected("rc_emitter_quiesce");
   if(sourcePauseParentAttached){
    original_pause_observation50LA::Owner::Diagnostic pauseCloseDiagnostic;
    if(!sourcePauseObservation.closeNativeSpectatorMenuForShutdown(pauseCloseDiagnostic)){
@@ -3566,28 +2684,16 @@ SessionExit50DU Context::run() {
   sourcePositionStatsResources.coldResourcesLoaded=false;
   sourcePositionStatsPrimitives.owner.reset();sourcePositionStatsPrimitives.resourceFragmentLoaded=false;
   bool clean=true;
-  // A failed source E8 owns the selected Bank slot. Retire its genuine
-  // partial reset before camera/model close performs any ordinary Bank visit.
-  if(mbSourceTriggers&&mbSourceTriggers->pending()){
-   const bool retired=mbSourceTriggers->retireSuspended([&](std::size_t slot){
-    require50DU(slot<racerCables.size()&&racerCables[slot]&&racerRigs[slot],
-        "MB failed-slot cleanup requires its actual cables and Rig");
-    return mb_source_trigger50MB::RetirementBorrow{s,x.bindings,x.parameters,gcLightOwner,
-        racerCables[slot]->visibility50(),recoveryQueries(),zoneLifecycle,liveWorld,membershipWork,
-        slot==0?playerRacer60:originalAi.racer60};
-   });
-   if(!retired)return closeRejected("mb_source_pending_retirement");
-  }
   if(originalCameraEnabled){
    // The zero-line counted race retires its empty Announcer120 transport here too.
-   if((taIntroAuthoring||(liveAudio->groupsForProviders()&&liveAudio->groupsForProviders()->zeroLineRaceIntroOpen()))&&
+   if((introAuthoring||(liveAudio->groupsForProviders()&&liveAudio->groupsForProviders()->zeroLineRaceIntroOpen()))&&
       liveAudio->groupsForProviders()&&
       !liveAudio->groupsForProviders()->retireTaIntro142590())return closeRejected("TA intro audio retirement");
-   if(taRootActive){
+   if(raceRootActive){
     std::string error;
     if(!originalMainApplication.abandonNativeTaRaceRootForTeardown50LA(*nativeIntroRace(),
-       *nativeIntroController(),taRootPublication,error))return closeRejected("TA pending root abandonment");
-    taRootActive=false;
+       *nativeIntroController(),raceRootPublication,error))return closeRejected("TA pending root abandonment");
+    raceRootActive=false;
    }
    if(nativeIntroRace()&&nativeIntroController()&&
       !nativeIntroRace()->clearNativeIntroControllerSlot48(*nativeIntroController()))
@@ -3612,17 +2718,13 @@ SessionExit50DU Context::run() {
      return closeRejected("if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)");
     }
    }
-   if(isRaTrack){
-    sourceCameraSession.reset();
-    if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))return closeRejected("if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))");
-   }
-   if(!isRcTrack&&!nativeTaParticles.close())return closeRejected("if(!nativeTaParticles.close())");
+   // The track's particle manager closes once with the Track's own release
+   // (common_track50CR::Track::release, R3), after the renderer below.
    if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))return closeRejected("if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))");
   }
-  // Common race: its Results104/F8 renderer leases pin the renderer. RA's
-  // session retires its race UI before this point; the other courses retire
-  // the race's root, F8 and Pause/Results here (idempotent in the later
-  // closeNativeConsumedRace), while the renderer and FIFO are still live.
+  // Every course's counted race: its Results104/F8 renderer leases pin the
+  // renderer. Retire the race's root, F8 and Pause/Results here (idempotent in
+  // the later closeNativeConsumedRace), while the renderer and FIFO are still live.
   if(const auto& race=originalMainApplication.sourceRace28COwner_;
      race&&native_race_replay50PD::Owner::commonRace(*race)&&race->results104_){
    if(originalMainApplication.resultsInputContinuation50LA_)return closeRejected("common race Results input still pending");
@@ -3658,18 +2760,11 @@ SessionExit50DU Context::run() {
   if(!originalMain.closeAudio())clean=closeAccumulated("if(!originalMain.closeAudio())clean=false;");
   if(!sourceAnnouncer->reset())clean=closeAccumulated("if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();");raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
-  if(tcGlobalSound&&tcGlobalSound->prepared()&&!tcGlobalSound->close())
-   return closeRejected("tc_actual_global_sound_shutdown");
-  if(gbPodSound&&!gbPodSound->close())return closeRejected("gb_actual_pod_sound_shutdown");
-  if(!retireGbAudioOwners())return closeRejected("gb_positional_material_audio_retirement");
-  if(!retireMcAudioOwners())return closeRejected("mc_positional_material_audio_retirement");
-  if(tbPodSound&&!tbPodSound->close())return closeRejected("tb_actual_pod_sound_shutdown");
-  gcGateAudio.reset(); // Stop exclusive GC voice126 before its real mixer/groups.
-  gaGateAudio.reset(); // Stop voice126 while its real mixer/groups still live.
+  // One positional-sound/material-audio owner of the track (AUB 271600, R7).
+  if(!retireAudioOwners())return closeRejected("track_positional_material_audio_retirement");
+  triggerAudio.reset(); // Stop the trigger voice while its real mixer/groups still live.
   opponentAudio->close(); // Release96..116 before the live mixer/shared PCM closes.
   originalAiAudio->close();
-  if(!retireRcAudioOwners())return closeRejected("rc_positional_material_audio_retirement");
-  if(!retireTbAudioOwners())return closeRejected("tb_positional_material_audio_retirement");
   sourceCameraCycleAudio.close(); //Retire exclusive voice159 before its actual mixer/output.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"audio close failed \"<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;");
@@ -3683,12 +2778,6 @@ SessionExit50DU Context::run() {
   // Session abandonAndCloseSpatial already retired actual racer Entity
   // prefixes. Renderer retirement above revoked Window publication/borrows.
   // Keep the real context alive for the atlas's checked GPU close.
-  if(rcParticleRender&&!rcParticleRender->close())return closeRejected("rc_particle_numeric_retirement");
-  if(gbParticleWindow&&!gbParticleWindow->close(textureDiagnostic))return closeRejected("gb_particle_window_retirement");
-  if(mcParticleWindow&&!mcParticleWindow->close(textureDiagnostic))return closeRejected("mc_particle_window_retirement");
-  if(rcParticleWindow&&!rcParticleWindow->close(textureDiagnostic))return closeRejected("rc_particle_window_retirement");
-  if(rcTrackParticles&&!rcTrackParticles->close())return closeRejected("rc_actual_shared_pool_retirement");
-  if(rcParticleRuntime&&!rcParticleRuntime->closeAfterPool())return closeRejected("rc_emitter_release_after_pool");
   if(!sourcePause.retireDrawing())return closeRejected("if(!sourcePause.retireDrawing())");
   // Renderer has retired its strong HUD owner and every pixel/GPU borrow.
   // Release canonical UI refs before later model retirement invalidates leaves.
@@ -3702,41 +2791,14 @@ SessionExit50DU Context::run() {
    std::cerr<<"track animation texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("track animation texture cleanup failed");
   }
   if(trackAnimationWindow.ownsResources())return closeRejected("track animation texture resources remain");
-  if(mcAtm.ownsResources()&&!mcAtm.close(textureDiagnostic))return closeRejected("mc_atm_texture_retirement");
-  if(gbAtm.ownsResources()&&!gbAtm.close(textureDiagnostic))return closeRejected("gb_atm_texture_retirement");
-  if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
-   std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
+  // The one authored animated-texture owner of the track (R5).
+  if(track.roles.atm&&track.roles.atm->ownsResources()&&!track.roles.atm->close(textureDiagnostic)){
+   std::cerr<<"track ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
+   clean=closeAccumulated("track ATM texture cleanup failed");
   }
-  if(gcAtm.ownsResources())return closeRejected("if(gcAtm.ownsResources())");
-  if(maCommonRouteAtm.ownsResources()&&!maCommonRouteAtm.close(textureDiagnostic)){
-   std::cerr<<"MA/common-route ATM texture cleanup rejected\n";clean=closeAccumulated("std::cerr<<\"MA/common-route ATM texture cleanup rejected\n\";clean=false;");
-  }
-  if(maCommonRouteAtm.ownsResources())return closeRejected("if(maCommonRouteAtm.ownsResources())");
-  if(mbAtm.ownsResources()&&!mbAtm.close(textureDiagnostic)){
-   std::cerr<<"MB ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
-   clean=closeAccumulated("MB ATM texture cleanup failed");
-  }
-  if(mbAtm.ownsResources())return closeRejected("if(mbAtm.ownsResources())");
-  if(scAtm.ownsResources()&&!scAtm.close(textureDiagnostic)){
-   std::cerr<<"SC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
-   clean=closeAccumulated("SC ATM texture cleanup failed");
-  }
-  if(scAtm.ownsResources())return closeRejected("if(scAtm.ownsResources())");
-  if(tbAtm.ownsResources()&&!tbAtm.close(textureDiagnostic))return closeRejected("TB ATM GPU close rejected");
-  if(tbAtm.ownsResources())return closeRejected("TB ATM resources remain");
-  if(rcAtm.ownsResources()&&!rcAtm.close(textureDiagnostic))return closeRejected("RC ATM GPU close rejected");
-  if(rcAtm.ownsResources())return closeRejected("RC ATM resources remain");
-  if(tcAtm.ownsResources()&&!tcAtm.close(textureDiagnostic)){
-   std::cerr<<"TC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';
-   clean=closeAccumulated("TC ATM texture cleanup failed");
-  }
-  if(tcAtm.ownsResources())return closeRejected("if(tcAtm.ownsResources())");
-  if(gaAtm.ownsResources()&&!gaAtm.close(textureDiagnostic)){
-   std::cerr<<"GA ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GA ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
-  }
-  if(gaAtm.ownsResources())return closeRejected("if(gaAtm.ownsResources())");
-  if(gcParticleMaterials.ownsResources()&&!gcParticleMaterials.closeGpu(textureDiagnostic))clean=closeAccumulated("if(gcParticleMaterials.ownsResources()&&!gcParticleMaterials.closeGpu(textureDiagnostic))clean=false;");
-  if(gcParticleMaterials.ownsResources())return closeRejected("if(gcParticleMaterials.ownsResources())");
+  if(track.roles.atm&&track.roles.atm->ownsResources())return closeRejected("track ATM resources remain");
+  if(particleMaterials.ownsResources()&&!particleMaterials.closeGpu(textureDiagnostic))clean=closeAccumulated("track particle materials GPU close");
+  if(particleMaterials.ownsResources())return closeRejected("track particle materials resources remain");
   if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=closeAccumulated("if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=false;");
   if(gameplayBinder.ownsResources())return closeRejected("if(gameplayBinder.ownsResources())");
   for(std::size_t index=0;index<raceOpponentCount;++index){
@@ -3803,98 +2865,35 @@ SessionExit50DU Context::run() {
     }
    }
   }
-  if(isTbTrack){
-   // abandonAndCloseSpatial above retired actual racer Entity/particle borrows.
-   // Renderer, HUD and model callbacks have now closed; reject external Session
-   // ownership before destroying its borrowed pool or authoring inputs.
-   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("tb_camera_owner_still_borrowed");
-   sourceCameraSession.reset();
-   if(tbTrackParticles&&!tbTrackParticles->close())return closeRejected("tb_actual_track_pool_retirement");
-   tbTrackParticles.reset();
-   tbSourceCameraAssets.reset();
-   // Keep all descriptor/source/registry charges until this runSession ends.
-  }
-  if(mbSourceTriggers){
-   // All renderer/camera/model callbacks above have retired. Remove the real
-   // serial query memberships while each original Bank slot is installed.
-   sourceCameraSession.reset();
-   for(std::size_t slot=0;slot<racerBank.count();++slot){
-    const bool retired=racerBank.visit(slot,[&](){
-     const auto queries=recoveryQueries();
-     for(const auto& q:queries.query){
-      if(!q.membership||!q.object||(q.membership->attached&&q.membership->object!=q.object))return false;
-      const auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*q.membership,membershipWork);
-      if(r.status!=LiveZoneStatus50EN::Complete||q.membership->attached||q.membership->object)return false;
-     }
-     s.shape.registrationE0=0;
-     const auto secondaryRow=trackStorage.currentRow(track_runtime_storage50IG::RosterRole::secondary364);
-     if(!secondaryRow)return false;
-     auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,*secondaryRow.state,membershipWork);
-     if(r.status!=LiveZoneStatus50EN::Complete||secondaryRow.state->attached||secondaryRow.state->object)return false;
-     for(std::size_t i=0;i<mbCollisionWorld->triggerCount();++i){auto* membership=mbCollisionWorld->triggerMembership(i);
-      if(!membership)return false;
-      r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership->state,membershipWork);
-      if(r.status!=LiveZoneStatus50EN::Complete||membership->state.attached||membership->state.object)return false;
-     }
-     return true;
-    });
-    if(!retired)return closeRejected("mb_serial_query_retirement");
-   }
-   if(!mbSourceTriggers->unbind())return closeRejected("mb_action_owner_unbind");
-   mbSourceTriggers.reset();
-  }
-  if(isGbTrack){
-   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("gb_camera_owner_still_borrowed");
-   sourceCameraSession.reset();gbSourceCameraAssets.reset();
-   if(!closeGbColdPrefix())return closeRejected("gb_all_peer_terminal_contact_retirement");
-  }
-  if(isMcTrack){
-   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("mc_camera_owner_still_borrowed");
-   sourceCameraSession.reset();mcSourceCameraAssets.reset();
-   if(!closeMcColdPrefix())return closeRejected("mc_all_peer_terminal_contact_retirement");
-  }
-  if(isTbTrack){
-   // Camera/Follow, pool and model/GPU borrowers have actually retired above; the
-   // track-animation binding retired its memberships there. This path removes only
-   // real query and trigger memberships, never a second removal of an animation row.
-   if(!closeTbColdPrefix())return closeRejected("tb_serial_visibility_collision_retirement");
-  }
-  if(isTcTrack){
-   // Camera/Follow and every model/GPU borrower have actually closed above.
-   if(!closeTcColdPrefix())return closeRejected("tc_serial_visibility_collision_retirement");
-  }
-  if(!closeRcBankCollision())return closeRejected("rc_serial_collision_retirement");
-  if(!closeScTriggerMemberships())return closeRejected("sc_serial_trigger_membership_retirement");
-  if(consumedRaStage.race()){
+  // One cold retirement for every course (the MC/GB aggregate shape).
+  // abandonAndCloseSpatial above retired actual racer Entity/particle borrows;
+  // renderer, HUD and model callbacks have now closed. Reject external Session
+  // ownership before the collision world fence and the Bank's serial
+  // visibility/collision/trigger-membership retirement.
+  if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("camera_owner_still_borrowed");
+  sourceCameraSession.reset();cameraAssets.reset();
+  if(!closeColdPrefix())return closeRejected("all_peer_terminal_contact_retirement");
+  if(!closeBankCollision())return closeRejected("serial_collision_retirement");
+  if(!closeTriggerMemberships())return closeRejected("serial_trigger_membership_retirement");
+  if(consumedStage.race()){
    // No frame, reader or model callback is invoked beyond this point. Destroy
    // actual snapshots before releasing the aggregate's runtime lifetime pin.
    if(!racerBank.retireNativeBacking())return closeRejected("if(!racerBank.retireNativeBacking())");
    // 1A6840 order: race-owned services before the World (see setup).
-   if(retireRaEndCandidateProducer&&!retireRaEndCandidateProducer())
-    return closeRejected("ra_end_candidate_producer_retirement");
-   sourcePauseTrack.reset();raRuntime.reset();
-   if(!consumedRaStage.close())return closeRejected("if(!consumedRaStage.close())");
+   if(retireEndCandidateProducer&&!retireEndCandidateProducer())
+    return closeRejected("end_candidate_producer_retirement");
+   // One stage close for every course: audio, the counted race and its World
+   // at race+74 (1B2870 retire), then the Track's own release (roles in
+   // reverse order, then the archive 1316A0; R1/R3).
+   if(!consumedStage.close()){
+    const auto* field=consumedStage.closeMaterialDiagnostic.field;
+    std::cerr<<"consumed_close_rejected field="<<(field?field:"")<<" pc="<<std::hex
+        <<consumedStage.closeMaterialDiagnostic.sourcePC<<std::dec<<'\n';
+    return closeRejected("consumed race/world retirement");
+   }
   }
-  if(consumedTaStage.race()&&!consumedTaStage.close()){
-   const auto* field=consumedTaStage.closeMaterialDiagnostic.field;
-   std::cerr<<"ta_close_rejected field="<<(field?field:"")<<" pc="<<std::hex
-       <<consumedTaStage.closeMaterialDiagnostic.sourcePC<<std::dec<<'\n';
-   return closeRejected("TA consumed race/world retirement");
-  }
-  if(consumedGcStage.race()&&!consumedGcStage.close())return closeRejected("GC consumed race/world retirement");
-  if(consumedGaStage.race()&&!consumedGaStage.close())return closeRejected("GA consumed race/world retirement");
-  if(consumedCommonRouteStage.race()&&!consumedCommonRouteStage.close())return closeRejected("common-route consumed race/world retirement");
-  if(consumedMaStage.race()&&!consumedMaStage.close())return closeRejected("MA consumed race/world retirement");
-  if(consumedMbStage.race()&&!consumedMbStage.close())return closeRejected("MB consumed race/world retirement");
-  if(consumedScStage.race()&&!consumedScStage.close())return closeRejected("SC consumed race/world retirement");
-  if(consumedGbStage.race()&&!consumedGbStage.close())return closeRejected("GB consumed race/world retirement");
-  if(consumedMcStage.race()&&!consumedMcStage.close())return closeRejected("MC consumed race/world retirement");
-  if(consumedTbStage.race()&&!consumedTbStage.close())return closeRejected("TB consumed race/world retirement");
-  if(consumedRcStage.race()&&!consumedRcStage.close())return closeRejected("RC consumed race/world retirement");
-  if(consumedTcStage.race()&&!consumedTcStage.close())return closeRejected("TC consumed race/world retirement");
-  // Original race unload releases the course's track bank (1316A0). A
-  // refusal (a live borrower of its files) keeps the bank active, logged.
-  native_course_archive_release50PD::holder().release();
+  // The course's track bank (1316A0) is released by the Track itself inside the
+  // stage close above (course_archive_release is printed there).
   if(!sourcePause.close())return closeRejected("if(!sourcePause.close())");
   if(!sourceDisplayLifetime->beginCloseAfterDependents())return closeRejected("if(!sourceDisplayLifetime->beginCloseAfterDependents())");
   if(!originalMainApplication.retainsPlayerWindow50DU()&&host.ownsResources()&&!host.close(hostDiagnostic)){
@@ -3907,18 +2906,14 @@ SessionExit50DU Context::run() {
   if(!clean)std::cerr<<"native_close_rejected gate=accumulated_cleanup_error\n";
   return clean;
  };
- // Late explicit closeWindow now owns every MB retirement path.
- mcColdPrefixGuard.armed=false;
- gbColdPrefixGuard.armed=false;
- mbColdPrefixGuard.armed=false;
- tcColdPrefixGuard.armed=false;
- tbColdPrefixGuard.armed=false;trackAnimationPrefixGuard.armed=false;
+ // Late explicit closeWindow now owns the cold retirement path.
+ coldPrefixGuard.armed=false;trackAnimationPrefixGuard.armed=false;
  try {
   // Root-owned callback installation stays at its original publication point.
   const auto installHumanCameraInput50DU=[&](){
-   if(humanCourseEnabled)resetHumanCamera=[&,requireMbRuntimeNavigation50MB](const UndertrackSelection50ET& selected,
+   if(humanCourseEnabled)resetHumanCamera=[&,requireRuntimeNavigation](const UndertrackSelection50ET& selected,
        const UndertrackPlacement50ET& placed,std::uint64_t serial){
-    if(isRcTrack)requireMbRuntimeNavigation50MB();
+    requireRuntimeNavigation();
     const auto result=sourceCameraSession->resetHumanUndertrack225B0C(selected,placed,serial);
     if(result.status!=sourceCamera::Status::complete){
      originalHumanRecoveryDiagnostic.sourcePC=result.sourcePC;
@@ -3954,7 +2949,7 @@ SessionExit50DU Context::run() {
     // The existing49A handler owns gates and its two following timer stores.
     // Only its genuine synchronous2255B0 effect is installed here, after all
     // physical owners and this concrete camera Session have been prepared.
-    executeOriginalManualReset=[&,requireMbRuntimeNavigation50MB,refreshAnimatedCandidates,recoveryQueries]() noexcept {
+    executeOriginalManualReset=[&,requireRuntimeNavigation,refreshAnimatedCandidates,recoveryQueries]() noexcept {
      auto failManual=[&](std::uint32_t pc,const char* message) noexcept {
       originalManualRecoveryDiagnostic.sourcePC=pc;originalManualRecoveryDiagnostic.message=message;
       std::cerr<<"ORIGINAL HUMAN manual reset unavailable: "<<message<<" pc="
@@ -3985,13 +2980,13 @@ SessionExit50DU Context::run() {
         // established.
         (m.vehicleState40!=0u&&m.vehicleState40!=1u&&m.vehicleState40!=2u)||
         originalManualResetSerial==std::numeric_limits<std::uint64_t>::max()||
-        gcGraphicsSequence[0]==std::numeric_limits<std::uint64_t>::max()||
+        graphicsSequence[0]==std::numeric_limits<std::uint64_t>::max()||
         (originalHumanRecovery.stage!=native_original_human_recovery::Stage::Idle&&
          originalHumanRecovery.stage!=native_original_human_recovery::Stage::Complete))
       return failManual(0x1a17a4u,"actual human Ready/normal-state reset owner is unavailable");
      std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
      auto& controllerD40=liveAudio->humanController();
-     requireMbRuntimeNavigation50MB();
+     requireRuntimeNavigation();
      if(!originalAiAudio->humanPhysicalResetOwners(playerRacer60,s,controllerD40,flags22C,field24C)||
         flags22C!=&controllerD40.flags22C()||!field24C||!refreshAnimatedCandidates())
       return failManual(0x1a259cu,"actual human D40/D44 or world publication is unavailable");
@@ -4000,44 +2995,23 @@ SessionExit50DU Context::run() {
       return failManual(0x124cb0u,"actual reset world registration queue is pending");
      const auto queries=recoveryQueries();const auto& relative=x.secondaryInputs.targetRelative2F0;
      const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-     auto mcActualHeightDomain=selectedRuntimeHeightDomain;
-     if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
-         terrainOwner.lift1F0,mcActualHeightDomain),"MC human reset requires actual same-runtime water334 and live348 lift");
-     using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB,native_original_human_recovery::Owners50GB,native_original_human_recovery::Owners50MC>;
-     RecoveryOwners50MB owners=isMcTrack?
-         RecoveryOwners50MB{native_original_human_recovery::Owners50MC{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,mcMapView,mcActualHeightDomain,
+     // A9: with water named in the SCB, the human reset reads the same-runtime
+     // water334 and live348 lift height domain of the one water runtime.
+     auto actualHeightDomain=selectedRuntimeHeightDomain;
+     if(track.hasWater())require50DU(track.roles.water&&track.roles.water->bindResetDomain(selectedRuntimeHeightDomain,
+         terrainOwner.lift1F0,actualHeightDomain),"human reset requires actual same-runtime water334 and live348 lift");
+     // One recovery owner set for every course, over the one map view.
+     native_original_human_recovery::Owners owners{lightOwner,racerCables[0]->visibility50(),
+         controllerD40,lapContinuity.prefix,*field24C,mapView,actualHeightDomain,
          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
-         RecoveryOwners50MB{native_original_human_recovery::Owners50GB{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,gbMapView,selectedRuntimeHeightDomain,
-         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
-         RecoveryOwners50MB{native_original_human_recovery::Owners50TB{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,tbMapView,selectedRuntimeHeightDomain,
-         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         isTcTrack?
-         RecoveryOwners50MB{native_original_human_recovery::Owners50TC{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,tcMapView,selectedRuntimeHeightDomain,
-         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         isMbTrack?
-         RecoveryOwners50MB{native_original_human_recovery::Owners50MB{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,mbMapView,selectedRuntimeHeightDomain,
-         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
-         RecoveryOwners50MB{native_original_human_recovery::Owners{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,*navigationMap,selectedRuntimeHeightDomain,
-         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
-         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
+         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount};
      const std::uint32_t resetBeforePositionBits[3]={
          original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[0]),
          original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[1]),
          original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[2])};
      ++originalManualResetSerial;
-     if(!std::visit([&](auto& actual){return native_original_human_recovery::resetController2255B0(s,x.bindings,x.parameters,navigationProgress,
-         originalManualResetSerial,originalHumanRecovery,actual,*originalRecoveryWorkspace,originalManualRecoveryDiagnostic);},owners))
+     if(!native_original_human_recovery::resetController2255B0(s,x.bindings,x.parameters,navigationProgress,
+         originalManualResetSerial,originalHumanRecovery,owners,*originalRecoveryWorkspace,originalManualRecoveryDiagnostic))
       return failManual(originalManualRecoveryDiagnostic.sourcePC,originalManualRecoveryDiagnostic.message);
      // Physical visibility lease has ended before camera3C borrows4C0.
      const auto camera=sourceCameraSession->resetHumanController225B0C(originalHumanRecovery.selection,
@@ -4047,7 +3021,7 @@ SessionExit50DU Context::run() {
      // Input samples may precede a zero-step host poll. Keep capture/resize
      // redraw pending until the next real graphics publication, never redraw
      // reset models against the previous sequence or force an extra update.
-     originalManualResetGraphicsDue=gcGraphicsSequence[0]+1u;
+     originalManualResetGraphicsDue=graphicsSequence[0]+1u;
      // Both reset owners returned complete; this does not claim graphics publication.
      std::cerr<<"original_manual_reset_complete serial="<<originalManualResetSerial
          <<" physical_completed="<<originalHumanRecovery.physicalCompleted
@@ -4058,7 +3032,7 @@ SessionExit50DU Context::run() {
          <<" after_position_bits="<<original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[0])<<','
          <<original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[1])<<','
          <<original_material_input_diagnostics50LN::bits(m.components.root.body.position.v[2])<<std::dec
-         <<" graphics_sequence="<<gcGraphicsSequence[0]
+         <<" graphics_sequence="<<graphicsSequence[0]
          <<" graphics_due="<<originalManualResetGraphicsDue<<'\n';
      return true;
     };
@@ -4075,529 +3049,379 @@ SessionExit50DU Context::run() {
   };
   auto bindResultsFeedback=[&](){sourceResultsFeedback.bindAfterPublication(*this,racerBank);};
   interactive_publication50DU::Context publicationContext50DU{
-   .acceptedRacePresentation=acceptedRacePresentation,
-   .accountRcParticleRegistryCall=interactive_frame50DU::BorrowedCall<void()>{accountRcParticleRegistry},
-   .accountTbParticleRegistryCall=interactive_frame50DU::BorrowedCall<void()>{accountTbParticleRegistry},
-   .activateColdRace=activateColdRace,
-   .actualWorld=actualWorld,
-   .advanceFrameCall=interactive_frame50DU::BorrowedCall<bool(std::size_t)>{advanceFrame},
-   .advanceFramePartCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,interactive_frame50DU::Part,float,float)>{advanceFramePart},
-   .advanceNativeGcWaterCall=interactive_frame50DU::BorrowedCall<void()>{advanceNativeGcWater},
-   .advanceOriginalAiManagerCall=interactive_frame50DU::BorrowedCall<void(float,const original_all8_frame::Schedule*)>{advanceOriginalAiManager},
-   .advanceRcTrackParticlesCall=interactive_frame50DU::BorrowedCall<void()>{advanceRcTrackParticles},
-   .advanceSourceAudioWorldCall=interactive_frame50DU::BorrowedCall<void(std::uint64_t,bool)>{advanceSourceAudioWorld},
-   .advanceTbTrackParticlesCall=interactive_frame50DU::BorrowedCall<void()>{advanceTbTrackParticles},
-   .advanceWorldAnimationsCall=interactive_frame50DU::BorrowedCall<void()>{advanceWorldAnimations},
-   .allAiControllerSamples=allAiControllerSamples,
-   .allAiEnabled=allAiEnabled,
-   .allAiHostDriverCalls=allAiHostDriverCalls,
-   .allAiKeyboardPackets=allAiKeyboardPackets,
-   .announcerRequestsUnjoined=announcerRequestsUnjoined,
-   .applicationClock=applicationClock,
-   .applicationEvents=applicationEvents,
-   .applyCourseInputCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{applyCourseInput},
-   .applyDynamicSpeechCall=interactive_frame50DU::BorrowedCall<bool(rr::game::RaceActorId50ID,const rr::game::AudioCommand50HE&)>{applyDynamicSpeech},
-   .audioDiagnostic=audioDiagnostic,
-   .audioEnabled=audioEnabled,
-   .audioListener=audioListener,
-   .audioListenerReady=audioListenerReady,
-   .audioOutputRequested=audioOutputRequested,
-   .authored=authored,
-   .autoDriveEnabled=autoDriveEnabled,
-   .baseTail=baseTail,
-   .beginNativeLightDrawCall=interactive_frame50DU::BorrowedCall<void(std::uint32_t,rr::game::original_gc_gameplay_lighting_candidate::DrawLease&)>{beginNativeLightDraw},
-   .beginTaRootCall=interactive_frame50DU::BorrowedCall<bool()>{beginTaRoot},
-   .boostButtonCode=boostButtonCode,
-   .boostState=boostState,
-   .cableDiagnostic=cableDiagnostic,
-   .cableGpuTextures=cableGpuTextures,
-   .cableMesh=cableMesh,
-   .cableOwner=cableOwner,
-   .cableWorkspace=cableWorkspace,
-   .cameraStartup350=cameraStartup350,
-   .captureDynamicBeforeFrameCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{captureDynamicBeforeFrame},
-   .captureDynamicBeforeScheduledPhysicsCall=interactive_frame50DU::BorrowedCall<void(const original_all8_frame::Schedule&,std::size_t)>{captureDynamicBeforeScheduledPhysics},
-   .captureFirstWrongWay=captureFirstWrongWay,
-   .capturePath=capturePath,
-   .captureRun=captureRun,
-   .capturedFirstWrongWay=capturedFirstWrongWay,
-   .checkpointOutput=checkpointOutput,
-   .checkpointRequested=checkpointRequested,
-   .coldFlame=coldFlame,
-   .coldLoadDiagnostics=coldLoadDiagnostics,
-   .collisionNormalMode=collisionNormalMode,
-   .completedFrames=completedFrames,
-   .completionDiagnostic=completionDiagnostic,
-   .composePacketCall=interactive_frame50DU::BorrowedCall<void(bool,const rr::platform::WindowInput50DQ&,std::size_t)>{composePacket},
-   .consumedGaStage=consumedGaStage,
-   .consumedGcStage=consumedGcStage,
-   .consumedMaStage=consumedMaStage,
-   .consumedMbStage=consumedMbStage,
-   .consumedScStage=consumedScStage,
-   .consumedGbStage=consumedGbStage,
-   .consumedMcStage=consumedMcStage,
-   .consumedTbStage=consumedTbStage,
-   .consumedRcStage=consumedRcStage,
-   .consumedTcStage=consumedTcStage,
-   .consumedRaStage=consumedRaStage,
-   .consumedCommonRouteStage=consumedCommonRouteStage,
-   .consumedTaStage=consumedTaStage,
-   .controlPresets=controlPresets,
-   .controller=controller,
-   .courseColdLoad=courseColdLoad,
-   .courseDiagnostic=courseDiagnostic,
-   .courseOutput=courseOutput,
-   .courseRaceCold=courseRaceCold,
-   .courseRaceLaunched=courseRaceLaunched,
-   .courseTargets=courseTargets,
-   .courseTuning=courseTuning,
-   .destination=destination,
-   .directOriginalHuman=directOriginalHuman,
-   .discardedHostNs=discardedHostNs,
-   .displayWallTotals=displayWallTotals,
-   .drawWorkspace=drawWorkspace,
-   .dynamicActorResolver=dynamicActorResolver,
-   .dynamicBoundaryCall=interactive_frame50DU::BorrowedCall<void(std::uint32_t,const char*)>{dynamicBoundary},
-   .dynamicConsumerFlags11050=dynamicConsumerFlags11050,
-   .dynamicContactEnabled=dynamicContactEnabled,
-   .dynamicDamageCursor=dynamicDamageCursor,
-   .dynamicEventBindings=dynamicEventBindings,
-   .dynamicEventCursor=dynamicEventCursor,
-   .dynamicEvents=dynamicEvents,
-   .dynamicLapCursor=dynamicLapCursor,
-   .dynamicMusicProfile=dynamicMusicProfile,
-   .dynamicPodEffect=dynamicPodEffect,
-   .dynamicProfile=dynamicProfile,
-   .dynamicRacer60=dynamicRacer60,
-   .dynamicRegistry=dynamicRegistry,
-   .engineDamage=engineDamage,
-   .engineDamageCompletions=engineDamageCompletions,
-   .engineDamageDips=engineDamageDips,
-   .engineDamageDraws=engineDamageDraws,
-   .engineDamageReturns=engineDamageReturns,
-   .engineDamageUpdates=engineDamageUpdates,
-   .feedbackHost=feedbackHost,
-   .finishDriverAppliedThisFrame=finishDriverAppliedThisFrame,
-   .finishDriverTicks=finishDriverTicks,
-   .finishManualInputTicks=finishManualInputTicks,
-   .finishTaRootCall=interactive_frame50DU::BorrowedCall<bool()>{finishTaRoot},
-   .finishTaRootWithResultsCall=interactive_frame50DU::BorrowedCall<bool()>{finishTaRootWithResults},
-   .trackAnimations=trackAnimations,
-   .trackAnimationBinding=trackAnimationBinding,
-   .gaAtm=gaAtm,
-   .trackAnimationWindow=trackAnimationWindow,
-   .gaOriginalWorld=gaOriginalWorld,
-   .gaTriggerActions=gaTriggerActions,
-   .gameplayBinder=gameplayBinder,
-   .gameplayBinderEnabled=gameplayBinderEnabled,
-   .gameplayBinderTemplates=gameplayBinderTemplates,
-   .gbAtm=gbAtm,
-   .gbColdSources=gbColdSources,
-   .gbFogOwner=gbFogOwner,
-   .gbLightOwner=gbLightOwner,
-   .gbMapView=gbMapView,
-   .gbOriginalWorld=gbOriginalWorld,
-   .gbParticleAttachments=gbParticleAttachments,
-   .gbParticleAuthoring=gbParticleAuthoring,
-   .gbParticleRender=gbParticleRender,
-   .gbParticleRenderDiagnostic=gbParticleRenderDiagnostic,
-   .gbParticleRuntime=gbParticleRuntime,
-   .gbParticleWindow=gbParticleWindow,
-   .gbQueryBinding=gbQueryBinding,
-   .gbRace=gbRace,
-   .gbRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{gbRemainingPayloadBytes},
-   .gbSourceCameraAssets=gbSourceCameraAssets,
-   .gbTrackParticles=gbTrackParticles,
-   .trackAnimationSteps=trackAnimationSteps,
-   .gcAtm=gcAtm,
-   .gcDrawLights=gcDrawLights,
-   .gcGateAudio=gcGateAudio,
-   .gcGraphicsSequence=gcGraphicsSequence,
-   .gcLightDiagnostic=gcLightDiagnostic,
-   .gcLightOwner=gcLightOwner,
-   .gcNativeGate=gcNativeGate,
-   .gcNativeWorldSelected=gcNativeWorldSelected,
-   .gcOriginalWorld=gcOriginalWorld,
-   .gcParticleMaterials=gcParticleMaterials,
-   .gcParticleRender=gcParticleRender,
-   .gcTriggerActions=gcTriggerActions,
-   .gpuTextures=gpuTextures,
-   .ground=ground,
-   .groundStack=groundStack,
-   .headlessLive=headlessLive,
-   .host=host,
-   .hostDiagnostic=hostDiagnostic,
-   .humanControlInput=humanControlInput,
-   .humanCourseEnabled=humanCourseEnabled,
-   .humanOriginalHud=humanOriginalHud,
-   .humanResultsActive=humanResultsActive,
-   .humanResultsCountdown=humanResultsCountdown,
-   .humanResultsReady=humanResultsReady,
-   .installHumanCameraInput50DUCall=interactive_frame50DU::BorrowedCall<void()>{installHumanCameraInput50DU},
-   .isGaTrack=isGaTrack,
-   .isGbTrack=isGbTrack,
-   .isGcTrack=isGcTrack,
-   .maOrCommonRouteTrack=maOrCommonRouteTrack,
-   .isMaTrack=isMaTrack,
-   .isMbTrack=isMbTrack,
-   .isMcTrack=isMcTrack,
-   .isRaTrack=isRaTrack,
-   .isRcTrack=isRcTrack,
-   .commonRouteTrack=commonRouteTrack,
-   .isScTrack=isScTrack,
-   .isTaTrack=isTaTrack,
-   .isTbTrack=isTbTrack,
-   .isTcTrack=isTcTrack,
-   .lapContinuity=lapContinuity,
-   .lapOwner=lapOwner,
-   .lastCommittedWrongWay=lastCommittedWrongWay,
-   .legacyRace=legacyRace,
-   .liveAudio=liveAudio,
-   .liveWorld=liveWorld,
-   .loadedAudioSettings=loadedAudioSettings,
-   .loadedTrack=loadedTrack,
-   .m=m,
-   .maOriginalDisc=maOriginalDisc,
-   .maOriginalWorld=maOriginalWorld,
-   .maCommonRouteAtm=maCommonRouteAtm,
-   .maTriggerActions=maTriggerActions,
-   .mainContactFrames=mainContactFrames,
-   .mainCrossedPortals=mainCrossedPortals,
-   .mainMembership=mainMembership,
-   .materialAudio=materialAudio,
-   .materialOwner=materialOwner,
-   .mbAtm=mbAtm,
-   .mbMapView=mbMapView,
-   .mbOriginalWorld=mbOriginalWorld,
-   .mbRace=mbRace,
-   .mcAtm=mcAtm,
-   .mcColdSources=mcColdSources,
-   .mcFogOwner=mcFogOwner,
-   .mcLightOwner=mcLightOwner,
-   .mcMapView=mcMapView,
-   .mcOriginalWorld=mcOriginalWorld,
-   .mcParticleAttachments=mcParticleAttachments,
-   .mcParticleFrame152Notice=mcParticleFrame152Notice,
-   .mcParticleRender=mcParticleRender,
-   .mcParticleRenderDiagnostic=mcParticleRenderDiagnostic,
-   .mcParticleRuntime=mcParticleRuntime,
-   .mcParticleSource=mcParticleSource,
-   .mcParticleVehicles=mcParticleVehicles,
-   .mcParticleWindow=mcParticleWindow,
-   .mcQueryBinding=mcQueryBinding,
-   .mcRace=mcRace,
-   .mcRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{mcRemainingPayloadBytes},
-   .mcSkyOwner=mcSkyOwner,
-   .mcSourceCameraAssets=mcSourceCameraAssets,
-   .mcTrackParticles=mcTrackParticles,
-   .mcWaterOwner=mcWaterOwner,
-   .mode1=mode1,
-   .mode1Effects=mode1Effects,
-   .mode1Enabled=mode1Enabled,
-   .monotonicNow50DU=monotonicNow50DU,
-   .nativeBottomLeftModels=nativeBottomLeftModels,
-   .nativeBottomRightModels=nativeBottomRightModels,
-   .nativeCalls=nativeCalls,
-   .nativeChariotModels=nativeChariotModels,
-   .nativeFireSerial=nativeFireSerial,
-   .nativeFireSpanDrawn=nativeFireSpanDrawn,
-   .nativeFireSpanIds=nativeFireSpanIds,
-   .nativeFireSpanOwner=nativeFireSpanOwner,
-   .nativeGcWater=nativeGcWater,
-   .nativeIntroRaceCall=interactive_frame50DU::BorrowedCall<rr::game::OriginalRaceConstructor50LA*()>{nativeIntroRace},
-   .nativeLeftModels=nativeLeftModels,
-   .nativeLightFailureCall=interactive_frame50DU::BorrowedCall<void(const char*,std::uint32_t,const rr::game::original_gc_gameplay_lighting_candidate::DrawLease&)>{nativeLightFailure},
-   .nativeLightingPolicy=nativeLightingPolicy,
-   .nativeModelDomain=nativeModelDomain,
-   .nativeOrdinaryLaunch11258=nativeOrdinaryLaunch11258,
-   .nativeOriginalFleet=nativeOriginalFleet,
-   .nativeRecordActor=nativeRecordActor,
-   .nativeRightModels=nativeRightModels,
-   .nativeSelectedLights=nativeSelectedLights,
-   .nativeTaParticleDiagnostic=nativeTaParticleDiagnostic,
-   .nativeTaParticles=nativeTaParticles,
-   .nativeVideo=nativeVideo,
-   .navigationAI=navigationAI,
-   .navigationAIScan=navigationAIScan,
-   .navigationAISequential=navigationAISequential,
-   .navigationMap=navigationMap,
-   .navigationMapScan=navigationMapScan,
-   .navigationMapSequential=navigationMapSequential,
-   .navigationProgress=navigationProgress,
-   .observeOriginalAiFleetCall=interactive_frame50DU::BorrowedCall<void(const original_all8_frame::Schedule*)>{observeOriginalAiFleet},
-   .observedNativeFinishFlags=observedNativeFinishFlags,
-   .observedNativeTicks=observedNativeTicks,
-   .openNativeVideoCall=interactive_frame50DU::BorrowedCall<void()>{openNativeVideo},
-   .opponentAudio=opponentAudio,
-   .opponentCableGpuTextures=opponentCableGpuTextures,
-   .opponentDraw=opponentDraw,
-   .opponentFlamePrepared=opponentFlamePrepared,
-   .opponentFlames=opponentFlames,
-   .opponentFrame=opponentFrame,
-   .opponentGpuTextures=opponentGpuTextures,
-   .opponentSpecularGpuTextures50LA=opponentSpecularGpuTextures50LA,
-   .opponentUvs=opponentUvs,
-   .originalAi=originalAi,
-   .originalAiAudio=originalAiAudio,
-   .originalAiAudioEnabled=originalAiAudioEnabled,
-   .originalAiEnabled=originalAiEnabled,
-   .originalAiHumanCount=originalAiHumanCount,
-   .originalAiOpponentCount=originalAiOpponentCount,
-   .originalAiOwnsSlotCall=interactive_frame50DU::BorrowedCall<bool(std::size_t) noexcept>{originalAiOwnsSlot},
-   .originalAiReads=originalAiReads,
-   .originalAiSession=originalAiSession,
-   .originalAiSettings1125C=originalAiSettings1125C,
-   .originalCameraEnabled=originalCameraEnabled,
-   .originalMain=originalMain,
-   .originalMainApplication=originalMainApplication,
-   .originalManualResetGraphicsDue=originalManualResetGraphicsDue,
-   .originalUiActive=originalUiActive,
-   .originalUiStarted=originalUiStarted,
-   .pendingSpeech=pendingSpeech,
-   .phaseTiming=phaseTiming,
-   .physicalControllerReceipt=physicalControllerReceipt,
-   .playerCableBindings=playerCableBindings,
-   .playerDrawAssets=playerDrawAssets,
-   .playerEnvironment=playerEnvironment,
-   .playerEvents=playerEvents,
-   .playerFlameUvs=playerFlameUvs,
-   .playerPodId=playerPodId,
-   .playerRacer60=playerRacer60,
-   .playerUsesRosterRig=playerUsesRosterRig,
-   .poseHistory=poseHistory,
-   .powerslideButtonCode=powerslideButtonCode,
-   .projectDynamicActorsForSlotCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{projectDynamicActorsForSlot},
-   .publishOriginalAiStandingsCall=interactive_frame50DU::BorrowedCall<void()>{publishOriginalAiStandings},
-   .raDiagnostic=raDiagnostic,
-   .raSession=raSession,
-   .raSessionDiagnostic=raSessionDiagnostic,
-   .raWorld=raWorld,
-   .race=race,
-   .raceAudio=raceAudio,
-   .raceBorrow=raceBorrow,
-   .raceEnabled=raceEnabled,
-   .raceMusic=raceMusic,
-   .raceOpponentCount=raceOpponentCount,
-   .raceRacerCount=raceRacerCount,
-   .racerBank=racerBank,
-   .racerCables=racerCables,
-   .racerCollisions=racerCollisions,
-   .racerContactIds=racerContactIds,
-   .racerContactMaterials=racerContactMaterials,
-   .racerContactOwner=racerContactOwner,
-   .racerContactTotals=racerContactTotals,
-   .racerContactsEnabled=racerContactsEnabled,
-   .racerFrameReads=racerFrameReads,
-   .racerHudNames=racerHudNames,
-   .racerNames=racerNames,
-   .racerRigs=racerRigs,
-   .racerVisuals=racerVisuals,
-   .rcAtm=rcAtm,
-   .rcColdSources=rcColdSources,
-   .rcCollisionWorld=rcCollisionWorld,
-   .rcCrystal=rcCrystal,
-   .rcLightOwner=rcLightOwner,
-   .rcNavigationBorrow=rcNavigationBorrow,
-   .rcOriginalDisc=rcOriginalDisc,
-   .rcOriginalWorld=rcOriginalWorld,
-   .rcParticleAttachmentDiagnostic=rcParticleAttachmentDiagnostic,
-   .rcParticleAttachments=rcParticleAttachments,
-   .rcParticleAuthoring=rcParticleAuthoring,
-   .rcParticleAuthoringDiagnostic=rcParticleAuthoringDiagnostic,
-   .rcParticleRegistryFinalAccounted=rcParticleRegistryFinalAccounted,
-   .rcParticleRegistryPayloadCharged=rcParticleRegistryPayloadCharged,
-   .rcParticleRender=rcParticleRender,
-   .rcParticleRenderDiagnostic=rcParticleRenderDiagnostic,
-   .rcParticleRuntime=rcParticleRuntime,
-   .rcParticleRuntimeDiagnostic=rcParticleRuntimeDiagnostic,
-   .rcParticleWindow=rcParticleWindow,
-   .rcParticleWindowPayloadReservation=rcParticleWindowPayloadReservation,
-   .rcRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{rcRemainingPayloadBytes},
-   .rcTrackParticles=rcTrackParticles,
-   .rcTriggerActions=rcTriggerActions,
-   .rcWorldBorrow=rcWorldBorrow,
-   .recoveryPaused=recoveryPaused,
-   .refreshAnimatedCandidatesCall=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
-   .renderDiagnostics=renderDiagnostics,
-   .renderedCameraPublication=renderedCameraPublication,
-   .renderer=renderer,
-   .rendererDiagnostic=rendererDiagnostic,
-   .repairActiveTicks=repairActiveTicks,
-   .repairButtonCode=repairButtonCode,
-   .reportHost50DU=reportHost50DU,
-   .reportOriginalAiFleetCall=interactive_frame50DU::BorrowedCall<void(const char*)>{reportOriginalAiFleet},
-   .reportRacerContactsCall=interactive_frame50DU::BorrowedCall<void()>{reportRacerContacts},
-   .reportRenderer50DU=reportRenderer50DU,
-   .requestIntroMusicFade=requestIntroMusicFade,
-   .requestStartMusic=requestStartMusic,
-   .requestedWindowSamples=requestedWindowSamples,
-   .requireMbRuntimeNavigation50MBCall=interactive_frame50DU::BorrowedCall<void()>{requireMbRuntimeNavigation50MB},
-   .requireOriginalAiFleetReadyCall=interactive_frame50DU::BorrowedCall<void()>{requireOriginalAiFleetReady},
-   .reserveGbAdditionalPayloadCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveGbAdditionalPayload},
-   .reserveMcEnvironmentCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveMcEnvironment},
-   .reserveRcAdditionalPayloadCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveRcAdditionalPayload},
-   .reserveTbAdditionalPayloadCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveTbAdditionalPayload},
-   .resolveDynamicSpeechCall=interactive_frame50DU::BorrowedCall<bool(rr::game::RaceActorId50ID,rr::game::DamageSpeechInput50HG&,const rr::game::PodSpeechCounts50HG*&,rr::game::PodSpeechState50HG*&)>{resolveDynamicSpeech},
-   .restartRequested=restartRequested,
-   .returnOriginalMainRequested=returnOriginalMainRequested,
-   .s=s,
-   .commonRouteOriginalDisc=commonRouteOriginalDisc,
-   .commonRouteWorld=commonRouteWorld,
-   .commonRouteTriggerActions=commonRouteTriggerActions,
-   .sampleControllerCall=interactive_frame50DU::BorrowedCall<void(bool)>{sampleController},
-   .sampleRaceFieldCall=interactive_frame50DU::BorrowedCall<void()>{sampleRaceField},
-   .scAtm=scAtm,
-   .scColdSources=scColdSources,
-   .scGround=scGround,
-   .scOriginalDisc=scOriginalDisc,
-   .scOriginalWorld=scOriginalWorld,
-   .scTriggerActions=scTriggerActions,
-   .scZeroSky=scZeroSky,
-   .secondaryContactFrames=secondaryContactFrames,
-   .secondaryCrossedPortals=secondaryCrossedPortals,
-   .secondaryMembership=secondaryMembership,
-   .selectedAiCount50MBCall=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedAiCount50MB},
-   .selectedAudioSettings=selectedAudioSettings,
-   .selectedControls=selectedControls,
-   .selectedMapCount50MBCall=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedMapCount50MB},
-   .selectedMapIndex50MBCall=interactive_frame50DU::BorrowedCall<std::uint8_t(std::uint32_t)>{selectedMapIndex50MB},
-   .selectedMapNode50MBCall=interactive_frame50DU::BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)>{selectedMapNode50MB},
-   .selectedRacer60=selectedRacer60,
-   .selectedRuntimeHeightDomain=selectedRuntimeHeightDomain,
-   .selectedTrack=selectedTrack,
-   .sessionIndex=sessionIndex,
-   .sessionRandom=sessionRandom,
-   .skyGpuTextures=skyGpuTextures,
-   .skyOwner=skyOwner,
-   .sourceAnnouncer=sourceAnnouncer,
-   .sourceApplicationClock=sourceApplicationClock,
-   .sourceAttachedGlobals=sourceAttachedGlobals,
-   .sourceBlur=sourceBlur,
-   .sourceCameraAssets=sourceCameraAssets,
-   .sourceCameraCables=sourceCameraCables,
-   .sourceCameraCycleAudio=sourceCameraCycleAudio,
-   .sourceCameraDisplay=sourceCameraDisplay,
-   .sourceCameraInput=sourceCameraInput,
-   .sourceCameraSession=sourceCameraSession,
-   .sourceCameraTick=sourceCameraTick,
-   .sourceConsumedIntroActivation=sourceConsumedIntroActivation,
-   .sourceConsumedPauseActivation=sourceConsumedPauseActivation,
-   .sourceDamage=sourceDamage,
-   .sourceDamageDisplayReported=sourceDamageDisplayReported,
-   .sourceDamageObservation=sourceDamageObservation,
-   .sourceDamageRendering=sourceDamageRendering,
-   .sourceDisplayLifetime=sourceDisplayLifetime,
-   .sourceEndingFade=sourceEndingFade,
-   .sourceFadeDuration98=sourceFadeDuration98,
-   .sourceFadeIn=sourceFadeIn,
-   .sourceFadeManagerA8=sourceFadeManagerA8,
-   .sourceFadeOut=sourceFadeOut,
-   .sourceFogRenderPhase=sourceFogRenderPhase,
-   .sourceFollowQueries=sourceFollowQueries,
-   .sourceFrameSchedule=sourceFrameSchedule,
-   .sourceMainBaseReady=sourceMainBaseReady,
-   .sourceModelRenderGlobals=sourceModelRenderGlobals,
-   .sourcePause=sourcePause,
-   .sourcePauseObservation=sourcePauseObservation,
-   .sourcePauseParentAttached=sourcePauseParentAttached,
-   .sourcePauseTrack=sourcePauseTrack,
-   .sourcePositionStatsDisplayReported=sourcePositionStatsDisplayReported,
-   .sourcePositionStatsHud=sourcePositionStatsHud,
-   .sourcePositionStatsPrestage=sourcePositionStatsPrestage,
-   .sourcePositionStatsPrestageDiagnostic=sourcePositionStatsPrestageDiagnostic,
-   .sourcePositionStatsRendering=sourcePositionStatsRendering,
-   .sourcePositionStatsResources=sourcePositionStatsResources,
-   .sourceRaceHud=sourceRaceHud,
-   .sourceRaceHudDisplayReported=sourceRaceHudDisplayReported,
-   .sourceRaceHudRejectionReported=sourceRaceHudRejectionReported,
-   .sourceRaceHudRendering=sourceRaceHudRendering,
-   .sourceRendererDispatch=sourceRendererDispatch,
-   .sourceSkySelection=sourceSkySelection,
-   .sourceSpeedBoost=sourceSpeedBoost,
-   .sourceSpeedBoostAdapter=sourceSpeedBoostAdapter,
-   .sourceSpeedBoostDisplayReported=sourceSpeedBoostDisplayReported,
-   .sourceSpeedBoostRendering=sourceSpeedBoostRendering,
-   .sourceTimeStats=sourceTimeStats,
-   .sourceTimeStatsAdapter=sourceTimeStatsAdapter,
-   .sourceTimeStatsDisplayReported=sourceTimeStatsDisplayReported,
-   .sourceTimeStatsRendering=sourceTimeStatsRendering,
-   .sourceTrackFog=sourceTrackFog,
-   .sourceVideo=sourceVideo,
-   .specularGpuTextures50LA=specularGpuTextures50LA,
-   .speechCounts=speechCounts,
-   .speechCues=speechCues,
-   .speechEvents=speechEvents,
-   .speechInputCall=interactive_frame50DU::BorrowedCall<rr::game::DamageSpeechInput50HG()>{speechInput},
-   .speechState=speechState,
-   .startAtMenu=startAtMenu,
-   .startMusicContext=startMusicContext,
-   .staticShadowReceiving=staticShadowReceiving,
-   .stopFeedbackTransportCall=interactive_frame50DU::BorrowedCall<void()>{stopFeedbackTransport},
-   .submittedDrawFrames=submittedDrawFrames,
-   .suspendedTaCameraFrame=suspendedTaCameraFrame,
-   .taIntroAuthoring=taIntroAuthoring,
-   .taIntroPcm=taIntroPcm,
-   .taOriginalDisc=taOriginalDisc,
-   .taOriginalWorld=taOriginalWorld,
-   .tbAiView=tbAiView,
-   .tbAtm=tbAtm,
-   .tbColdSources=tbColdSources,
-   .tbCollisionWorld=tbCollisionWorld,
-   .tbLightOwner=tbLightOwner,
-   .tbMapView=tbMapView,
-   .tbOriginalDisc=tbOriginalDisc,
-   .tbOriginalWorld=tbOriginalWorld,
-   .tbParticleRegistryFinalAccounted=tbParticleRegistryFinalAccounted,
-   .tbPodSound=tbPodSound,
-   .tbRace=tbRace,
-   .tbRemainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{tbRemainingPayloadBytes},
-   .tbSourceCameraAssets=tbSourceCameraAssets,
-   .tbTrackParticles=tbTrackParticles,
-   .tbTriggerActions=tbTriggerActions,
-   .tbWorldBorrow=tbWorldBorrow,
-   .tcAiView=tcAiView,
-   .tcAtm=tcAtm,
-   .tcColdSources=tcColdSources,
-   .tcCollisionWorld=tcCollisionWorld,
-   .tcGlobalSound=tcGlobalSound,
-   .tcMapView=tcMapView,
-   .tcOriginalDisc=tcOriginalDisc,
-   .tcOriginalWorld=tcOriginalWorld,
-   .tcRace=tcRace,
-   .tcTriggerActions=tcTriggerActions,
-   .tcWorldBorrow=tcWorldBorrow,
-   .terrainHitFrames=terrainHitFrames,
-   .terrainOwnerCount=terrainOwnerCount,
-   .terrainQueries=terrainQueries,
-   .terrainSupportedFrames=terrainSupportedFrames,
-   .textureDiagnostic=textureDiagnostic,
-   .tournamentLaunchSelection=tournamentLaunchSelection,
-   .tournamentLaunchStamp=tournamentLaunchStamp,
-   .tournamentResultArmed=tournamentResultArmed,
-   .tournamentResultCommitted=tournamentResultCommitted,
-   .trackAdmission=trackAdmission,
-   .trackGpuTextures=trackGpuTextures,
-   .trackMaterialDiagnostic=trackMaterialDiagnostic,
-   .trackMaterialOwner=trackMaterialOwner,
-   .trackMaterialRequest=trackMaterialRequest,
-   .trackMesh=trackMesh,
-   .trackNormals=trackNormals,
-   .trackSession=trackSession,
-   .trackSource=trackSource,
-   .trackTextureBytes=trackTextureBytes,
-   .trackUvAnimation=trackUvAnimation,
-   .updateOpponentAudioCall=interactive_frame50DU::BorrowedCall<void()>{updateOpponentAudio},
-   .updateOriginalAiPackingCall=interactive_frame50DU::BorrowedCall<void()>{updateOriginalAiPacking},
-   .usePhysicalGameController=usePhysicalGameController,
-   .windowSwaps=windowSwaps,
-   .wrongWayActiveTicks=wrongWayActiveTicks,
-   .wrongWayReceipt=wrongWayReceipt,
-   .wrongWayUpdates=wrongWayUpdates,
-   .x=x,
-   .zoneCount=zoneCount,
-   .zoneLifecycle=zoneLifecycle,
-   .bindResultsFeedbackCall=interactive_frame50DU::BorrowedCall<void()>{bindResultsFeedback},
-  };
+  .track=track,
+  .laps=laps,
+  .roster=roster,
+  .raceStart=raceStart,
+  .raceEnd=raceEnd,
+  .acceptedRacePresentation=acceptedRacePresentation,
+  .accountParticleRegistryCall=interactive_frame50DU::BorrowedCall<void()>{accountParticleRegistry},
+  .activateColdRace=activateColdRace,
+  .actualWorld=actualWorld,
+  .advanceFrameCall=interactive_frame50DU::BorrowedCall<bool(std::size_t)>{advanceFrame},
+  .advanceFramePartCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,interactive_frame50DU::Part,float,float)>{advanceFramePart},
+  .advanceWaterCall=interactive_frame50DU::BorrowedCall<void()>{advanceWater},
+  .advanceOriginalAiManagerCall=interactive_frame50DU::BorrowedCall<void(float,const original_all8_frame::Schedule*)>{advanceOriginalAiManager},
+  .advanceTrackParticlesCall=interactive_frame50DU::BorrowedCall<void()>{advanceTrackParticles},
+  .advanceSourceAudioWorldCall=interactive_frame50DU::BorrowedCall<void(std::uint64_t,bool)>{advanceSourceAudioWorld},
+  .advanceWorldAnimationsCall=interactive_frame50DU::BorrowedCall<void()>{advanceWorldAnimations},
+  .allAiControllerSamples=allAiControllerSamples,
+  .allAiEnabled=allAiEnabled,
+  .allAiHostDriverCalls=allAiHostDriverCalls,
+  .allAiKeyboardPackets=allAiKeyboardPackets,
+  .announcerRequestsUnjoined=announcerRequestsUnjoined,
+  .applicationClock=applicationClock,
+  .applicationEvents=applicationEvents,
+  .applyCourseInputCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{applyCourseInput},
+  .applyDynamicSpeechCall=interactive_frame50DU::BorrowedCall<bool(rr::game::RaceActorId50ID,const rr::game::AudioCommand50HE&)>{applyDynamicSpeech},
+  .audioDiagnostic=audioDiagnostic,
+  .audioEnabled=audioEnabled,
+  .audioListener=audioListener,
+  .audioListenerReady=audioListenerReady,
+  .audioOutputRequested=audioOutputRequested,
+  .authored=authored,
+  .autoDriveEnabled=autoDriveEnabled,
+  .baseTail=baseTail,
+  .beginNativeLightDrawCall=interactive_frame50DU::BorrowedCall<void(std::uint32_t,rr::game::original_gc_gameplay_lighting_candidate::DrawLease&)>{beginNativeLightDraw},
+  .beginRaceRootCall=interactive_frame50DU::BorrowedCall<bool()>{beginRaceRoot},
+  .boostButtonCode=boostButtonCode,
+  .boostState=boostState,
+  .cableDiagnostic=cableDiagnostic,
+  .cableGpuTextures=cableGpuTextures,
+  .cableMesh=cableMesh,
+  .cableOwner=cableOwner,
+  .cableWorkspace=cableWorkspace,
+  .cameraStartup350=cameraStartup350,
+  .captureDynamicBeforeFrameCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{captureDynamicBeforeFrame},
+  .captureDynamicBeforeScheduledPhysicsCall=interactive_frame50DU::BorrowedCall<void(const original_all8_frame::Schedule&,std::size_t)>{captureDynamicBeforeScheduledPhysics},
+  .captureFirstWrongWay=captureFirstWrongWay,
+  .capturePath=capturePath,
+  .captureRun=captureRun,
+  .capturedFirstWrongWay=capturedFirstWrongWay,
+  .checkpointOutput=checkpointOutput,
+  .checkpointRequested=checkpointRequested,
+  .coldFlame=coldFlame,
+  .coldLoadDiagnostics=coldLoadDiagnostics,
+  .collisionNormalMode=collisionNormalMode,
+  .completedFrames=completedFrames,
+  .completionDiagnostic=completionDiagnostic,
+  .composePacketCall=interactive_frame50DU::BorrowedCall<void(bool,const rr::platform::WindowInput50DQ&,std::size_t)>{composePacket},
+  .consumedStage=consumedStage,
+  .controlPresets=controlPresets,
+  .controller=controller,
+  .courseColdLoad=courseColdLoad,
+  .courseDiagnostic=courseDiagnostic,
+  .courseOutput=courseOutput,
+  .rootedCourseRace=rootedCourseRace,
+  .courseRaceLaunched=courseRaceLaunched,
+  .courseTargets=courseTargets,
+  .courseTuning=courseTuning,
+  .destination=destination,
+  .discardedHostNs=discardedHostNs,
+  .displayWallTotals=displayWallTotals,
+  .drawWorkspace=drawWorkspace,
+  .dynamicActorResolver=dynamicActorResolver,
+  .dynamicBoundaryCall=interactive_frame50DU::BorrowedCall<void(std::uint32_t,const char*)>{dynamicBoundary},
+  .dynamicConsumerFlags11050=dynamicConsumerFlags11050,
+  .dynamicContactEnabled=dynamicContactEnabled,
+  .dynamicDamageCursor=dynamicDamageCursor,
+  .dynamicEventBindings=dynamicEventBindings,
+  .dynamicEventCursor=dynamicEventCursor,
+  .dynamicEvents=dynamicEvents,
+  .dynamicLapCursor=dynamicLapCursor,
+  .dynamicMusicProfile=dynamicMusicProfile,
+  .dynamicPodEffect=dynamicPodEffect,
+  .dynamicProfile=dynamicProfile,
+  .dynamicRacer60=dynamicRacer60,
+  .dynamicRegistry=dynamicRegistry,
+  .engineDamage=engineDamage,
+  .engineDamageCompletions=engineDamageCompletions,
+  .engineDamageDips=engineDamageDips,
+  .engineDamageDraws=engineDamageDraws,
+  .engineDamageReturns=engineDamageReturns,
+  .engineDamageUpdates=engineDamageUpdates,
+  .feedbackHost=feedbackHost,
+  .finishDriverAppliedThisFrame=finishDriverAppliedThisFrame,
+  .finishDriverTicks=finishDriverTicks,
+  .finishManualInputTicks=finishManualInputTicks,
+  .finishRaceRootCall=interactive_frame50DU::BorrowedCall<bool()>{finishRaceRoot},
+  .finishRaceRootWithResultsCall=interactive_frame50DU::BorrowedCall<bool()>{finishRaceRootWithResults},
+  .trackAnimations=trackAnimations,
+  .trackAnimationBinding=trackAnimationBinding,
+  .trackAnimationWindow=trackAnimationWindow,
+  .gameplayBinder=gameplayBinder,
+  .gameplayBinderEnabled=gameplayBinderEnabled,
+  .gameplayBinderTemplates=gameplayBinderTemplates,
+  .mapView=mapView,
+  .raceSession=raceSession,
+  .remainingPayloadBytesCall=interactive_frame50DU::BorrowedCall<std::size_t()>{remainingPayloadBytes},
+  .cameraAssets=cameraAssets,
+  .trackAnimationSteps=trackAnimationSteps,
+  .drawLights=drawLights,
+  .triggerAudio=triggerAudio,
+  .graphicsSequence=graphicsSequence,
+  .lightDiagnostic=lightDiagnostic,
+  .particleMaterials=particleMaterials,
+  .particleRender=particleRender,
+  .gpuTextures=gpuTextures,
+  .ground=ground,
+  .groundStack=groundStack,
+  .headlessLive=headlessLive,
+  .host=host,
+  .hostDiagnostic=hostDiagnostic,
+  .humanControlInput=humanControlInput,
+  .humanCourseEnabled=humanCourseEnabled,
+  .humanOriginalHud=humanOriginalHud,
+  .humanResultsActive=humanResultsActive,
+  .humanResultsCountdown=humanResultsCountdown,
+  .humanResultsReady=humanResultsReady,
+  .installHumanCameraInput50DUCall=interactive_frame50DU::BorrowedCall<void()>{installHumanCameraInput50DU},
+  .lapContinuity=lapContinuity,
+  .lapOwner=lapOwner,
+  .lastCommittedWrongWay=lastCommittedWrongWay,
+  .liveAudio=liveAudio,
+  .liveWorld=liveWorld,
+  .loadedAudioSettings=loadedAudioSettings,
+  .loadedTrack=loadedTrack,
+  .m=m,
+  .mainContactFrames=mainContactFrames,
+  .mainCrossedPortals=mainCrossedPortals,
+  .mainMembership=mainMembership,
+  .materialAudio=materialAudio,
+  .materialOwner=materialOwner,
+  .mode1=mode1,
+  .mode1Effects=mode1Effects,
+  .mode1Enabled=mode1Enabled,
+  .monotonicNow50DU=monotonicNow50DU,
+  .nativeBottomLeftModels=nativeBottomLeftModels,
+  .nativeBottomRightModels=nativeBottomRightModels,
+  .nativeCalls=nativeCalls,
+  .nativeChariotModels=nativeChariotModels,
+  .nativeFireSerial=nativeFireSerial,
+  .nativeFireSpanDrawn=nativeFireSpanDrawn,
+  .nativeFireSpanIds=nativeFireSpanIds,
+  .nativeFireSpanOwner=nativeFireSpanOwner,
+  .nativeIntroRaceCall=interactive_frame50DU::BorrowedCall<rr::game::OriginalRaceConstructor50LA*()>{nativeIntroRace},
+  .nativeLeftModels=nativeLeftModels,
+  .nativeLightFailureCall=interactive_frame50DU::BorrowedCall<void(const char*,std::uint32_t,const rr::game::original_gc_gameplay_lighting_candidate::DrawLease&)>{nativeLightFailure},
+  .nativeLightingPolicy=nativeLightingPolicy,
+  .nativeModelDomain=nativeModelDomain,
+  .nativeOrdinaryLaunch11258=nativeOrdinaryLaunch11258,
+  .nativeOriginalFleet=nativeOriginalFleet,
+  .nativeRecordActor=nativeRecordActor,
+  .nativeRightModels=nativeRightModels,
+  .nativeSelectedLights=nativeSelectedLights,
+  .particleDiagnostic=particleDiagnostic,
+  .nativeVideo=nativeVideo,
+  .navigationAIScan=navigationAIScan,
+  .navigationAISequential=navigationAISequential,
+  .navigationMapScan=navigationMapScan,
+  .navigationMapSequential=navigationMapSequential,
+  .navigationProgress=navigationProgress,
+  .observeOriginalAiFleetCall=interactive_frame50DU::BorrowedCall<void(const original_all8_frame::Schedule*)>{observeOriginalAiFleet},
+  .observedNativeFinishFlags=observedNativeFinishFlags,
+  .observedNativeTicks=observedNativeTicks,
+  .openNativeVideoCall=interactive_frame50DU::BorrowedCall<void()>{openNativeVideo},
+  .opponentAudio=opponentAudio,
+  .opponentCableGpuTextures=opponentCableGpuTextures,
+  .opponentDraw=opponentDraw,
+  .opponentFlamePrepared=opponentFlamePrepared,
+  .opponentFlames=opponentFlames,
+  .opponentFrame=opponentFrame,
+  .opponentGpuTextures=opponentGpuTextures,
+  .opponentSpecularGpuTextures50LA=opponentSpecularGpuTextures50LA,
+  .opponentUvs=opponentUvs,
+  .originalAi=originalAi,
+  .originalAiAudio=originalAiAudio,
+  .originalAiAudioEnabled=originalAiAudioEnabled,
+  .originalAiEnabled=originalAiEnabled,
+  .originalAiHumanCount=originalAiHumanCount,
+  .originalAiOpponentCount=originalAiOpponentCount,
+  .originalAiOwnsSlotCall=interactive_frame50DU::BorrowedCall<bool(std::size_t) noexcept>{originalAiOwnsSlot},
+  .originalAiReads=originalAiReads,
+  .originalAiSession=originalAiSession,
+  .originalAiSettings1125C=originalAiSettings1125C,
+  .originalCameraEnabled=originalCameraEnabled,
+  .originalMain=originalMain,
+  .originalMainApplication=originalMainApplication,
+  .originalManualResetGraphicsDue=originalManualResetGraphicsDue,
+  .originalUiActive=originalUiActive,
+  .originalUiStarted=originalUiStarted,
+  .pendingSpeech=pendingSpeech,
+  .phaseTiming=phaseTiming,
+  .physicalControllerReceipt=physicalControllerReceipt,
+  .playerCableBindings=playerCableBindings,
+  .playerDrawAssets=playerDrawAssets,
+  .playerEnvironment=playerEnvironment,
+  .playerEvents=playerEvents,
+  .playerFlameUvs=playerFlameUvs,
+  .playerPodId=playerPodId,
+  .playerRacer60=playerRacer60,
+  .playerUsesRosterRig=playerUsesRosterRig,
+  .poseHistory=poseHistory,
+  .powerslideButtonCode=powerslideButtonCode,
+  .projectDynamicActorsForSlotCall=interactive_frame50DU::BorrowedCall<void(std::size_t)>{projectDynamicActorsForSlot},
+  .publishOriginalAiStandingsCall=interactive_frame50DU::BorrowedCall<void()>{publishOriginalAiStandings},
+  .race=race,
+  .raceAudio=raceAudio,
+  .raceBorrow=raceBorrow,
+  .raceEnabled=raceEnabled,
+  .raceMusic=raceMusic,
+  .raceOpponentCount=raceOpponentCount,
+  .raceRacerCount=raceRacerCount,
+  .racerBank=racerBank,
+  .racerCables=racerCables,
+  .racerCollisions=racerCollisions,
+  .racerContactIds=racerContactIds,
+  .racerContactMaterials=racerContactMaterials,
+  .racerContactOwner=racerContactOwner,
+  .racerContactTotals=racerContactTotals,
+  .racerContactsEnabled=racerContactsEnabled,
+  .racerFrameReads=racerFrameReads,
+  .racerHudNames=racerHudNames,
+  .racerNames=racerNames,
+  .racerRigs=racerRigs,
+  .racerVisuals=racerVisuals,
+  .recoveryPaused=recoveryPaused,
+  .refreshAnimatedCandidatesCall=interactive_frame50DU::BorrowedCall<bool()>{refreshAnimatedCandidates},
+  .renderDiagnostics=renderDiagnostics,
+  .renderedCameraPublication=renderedCameraPublication,
+  .renderer=renderer,
+  .rendererDiagnostic=rendererDiagnostic,
+  .repairActiveTicks=repairActiveTicks,
+  .repairButtonCode=repairButtonCode,
+  .reportHost50DU=reportHost50DU,
+  .reportOriginalAiFleetCall=interactive_frame50DU::BorrowedCall<void(const char*)>{reportOriginalAiFleet},
+  .reportRacerContactsCall=interactive_frame50DU::BorrowedCall<void()>{reportRacerContacts},
+  .reportRenderer50DU=reportRenderer50DU,
+  .requestIntroMusicFade=requestIntroMusicFade,
+  .requestStartMusic=requestStartMusic,
+  .requestedWindowSamples=requestedWindowSamples,
+  .requireRuntimeNavigationCall=interactive_frame50DU::BorrowedCall<void()>{requireRuntimeNavigation},
+  .requireOriginalAiFleetReadyCall=interactive_frame50DU::BorrowedCall<void()>{requireOriginalAiFleetReady},
+  .reserveAdditionalPayloadCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveAdditionalPayload},
+  .reserveEnvironmentCall=interactive_frame50DU::BorrowedCall<void(std::size_t,const char*)>{reserveEnvironment},
+  .resolveDynamicSpeechCall=interactive_frame50DU::BorrowedCall<bool(rr::game::RaceActorId50ID,rr::game::DamageSpeechInput50HG&,const rr::game::PodSpeechCounts50HG*&,rr::game::PodSpeechState50HG*&)>{resolveDynamicSpeech},
+  .returnOriginalMainRequested=returnOriginalMainRequested,
+  .s=s,
+  .sampleControllerCall=interactive_frame50DU::BorrowedCall<void(bool)>{sampleController},
+  .sampleRaceFieldCall=interactive_frame50DU::BorrowedCall<void()>{sampleRaceField},
+  .secondaryContactFrames=secondaryContactFrames,
+  .secondaryCrossedPortals=secondaryCrossedPortals,
+  .secondaryMembership=secondaryMembership,
+  .selectedAiCount50MBCall=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedAiCount50MB},
+  .selectedAudioSettings=selectedAudioSettings,
+  .selectedControls=selectedControls,
+  .selectedMapCountCall=interactive_frame50DU::BorrowedCall<std::uint32_t()>{selectedMapCount},
+  .selectedMapIndexCall=interactive_frame50DU::BorrowedCall<std::uint8_t(std::uint32_t)>{selectedMapIndex},
+  .selectedMapNodeCall=interactive_frame50DU::BorrowedCall<const rr::game::UndertrackNode50ET&(std::uint32_t)>{selectedMapNode},
+  .selectedRacer60=selectedRacer60,
+  .selectedRuntimeHeightDomain=selectedRuntimeHeightDomain,
+  .selectedTrack=selectedTrack,
+  .sessionIndex=sessionIndex,
+  .sessionRandom=sessionRandom,
+  .skyGpuTextures=skyGpuTextures,
+  .skyOwner=skyOwner,
+  .sourceAnnouncer=sourceAnnouncer,
+  .sourceApplicationClock=sourceApplicationClock,
+  .sourceAttachedGlobals=sourceAttachedGlobals,
+  .sourceBlur=sourceBlur,
+  .sourceCameraAssets=sourceCameraAssets,
+  .sourceCameraCables=sourceCameraCables,
+  .sourceCameraCycleAudio=sourceCameraCycleAudio,
+  .sourceCameraDisplay=sourceCameraDisplay,
+  .sourceCameraInput=sourceCameraInput,
+  .sourceCameraSession=sourceCameraSession,
+  .sourceCameraTick=sourceCameraTick,
+  .sourceConsumedIntroActivation=sourceConsumedIntroActivation,
+  .sourceConsumedPauseActivation=sourceConsumedPauseActivation,
+  .sourceDamage=sourceDamage,
+  .sourceDamageDisplayReported=sourceDamageDisplayReported,
+  .sourceDamageObservation=sourceDamageObservation,
+  .sourceDamageRendering=sourceDamageRendering,
+  .sourceDisplayLifetime=sourceDisplayLifetime,
+  .sourceEndingFade=sourceEndingFade,
+  .sourceFadeDuration98=sourceFadeDuration98,
+  .sourceFadeIn=sourceFadeIn,
+  .sourceFadeManagerA8=sourceFadeManagerA8,
+  .sourceFadeOut=sourceFadeOut,
+  .sourceFogRenderPhase=sourceFogRenderPhase,
+  .sourceFollowQueries=sourceFollowQueries,
+  .sourceFrameSchedule=sourceFrameSchedule,
+  .sourceMainBaseReady=sourceMainBaseReady,
+  .sourceModelRenderGlobals=sourceModelRenderGlobals,
+  .sourcePause=sourcePause,
+  .sourcePauseObservation=sourcePauseObservation,
+  .sourcePauseParentAttached=sourcePauseParentAttached,
+  .sourcePositionStatsDisplayReported=sourcePositionStatsDisplayReported,
+  .sourcePositionStatsHud=sourcePositionStatsHud,
+  .sourcePositionStatsPrestage=sourcePositionStatsPrestage,
+  .sourcePositionStatsPrestageDiagnostic=sourcePositionStatsPrestageDiagnostic,
+  .sourcePositionStatsRendering=sourcePositionStatsRendering,
+  .sourcePositionStatsResources=sourcePositionStatsResources,
+  .sourceRaceHud=sourceRaceHud,
+  .sourceRaceHudDisplayReported=sourceRaceHudDisplayReported,
+  .sourceRaceHudRejectionReported=sourceRaceHudRejectionReported,
+  .sourceRaceHudRendering=sourceRaceHudRendering,
+  .sourceRendererDispatch=sourceRendererDispatch,
+  .sourceSkySelection=sourceSkySelection,
+  .sourceSpeedBoost=sourceSpeedBoost,
+  .sourceSpeedBoostAdapter=sourceSpeedBoostAdapter,
+  .sourceSpeedBoostDisplayReported=sourceSpeedBoostDisplayReported,
+  .sourceSpeedBoostRendering=sourceSpeedBoostRendering,
+  .sourceTimeStats=sourceTimeStats,
+  .sourceTimeStatsAdapter=sourceTimeStatsAdapter,
+  .sourceTimeStatsDisplayReported=sourceTimeStatsDisplayReported,
+  .sourceTimeStatsRendering=sourceTimeStatsRendering,
+  .sourceTrackFog=sourceTrackFog,
+  .sourceVideo=sourceVideo,
+  .specularGpuTextures50LA=specularGpuTextures50LA,
+  .speechCounts=speechCounts,
+  .speechCues=speechCues,
+  .speechEvents=speechEvents,
+  .speechInputCall=interactive_frame50DU::BorrowedCall<rr::game::DamageSpeechInput50HG()>{speechInput},
+  .speechState=speechState,
+  .startAtMenu=startAtMenu,
+  .startMusicContext=startMusicContext,
+  .staticShadowReceiving=staticShadowReceiving,
+  .stopFeedbackTransportCall=interactive_frame50DU::BorrowedCall<void()>{stopFeedbackTransport},
+  .submittedDrawFrames=submittedDrawFrames,
+  .suspendedCameraFrame=suspendedCameraFrame,
+  .introAuthoring=introAuthoring,
+  .introPcm=introPcm,
+  .aiView=aiView,
+  .terrainHitFrames=terrainHitFrames,
+  .terrainOwnerCount=terrainOwnerCount,
+  .terrainQueries=terrainQueries,
+  .terrainSupportedFrames=terrainSupportedFrames,
+  .textureDiagnostic=textureDiagnostic,
+  .tournamentLaunchSelection=tournamentLaunchSelection,
+  .tournamentLaunchStamp=tournamentLaunchStamp,
+  .tournamentResultArmed=tournamentResultArmed,
+  .tournamentResultCommitted=tournamentResultCommitted,
+  .trackAdmission=trackAdmission,
+  .trackGpuTextures=trackGpuTextures,
+  .trackMaterialDiagnostic=trackMaterialDiagnostic,
+  .trackMaterialOwner=trackMaterialOwner,
+  .trackMaterialRequest=trackMaterialRequest,
+  .trackMesh=trackMesh,
+  .trackNormals=trackNormals,
+  .trackSession=trackSession,
+  .trackSource=trackSource,
+  .trackTextureBytes=trackTextureBytes,
+  .trackUvAnimation=trackUvAnimation,
+  .updateOpponentAudioCall=interactive_frame50DU::BorrowedCall<void()>{updateOpponentAudio},
+  .updateOriginalAiPackingCall=interactive_frame50DU::BorrowedCall<void()>{updateOriginalAiPacking},
+  .usePhysicalGameController=usePhysicalGameController,
+  .windowSwaps=windowSwaps,
+  .wrongWayActiveTicks=wrongWayActiveTicks,
+  .wrongWayReceipt=wrongWayReceipt,
+  .wrongWayUpdates=wrongWayUpdates,
+  .x=x,
+  .zoneCount=zoneCount,
+  .zoneLifecycle=zoneLifecycle,
+  .bindResultsFeedbackCall=interactive_frame50DU::BorrowedCall<void()>{bindResultsFeedback},
+ };
   publicationContext50DU.run();
  }catch(...){
   const auto failure=std::current_exception();
@@ -4611,7 +3435,7 @@ SessionExit50DU Context::run() {
   throw;
  }
  const auto closedNavigationAnchor=originalUiActive?0u:static_cast<unsigned>(
-     selectedMapIndex50MB(navigationProgress.reset.vehicleC8C));
+     selectedMapIndex(navigationProgress.reset.vehicleC8C));
  const auto closedMainZone=originalUiActive?0:mainMembership.storage.links[0].zone;
  const auto closedSecondaryZone=originalUiActive?0:secondaryMembership.storage.links[0].zone;
  bool windowClosed=closeWindow();
@@ -4643,7 +3467,7 @@ SessionExit50DU Context::run() {
   return courseColdLoad.pending()?SessionExit50DU::CourseColdLoad:SessionExit50DU::Quit;
  }
  if(raceEnabled)reportRacerContacts();
- std::cout<<(restartRequested?"Development session restarting: ticks=":"Development drive stopped: ticks=")<<completedFrames
+ std::cout<<"Development drive stopped: ticks="<<completedFrames
           <<" render_commits="<<submittedDrawFrames<<" window_swaps="<<windowSwaps<<" native_calls="<<nativeCalls
           <<" collected_calls="<<collectedCalls<<" peak_collected="<<peakCollected
           <<" main_contact_ticks="<<mainContactFrames<<" secondary_contact_ticks="<<secondaryContactFrames
@@ -4669,7 +3493,9 @@ SessionExit50DU Context::run() {
  return originalMainApplication.nativePauseMenuDeparting50LA()?SessionExit50DU::PauseMenuReturn:
         originalMainApplication.nativeResultsHallDeparting50LA()?SessionExit50DU::ResultsHallReturn:
      returnOriginalMainRequested?SessionExit50DU::ReturnOriginalMain:
-     checkpointRequested?SessionExit50DU::Checkpoint:(restartRequested?SessionExit50DU::Restart:SessionExit50DU::Quit);
+     // No Restart exit: Pause RESTART, the Time Trial finish and Practice restart
+     // the race in place through 1AC8E0 (common_race_start50CR, R9).
+     checkpointRequested?SessionExit50DU::Checkpoint:SessionExit50DU::Quit;
 }
 } // namespace interactive_continuation50DU
 
@@ -4682,34 +3508,32 @@ bool OriginalRaceConstructor50LA::initializeNativeRacerB0(
     if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
     // Existing lexical native producer only, after its real registered roster
     // and grounded grid creation. This does not enter source1AA580/1AD520.
-    if(!context.isRaTrack||!context.originalAiEnabled||context.nativeRacerManager||
-       context.consumedRaStage.race().get()!=this||context.originalMainApplication.race28C()!=this||
+    // B-C06: one rule for every course. The counted race's World at race+74
+    // (1B2870) holds this session's Track and its collision world answers queries.
+    const auto& track=context.track;
+    if(!context.originalAiEnabled||context.nativeRacerManager||
+       context.consumedStage.race().get()!=this||context.originalMainApplication.race28C()!=this||
        application_!=context.originalMainApplication.entities()||!counted_||rolledBack_||
-       !world74_||world74_!=context.raWorld||world74_->terminal_||world74_->closed_||
-       !world74_->runtimeQueries_||!world74_->source_||!profile_||
+       !world74_||world74_->trackData()!=&track||!world74_->track||
+       !track.roles.collision||!track.roles.collision->queryReady()||!profile_||
        profile_!=context.originalMainApplication.riderProfile||
        context.originalAiHumanCount>1u||context.originalAiHumanCount>bank.count()||
        context.originalAiOpponentCount!=bank.count()-context.originalAiHumanCount)return false;
-    const auto& runtime=*world74_->runtimeQueries_;
-    if(runtime.terminal_||runtime.closed_||!runtime.cameraBankCurrent()||runtime.bankIdentity_!=&bank)return false;
     try {
         // Original1A6F4C calls2A1160,1A6F54 publishes B8, then1A6F5C
-        // loads it. Here the existing native cold producer adopts only the
-        // same retained RA projection, BEFORE constructing native B0.
+        // loads it over the race's one track navigation, BEFORE constructing native B0.
         pc=0x1a6f48;
         if(!mapB8_){
-            ra_cold_aggregate50LA::Diagnostic diagnostic;
-            auto navigation=world74_->borrowColdNavigation(diagnostic);
-            if(!navigation||&navigation->map()!=context.navigationMap)return false;
             auto next=context.originalMainApplication.constructTunnelTrackCold2A1160(
-                entity_.sessionGeneration,OriginalTunnelTrackRole50LA::mapB8,std::move(navigation));
+                entity_.sessionGeneration,OriginalTunnelTrackRole50LA::mapB8,
+                std::shared_ptr<const common_track50CR::Track>(world74_->track));
             if(!next)return false;
             mapB8_=std::move(next); //Retain actual count if later binding fails.
         }
         pc=0x1a6f5c;
         if(!mapB8_->navigation()&&
            !context.originalMainApplication.bindTunnelTrackColdProjection2A1260(*mapB8_))return false;
-        if(mapB8_->navigation()!=context.navigationMap||mapB8_->application_!=application_||
+        if(!mapB8_->navigation()||!context.mapView.runtimeValid()||mapB8_->application_!=application_||
            mapB8_->entity_.sessionGeneration!=entity_.sessionGeneration)return false;
         pc=0x1aa548;
         if(!racerB0_){
@@ -4731,15 +3555,14 @@ bool OriginalRaceConstructor50LA::initializeNativeTimingB4(
     if(resultsFeedbackThread_!=std::this_thread::get_id())return false;
     //This is the actual EXISTING native cold manager producer, not permission
     //to skip the incomplete original1A6BF0/world/controller/attachment tails.
-    if(!context.isRaTrack||!context.originalAiEnabled||context.consumedRaStage.race().get()!=this||
+    // B-C06: one rule for every course (World at race+74 holds this Track).
+    const auto& track=context.track;
+    if(!context.originalAiEnabled||context.consumedStage.race().get()!=this||
        context.originalMainApplication.race28C()!=this||application_!=context.originalMainApplication.entities()||
-       !counted_||rolledBack_||!world74_||world74_!=context.raWorld||
-       world74_->terminal_||world74_->closed_||!world74_->runtimeQueries_||!world74_->source_)return false;
-    const auto& runtime=*world74_->runtimeQueries_;
-    if(runtime.terminal_||runtime.closed_||!runtime.cameraBankCurrent()||runtime.bankIdentity_!=&bank)return false;
-    const auto* source=world74_->source_->sourcesDecoded();
-    if(!source||context.navigationMap!=&source->map||!source->mapMetadata.bound||
-       source->map.track.count<2u||!profile_||
+       !counted_||rolledBack_||!world74_||world74_->trackData()!=&track||
+       !track.roles.collision||!track.roles.collision->queryReady())return false;
+    // The map view over m<code>.spl (2A1260) with its bound AI metadata.
+    if(!context.mapView.runtimeValid()||!context.mapView.metadata()||context.mapView.count()<2u||!profile_||
        profile_!=context.originalMainApplication.riderProfile)return false;
     try {
         if(!timingB4_){
@@ -4749,7 +3572,7 @@ bool OriginalRaceConstructor50LA::initializeNativeTimingB4(
             timingB4_=std::move(next); //Actual1A7730 publication BEFORE subtype/load.
         }
         return timingB4_->continueNativeAssociation(*this,context.originalAiSession,bank,
-            source->map,source->mapMetadata,pc);
+            context.mapView,pc);
     }catch(...){return false;} //Retain published B4/count and any reached effects.
 }
 }
@@ -4767,14 +3590,8 @@ void Registration::continuePreAck1AB520(rr::game::OriginalRaceConstructor50LA& r
        !race.counted_||race.rolledBack_||race.entity_.sessionGeneration!=generation_||
        race.endHud_.lock().get()!=this||!race.anyWorld())return;
     try {
-        // RA: the camera is its world join's retained Session. Every other
-        // course's race reaches the same 1AB520 through its own camera link.
-        std::shared_ptr<original_camera_session50KX::Session> borrowed;
-        const original_camera_session50KX::Session* camera=nullptr;
-        if(race.world74_){
-            const auto world=race.world74_;ra_cold_aggregate50LA::Diagnostic wd;
-            borrowed=world->borrowRuntimeSourceCamera(world,wd);camera=borrowed.get();
-        }else camera=race.cameraNativeAdapter34_;
+        // Every course's race reaches 1AB520 through its own camera link.
+        const original_camera_session50KX::Session* camera=race.cameraNativeAdapter34_;
         if(!camera||camera!=camera_||&camera->actual_.bank!=bank_||
            camera->actual_.raceHud!=hud_||camera->generation_!=generation_||
            camera->actual_.applicationEntities!=race.application_)return;
