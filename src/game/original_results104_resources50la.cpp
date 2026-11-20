@@ -1,4 +1,5 @@
 #include "original_results104_storage50la.h"
+#include "../assets/original_ui_screen_assets50kg.h" // DLC add-on Results icon image (PORT EXTENSION)
 #include <algorithm>
 #include <bit>
 #include <cstring>
@@ -52,9 +53,23 @@ bool OriginalResults10450LA::Impl::texture(Texture& t,Role role,std::uint32_t pc
     if(!domain->populateTimeStatsResources2DF144(context,materialDiagnostic))
         return stop(d,S::material,materialDiagnostic.sourcePC,"Results actual whole-table population");
     const auto* ref=references.reference(t.primitive54->reference);
-    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's absent portrait has no
-    // material, atlas or packet; every later reader skips it (never drawn).
-    if(ref&&ref->absent)return true;
+    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's portrait has no stock
+    // material or atlas. With its own icon loaded (references.addonIcon) it
+    // gets the same packet the stock portrait gets, sized from that icon's
+    // own image; without one it has no packet and every later reader skips it.
+    if(ref&&ref->absent){
+        const auto* icon=references.addonIcon(ref);
+        const auto* image=icon?icon->images->decodedTexture(0):nullptr;
+        if(!image||image->mips.empty())return true;
+        t.atlas=nullptr;
+        t.width34=static_cast<float>(image->mips.back().width);t.height38=static_cast<float>(image->mips.back().height);
+        t.invWidth4C=1.f/t.width34;t.invHeight50=1.f/t.height38;
+        t.buffer58=std::make_unique<Packet>();t.primitive54->packet10=t.buffer58.get();
+        for(std::size_t i=0;i<4;++i){auto& v=t.buffer58->vertices[i];
+            v.rgba={{127,127,127,63}};v.xyz={{0,0,static_cast<float>(depth)-t.field40,1}};
+            v.stq={{(i&1)?1.f:0.f,(i&2)?1.f:0.f,1,0}};}
+        t.flags5C|=1;return true;
+    }
     const assets::OriginalStandardMaterialObject50LA* object=nullptr;
     assets::OriginalStandardMaterialPassView50LA pass;
     assets::OriginalStandardTextureRowView50LA row;

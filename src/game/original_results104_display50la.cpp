@@ -1,4 +1,5 @@
 #include "original_results104_storage50la.h"
+#include "../assets/original_ui_screen_assets50kg.h" // DLC add-on Results icon image (PORT EXTENSION)
 #include "../../tests/native/original_results_live_owner_read50la.h"
 #include "original_ui_text50kg.h"
 #include "original_ui_text_position50kg.h"
@@ -79,7 +80,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     const auto texture=[&](const Impl::Texture& t,std::uint32_t pc){
         if(!t.primitive54)return stop(0x2df8a0,"Results slot40 actual texture primitive absent");
         const auto* ref=p.references.reference(t.primitive54->reference);
-        if(ref&&ref->absent&&!t.buffer58)return true; // add-on portrait: no texture to demand (PORT EXTENSION)
+        if(ref&&ref->absent)return true; // add-on portrait: no canonical texture to demand (PORT EXTENSION)
         const assets::OriginalStandardMaterialObject50LA* material=nullptr;
         assets::OriginalStandardMaterialRowView50LA row;assets::OriginalStandardMaterialPassView50LA pass;
         if(!ref||!ref->retained||!t.buffer58||t.primitive54->packet10!=t.buffer58.get()||
@@ -281,6 +282,18 @@ bool OriginalResults10450LA::Impl::retainNativeOccurrence(std::size_t reference,
        !context||!context->live()||!domain||vertices.empty()||vertices.size()%4)
         return stop(d,S::owner,caller,"Results native occurrence custody absent");
     const auto table=domain->materials382B38();const auto* ref=references.reference(reference);
+    if(ref&&ref->absent){
+        // PORT EXTENSION, NOT ORIGINAL: an add-on portrait (own icon, no stock
+        // row). Kept in source order with no leaf yet; its policy and leaf are
+        // resolved when this capture's derived body returns
+        // (captureNativeDerivedCpu1C21B0), or the packet is dropped there.
+        if(!references.addonIcon(ref))return true;
+        try {
+            NativeDisplayCapture::Packet packet;packet.reference=reference;packet.caller=caller;
+            packet.vertices=std::move(vertices);packet.material.finalLeaf=-1;
+            nativeDisplay->packets.push_back(std::move(packet));return true;
+        }catch(...){return stop(d,S::allocation,caller,"Results native add-on occurrence allocation");}
+    }
     if(!table||!ref||!ref->retained||!table->coldCollectorCurrent(nativeDisplay->receipt))
         return stop(d,S::material,caller,"Results originating primitive collector changed");
     // prepareNativePrimitive owns its collector pin and exactly one originating
@@ -403,10 +416,40 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDe
         p.stop(d,Impl::S::material,0x14d440,"Results native capture collector snapshot");return DisplayCpuPrefix::none;}
     capture.receipt=p.domain->coldCollector14D440();
     capture.race=&race;capture.generation=p.component.sessionGeneration;capture.building=true;
+    p.references.beginNativeCapture50DL(); // PORT EXTENSION: add-on icon policy is per capture
     // The existing private chain traverses each reached derived call once;
     // never replay its borrowed TextCall/TextureCall arrays after mutation.
     const auto prefix=prepareCareerSummaryCpuPrefix(race,observer,d);
     capture.building=false;capture.stoppedPC=d.sourcePC;
+    // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step D): each add-on portrait
+    // packet takes its policy and leaf now (PortraitPolicy), or is dropped
+    // (not drawn). Stock packets are untouched; with no add-on icon this loop
+    // changes nothing.
+    try {
+        for(std::size_t i=0;i<capture.packets.size();){auto& packet=capture.packets[i];
+            const auto* ref=p.references.reference(packet.reference);
+            if(!ref||!ref->absent){++i;continue;}
+            const auto* icon=p.references.addonIcon(ref);
+            assets::OriginalStandardMaterialDiagnostic50LA md;Impl::References::NativePrimitive material;
+            bool drawn=icon&&p.references.prepareAddonPortrait50DL(packet.reference,capture.receipt,material,md);
+            const char* why=drawn?nullptr:(md.field?md.field:"add-on icon policy refused");
+            if(drawn)for(const auto& v:packet.vertices)if(v.color[3]>material.textured.maximumVertexAlpha){
+                drawn=false;why="vertex alpha above the policy bound";break;}
+            const std::uint8_t outcome=drawn?1u:2u;
+            if(icon&&icon->logged!=outcome){icon->logged=outcome;
+                const auto* image=icon->images->decodedTexture(0);
+                if(drawn)std::fprintf(stderr,"dlc_results_portrait racer=%u key=%s icon=%s status=drawn width=%u height=%u leaf=%d policy=stock_portrait_reference_%zu\n",
+                    icon->racer60,icon->key.c_str(),icon->member.c_str(),image&&!image->mips.empty()?image->mips.back().width:0u,
+                    image&&!image->mips.empty()?image->mips.back().height:0u,material.finalLeaf,p.references.portraitPolicy_.reference);
+                else std::fprintf(stderr,"dlc_results_portrait racer=%u key=%s icon=%s status=refused reason=\"%s\"\n",
+                    icon->racer60,icon->key.c_str(),icon->member.c_str(),why);
+            }
+            if(drawn){packet.material=std::move(material);++i;}
+            else capture.packets.erase(capture.packets.begin()+static_cast<std::ptrdiff_t>(i));
+        }
+    }catch(...){
+        p.stop(d,Impl::S::allocation,0x1c21b0,"Results native add-on portrait resolution");
+        capture.boundedDerivedReturned=false;return DisplayCpuPrefix::none;}
     capture.boundedDerivedReturned=p.displayCpu&&p.displayCpu->nextSourcePC==0x1c8a74&&d.status==Impl::S::incomplete;
     return prefix; // Preserve incomplete/error, never turn CPU capture into draw success.
 }
@@ -418,21 +461,23 @@ bool OriginalResults10450LA::Impl::projectTextureCpu2DF694(Texture& t,
             return stop(d,S::owner,caller,"Results native texture occurrence owner thread");
         if(!application->screenQuadEnabled383678_)return true; //Source gate BEFORE projection/service.
     }
-    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's absent portrait
-    // (Reference::absent) is not projected or drawn.
+    // PORT EXTENSION, NOT ORIGINAL: an add-on racer's portrait
+    // (Reference::absent) is projected only with its own icon loaded (a
+    // packet exists); it has no stock atlas or retained row.
+    bool addonPortrait=false;
     if(t.primitive54){const auto* absent=references.reference(t.primitive54->reference);
-        if(absent&&absent->absent&&!t.buffer58)return true;}
+        if(absent&&absent->absent){if(!t.buffer58||!references.addonIcon(absent))return true;addonPortrait=true;}}
     // Only the zero-rotation CPU span2DF694..2DF860. In particular this is
     // NOT2DF550: source phase5/global383678 checks, current camera1E8/1EC
     // packet header writes and246760 submission are not implemented here.
-    if(!t.primitive54||!t.buffer58||!t.atlas||
+    if(!t.primitive54||!t.buffer58||(!t.atlas&&!addonPortrait)||
        t.primitive54->packet10!=t.buffer58.get()||t.field3C!=0.f||
        (t.flags5C&2u)||t.field30!=1.f||t.field40!=1.f||
        !std::isfinite(t.x10)||!std::isfinite(t.y14)||
        !std::isfinite(t.width34)||!std::isfinite(t.height38))
         return stop(d,S::source,caller,"Results bounded texture CPU geometry");
     const auto* ref=references.reference(t.primitive54->reference);
-    if(!ref||!ref->retained)
+    if(!ref||(!ref->retained&&!addonPortrait))
         return stop(d,S::material,caller,"Results texture lost its own material association");
     Packet next=*t.buffer58;
     if(t.flags5C&1u){

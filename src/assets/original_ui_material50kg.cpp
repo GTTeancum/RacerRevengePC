@@ -1724,6 +1724,23 @@ bool OriginalStandardMaterialObject50LA::prepareResultsScreenFallback2475C0(
         material=std::move(actual);output=policy;return true;
     }catch(...){return reject(OriginalStandardMaterialStatus50LA::allocation,0x2475C0,"Results FINAL fallback policy projection");}
 }
+bool prepareOriginalResultsAddonPortraitMaterial50DL(const OriginalUiMaterialPass50KG& pass,
+    const OriginalStandardMaterialObject50LA& stockFinal,const Texture48E& addonImage,
+    OriginalUiNativeMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see original_ui_addon_material50dl.h. The
+    // stock pass is exactly the one prepareResultsScreenFallback2475C0 lowers;
+    // only the image (shape-checked below like every one-map policy) differs.
+    d={};
+    if(pass.provenance.origin!=OriginalUiMaterialOrigin50KG::resultsCanonicalScreenMissingPsmFallback&&
+       pass.provenance.origin!=OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback&&
+       pass.provenance.origin!=OriginalUiMaterialOrigin50KG::memoryCardCanonicalScreenMissingPsmFallback)
+        return fail(d,Error::profile,"stock Results portrait missing-PSM fallback pass",0x2475c0u);
+    OriginalUiNativeMaterial50KG policy;bool fog=false,alphaTest=false;
+    if(!prepareOriginalUiOneMapMaterial50KM(pass,addonImage,policy,d,false,fog,alphaTest,
+        false,false,false,false,false,false,false,false,false,false,false,false,nullptr,nullptr,false,nullptr,nullptr,&stockFinal))
+        return false;
+    output=policy;return true;
+}
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d) noexcept {

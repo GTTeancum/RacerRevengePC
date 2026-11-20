@@ -7,7 +7,7 @@
 // the original navigation, widgets, models and profile stay on the stock control
 // the add-on block follows (the "anchor"). For that frame the anchor control's
 // four authored widgets (pod model, venus16 name, swhutt44 name, character model)
-// draw nothing; the add-on's lines are laid out with the venus16 name widget's own
+// draw nothing; the add-on's name line is laid out with the venus16 name widget's own
 // font, colour and position. The stats code gets the add-on's own registry
 // number (no stock portrait), and the anchor's NN_bkg background is not drawn,
 // so no stock rider's model or image shows under an add-on name.
@@ -29,7 +29,9 @@ struct Overlay {
     const void* collector=nullptr;               // the one collector this frame belongs to
     std::array<std::uint16_t,4> suppressed{};    // anchor control widgets, authored order
     std::uint16_t nameWidget=0;                  // suppressed[1]: venus16 name text
-    std::array<Line,2> lines{};                  // pilot name, then package name under it
+    // The pilot name only, as on a stock control: package and source game stay in the
+    // logs and dlc.json, never on screen.
+    std::array<Line,1> lines{};
     std::uint32_t statRider=0;                   // the add-on's registry number the stats input carries
     std::uint32_t anchorRider=0;                 // the stock rider the add-on block follows (draw-order reference)
     // Menu-art step A: add-on model table row drawn in place of the anchor pod

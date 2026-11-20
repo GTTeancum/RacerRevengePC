@@ -4,7 +4,7 @@ import pathlib,re,subprocess,sys,json
 MAIN=pathlib.Path(r'D:\Programming\GitHub\RacerRevengePC')
 WT=pathlib.Path(r'D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\agent-a4997ceb610a9c15d')
 OUT=WT/'work'/'scratch'/'146p-rider'/'obj';OUT.mkdir(exist_ok=True)
-BASE=MAIN/'build'/'takeover-b145c'
+BASE=MAIN/'build'/'takeover-b146b'
 r=json.loads((BASE/'build-receipt.json').read_text(encoding='utf-8-sig'))
 TOPS=('src','platform','tests','third_party')
 def remap(t):
@@ -18,6 +18,10 @@ ok=True
 def job(rel):
     global ok
     lines=[]
+    like=None
+    if '=' in rel:rel,like=rel.split('=',1)  # new.cpp=existing.cpp: borrow existing's flags
+    target=rel
+    if like:rel=like
     src=(WT/rel).resolve();mainsrc=str(MAIN/rel).lower()
     hit=None
     for d in folders:
@@ -30,6 +34,10 @@ def job(rel):
         with lock:print('no rsp for',rel);ok=False
         return
     p,t=hit;t=remap(t)
+    if like:
+        a_=str(WT/like).replace('/',chr(92));b_=str(WT/target).replace('/',chr(92))
+        t=re.sub(re.escape(a_),lambda m:b_,t,flags=re.I)
+        src=(WT/target).resolve();rel=target
     obj=re.search(r'/Fo"([^"]+)"',t)[1];t=t.replace(obj,str(OUT/(src.stem+'.obj')))
     pdb='/Fd"'+str(OUT/(src.stem+'.pdb'))+'"';t=re.sub(r'/Fd"[^"]+"',lambda m:pdb,t)
     rp=OUT/(src.stem+'.rsp');rp.write_text(t,encoding='utf-16')

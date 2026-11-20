@@ -3,7 +3,13 @@
 #include "original_standard_material_domain50la.h"
 #include "original_ui_screen_assets50kg.h"
 #include "dlc_registry50dl.h"
+#include "dlc_files50dl.h"
+#include "original_ui_addon_material50dl.h"
+#include "original_standard_material_table50la.h"
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <system_error>
 #include <cstdio>
 #include <cstring>
 #include <bit>
@@ -205,12 +211,15 @@ bool OriginalResultsPrimitiveReferences50LA::acquireNext(Role role,std::uint32_t
        domain_->materials382B38()->populationTerminal()||domain_->materials382B38()->demandTerminal()||
        !domain_->textures383400()||domain_->textures383400()->populationTerminal())return stop(S::phase,0x14D370);
     if(role==Role::portrait&&dlc50DL::addonNumberRange(racer60)&&dlc50DL::addonPod(racer60)){
-        // PORT EXTENSION, NOT ORIGINAL: see Reference::absent. No name lookup,
-        // store or retain happens; the source order of later occurrences is kept.
+        // PORT EXTENSION, NOT ORIGINAL: see Reference::absent. No standard-table
+        // name lookup, store or retain happens; the source order of later
+        // occurrences is kept. The pod's own icon loads into this owner's own
+        // add-on bank (addonIcons_); a refusal leaves the portrait undrawn.
         auto& reference=references_[next_];reference=Reference{};reference.absent=true;
-        const auto* pod=dlc50DL::addonPod(racer60);
-        std::fprintf(stderr,"dlc_results_portrait racer=%u key=%s icon=%s status=absent reason=\"package UI archive not mounted by Results\"\n",
-            racer60,pod->key.c_str(),pod->ui.resultsIcon.c_str());
+        const auto* pod=dlc50DL::addonPod(racer60);std::size_t index=noAddonIcon;std::string why;
+        if(loadAddonIcon50DL(racer60,index,why))reference.addonIcon=index;
+        else std::fprintf(stderr,"dlc_results_portrait racer=%u key=%s icon=%s status=absent reason=\"%s\"\n",
+            racer60,pod->key.c_str(),pod->ui.resultsIcon.c_str(),why.c_str());
         ++next_;return true;
     }
     try {
@@ -276,6 +285,86 @@ bool OriginalResultsPrimitiveReferences50LA::acquireNext(Role role,std::uint32_t
         d.row=row;d.storedSlots=1;d.retainedSlots=1;d.sourceEffectsCommitted=true;
         ++next_;return true;
     }catch(...){return stop(S::allocation,0x299BE0);}
+}
+bool OriginalResultsPrimitiveReferences50LA::loadAddonIcon50DL(std::uint32_t racer60,
+    std::size_t& index,std::string& why)noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see AddonIcon in the header.
+    index=noAddonIcon;
+    try {
+        const auto* pod=dlc50DL::addonPod(racer60);
+        if(!pod){why="registry row absent";return false;}
+        for(std::size_t i=0;i<addonIcons_.size();++i)if(addonIcons_[i].racer60==racer60){index=i;return true;}
+        if(addonIcons_.size()>=racers_){why="outside the Results add-on icon capacity (one per racer)";return false;}
+        const auto& icon=pod->ui.resultsIcon;
+        if(icon.size()<5||!same(icon.substr(icon.size()-4),".pst")){why="results_icon is not a .pst member";return false;}
+        std::vector<std::uint8_t> bytes;
+        {
+            const auto path=dlc50DL::host(std::filesystem::path(pod->ui.archive));
+            std::error_code e;const auto size=std::filesystem::file_size(path,e);
+            if(e||!size||size>dlc50DL::RegistryLimits::uiArchiveBytes){why="menu archive outside the add-on UI archive capacity";return false;}
+            std::ifstream in(path,std::ios::binary);
+            if(!in){why="menu archive cannot be opened";return false;}
+            bytes.resize(static_cast<std::size_t>(size));
+            if(!in.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()))){why="menu archive cannot be read";return false;}
+        }
+        auto archive=std::make_shared<OriginalUiArchive50KG>();OriginalUiArchiveDiagnostic50KG ad;
+        if(!archive->loadAddon(pod->ui.archive,std::move(bytes),dlc50DL::RegistryLimits::uiArchiveBytes,
+            dlc50DL::RegistryLimits::uiDecodedBytes,dlc50DL::RegistryLimits::uiEntries,ad)||!archive->addon()){
+            why="menu archive does not decode within its capacity (status "+std::to_string(unsigned(ad.status))+")";return false;}
+        const auto member=archive->find(icon);
+        if(!member.identity||!member.data||!member.size||member.size!=member.identity->bytes||
+           originalUiAddonMemberArchive50DL(member.identity)!=archive->identity()){why="results_icon member absent from the menu archive";return false;}
+        // The original "%02d_fsm" portraits have no PSM (2475C0 fallback); an
+        // add-on icon with an authored PSM has no matching draw policy here.
+        if(archive->find(icon.substr(0,icon.size()-4)+".psm").identity){why="results_icon has an authored PSM (not supported)";return false;}
+        auto images=std::make_shared<OriginalUiScreenAssets50KG>();OriginalUiScreenAssetDiagnostic50KG decoded;
+        if(!images->load({OriginalUiImageSource50KG{0,member,0,member.size,{}}},decoded)){
+            why="results_icon does not decode";return false;}
+        const auto* image=images->decodedTexture(0);
+        if(!image||image->mips.empty()||!image->mips.back().width||!image->mips.back().height){why="results_icon decoded image empty";return false;}
+        AddonIcon next;next.racer60=racer60;next.key=pod->key;next.member=icon;next.archive=std::move(archive);
+        next.images=std::move(images);next.identity=member.identity;next.bytes=member.size;
+        addonIcons_.push_back(std::move(next));index=addonIcons_.size()-1;return true;
+    }catch(const std::exception& x){try{why=x.what();}catch(...){}}
+     catch(...){}
+    try{if(why.empty())why="results_icon load failed";}catch(...){}
+    return false;
+}
+bool OriginalResultsPrimitiveReferences50LA::prepareAddonPortrait50DL(std::size_t reference,
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,NativePrimitive& output,D& d)noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see AddonIcon / PortraitPolicy in the header.
+    d={};
+    if(nativeImageThread_!=std::this_thread::get_id())return fail(d,S::phase,0x246760);
+    if(!prepared_||failed_||closing_||next_!=references_.size()||reference>=references_.size()||
+       source(reference).role!=Role::portrait||!domain_||!context_||!context_->live())return fail(d,S::reference,0x246760);
+    const auto* icon=addonIcon(&references_[reference]);
+    if(!icon){d.field="add-on Results icon not loaded";return fail(d,S::reference,0x246760);}
+    const auto& policy=portraitPolicy_;
+    if(!policy.known||!policy.final||policy.leaf<0||policy.reference>=references_.size()||
+       !references_[policy.reference].retained||references_[policy.reference].material00!=policy.row){
+        d.field="no stock Results portrait policy in this capture";return fail(d,S::reference,0x2475C0);}
+    const auto table=domain_->materials382B38();
+    if(!table||!table->pinNativeCollector(receipt))return fail(d,S::collector,0x249610);
+    const auto unpin=[&](OriginalStandardMaterialTable50LA*)noexcept{table->unpinNativeCollector();};
+    std::unique_ptr<OriginalStandardMaterialTable50LA,decltype(unpin)> pin(table.get(),unpin);
+    try {
+        // The borrowed stock portrait is still the same live FINAL leaf.
+        OriginalStandardMaterialCollectorEntryView50LA origin,final;
+        if(!table->coldCollectorPass(receipt,policy.row,0,origin)||origin.finalLeaf!=policy.leaf||
+           !table->coldCollectorEntry(receipt,static_cast<std::size_t>(origin.finalLeaf),final)||
+           final.redirect18!=-1||final.material!=policy.final||final.pass!=0||!final.material->constructed29B550()){
+            d.field="stock Results portrait policy changed";return fail(d,S::collector,0x24B1A0);}
+        const auto* image=icon->images->decodedTexture(0);
+        if(!image)return fail(d,S::texture,0x24E880);
+        NativePrimitive next;OriginalUiMaterialDiagnostic50KG numeric;
+        if(!prepareOriginalResultsAddonPortraitMaterial50DL(policy.pass,*policy.final,*image,next.textured,numeric)){
+            d.document=numeric.document;d.field="add-on Results icon policy";
+            return fail(d,S::unsupportedPass,numeric.sourcePC?numeric.sourcePC:0x2475C0);}
+        if(next.textured.blend==OriginalUiMaterialBlend50KG::destinationAlphaAdditive)return fail(d,S::unsupportedPass,0x249610);
+        next.image.images=icon->images;next.image.member=icon->identity;next.image.image=0;
+        next.image.offset=0;next.image.bytes=icon->bytes;next.hasTexture=true;next.finalLeaf=policy.leaf;
+        output=std::move(next);return true;
+    }catch(...){return fail(d,S::allocation,0x2475C0);}
 }
 void OriginalResultsPrimitiveReferences50LA::release299AC0(std::size_t i)noexcept {
     if(i>=references_.size())std::terminate();closing_=true;
@@ -520,6 +609,14 @@ bool OriginalResultsPrimitiveReferences50LA::prepareNativePrimitive50LA(std::siz
                 return stop(S::phase,0x249BA0);
         }
         next.finalLeaf=origin.finalLeaf; //Rechecked against the live registry just above.
+        if(role==Role::portrait&&fallback&&next.hasTexture&&!portraitPolicy_.known&&!addonIcons_.empty()){
+            // PORT EXTENSION, NOT ORIGINAL: kept for an add-on icon of this
+            // same capture (PortraitPolicy). No stock output changes; a failed
+            // copy only leaves the add-on icon undrawn.
+            try{portraitPolicy_.pass=effective;portraitPolicy_.final=final.material;portraitPolicy_.row=row;
+                portraitPolicy_.leaf=origin.finalLeaf;portraitPolicy_.reference=reference;portraitPolicy_.known=true;}
+            catch(...){portraitPolicy_.known=false;portraitPolicy_.final=nullptr;}
+        }
         output=std::move(next);d.sourceEffectsCommitted|=serviced;return true;
     }catch(...){return stop(S::allocation,0x247110);}
 }

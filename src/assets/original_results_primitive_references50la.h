@@ -17,6 +17,7 @@ class OriginalStandardTextureResource50LA;
 class OriginalStandardMaterialCollectorReceipt50LA;
 class OriginalUiScreenAssets50KG;
 struct OriginalUiMemberIdentity50KG;
+class OriginalStandardMaterialObject50LA;
 // Private material-reference facet of the connected Results104 loader. The
 // source occurrence schedule, not a public name/certificate, selects each row.
 class OriginalResultsPrimitiveReferences50LA final {
@@ -27,10 +28,13 @@ public:
         medalGold,medalSilver,medalBronze,separator };
     // absent: PORT EXTENSION, NOT ORIGINAL. An add-on racer's Results
     // portrait (DLC pod): the original "%02d_fsm" catalogue has no row for
-    // it and its own results icon lives in a package UI archive the Results
-    // owner does not mount, so the occurrence is consumed with no material
-    // (nothing stored or retained) and the portrait is simply not drawn.
-    struct Reference {std::int32_t material00=-1;bool started=false,retained=false,absent=false;};
+    // it, so the occurrence is consumed with no stock material (nothing
+    // stored or retained in the standard table). addonIcon names this
+    // owner's own add-on icon (addonIcons_) when the pod's ui.results_icon
+    // loaded from the pod's own UI archive; npos = not drawn.
+    static constexpr std::size_t noAddonIcon=static_cast<std::size_t>(-1);
+    struct Reference {std::int32_t material00=-1;bool started=false,retained=false,absent=false;
+        std::size_t addonIcon=noAddonIcon;};
     ~OriginalResultsPrimitiveReferences50LA();
     OriginalResultsPrimitiveReferences50LA(const OriginalResultsPrimitiveReferences50LA&)=delete;
     OriginalResultsPrimitiveReferences50LA& operator=(const OriginalResultsPrimitiveReferences50LA&)=delete;
@@ -93,6 +97,43 @@ private:
     // standalone PST the resolver took from a non-UI archive (a course RES).
     // Owned for this object's lifetime: image caches keep raw pointers.
     std::vector<std::unique_ptr<OriginalUiMemberIdentity50KG>> nativeResourceMembers_;
+    // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step D): the add-on Results
+    // icon. The Results owner opens the pod's own UI archive itself (through
+    // dlc50DL::host, within RegistryLimits::uiArchive*) and decodes only the
+    // ui.results_icon member ("<stem>_fsm.pst", no PSM) into its own image
+    // bank. Own capacity: at most one icon per actual racer (racers_).
+    struct AddonIcon {
+        std::uint32_t racer60=0;
+        std::string key,member;
+        std::shared_ptr<const OriginalUiArchive50KG> archive;
+        std::shared_ptr<const OriginalUiScreenAssets50KG> images;
+        const OriginalUiMemberIdentity50KG* identity=nullptr;
+        std::size_t bytes=0;
+        // Last logged dlc_results_portrait outcome (0 none, 1 drawn, 2 refused):
+        // one line per icon, again only if the outcome changes.
+        mutable std::uint8_t logged=0;
+    };
+    std::vector<AddonIcon> addonIcons_;
+    const AddonIcon* addonIcon(const Reference* r)const noexcept{
+        return r&&r->absent&&r->addonIcon<addonIcons_.size()&&addonIcons_[r->addonIcon].images?&addonIcons_[r->addonIcon]:nullptr;}
+    bool loadAddonIcon50DL(std::uint32_t racer60,std::size_t& index,std::string& why)noexcept;
+    // The add-on icon's draw policy. PORT STAND-IN: the add-on has no row in
+    // the standard material table, so its ScreenTexture draws with the FINAL
+    // pass of a stock "%02d_fsm" portrait of the SAME capture (the same
+    // 2475C0 missing-PSM fallback and current 249610 context every stock
+    // portrait gets; the pass carries no per-image field) lowered over the
+    // add-on's own image, at that portrait's final collector leaf. Reset at
+    // every capture start; filled by prepareNativePrimitive50LA.
+    struct PortraitPolicy {
+        OriginalUiMaterialPass50KG pass;
+        const OriginalStandardMaterialObject50LA* final=nullptr;
+        std::int32_t row=-1,leaf=-1;std::size_t reference=0;bool known=false;
+    };
+    PortraitPolicy portraitPolicy_;
+    void beginNativeCapture50DL()noexcept{portraitPolicy_.known=false;portraitPolicy_.final=nullptr;}
+    bool prepareAddonPortrait50DL(std::size_t reference,
+        const OriginalStandardMaterialCollectorReceipt50LA&,NativePrimitive&,
+        OriginalStandardMaterialDiagnostic50LA&)noexcept;
     struct Source {Role role{};std::uint32_t caller=0,offset=0;std::size_t ordinal=0;const char* directory=nullptr;const char* name=nullptr;bool missingPsm=false;};
     Source source(std::size_t)const noexcept;
     std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;

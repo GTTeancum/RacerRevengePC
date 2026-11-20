@@ -1728,7 +1728,7 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         }
         auto& overlay=s->addonOverlay;overlay={};
         overlay.collector=&s->collector;overlay.suppressed=ids;overlay.nameWidget=ids[1];
-        overlay.lines[0]={&s->addonText[0],&s->addonText[1]};overlay.lines[1]={&s->addonText[2],nullptr};
+        overlay.lines[0]={&s->addonText[0],&s->addonText[1]}; // name only (the package name is logged, not drawn)
         overlay.statRider=pod->number;overlay.anchorRider=s->state.rider4C4;
         // Menu-art step A: the add-on's own pod model in place of the anchor pod.
         if(s->addonModelRow(s->addonSlot))overlay.modelRow=s->addonSlot-1;
@@ -1794,8 +1794,8 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     }
     if(s->addonSlot&&!s->addonSkipLogged&&(s->addonOverlay.drawnLines||s->addonOverlay.skippedLines)){
         s->addonSkipLogged=true;const auto* pod=s->addonPod();
-        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u stats=pod_phy model=pod portrait=own background=own character=own\n",
-            pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines);
+        std::fprintf(stderr,"dlc_rider_draw key=%s number=%u name_lines_drawn=%u name_lines_skipped=%u package=\"%s\" stats=pod_phy model=pod portrait=own background=own character=own\n",
+            pod?pod->key.c_str():"-",pod?pod->number:0u,s->addonOverlay.drawnLines,s->addonOverlay.skippedLines,pod?pod->packageName.c_str():"-");
     }
     ++s->state.renders;s->state.framePublished=true;return result(d,Status::ok);
 }

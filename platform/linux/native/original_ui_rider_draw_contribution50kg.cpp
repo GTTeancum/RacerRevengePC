@@ -1154,7 +1154,7 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
             const auto& material=materials[materialIndex];const auto* map=s.backend->staticImage(s.staticOwner,material.images[0]);
             if(!map)return fail(d,E::bank);const auto binding=s.find(&material.material.passes[0],map->combinedIndex);
             if(binding==unresolved)return fail(d,E::material);float z=0;if(!s.resources->textPacketDepth(id,z))return fail(d,E::geometry);
-            float below=0; // the package name goes one font line under the pilot name
+            float below=0; // further lines (none today) go one font line under the name
             for(const auto& line:addon->lines){
                 // A line whose glyphs the authored font lacks is skipped (logged by the
                 // session), never drawn with invented glyphs and never a frame failure.
