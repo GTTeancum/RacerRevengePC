@@ -1,4 +1,5 @@
 #include "dlc_registry50dl.h"
+#include "dlc_name_font50dl.h"
 #include "dlc_package50dl.h"
 // NOT ORIGINAL BEHAVIOUR (PC enhancement): see dlc_registry50dl.h.
 // Contract: work\scratch\dlc\DLC-JSON.md, "Add-on items" (dlc-contract-2).
@@ -257,6 +258,16 @@ bool readStrings(const Package& p,const Json& root,PackageItems& out,std::string
             const auto t=k->get<std::string>();
             if(!fontText(t,RegistryLimits::stringBytes))
                 return fail(reason,"strings: "+language+"."+k.key()+" must be 1-255 characters the menu fonts draw (printable ASCII)");
+            // A display string can be a racer name: every font that draws a
+            // racer name must draw it (dlc_name_font50dl.h, the one set).
+            for(const char c:t)if(!dlcNameCharacter(c)){
+                // Named by code too: the log quoting turns '"' into '\''.
+                static constexpr char hex[]="0123456789abcdef";
+                const std::string code{'0','x',hex[(unsigned char)c>>4],hex[(unsigned char)c&15]};
+                const std::string shown=c=='"'?std::string("double quote"):"'"+std::string(1,c)+"'";
+                return fail(reason,"strings: "+language+"."+k.key()+" uses "+shown+" ("+code+
+                    "), which the race HUD font cannot draw (allowed: "+dlcNameCharacterSetText+")");
+            }
             if(++keys>RegistryLimits::stringKeys)return fail(reason,"strings: more than 4096 keys");
             out.strings[language][k.key()]=t;
         }

@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds_storage.h"
+#include "../../../src/assets/dlc_name_font50dl.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -58,7 +59,9 @@ constexpr std::uint64_t hudGlyph(U a, U b, U c, U d, U e, U f, U g) noexcept {
         (std::uint64_t(f) << 25) | (std::uint64_t(g) << 30);
 }
 
-std::uint64_t hostHudGlyph(char letter) noexcept {
+// The glyph table itself, constexpr so the DLC name character set can be
+// checked against it at compile time (below). Same table, same results.
+constexpr std::uint64_t hostHudGlyphTable(char letter) noexcept {
     if (letter >= 'a' && letter <= 'z') letter = char(letter - 'a' + 'A');
     switch (letter) {
     case 'A': return hudGlyph(14,17,17,31,17,17,17);
@@ -111,6 +114,20 @@ std::uint64_t hostHudGlyph(char letter) noexcept {
     default: return 0; // The only other admitted character is a space.
     }
 }
+std::uint64_t hostHudGlyph(char letter) noexcept { return hostHudGlyphTable(letter); }
+// PORT EXTENSION cross-check (DLC): the registry's one allowed character set
+// for package display strings (src\assets\dlc_name_font50dl.h) must be exactly
+// what this font draws over ASCII 32..126 (space included). A glyph added or
+// removed here without the same change there fails the build.
+constexpr bool hostHudSetMatchesDlcNameSet() noexcept {
+    for (int c = 32; c <= 126; ++c) {
+        const bool drawn = c == ' ' || hostHudGlyphTable(char(c)) != 0;
+        if (drawn != rr::assets::dlc50DL::dlcNameCharacter(char(c))) return false;
+    }
+    return true;
+}
+static_assert(hostHudSetMatchesDlcNameSet(),
+    "host HUD glyph set differs from the DLC name character set (src/assets/dlc_name_font50dl.h)");
 
 bool validHostHudName(const char (&name)[maxVehicleWindowRacerName50DS + 1]) noexcept {
     bool visible = false;

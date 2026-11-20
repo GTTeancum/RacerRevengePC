@@ -232,6 +232,18 @@ def font_text(s, limit):  # printable ASCII: the stock menu fonts draw every gly
     return isinstance(s, str) and 0 < len(s) <= limit and all(0x20 <= ord(c) <= 0x7e for c in s)
 
 
+# The one allowed character set for display strings (a string can be a racer
+# name, drawn by the race HUD font too). Same set as the port's
+# src/assets/dlc_name_font50dl.h (dlcNameCharacter), which the HUD source checks
+# against its glyph table at compile time.
+NAME_PUNCTUATION = "!'()+,-./:;"
+NAME_SET_TEXT = "space, A-Z, a-z, 0-9 and ! ' ( ) + , - . / : ;"
+
+
+def name_character(c):
+    return c == ' ' or ('A' <= c <= 'Z') or ('a' <= c <= 'z') or ('0' <= c <= '9') or c in NAME_PUNCTUATION
+
+
 def read_res(path, cap):
     """RES3 names and decoded storage (layout of src/assets/import_decode48c.cpp)."""
     b = Path(path).read_bytes()
@@ -337,6 +349,9 @@ def read_items(p, d):
         for k, v in table.items():
             need(KEY.match(k) is not None, f'strings: key "{k}" is not [A-Z0-9_]{{1,47}}')
             need(font_text(v, 255), f'strings: {lang}.{k} must be 1-255 characters the menu fonts draw (printable ASCII)')
+            for c in v:
+                shown = 'double quote' if c == '"' else f"'{c}'"
+                need(name_character(c), f"strings: {lang}.{k} uses {shown} (0x{ord(c):02x}), which the race HUD font cannot draw (allowed: {NAME_SET_TEXT})")
             keys += 1
             need(keys <= 4096, 'strings: more than 4096 keys')
     p['strings'] = strings
