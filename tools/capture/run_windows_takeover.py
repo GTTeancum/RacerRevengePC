@@ -101,6 +101,46 @@ def seed_dlc_hall(pod_key):
             'pods': {pod_key: {'unlocked': True}}, 'careers': {}}
 
 
+# Course ids 0..12 (original course descriptors / Hall row order).
+HALL_COURSES = ('TA', 'TB', 'TC', 'RC', 'MA', 'MB', 'MC', 'RA', 'GA', 'GB', 'GC', 'SA', 'SC')
+SLOW_HALL_SECONDS = 3599.99  # shown by 189000 as 59:59.99
+
+
+def seed_slow_hall(data, code, free_play_main):
+    """Return progress-v1.bin bytes in which course `code`'s Hall rows are all
+    slow (lap and race 59:59.99, knockouts 0) so any finished time qualifies
+    under the unchanged 1ABFC0/1AC440 rules. Layout = the order
+    saveNativeBetaProgress writes (platform/linux/native/
+    original_ui_rider_profile50kg.cpp): 16-byte RRPB header, 3 words, unlock
+    27, hidden 27, remembered 4, remembered course 7, 27 careers of
+    (4 words + 27 pods * 32 words), 29 names * 21 words, then 13 Hall courses
+    of (3 lap floats, 3 race floats, 3 knockout words, 9 names * 21 words).
+    Only those 9 numeric words change (names kept). free_play_main also sets
+    the Main remembered slot 6E0 to 1 (the free-play route's fresh entry).
+    The CRC and size words are rewritten; anything off-layout is refused."""
+    d = bytearray(data)
+    u32 = lambda at: struct.unpack_from('<I', d, at)[0]
+    if len(d) < 16 or u32(0) != 0x42505252 or u32(4) != 1 or u32(8) != len(d) - 16 or \
+            u32(12) != zlib.crc32(bytes(d[16:])) & 0xffffffff:
+        raise ValueError('Seed save is not an intact progress-v1 file')
+    words = 3 + 27 + 27 + 4 + 7 + 27 * (4 + 27 * 32) + 29 * 21
+    hall = 16 + 4 * words
+    course_bytes = 4 * (3 + 3 + 3 + 9 * 21)
+    if hall + 13 * course_bytes != len(d):
+        raise ValueError(f'Seed save size {len(d)} does not match the RRPB layout ({hall + 13 * course_bytes})')
+    course = HALL_COURSES.index(code)
+    at = hall + course * course_bytes
+    if not (16 <= at and at + 36 <= len(d)):
+        raise ValueError('Hall row offset outside the seed')
+    struct.pack_into('<6f', d, at, *([SLOW_HALL_SECONDS] * 6))
+    struct.pack_into('<3I', d, at + 24, 0, 0, 0)
+    if free_play_main:
+        struct.pack_into('<I', d, 16 + 8, 1)  # savedSlot6E0 (third header word)
+    struct.pack_into('<I', d, 8, len(d) - 16)
+    struct.pack_into('<I', d, 12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
+    return bytes(d)
+
+
 def digest(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -194,6 +234,10 @@ def main():
                         help='With --hold-throttle: hold the repair key (R) 2 s of every 6 s')
     parser.add_argument('--unstick', action='store_true',
                         help='With --hold-throttle: tap the manual reset key (T) when the pod is wedged for 3 s')
+    parser.add_argument('--seed-slow-hall', metavar='CODE', type=str.upper,
+                        help='Test only: with --seed-save, make course CODE\'s Hall rows all slow (lap/race '
+                             '59:59.99, knockouts 0) so the unattended driver\'s time is a record (unchanged '
+                             'original rules). For the free-play route also sets the Main slot to 1')
     parser.add_argument('--seed-save', type=Path,
                         help='Test only: copy this prepared native progress file (progress-v1.bin format) into the run save directory before launch')
     parser.add_argument('--player-racer', type=int, choices=ORIGINAL_RACERS,
@@ -281,6 +325,8 @@ def main():
     temporary.mkdir()
     saves = output / 'saves'
     saves.mkdir()
+    if args.seed_slow_hall is not None and (not args.seed_save or args.seed_slow_hall not in HALL_COURSES):
+        raise ValueError('--seed-slow-hall needs --seed-save and a course code ' + '/'.join(HALL_COURSES))
     if args.seed_save:
         seed = args.seed_save.resolve()
         if not seed.is_file():
@@ -289,6 +335,11 @@ def main():
             shutil.copy2(seed, saves / 'progress-v1.bin')
         else:
             (saves / 'progress-v1.bin').write_bytes(seed_player_racer(seed.read_bytes(), args.player_racer))
+        if args.seed_slow_hall is not None:
+            target = saves / 'progress-v1.bin'
+            target.write_bytes(seed_slow_hall(target.read_bytes(), args.seed_slow_hall,
+                                              args.route in ADDON_RIDER_ROUTES))
+            print(f'test_seed hall={args.seed_slow_hall} slow=1', flush=True)
     if args.eyecheck_dlc_hall is not None:
         (saves / 'dlc-progress-v1.json').write_text(json.dumps(seed_dlc_hall(args.eyecheck_dlc_hall), indent=2) + '\n')
     staged = output / 'RacerRevengePC.exe'
@@ -413,6 +464,7 @@ def main():
                   visualVerified=False, audioVerified=False, hostInputUsed=False, logsOnly=logs_only,
                   addonRider=args.addon_rider, addonRiderHold=args.hold_rider, addonCourse=args.addon_course,
                   eyecheckDlcHall=args.eyecheck_dlc_hall, resultsHold=args.hold_results, resultsHallCapture=args.hold_results_hall,
+                  seedSlowHall=args.seed_slow_hall,
                   resultsExit=args.results_exit,
                   cameraPoseTrace=args.camera_trace, nativeRestartOnce=args.restart_once, rendererSwitches=sorted(set(args.renderer_switch)),
                   performanceProfiling=args.profile_performance or args.profile_gpu_stages,
