@@ -31,6 +31,7 @@
 #include "pod_cables50fd_fixture.h"
 // Common rewrite: the one stage, track, roster, lap tracker, race start/end.
 #include "original_consumed_stage50du.h"
+#include "original_race_pause_forward50la.h" // teardown: 1ACF50 / 142040 resume of a still-paused race
 #include "common_track50cr.h"
 #include "common_race_world50cr.h"
 #include "common_roster50cr.h"
@@ -2956,6 +2957,22 @@ SessionExit50DU Context::run() {
    std::cerr<<"common_teardown_detail role=animation session_holder_released="<<bool(trackAnimations)
        <<" use_count_before="<<trackAnimations.use_count()<<'\n';
    trackAnimations.reset();
+   // A session that ends while the race is still under its Pause 142040 (the Pause open at
+   // the wall budget, or the Time Trial record page 3 that 1BDAB4 leaves over the paused
+   // race with App11C set) keeps race flags29 bit2 and the paused race groups; the race's
+   // retirement admits only the running race (flags29 & 15 == 3), so cr20 GC refused
+   // ("race detached identity/flags/children") and terminated. The original leaves through
+   // its screen change and never meets this gate; the port closes the Pause's own effects
+   // first, in 1BE830's order (App11C = 0, 1ACF50 resume, 142040(race,0)), through the same
+   // owners. Same values when nothing is paused. PORT STAND-IN (flagged): teardown-only.
+   if(const auto& pausedRace=consumedStage.race()){
+    const bool app11C=originalMainApplication.animationPaused();
+    originalMainApplication.setExplicitAnimationPause(false);
+    const bool world=originalMainApplication.pauseConsumedRaceWorld1ACF50(*pausedRace,false);
+    const bool entity=originalMainApplication.pauseConsumedRaceEntity142040(*pausedRace,false);
+    std::cerr<<"common_teardown_pause app11C_was="<<app11C<<" world_1ACF50_resume="<<world
+        <<" race_142040_resume="<<entity<<'\n';
+   }
    // One stage close for every course: audio, the counted race and its World
    // at race+74 (1B2870 retire), then the Track's own release (roles in
    // reverse order, then the archive 1316A0; R1/R3).

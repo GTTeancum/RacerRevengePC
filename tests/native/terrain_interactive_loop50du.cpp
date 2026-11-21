@@ -1803,6 +1803,49 @@ void Context::run() {
        require50DU(finish(),"actual race root return rejected");
      }
     } raceRootReturn{finishRaceRoot,suspendedCameraFrame};
+    if(pauseRecordPage1BDAB4&&sourceCameraSession&&originalMainApplication.animationPaused()){
+     // Time Trial Pause QUIT with a record (1BDAB4, every course): App11C stays set, so
+     // 1A7B40 takes 1A7B94..1A7BAC, 141ED0 over the race's children only. No racer,
+     // manager, lap or race-clock step runs (cr20 GC: the race went on counting to 624 s
+     // because the world was not held once the Pause itself had closed). Results 1C8AE0
+     // updates over the frozen race and takes the pad (1C8C30 is routed above); its
+     // 1CA574..1CA6F0 confirm departs to the Hall through its own owners.
+     // PORT STAND-IN (flagged): the camera publishes a frame from the frozen racers through
+     // the replayPose cut (every racer Ready, no racer frame this tick), because the native
+     // Results update requires a current Camera publication; the original 141ED0 is not
+     // claimed to run the camera.
+     const auto frame=++sourceCameraTick;
+     const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
+     const auto cameraChild=scene.status==sourceCamera::Status::sceneChildComplete?
+         sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::replayPose):scene;
+     {static unsigned reported=0xffu;
+      if(static_cast<unsigned>(cameraChild.status)!=reported){reported=static_cast<unsigned>(cameraChild.status);
+       std::cerr<<"pause_record_page frame=1BDAB4 camera_status="<<reported<<" pc="<<std::hex<<cameraChild.sourcePC<<std::dec<<'\n';}}
+     if(cameraChild.status==sourceCamera::Status::framePublished){
+      publishSourceCameraFog();forceSceneRender=true;
+      rr::game::OriginalResults104Diagnostic50LA resultsUpdate;
+      const bool updated=originalMainApplication.updateNativeResultsAfterRace50LA(*sourceCameraSession,resultsUpdate);
+      const bool captured=updated&&finishRaceRootWithResults();
+      {static const char* reported=nullptr;
+       if(!updated||!captured||resultsUpdate.operation!=reported){reported=resultsUpdate.operation;
+        std::cerr<<"pause_record_page results updated="<<updated<<" captured="<<captured<<" pc="<<std::hex
+            <<resultsUpdate.sourcePC<<std::dec<<" status="<<static_cast<unsigned>(resultsUpdate.status)
+            <<" operation="<<(resultsUpdate.operation?resultsUpdate.operation:"")<<'\n';}}
+      require50DU(updated,resultsUpdate.operation?resultsUpdate.operation:"Pause record page Results update rejected");
+     }
+     // The race audio keeps its owners behind the page (the same held route as a completed
+     // scene and the Results replay): the page's own feedback and its confirm's 26D070 stop
+     // need the live mixer.
+     if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}
+     if(audioEnabled&&liveAudio->outputOpen()){
+      phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
+      const auto beforeMix=liveAudio->mixedFrames();
+      const bool mixed=liveAudio->committedStep(audioDiagnostic);
+      advanceSourceAudioWorld(beforeMix,true);
+      require50DU(mixed,"native Pause record page audio step failed");
+     }
+     continue;
+    }
     if((allAiEnabled&&(originalAiSession.all8FinishAwaitingDisplay||originalAiSession.all8ResultsComplete))||
        (humanCourseEnabled&&humanResultsReady)){
      // Completed native Results holds the last genuine world/camera frame.

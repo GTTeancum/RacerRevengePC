@@ -108,7 +108,15 @@ bool Application::updateNativeResultsAfterRace50LA(const original_camera_session
     // frame, as the original Results run over the replay.
     const bool commonReplay=race->endDispatchReturned_&&
         native_common_results50PD::state().replayActive;
-    if(!commonReplay&&(race->endEntryStep_!=Race::EndEntryStep::subtype||race->endEntryProfile_||
+    // Time Trial Pause QUIT with a record (1BDAB4, every course): 1BDAC0 cleared Pause+200
+    // and its activity, 1BDB30 activated Results104 and 1BDB4C set page 3, but App11C stays
+    // set (no 1BE830). 1A7B40 then runs only 141ED0 over the race's children (1A7B94..1A7BAC),
+    // so Results 1C8AE0 updates over the paused race with no race end entered. Recognised
+    // from that state itself (launch 11258 == 3, App11C set, Pause+200 == 0), not a flag.
+    const bool pauseRecordPage1BDAB4=!race->endDispatchReturned_&&!race->endDispatchPublication_&&
+        returnedCamera.actual_.launchKind11258==3u&&animationPaused()&&
+        race->pause100_&&!race->pause100_->active200_;
+    if(!commonReplay&&!pauseRecordPage1BDAB4&&(race->endEntryStep_!=Race::EndEntryStep::subtype||race->endEntryProfile_||
        race->endDispatchPublication_||race->endDispatchReturned_))
         return stop(S::incomplete,0,"Canonical Race end continuation has not returned; native Camera publication is not its receipt");
     try {
