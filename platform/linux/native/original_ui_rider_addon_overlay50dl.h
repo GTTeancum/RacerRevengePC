@@ -45,6 +45,8 @@ struct Overlay {
     std::size_t modelRow=noRow;
     mutable std::uint32_t modelPackets=0;        // add-on model packets emitted this frame
     mutable std::uint32_t characterPackets=0;    // step B: add-on character packets this frame
+    mutable std::uint32_t binderPackets=0;       // add-on engine-cable (binder) packets this frame
+    mutable const char* binderRefused=nullptr;   // why the add-on binders drew nothing (static text)
     mutable const char* characterRefused=nullptr;
     mutable bool portraitDrawn=false,backgroundDrawn=false; // step C, this frame
     mutable const char* pageRefused=nullptr;

@@ -279,7 +279,7 @@ bool Application::nativePauseCourseReceiverCurrent50LA()const noexcept {
 bool Application::bindNativePauseMenuReceiver50LA(const Frontend& frontend,
     const std::shared_ptr<Video>& video)const noexcept {
     if(!nativePauseMenuReceiverCurrent50LA()||video!=videoOwner_||frontend.materialApplicationOwner!=this||
-       frontend.nativeResultsHallEntry_||frontend.nativePauseMainEntry_==frontend.nativePauseCourseEntry_)return false;
+       frontend.nativePauseMainEntry_==frontend.nativePauseCourseEntry_)return false;
     const auto p=pauseMenuTransfer50LA_;
     if(p->receiver||frontend.nativePauseCourseEntry_!=(p->selection==10u))return false;
     p->receiver=&frontend;
@@ -305,7 +305,7 @@ bool Application::nativePauseCourseOriginCurrent50LA(const rr::platform::Origina
     // can manufacture this request or redirect its one-shot session binding.
     return p->courseOrigin.get()==&origin&&origin.root_==this&&origin.frontend_==p->receiver&&
         p->receiver&&p->receiver->materialApplicationOwner==this&&p->receiver->nativePauseCourseEntry_&&
-        !p->receiver->nativePauseMainEntry_&&!p->receiver->nativeResultsHallEntry_&&
+        !p->receiver->nativePauseMainEntry_&&
         p->receiver->coordinator.courseSession()==&session&&
         (!origin.session_||origin.session_==&session)&&!origin.entryCommitted_&&
         origin.preimage_.generation==p->stamp.generation&&origin.preimage_.mode34==p->stamp.mode34;
@@ -315,7 +315,7 @@ bool Application::acceptNativePauseMenuReceiver50LA(const Frontend& frontend,
     if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
     const auto p=pauseMenuTransfer50LA_;const auto display=raceDisplayOwner50LA_.lock();
     if(!p||p->phase!=NativePauseMenuTransfer50LA::Phase::receiver||p->receiver!=&frontend||
-       frontend.materialApplicationOwner!=this||frontend.nativeResultsHallEntry_||
+       frontend.materialApplicationOwner!=this||
        frontend.nativePauseMainEntry_==frontend.nativePauseCourseEntry_||
        frontend.nativePauseCourseEntry_!=(p->selection==10u)||
        p->race||p->origin||!p->pause.expired()||!p->camera.expired()||!p->display.expired()||!p->scope.expired()||

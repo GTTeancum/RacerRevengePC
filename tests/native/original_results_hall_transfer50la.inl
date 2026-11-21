@@ -168,17 +168,9 @@ bool Application::nativeResultsHallReceiverCurrent50LA()const noexcept {
         p->routeCurrent()&&
         riderProfile->stamp().generation==p->stamp.generation&&riderProfile->stamp().mode34==p->stamp.mode34;
 }
-bool Application::acceptNativeResultsHallReceiver50LA()const noexcept {
-    if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
-    const auto p=resultsHallTransfer50LA_;
-    // The real coordinator's mode-entry commit is the ONLY permitted change.
-    if(!p||p->phase!=NativeResultsHallTransfer50LA::Phase::receiver||p->acknowledgement1AB5BC||
-       p->profile!=riderProfile||p->common!=profile||
-       p->video!=videoOwner_||sourceRace28COwner_||p->request.reference00||p->enrolled||
-       !profile||profile->previousMode38!=0u||profile->mode34!=5u||
-       riderProfile->stamp().mode34!=5u||riderProfile->stamp().generation!=p->stamp.generation)return false;
-    p->flags30=0u;resultsHallTransfer50LA_.reset();return true;
-}
+// acceptNativeResultsHallReceiver50LA (the separate Results Hall entrance's mode5 entry
+// commit) is deleted with that entrance; acceptNativeRaceReturnReceiver50PD consumes every
+// retained race departure, the Results Hall included.
 bool Application::commitRaceAcknowledgementTransfer50PD(rr::game::OriginalRaceConstructor50LA& race,
     const rr::game::OriginalRaceAckDestination50PD& route)const noexcept {
     // 1AB5BC -> 17DE10(App,6,screen,1): store the three request lanes, then
@@ -240,8 +232,8 @@ bool Application::commitRaceAcknowledgementTransfer50PD(rr::game::OriginalRaceCo
 // 17DB80/ld_ui writes no mode, so both enter the same race-return first screen
 // (here Hall11 with P+34 unchanged), with the same shared-dialog/dispatcher boot.
 // The former separate 1CA6F0 receiver (prepareNativeResultsHall: Hall entered in
-// Options mode5, no 1B7BD0 boot) is no longer selected (cr-26: its frontend reached
-// the Root audio prefix with the previous lifetime's closed dispatcher).
+// Options mode5, no 1B7BD0 boot; cr-26: its frontend reached the Root audio prefix with
+// the previous lifetime's closed dispatcher) is deleted.
 bool Application::nativeRaceReturnRoute50PD(std::uint32_t& screen,std::uint32_t& page)const noexcept {
     screen=0;page=0;
     const auto p=resultsHallTransfer50LA_;

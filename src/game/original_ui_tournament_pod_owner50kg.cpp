@@ -209,7 +209,10 @@ bool OriginalUiTournamentPodOwner50KG::attachSelected(D& d)noexcept {
         // Source model attach141960 occurs at1D35F4 BEFORE binder creation.
         if(!s.visibility.registerModel(s.input.pod,s.pod,true,s.membership,d.visibility))return reject(E::membership,0x1D35F4);
         s.attached=true;s.shown=true;
-        for(std::size_t pair=0;pair<2;++pair)if(s.pod.binderPresent(pair)){
+        // DLC career: the helpers follow the binder pairs of the graph that is
+        // drawn (the add-on's own graph; none when it did not load), never the
+        // anchor's. A stock career: the stock pod's pairs, exactly as before.
+        for(std::size_t pair=0;pair<2;++pair)if(s.input.addonCareer?(s.addonReady&&s.addonScene.binderPresent(pair)):s.pod.binderPresent(pair)){
             s.binders[pair]=std::make_unique<OriginalUiRiderBinderAnimation50KG>();
             if(!s.binders[pair]->initialize(s.binderAssets,s.lifetime,s.binderFootprint,d.lifetime))return reject(E::binder,0x1D3E10);
         }
@@ -287,7 +290,10 @@ bool OriginalUiTournamentPodOwner50KG::projectBinder(std::size_t pair,const Orig
        !camera.isCurrent(frame)||camera.archive()!=storage_->input.pod->archive().get()||
        storage_->cameraSerial!=frame.serial()||(animate&&milliseconds!=frame.applicationCurrent230()))return fail(d,E::phase,0x1D3F90);
     OriginalUiRiderBinderQuad50KG source;OriginalUiTournamentBinderPacket50KG next;
-    if(!storage_->pod.projectBinder(pair,frame.cameraAfterFog().binderCameraColumn,source,d.model))return fail(d,E::model,0x1D3F90);
+    // DLC career: the add-on graph's own binder nodes (same original binder rule).
+    auto& graph=storage_->input.addonCareer?storage_->addonScene:storage_->pod;
+    if(storage_->input.addonCareer&&!storage_->addonReady)return fail(d,E::model,0x1D3F90);
+    if(!graph.projectBinder(pair,frame.cameraAfterFog().binderCameraColumn,source,d.model))return fail(d,E::model,0x1D3F90);
     if(!(animate?storage_->binders[pair]->advanceAfterGeometry(milliseconds,next.image):storage_->binders[pair]->current(next.image)))
         return fail(d,E::binder,0x1D4240);
     if(projectOriginalUiRiderBinderPacket50KM(source,frame.context(),frame.lighting().ambient50,next.geometry)!=OriginalUiLitGeometryStatus50KM::complete)

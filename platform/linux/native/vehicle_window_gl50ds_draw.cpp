@@ -39,6 +39,24 @@ bool VehicleWindowGl50DS::Storage::validateTrackAnimationFrames(const VehicleWin
         return true;
     }
 
+bool VehicleWindowGl50DS::Storage::validateSkySpanImages(const VehicleWindowFrame50DS& frame,
+        VehicleWindowDiagnostic50DS& d) const noexcept {
+        // 12C540 selection from the source owner: one entry per sky span, or none
+        // at all when the request supplied no sequence bank.
+        const auto* seq = request.sky.sequenceTextures;
+        if (!seq) return (!frame.skySpanImages && !frame.skySpanImageCount) ||
+            fail(d, VehicleWindowError50DS::frame, "sky span images require a sky sequence bank");
+        if (!frame.skySpanImages || frame.skySpanImageCount != skySpanCount)
+            return fail(d, VehicleWindowError50DS::frame, "one explicit sky span image per authored sky span required");
+        const auto count = seq->textureCount();
+        for (U i = 0; i < skySpanCount; ++i) {
+            const auto image = frame.skySpanImages[i];
+            if (image != vehicleWindowSkyBaseImage50DS && (image >= count || !seq->texture(image)))
+                return fail(d, VehicleWindowError50DS::frame, "sky span image outside the sky sequence bank");
+        }
+        return true;
+    }
+
 void VehicleWindowGl50DS::Storage::prepareTrackVisibility() noexcept {
         // Start each frame at the complete list. On helper failure its output
         // prefix is discarded by leaving this mode/count unchanged.
@@ -1031,14 +1049,19 @@ bool VehicleWindowGl50DS::Storage::drawSky() noexcept {
         drawGl.bindBuffer(elementBuffer, skyIndexBuffer);
         for (U i = 0; i < skySpanCount; ++i) {
             const auto& span = skySpans[i];
-            gl.bindTexture(texture2D, span.material.name);
-            gl.uniform1i(shader->uniforms().useTexture, span.material.name ? 1 : 0);
+            // 12C540: a sequence tile swaps only its texture (same quad, opaque).
+            const auto image = frameSkySpanImages ? frameSkySpanImages[i] : vehicleWindowSkyBaseImage50DS;
+            const U name = image == vehicleWindowSkyBaseImage50DS ? span.material.name :
+                request.sky.sequenceTextures->texture(image);
+            gl.bindTexture(texture2D, name);
+            gl.uniform1i(shader->uniforms().useTexture, name ? 1 : 0);
             if (!check("bind actual authored sky tile")) return false;
             drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.indexCount), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
             if (!check("draw actual authored sky tile")) return false;
             ++diagnostic->skyDraws; diagnostic->skyIndices += span.indexCount;
         }
+        frameSkySpanImages = nullptr; // Borrowed through this submit only.
         resetPodState();
         return check("restore world transform and depth after sky");
     }

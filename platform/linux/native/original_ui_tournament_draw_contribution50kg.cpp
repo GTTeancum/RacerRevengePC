@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include "../../../src/game/dlc_career50dl.h"
 #include <cstring>
 #include <limits>
 #include <optional>
@@ -127,7 +128,7 @@ struct OriginalUiTournamentDrawContribution50KG::Storage {
     game::OriginalUiApertureSnapshot50KG apertureAtBegin{};
     bool exitExpected=false,exitProjected=false;
     std::uint32_t widgetOwner=0,careerOwner=0,modelOwner=0,binderOwner=0,addonOwner=0;
-    bool addonModelLogged=false; // DLC career: one dlc_tournament_model line per screen
+    bool addonModelLogged=false,addonBinderLogged=false; // DLC career: one line each per screen
     game::OriginalUiTextureAnimation50KG markerAnimation{};
     std::uint32_t markerControllerStamp=0xffffffffu;bool markerAnimatesWhilePaused=false;
     bool markerMutatedInFrame=false,markerTerminal=false;
@@ -374,8 +375,8 @@ bool OriginalUiTournamentDrawContribution50KG::model(std::uint16_t id,D& d) noex
  game::OriginalUiTournamentPodPacket50KG selected;
  if(!s.cameraFrame||!s.backend->prepareSelected(*s.camera,*s.cameraFrame,selected,d.pod))return fail(d,E::model);
  // DLC career: the anchor pod's geometry and binders are never drawn; the
- // add-on model draws in their place, or nothing.
- if(s.backend->addonCareer())return addonModel(selected,d);
+ // add-on model and its own binders draw in their place, or nothing.
+ if(s.backend->addonCareer()){if(!addonModel(selected,d))return false;return addonBinders(d);}
  if(selected.emitsGeometry){const auto& packet=selected.model;const auto materials=s.backend->materials();
   if(!packet.scene||!materials||packet.scene->lods.size()!=1)return fail(d,E::geometry);
   const auto& surfaces=packet.scene->lods[0].surfaces;
@@ -409,6 +410,33 @@ bool OriginalUiTournamentDrawContribution50KG::model(std::uint16_t id,D& d) noex
   s.vertices.insert(s.vertices.end(),p.vertices.begin(),p.vertices.end());s.w.insert(s.w.end(),p.rasterW.begin(),p.rasterW.end());s.fog.insert(s.fog.end(),p.fogFactors.begin(),p.fogFactors.end());
   s.packets.push_back({first,2,binding,static_cast<std::uint32_t>(s.packets.size())});
  }
+ return true;
+}
+bool OriginalUiTournamentDrawContribution50KG::addonBinders(D& d) noexcept {
+ // PORT EXTENSION, NOT ORIGINAL (DLC career): the add-on pod's engine cables by
+ // the same 1D3F90/1D4240 binder rule as a stock pod (helpers created for the
+ // add-on graph's own binder pairs). A pair that cannot draw withdraws every
+ // add-on binder packet this frame (logged once); the screen continues.
+ auto& s=*storage_;
+ const auto vertices0=s.vertices.size(),w0=s.w.size(),fog0=s.fog.size(),packets0=s.packets.size();
+ std::uint32_t emitted=0;const char* refused=nullptr;
+ for(std::size_t pair=0;pair<2&&!refused;++pair)if(s.backend->binderPresent(pair)){
+  game::OriginalUiTournamentBinderPacket50KG packet;game::OriginalUiTournamentPodDiagnostic50KG pd;
+  if(!s.backend->projectBinder(pair,*s.camera,*s.cameraFrame,s.clock.milliseconds,s.clock.advanceAnimations,packet,pd)){refused="binder projection";break;}
+  const auto* map=s.bank->mapping(s.binderOwner,packet.image.imageIndex);if(!map){refused="binder image not in the bank";break;}
+  const auto binding=s.find(packet.image.pass,map->combinedIndex);if(binding==unresolved){refused="binder material not registered";break;}
+  if(!s.capacity(2))return fail(d,E::capacity); // the page's own bound, as for a stock pod
+  const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);const auto& p=packet.geometry;
+  s.vertices.insert(s.vertices.end(),p.vertices.begin(),p.vertices.end());s.w.insert(s.w.end(),p.rasterW.begin(),p.rasterW.end());s.fog.insert(s.fog.end(),p.fogFactors.begin(),p.fogFactors.end());
+  s.packets.push_back({first,2,binding,static_cast<std::uint32_t>(s.packets.size())});++emitted;
+ }
+ if(refused){s.vertices.resize(vertices0);s.w.resize(w0);s.fog.resize(fog0);s.packets.resize(packets0);emitted=0;}
+ if(!s.addonBinderLogged){s.addonBinderLogged=true;
+  const auto* career=s.career?s.career->career():nullptr;
+  const auto* addon=career?rr::game::dlc50DL::activeAddonCareer(career->career100C0):nullptr;
+  std::fprintf(stderr,"dlc_binder screen=tournament key=%s status=%s packets=%u%s%s%s\n",addon?addon->key.c_str():"-",
+      emitted?"drawn":"none",emitted,emitted?"":" reason=\"",emitted?"":(refused?refused:
+      (s.backend->addonReady()?"the add-on graph has no binder nodes":"add-on model not ready")),emitted?"":"\"");}
  return true;
 }
 bool OriginalUiTournamentDrawContribution50KG::addonModel(const game::OriginalUiTournamentPodPacket50KG& selected,D& d) noexcept {

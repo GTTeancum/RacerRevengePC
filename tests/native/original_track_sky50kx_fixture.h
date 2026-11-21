@@ -14,6 +14,7 @@
 // cube names and CUB/SCB digests are receipts (sky.zone_rows, sky.cub_bytes,
 // sky.cubes, fog.color.*), never pins.
 #include "sky50gw_fixture.h"
+#include "sky_cube_sequences50sf.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/game/original_track_fog50cr.h"
 #include <array>
@@ -31,7 +32,18 @@ class Owner final {
     std::array<float,4> clear_{{0.f,0.f,0.f,1.f}};
     bool clearAuthored_=false;
     std::unique_ptr<sky50gw_fixture::Owner> images_;
+    // 1299A0 cube sequences (overlay "flash" cubes) of the same CUB; null when
+    // the sky authors none (no .acb) or their data was refused (base sky kept).
+    std::unique_ptr<sky_cube_sequences50SF::Owner> sequences_;
     bool prepared_=false;
+    static bool extractMember(const rr::assets::ResArchive48C& archive,const std::string& member,
+        std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& error){
+        return rr::assets::extractResMember48C(archive,member,out,error);
+    }
+    static bool extractMember(const rr::assets::IndexedResArchive48C& archive,const std::string& member,
+        std::vector<std::uint8_t>& out,rr::assets::DecodeError48C& error){
+        return archive.extractMember(member,out,error,8u*1024u*1024u);
+    }
     static bool field(const rr::assets::ParameterBlock48F& block,const std::string& key,
         const std::string*& value) noexcept {
         value=nullptr;
@@ -116,8 +128,19 @@ public:
         if(!cubes_)return true;
         auto images=std::make_unique<sky50gw_fixture::Owner>();
         if(!images->loadFromCourseData(archive,world,d))return false;
+        // 1295B0 -> 1299A0: the same CUB's sequences from the same archive.
+        auto sequences=std::make_unique<sky_cube_sequences50SF::Owner>();
+        sky_cube_sequences50SF::Diagnostic sd;
+        const bool sequenced=sequences->load([&](const std::string& member,std::vector<std::uint8_t>& out,
+            rr::assets::DecodeError48C& error){return extractMember(archive,member,out,error);},*images,sd);
+        // PORT bound (flagged): refused sequence data keeps the base sky (the
+        // original asserts); the refusal reason is logged by the owner.
+        if(sequenced&&sequences->loaded())sequences_=std::move(sequences);
         images_=std::move(images);return true;
     }
+    // The cube sequences (null when the sky authors none or they were refused).
+    sky_cube_sequences50SF::Owner* sequences()noexcept {return sequences_.get();}
+    const sky_cube_sequences50SF::Owner* sequences()const noexcept {return sequences_.get();}
     bool prepared()const noexcept {return prepared_;}
     std::uint32_t cubeCount()const noexcept {return prepared_?cubes_:0u;}
     const std::string& cubeFile()const noexcept {return cubeFile_;}

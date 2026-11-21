@@ -984,6 +984,35 @@ void Context::run() {
          <<resultsInputDiagnostic.sourcePC<<std::dec<<" operation="<<(resultsInputDiagnostic.operation?resultsInputDiagnostic.operation:"")
          <<" modal="<<nativeModalOwnsInput<<" ui="<<originalUiActive<<'\n';}
    }
+   // Results Restart rows (flow audit F15), every course: Results input ran the row's own
+   // store (race1B0 bit4) and handed its 1AC8E0(race,0) over, as the Pause RESTART row does.
+   // The one in-place restart (common_race_start reason=restart caller=1C8DF0|1C9774), then
+   // the row's tail in its order: 1C9790 1A4AB0(race10C,0.5) on the tournament row only,
+   // then 1A4B90(race10C,2) (1C8E08 / 1C97A8).
+   if(!resultsInputOkay&&resultsInputDiagnostic.status==rr::game::OriginalResults104Diagnostic50LA::Status::incomplete&&
+      (resultsInputDiagnostic.sourcePC==common_race_start50CR::callerResultsReplay||
+       resultsInputDiagnostic.sourcePC==common_race_start50CR::callerResultsTournamentReplay1C9774)){
+    const auto caller=resultsInputDiagnostic.sourcePC;
+    const bool tournamentRow=caller==common_race_start50CR::callerResultsTournamentReplay1C9774;
+    const bool replayWas=native_common_results50PD::state().replayActive;
+    std::cerr<<"results_row_restart pc="<<std::hex<<caller<<std::dec<<" replay_was="<<replayWas<<'\n';
+    const bool restarted=restartInPlace1AC8E0(caller,0u,tournamentRow?"results_row_1C9774":"results_row_1C8DF0");
+    if(restarted){
+     if(tournamentRow){
+      const bool faded=raceMusic&&raceMusic->requestFade1A4AB0(0.5f).completed();
+      std::cerr<<"results_row_restart step=1A4AB0 seconds=0.5 completed="<<faded<<'\n';
+     }
+     auto* cycle=native_common_results50PD::state().raceCycleAudio;
+     const auto played=cycle?static_cast<int>(cycle->dispatchResultsFeedback(2u)):-1;
+     std::cerr<<"results_row_restart step=1A4B90 key=2 result="<<played<<'\n';
+    }else if(replayWas){
+     // PORT STAND-IN (flagged): the original 1AC8E0 cannot refuse. A refused in-place
+     // restart leaves the Results replay running, so the row's bit4 clear is undone.
+     const bool restored=native_race_replay50PD::owner().markResultsReplay1AB520();
+     std::cerr<<"results_row_restart refused bit4_restored="<<restored<<'\n';
+    }
+    forceSceneRender=true;continue;
+   }
    if(originalMainApplication.resultsDonePending50LA()){
     require50DU(resultsInputClaimed,"Results handoff did not retire exact synchronous output");
     hostClock.pause(monotonicNow50DU());discardTrackBaseline();continue;
@@ -3485,6 +3514,11 @@ void Context::run() {
       require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&
           track.roles.sky->select(cameraZone48,renderFrame.skyEnabled),
           "actual camera primary-zone sky selection rejected");
+     }
+     // 12C540: this frame's sky cube sequence images (the sky's own .acb data).
+     if(auto* sequences=track.roles.sky->sequences()){
+      sequences->setSelected(renderFrame.skyEnabled);
+      require50DU(sequences->bindFrame(renderFrame),"sky cube sequence frame binding rejected");
      }
     }
     {

@@ -329,7 +329,6 @@ private:
     bool cancelNativeResultsHallTransfer50LA()const noexcept;
     bool nativeResultsHallDeparting50LA()const noexcept;
     bool nativeResultsHallReceiverCurrent50LA()const noexcept;
-    bool acceptNativeResultsHallReceiver50LA()const noexcept;
     // 1AB5BC: the common race's acknowledgement request 17DE10(App,6,screen,1),
     // appended to App10 like 1CA6F0's Hall request and consumed by the same
     // departure/receiver lifecycle. The route is the original's decision.
@@ -1653,7 +1652,6 @@ inline bool Application::continueSourceInput04NativeActivation()const noexcept {
 
 struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:
-    bool nativeResultsHallEntry_=false;
     bool nativePauseMainEntry_=false,nativePauseCourseEntry_=false;
     // 1AB5BC request receiver: first screen/page of this lifetime (0 = none).
     std::uint8_t nativeRaceReturnScreen_=0,nativeRaceReturnPage_=0;

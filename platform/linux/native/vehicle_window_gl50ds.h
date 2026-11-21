@@ -411,7 +411,13 @@ struct VehicleWindowSky50DS {
     const MaterialTextureGl50EB* textures = nullptr;
     const VehicleWindowTrackSpan50DS* spans = nullptr;
     std::uint32_t spanCount = 0;
+    // Optional sky cube sequence images (the overlay cubes' tiles, 12C540), a
+    // separate immutable cold bank borrowed until close; requires textures.
+    // Timing stays with the source owner; frame.skySpanImages selects per span.
+    const MaterialTextureGl50EB* sequenceTextures = nullptr;
 };
+// frame.skySpanImages entry: draw the span's own (base cube) texture.
+constexpr std::uint32_t vehicleWindowSkyBaseImage50DS = 0xffffffffu;
 struct VehicleWindowMaterialUv50DS {
     // Optional per-frame scale/offset for an existing original pod material.
     // The array must be unique and sorted by component, then materialIndex.
@@ -430,7 +436,6 @@ struct VehicleWindowCables50DS {
 // One explicit original static-track texture association and its source-ordered
 // stored frame range in a separate immutable cold texture bank. Timing stays
 // with the source owner; the renderer only validates and selects a frame name.
-constexpr std::uint32_t maxVehicleWindowTrackAnimations50DS = 128;
 constexpr std::uint32_t maxVehicleWindowAnimationFrames50DS = 64;
 struct VehicleWindowTrackAnimation50DS {
     std::uint32_t sourceSpanIndex = assets::unresolvedMaterialTexture50EA;
@@ -781,6 +786,11 @@ struct VehicleWindowFrame50DS {
     // Explicit source world/camera zone selection; keeps cold sky storage alive.
     // Default preserves existing callers. Matrix remains required when hidden.
     bool skyEnabled = true;
+    // Required iff request.sky.sequenceTextures: exactly one entry per sky span,
+    // an image of that bank or vehicleWindowSkyBaseImage50DS. Borrowed through
+    // submit only, every index bounded before GL work; no timer is advanced here.
+    const std::uint32_t* skySpanImages = nullptr;
+    std::uint32_t skySpanImageCount = 0;
     // Borrowed synchronously and copied before any GL work; no frame allocation.
     // Missing entries use identity UV. Max 5*4096 entries; originals unchanged.
     const VehicleWindowMaterialUv50DS* materialUvs = nullptr;

@@ -137,6 +137,9 @@ bool readSky274AE0(Track& track,const LoadInputs&,Diagnostic& d)noexcept {
             count(track,"sky.tiles",file,images&&images->spans()?images->spans()->size():0u);
             count(track,"sky.vertices",file,images&&images->mesh()?images->mesh()->vertices.size():0u);
             count(track,"sky.indices",file,images&&images->mesh()?images->mesh()->indices.size():0u);
+            // 1299A0 cube sequences of this sky (acb=absent on every course without one).
+            if(const auto* sequences=sky->sequences())sequences->logLoad(track.code());
+            else std::cerr<<"sky_flash course="<<track.code()<<" overlays=0 acb=none\n";
         }
         log::trackData(log::Role::sky,track.code(),scb,sky->cubeCount(),false,0u);
         d.value=sky->cubeCount();

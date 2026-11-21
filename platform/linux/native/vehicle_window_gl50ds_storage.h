@@ -449,7 +449,10 @@ struct VehicleWindowGl50DS::Storage {
     std::unique_ptr<TrackSpan[]> skySpans;
     U skySpanCount = 0, skyVertexBuffer = 0, skyIndexBuffer = 0, skyVertexArray = 0;
     I skyIndexCount = 0;
-    std::uint64_t skyTexturePublication = 0;
+    std::uint64_t skyTexturePublication = 0, skySequenceTexturePublication = 0;
+    // Per-span sequence image of the current submit (null = every span base).
+    // Borrowed through this submit only; validated before any GL work.
+    const std::uint32_t* frameSkySpanImages = nullptr;
     // Address-only identity of actual successful cold geometry upload. Never
     // dereferenced; CPU bytes remain owned by the original immutable sky owner.
     const assets::Mesh48B* nativeSkyMeshIdentity129280=nullptr;
@@ -706,6 +709,8 @@ bool uiCoverageDisjointTraced=false;
     bool createTrackMaterials(const VehicleWindowTrack50DS& input) noexcept;
     bool createTrackAnimations(const VehicleWindowRequest50DS& input) noexcept;
     bool validateTrackAnimationFrames(const VehicleWindowFrame50DS& frame,
+        VehicleWindowDiagnostic50DS& d) const noexcept;
+    bool validateSkySpanImages(const VehicleWindowFrame50DS& frame,
         VehicleWindowDiagnostic50DS& d) const noexcept;
     bool createDynamicWorldMaterials(const VehicleWindowTrack50DS& input) noexcept;
     bool createSkyMaterials(const VehicleWindowSky50DS& input) noexcept;

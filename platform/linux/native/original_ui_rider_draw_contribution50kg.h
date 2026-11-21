@@ -128,6 +128,10 @@ private:
     bool addonModel(std::size_t row,std::uint8_t flags191,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     // Step B: the add-on character, lit with the anchor character's Rider lights.
     bool addonCharacter(std::size_t row,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    // PORT EXTENSION (DLC): the add-on pod's binders (engine cables) by the same
+    // original binder rule, from its own graph's binder nodes, with the anchor
+    // control's binder animation frame (the shared original binder material).
+    bool addonBinders(std::size_t row,std::uint16_t anchorPod,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool append(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,float packetZ,
         OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;

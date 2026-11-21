@@ -179,6 +179,10 @@ bool VehicleWindowGl50DS::Storage::texturesCurrent(VehicleWindowDiagnostic50DS& 
             request.context, request.isCurrent, skyTexturePublication))
             return fail(d, VehicleWindowError50DS::material,
                 "borrowed sky texture publication/context/thread is no longer valid");
+        if (request.sky.sequenceTextures && !request.sky.sequenceTextures->validBorrow(
+            request.context, request.isCurrent, skySequenceTexturePublication))
+            return fail(d, VehicleWindowError50DS::material,
+                "borrowed sky sequence texture publication/context/thread is no longer valid");
         if (request.cables.textures && !request.cables.textures->validBorrow(
             request.context, request.isCurrent, cableTexturePublication))
             return fail(d, VehicleWindowError50DS::material,
@@ -1905,6 +1909,7 @@ bool VehicleWindowGl50DS::Storage::initialize(const VehicleWindowRequest50DS& in
         cableTexturePublication = input.cables.textures ? input.cables.textures->publicationToken() : 0;
         gameplayBinderPublication=input.gameplayBinderTextures?input.gameplayBinderTextures->publicationToken():0;
         skyTexturePublication = input.sky.textures ? input.sky.textures->publicationToken() : 0;
+        skySequenceTexturePublication = input.sky.sequenceTextures ? input.sky.sequenceTextures->publicationToken() : 0;
         cableTextureName = input.cables.textures ? input.cables.textures->texture(input.cables.textureIndex) : 0;
         maximumWidth = request.maximumWidth; maximumHeight = request.maximumHeight;
         if (!current(*diagnostic) || !texturesCurrent(*diagnostic)) return false;

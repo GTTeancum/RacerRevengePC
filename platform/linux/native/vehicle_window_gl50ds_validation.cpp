@@ -413,8 +413,7 @@ bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWin
     // Bounded by the data, not a fixed row cap: one animation row per distinct placed
     // span of the track table (duplicates are refused below), and the renderer's tables
     // are heap-sized from this count (createTrackAnimations). The former 128-row guard
-    // (maxVehicleWindowTrackAnimations50DS, unchanged in the header and no longer read)
-    // refused RA's 346 crowd spans (every other stock course places 26..76).
+    // (since removed from the header) refused RA's 346 crowd spans (every other stock course places 26..76).
     if (request.trackAnimationCount > request.track.spanCount)
         return fail(d, VehicleWindowError50DS::material, "track animation rows exceed the track's placed spans");
     if (!request.trackAnimations || !request.trackAnimationTextures ||
@@ -477,7 +476,7 @@ bool validateSky(const VehicleWindowRequest50DS& request, VehicleWindowDiagnosti
     const auto& sky = request.sky;
     if (!sky.mesh)
         return (!sky.maximumVertexBytes && !sky.maximumIndexBytes && !sky.textures &&
-            !sky.spans && !sky.spanCount) ||
+            !sky.spans && !sky.spanCount && !sky.sequenceTextures) ||
             fail(d, VehicleWindowError50DS::request, "sky fields require an actual authored sky mesh");
     VehicleWindowRequest50DS check = request;
     check.track = {};
@@ -497,6 +496,16 @@ bool validateSky(const VehicleWindowRequest50DS& request, VehicleWindowDiagnosti
             sky.spans[i].sourcePassCount != 1 || sky.spans[i].projectionPass)
             return fail(d, VehicleWindowError50DS::material,
                 "sky requires explicit unlit opaque non-depth-writing materials");
+    }
+    // Sky cube sequence bank (12C540 overlay tiles): a complete, current upload.
+    if (const auto* seq = sky.sequenceTextures) {
+        if (!sky.textures || !seq->textureCount() ||
+            !seq->validBorrow(request.context, request.isCurrent, seq->publicationToken()))
+            return fail(d, VehicleWindowError50DS::material,
+                "sky sequence bank requires the sky bank and a current complete upload");
+        for (U i = 0; i < seq->textureCount(); ++i)
+            if (!seq->texture(i))
+                return fail(d, VehicleWindowError50DS::material, "sky sequence image not uploaded");
     }
     return true;
 }

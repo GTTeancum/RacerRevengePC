@@ -2462,6 +2462,16 @@ SessionExit50DU Context::run() {
   // One authored animated-texture owner (29B1D0 family, R5).
   if(track.roles.atm&&track.roles.atm->loaded())
    require50DU(track.roles.atm->advance(sourceApplicationTimestamp),"track ATM time update rejected");
+  // 12BB50 sky cube sequences (the sky's own .acb data; absent owner = nothing to do).
+  // dt = the same .016 world-child frame time, shared percentile stream.
+  // PORT (flagged): skipped while paused, like the track animations; whether the
+  // original SkyCube keeps timing in pause is not recovered. No restart reset
+  // (274AE0 builds the sky once per world load).
+  sky_cube_sequences50SF::Owner* skySequences=track.roles.sky?track.roles.sky->sequences():nullptr;
+  if(skySequences){sky_cube_sequences50SF::Diagnostic skySequenceDiagnostic;
+   const bool stepped=skySequences->update(.016f,actualPause!=0,sourceApplicationTimestamp,
+       s.noiseOwner().sharedRandomState,sessionRandom,skySequenceDiagnostic);
+   require50DU(stepped,"sky cube sequence update rejected");}
   // The one 2A0B30 trigger exit service over committed COL poses (one trigger
   // group, one collision world; R3/R5).
   if(track.roles.collision){
@@ -2471,6 +2481,7 @@ SessionExit50DU Context::run() {
   }
   require50DU(::allocations==before,"successful original world animation allocated C++ storage");
   if(trackAnimations)++trackAnimationSteps;
+  if(skySequences)skySequences->logPeriodic(track.code());
  };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  platform::MaterialTextureGl50EB specularGpuTextures50LA;
@@ -2898,6 +2909,12 @@ SessionExit50DU Context::run() {
    std::cerr<<"sky texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"sky texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
   if(skyGpuTextures.ownsResources())return closeRejected("if(skyGpuTextures.ownsResources())");
+  if(track.roles.sky)if(auto* sequences=track.roles.sky->sequences()){
+   if(sequences->ownsResources()&&!sequences->close(textureDiagnostic)){
+    std::cerr<<"sky sequence texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("sky sequence texture cleanup error");
+   }
+   if(sequences->ownsResources())return closeRejected("sky sequence textures remain");
+  }
   // Session retires its attached racers above. Frontend-only exit and a
   // rejected cold material population have no Session, but still own real
   // installed models and may already have canonical flame borrows. Close
@@ -3159,6 +3176,14 @@ SessionExit50DU Context::run() {
     if(slot==0){
      if(restartSerial1AEA70==std::numeric_limits<std::uint64_t>::max())return refuse();
      ++restartSerial1AEA70;
+     // Flow audit F16: the tournament result arming (host record of the 1875C0 launch
+     // stamp taken at GO) belongs to the race that is now restarted. An uncommitted arm is
+     // dropped so the restarted race arms again at its own GO with a fresh stamp
+     // (advanceOriginalAiManager); a committed result stays committed.
+     if(tournamentResultArmed&&!tournamentResultCommitted){
+      tournamentResultArmed=false;
+      try{std::cerr<<"tournament_arm reset at=1AEA70 reason=in_place_restart\n";}catch(...){}
+     }
      // 1AEA88..1AEAC4: 16E830(racer, 1) for every AI (manager slots humans34
      // up to count30) before any racer is placed (a1 is overwritten at 16E830).
      for(std::size_t ai=static_cast<std::size_t>(originalAiHumanCount);ai<racerBank.count();++ai){

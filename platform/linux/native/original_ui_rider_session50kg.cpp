@@ -179,7 +179,7 @@ struct OriginalUiRiderSession50KG::Storage {
     bool addonAnchorLast=true;          // entered by Next past the last (true) or Previous past the first (false) stock rider
     std::uint32_t addonConfirmRider=0;  // stock rider an add-on Confirm records (the last stock Confirm's rider)
     bool addonSkipLogged=false,addonRestoreTried=false,addonModelLogged=false,addonAdvanceLogged=false;
-    bool addonCharacterLogged=false,addonSelectLogged=false,addonPageLogged=false;
+    bool addonCharacterLogged=false,addonSelectLogged=false,addonPageLogged=false,addonBinderLogged=false;
     std::string addonCharacterNote;
     // The shown add-on character (step B), or nullptr.
     game::OriginalUiRiderCharacterScene50KG* addonCharacter() noexcept {
@@ -276,7 +276,7 @@ struct OriginalUiRiderSession50KG::Storage {
         addonSlot=slot;
         const auto* pod=addonPod();
         if(slot&&!pod){addonSlot=previous;return false;}
-        addonModelLogged=false;addonCharacterLogged=false;addonSelectLogged=false;addonPageLogged=false;
+        addonModelLogged=false;addonCharacterLogged=false;addonSelectLogged=false;addonPageLogged=false;addonBinderLogged=false;
         try{addonText={pod?pod->name:std::string(),pod?pod->shortName:std::string(),pod?pod->packageName:std::string(),
             pod?pod->ui.hutteseName:std::string()};}
         catch(...){addonText={};}
@@ -1870,6 +1870,14 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
             pod?pod->key.c_str():"-",drawn?"drawn":"refused",s->addonOverlay.characterPackets,
             crow&&crow->characterLayoutFixed?"layout_slot":"anchor",crow?unsigned(crow->characterLayout):0u,
             drawn?"":" reason=\"",drawn?"":why,drawn?"":"\"");
+    }
+    if(s->addonSlot&&!s->addonBinderLogged){
+        // One line per highlighted add-on pod: its engine cables (binders).
+        s->addonBinderLogged=true;const auto* pod=s->addonPod();
+        const bool drawn=s->addonOverlay.binderPackets&&!s->addonOverlay.binderRefused;
+        std::fprintf(stderr,"dlc_binder screen=rider key=%s status=%s packets=%u%s%s%s\n",pod?pod->key.c_str():"-",
+            drawn?"drawn":"none",s->addonOverlay.binderPackets,drawn?"":" reason=\"",
+            drawn?"":(s->addonOverlay.binderRefused?s->addonOverlay.binderRefused:"no packet"),drawn?"":"\"");
     }
     if(s->addonSlot&&!s->addonModelLogged){
         // One line per highlighted add-on model (first rendered frame).

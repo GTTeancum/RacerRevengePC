@@ -977,6 +977,47 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
     }
     return true;
 }
+bool OriginalUiRiderDrawContribution50KG::addonBinders(std::size_t index,std::uint16_t anchorPod,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL (DLC): see the header. The anchor's helpers
+    // already advanced their animation this frame inside model(anchorPod) (its
+    // output dropped), so the current frame image is read, never advanced twice.
+    // A binder that cannot draw withdraws every add-on binder packet this frame.
+    auto& s=*storage_;const auto* addon=riderAddon50DL::overlayFor(this);
+    const auto vertices0=s.vertices.size(),w0=s.w.size(),fog0=s.fog.size(),packets0=s.packets.size();
+    std::uint32_t emitted=0;
+    const auto refuse=[&](const char* why){
+        s.vertices.resize(vertices0);s.w.resize(w0);s.fog.resize(fog0);s.packets.resize(packets0);
+        if(addon){addon->binderRefused=why;addon->binderPackets=0;}return true;};
+    const auto* table=s.backend->addonModels();
+    auto* row=table?const_cast<game::OriginalUiRiderAddonModels50DL*>(table)->row(index):nullptr;
+    if(!row||!row->ready||!row->scene||!row->scene->loaded())return refuse("add-on model row not ready");
+    for(std::uint8_t pair=0;pair<2;++pair){
+        if(!row->scene->binderPresent(pair))continue;          // the add-on graph has no such binder pair
+        auto* animation=s.backend->binder(anchorPod,pair);
+        if(!animation)return refuse("no binder helper on this control for that pair");
+        game::OriginalUiRiderBinderQuad50KG source{};game::OriginalUiRiderModelDiagnostic50KG md;
+        if(!row->scene->projectBinder(pair,s.render.cameraAfterFog.binderCameraColumn,source,md))return refuse("binder geometry");
+        game::OriginalUiRiderBinderFrame50KG image;
+        if(!animation->current(image))return refuse("binder frame");
+        game::original_racer_lighting50KM::LightMatrices global{};
+        if(game::projectOriginalUiGlobalLightRows50KM(true,s.lighting.directionalLook78,s.lighting.directional3C,
+            s.lighting.ambient50,global)!=game::original_racer_lighting50KM::Status::complete)return refuse("light rows");
+        game::OriginalUiLitContext50KM context{};
+        if(!game::prepareOriginalUiRiderLitContext50KG(*s.backend->riderArchive(),s.render,global,context))return refuse("camera context");
+        game::OriginalUiLitBinderPacket50KM projected{};
+        if(game::projectOriginalUiRiderBinderPacket50KM(source,context,s.lighting.ambient50,projected)!=game::OriginalUiLitGeometryStatus50KM::complete)
+            return refuse("binder projection");
+        const auto* map=s.backend->binderImage(image.imageIndex);if(!map)return refuse("binder image not in the bank");
+        const auto binding=s.find(image.pass,map->combinedIndex);if(binding==unresolved)return refuse("binder material not registered");
+        if(!s.capacity(2))return fail(d,E::capacity); // the page's own bound, as for a stock pod
+        const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+        s.vertices.insert(s.vertices.end(),projected.vertices.begin(),projected.vertices.end());
+        s.w.insert(s.w.end(),projected.rasterW.begin(),projected.rasterW.end());s.fog.insert(s.fog.end(),projected.fogFactors.begin(),projected.fogFactors.end());
+        s.packets.push_back({first,2,binding,static_cast<std::uint32_t>(s.packets.size())});++emitted;
+    }
+    if(addon){addon->binderPackets+=emitted;if(!emitted&&!addon->binderRefused)addon->binderRefused="the add-on graph has no binder nodes";}
+    return true;
+}
 bool OriginalUiRiderDrawContribution50KG::addonModel(std::size_t index,std::uint8_t flags,D& d) noexcept {
     // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step A): the add-on pod model,
     // projected exactly as a stock pod (same light rows, Rider camera context,
@@ -1135,6 +1176,8 @@ bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noex
                    addon->modelRow!=riderAddon50DL::Overlay::noRow){
                     if(!s.addonFlagsValid)addon->modelRefused="anchor pod not selected this frame";
                     else if(!addonModel(addon->modelRow,s.addonFlags191,d))return false;
+                    // Binders run like a stock pod's helpers, also after a culled model parent.
+                    if(!addonBinders(addon->modelRow,id,d))return false;
                 }
                 s.addonFlagsValid=false;
                 if(state.kind==game::OriginalUiRiderWidgetKind50KG::character&&id==addon->suppressed[3]&&

@@ -505,7 +505,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
             !s.validateOpponents(batch, frame, d, normalReceipts) ||
             !s.validateDynamicWorldFrame(frame.dynamicWorld, d) ||
-            !s.validateTrackAnimationFrames(frame, d)) return false;
+            !s.validateTrackAnimationFrames(frame, d) ||
+            !s.validateSkySpanImages(frame, d)) return false;
         std::uintptr_t fleetLightOwner = 0;
         if (!s.copyNativeGcLights(frame.lightingPolicy, frame.selectedLights, 0,
             batch, 0, fleetLightOwner, playerLights, d, normalReceipts[0])) return false;
@@ -707,6 +708,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     }
     s.frameTrackUv=frame.trackUvAnimation?*frame.trackUvAnimation:VehicleWindowTrackUvFrame50DS{};
     s.frameSkyEnabled=frame.skyEnabled;
+    s.frameSkySpanImages=frame.skySpanImages; // validated above, drawn before return
     if (frame.skyWorldViewProjection)
         std::memcpy(s.skyMatrix, frame.skyWorldViewProjection, sizeof(s.skyMatrix));
     if (s.request.track.worldFog.enabled)

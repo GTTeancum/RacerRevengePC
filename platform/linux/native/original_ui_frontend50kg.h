@@ -306,12 +306,6 @@ private:
         const ::original_main_entry50KG::Frontend&,
         OriginalUiRiderProfileOwner50KG::CourseRaceSelection&,
         std::shared_ptr<::original_main_entry50KG::RaceDisplayLifetime50LA>&)const noexcept;
-    // Uncalled native reverse-route receiver. Future exact Results flags6
-    // transfer must establish origin/whole-poll completion/retirement first.
-    // No Main construction history or source1B7BD0 receipt is synthesized.
-    OriginalUiFrontendStatus50KG prepareNativeResultsHall(
-        const OriginalUiFrontendCold50KG&,const ::original_main_entry50KG::Application&,
-        OriginalUiFrontendDiagnostic50KG&)noexcept;
     // Only the genuine retained Pause row10 request can issue this origin.
     // It opens Course directly without a Main/Rider entry or profile replay.
     OriginalUiFrontendStatus50KG prepareNativePauseCourse(

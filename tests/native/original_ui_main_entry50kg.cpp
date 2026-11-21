@@ -729,18 +729,18 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
          require(!raceReturn||(raceScreen<=255u&&racePage<=255u),"race return route out of range");
          nativeRaceReturnScreen_=raceReturn?static_cast<std::uint8_t>(raceScreen):0;
          nativeRaceReturnPage_=raceReturn?static_cast<std::uint8_t>(racePage):0;
-         // A 1AB5BC request has its own receiver; only 1CA6F0's is the Hall's.
-         nativeResultsHallEntry_=bool(application.resultsHallTransfer50LA_)&&!raceReturn;}
+         // Every retained race departure (1AB5BC rows and the 1CA6F0 Results Hall) enters
+         // through the one race-return receiver; the former separate Results Hall entrance
+         // is deleted, so a retained transfer without a race-return route is refused.
+         require(!application.resultsHallTransfer50LA_||raceReturn,
+             "Results Hall request requires the common race-return receiver");}
         nativePauseMainEntry_=application.nativePauseMainReceiverCurrent50LA();
         nativePauseCourseEntry_=application.nativePauseCourseReceiverCurrent50LA();
         require(!application.pauseMenuTransfer50LA_||(nativePauseMainEntry_!=nativePauseCourseEntry_),
             "Pause receiver requires an exact retired-session request");
-        require(!(nativeResultsHallEntry_&&(nativePauseMainEntry_||nativePauseCourseEntry_)),"competing native receiver requests");
         require(!(nativeRaceReturnScreen_&&(nativePauseMainEntry_||nativePauseCourseEntry_)),"competing native race-return receiver requests");
         require(!nativePauseMainEntry_||application.nativePauseMainReceiverCurrent50LA(),
             "Pause Main receiver requires exact post-batch, post-session request");
-        require(!nativeResultsHallEntry_||application.nativeResultsHallReceiverCurrent50LA(),
-            "Results Hall receiver requires the exact post-session request");
         materialApplicationOwner=&application;
         require(!(nativePauseMainEntry_||nativePauseCourseEntry_)||application.bindNativePauseMenuReceiver50LA(*this,video),
             "Pause request requires this exact native frontend/Video receiver");
@@ -913,7 +913,6 @@ void Frontend::prepare(const Application& application,const std::shared_ptr<Vide
         rr::platform::loading_progress50DU::step(.1f,0x1b7b54);
         const auto prepared=nativePauseCourseEntry_?
             coordinator.prepareNativePauseCourse(cold,application.pauseCourseReceiverOrigin50LA(*this),diagnostic):
-            nativeResultsHallEntry_?coordinator.prepareNativeResultsHall(cold,application,diagnostic):
             nativeRaceReturnScreen_?coordinator.prepareNativeRaceReturn(cold,application,
                 nativeRaceReturnScreen_,nativeRaceReturnPage_,diagnostic):
             coordinator.prepare(cold,diagnostic);
@@ -931,19 +930,15 @@ void Frontend::activate(rr::platform::VehicleWindowGl50DS& renderer) {
         if((nativePauseMainEntry_||nativePauseCourseEntry_)&&(!materialApplicationOwner||
            !(nativePauseCourseEntry_?materialApplicationOwner->nativePauseCourseReceiverCurrent50LA():
              materialApplicationOwner->nativePauseMainReceiverCurrent50LA())))fail("Pause menu receiver currentness");
-        if(nativeResultsHallEntry_&&(!materialApplicationOwner||
-           !materialApplicationOwner->nativeResultsHallReceiverCurrent50LA()))fail("Results Hall receiver currentness");
         if(nativeRaceReturnScreen_){std::uint32_t screen=0,page=0;
             if(!materialApplicationOwner||!materialApplicationOwner->nativeRaceReturnRoute50PD(screen,page)||
                screen!=nativeRaceReturnScreen_||page!=nativeRaceReturnPage_)fail("race return receiver currentness");}
         std::string languageError;
         if(!materialApplicationOwner||!materialApplicationOwner->prepareFrontendLanguageServices(*this,renderer,languageError))
             throw std::runtime_error("original UI language startup rejected: "+languageError);
-        if(!nativeResultsHallEntry_&&!nativePauseCourseEntry_&&(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic)))
+        if(!nativePauseCourseEntry_&&(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic)))
             fail("shared UI initial ownership");
         if(coordinator.activate(renderer,diagnostic)!=Status::ok)fail("activation");
-        if(nativeResultsHallEntry_&&!materialApplicationOwner->acceptNativeResultsHallReceiver50LA())
-            fail("Results Hall actual entry commit");
         // 1AB5BC race return: the coordinator has entered the real Garage13,
         // Hall11, Win7 or Unlock10 manager as this lifetime's first screen;
         // consume the request.
@@ -1477,9 +1472,9 @@ bool Frontend::advanceCourseRaLoadingPrefix50LA(std::uint32_t& pc)noexcept {
 bool Frontend::closeUi() noexcept {
         // Diagnostic only: name the refusing owner; no order or result changes.
         const auto refuse=[&](const char* step)noexcept {
-            std::fprintf(stderr,"frontend_close_refused owner=frontend_ui step=%s race_return_screen=%u results_hall_entry=%d"
+            std::fprintf(stderr,"frontend_close_refused owner=frontend_ui step=%s race_return_screen=%u"
                 " pause_main_entry=%d pause_course_entry=%d\n",step,unsigned(nativeRaceReturnScreen_),
-                int(nativeResultsHallEntry_),int(nativePauseMainEntry_),int(nativePauseCourseEntry_));
+                int(nativePauseMainEntry_),int(nativePauseCourseEntry_));
             return false;
         };
         if(uploadLifetime_&&(uploadLifetime_->active_||
@@ -1488,7 +1483,7 @@ bool Frontend::closeUi() noexcept {
         if(status!=Status::ok&&status!=Status::noChange)return refuse("coordinator_close");
         if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))
             return refuse("course_ra_loading_prefix_withdraw");
-        if((nativeResultsHallEntry_||nativeRaceReturnScreen_)&&materialApplicationOwner&&
+        if(nativeRaceReturnScreen_&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return refuse("results_hall_transfer_cancel");
         if((nativePauseMainEntry_||nativePauseCourseEntry_)&&materialApplicationOwner&&
            !materialApplicationOwner->cancelNativePauseMenuTransfer50LA())return refuse("pause_menu_transfer_cancel");

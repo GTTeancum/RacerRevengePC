@@ -1267,6 +1267,11 @@ void Context::run() {
   renderRequest.sky.maximumIndexBytes=288u*sizeof(std::uint32_t);
   renderRequest.sky.spans=skyBindings.data();
   renderRequest.sky.spanCount=static_cast<std::uint32_t>(skyBindings.size());
+  // 1299A0 cube sequences of the same sky (data: absent unless the sky authors an .acb).
+  if(track.roles.sky)if(auto* sequences=track.roles.sky->sequences()){
+   require50DU(sequences->createGpu(textureRequest,textureDiagnostic),"sky cube sequence texture upload failed");
+   require50DU(sequences->bindRequest(renderRequest),"sky cube sequence renderer binding rejected");
+  }
   }
   std::array<platform::VehicleWindowRacerArchetype50DS,raceOpponentCapacity> racerArchetypes{};
   if(raceEnabled){
