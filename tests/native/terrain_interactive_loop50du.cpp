@@ -2199,6 +2199,14 @@ void Context::run() {
       // PORT STAND-IN (flagged): the port's racer-contact pass and host race session are
       // host owners stepped only by the racing step; neither runs before GO (pods apart and
       // axis-locked on the grid). Not proven which original owner performs racer contacts.
+      // The racers' per-frame audio consumers (boost 217DE0 boundary, repair, engine, material,
+      // speech timers) run inside these frames, as after GO. The host display service pauses
+      // the shared mixer while a fade runs (intro fade-in, intro skip); the countdown service
+      // below and the racing step both lift that pause before their audio work. Lift it here,
+      // before the racer frames, the same way (cr-29: every stock race stopped at
+      // "source boost audio event rejected", the paused mixer refusing the player's boost
+      // boundary in the first live intro frame). The original's audio is never paused by a fade.
+      if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}
       {
        const platform::WindowInput50DQ introNoKeys{};
        const auto introFrame=[&](std::size_t slot){

@@ -35,6 +35,8 @@ ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
 FREE_PLAY_ROUTES = ('main-rider-course', 'main-rider-course-ta')
 PLAYER_RACER_ROUTES = FREE_PLAY_ROUTES + ('main-tournament-course-ta',)
 ADDON_RIDER_ROUTES = FREE_PLAY_ROUTES
+# DLC career eye checks (test only): an add-on pod in the tournament route.
+TOURNAMENT_ROUTE = 'main-tournament-course-ta'
 # DLC phase 3 (146c, PORT EXTENSION, NOT ORIGINAL): add-on course item key and the free-play route it rides.
 ADDON_COURSE_KEY = re.compile(r'[a-z0-9][a-z0-9-]{2,47}/[a-z0-9][a-z0-9-]{1,46}')
 ADDON_COURSE_ROUTES = FREE_PLAY_ROUTES
@@ -371,6 +373,18 @@ def main():
                              'the game\'s own clean wall-budget exit (sets RR_TEST_RETURN_HOLD_SECONDS)')
     parser.add_argument('--gpu-vertex-check', type=int, default=0,
                         help='Diagnostic: compare GPU pod vertices with the CPU reference every N rendered frames')
+    parser.add_argument('--hold-tournament', type=int, default=0, metavar='SECONDS',
+                        help='Test only (DLC career eye check): on --route main-tournament-course-ta stop on the '
+                             'Tournament screen (no Continue; sets RR_TEST_TOURNAMENT_HOLD=1) and add SECONDS to the '
+                             'wall budget so the hold lasts at least that long')
+    parser.add_argument('--hold-garage', type=int, default=0, metavar='SECONDS',
+                        help='Test only (DLC career eye check): on --route main-tournament-course-ta stop on the '
+                             'Garage. --garage-from tournament (default): press the Tournament screen\'s original '
+                             'Garage input and hold there (RR_TEST_TOURNAMENT_GARAGE=1); --garage-from race: race '
+                             'the first tournament course and hold on the forced race-return Garage '
+                             '(RR_TEST_GARAGE_HOLD=1). Adds SECONDS to the wall budget')
+    parser.add_argument('--garage-from', choices=['tournament', 'race'], default='tournament',
+                        help='With --hold-garage: which Garage entry to hold on (see --hold-garage)')
     parser.add_argument('--keep-binaries', action='store_true',
                         help='Keep the staged program/DLL copies and audio recording after a logs-only run '
                              '(by default they are deleted when the run ends; logs are always kept)')
@@ -386,8 +400,8 @@ def main():
     if args.addon_rider is not None:
         if not addon_key.fullmatch(args.addon_rider):
             parser.error('--addon-rider expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
-        if args.route not in ADDON_RIDER_ROUTES:
-            parser.error('--addon-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
+        if args.route not in ADDON_RIDER_ROUTES + (TOURNAMENT_ROUTE,):
+            parser.error('--addon-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES + (TOURNAMENT_ROUTE,)))
         if args.player_racer is not None:
             parser.error('--addon-rider and --player-racer cannot be combined')
     if args.hold_course and args.addon_course is None:
@@ -408,6 +422,19 @@ def main():
             parser.error('--laps must be 1..25 (the original Duration range)')
         if args.route not in FREE_PLAY_ROUTES:
             parser.error('--laps works only on the free-play route; the tournament keeps its original 3 laps')
+    if not 0 <= args.hold_tournament <= 600 or not 0 <= args.hold_garage <= 600:
+        parser.error('--hold-tournament / --hold-garage must be 0..600 seconds')
+    if (args.hold_tournament or args.hold_garage) and args.route != TOURNAMENT_ROUTE:
+        parser.error('--hold-tournament / --hold-garage work only with --route ' + TOURNAMENT_ROUTE)
+    if args.hold_tournament and args.hold_garage:
+        parser.error('--hold-tournament and --hold-garage each stop their own screen; use one')
+    if args.hold_tournament or args.hold_garage:
+        if args.hold_rider or args.hold_course or args.hold_results or args.results_exit or args.main_exit:
+            parser.error('--hold-tournament / --hold-garage cannot be combined with another hold or exit test')
+        args.seconds = min(1800, args.seconds + args.hold_tournament + args.hold_garage)
+    if args.route == TOURNAMENT_ROUTE and args.addon_rider is not None and \
+            not any(item.startswith('RR_DLC_ROOT=') and len(item) > len('RR_DLC_ROOT=') for item in args.env):
+        parser.error('--addon-rider on the tournament route needs --env RR_DLC_ROOT=<folder holding the DLC packages>')
     if not 0 <= args.return_hold <= 600:
         parser.error('--return-hold must be 0..600 seconds')
     if args.hold_course and args.hold_rider:
@@ -585,6 +612,14 @@ def main():
         env['RR_TEST_PLAYER_RACER'] = str(args.player_racer)
     if args.addon_rider is not None:
         env['RR_TEST_ADDON_RIDER'] = args.addon_rider
+        if args.route == TOURNAMENT_ROUTE:
+            # Test only: lets the add-on Tournament Confirm through the career latch
+            # (honoured by the game only with RR_UNATTENDED_CAPTURE=1, which every run sets).
+            env['RR_TEST_ADDON_TOURNAMENT'] = '1'
+    if args.hold_tournament:
+        env['RR_TEST_TOURNAMENT_HOLD'] = '1'
+    if args.hold_garage:
+        env['RR_TEST_TOURNAMENT_GARAGE' if args.garage_from == 'tournament' else 'RR_TEST_GARAGE_HOLD'] = '1'
     if args.hold_rider:
         env['RR_TEST_ADDON_RIDER_HOLD' if args.addon_rider is not None else 'RR_TEST_RIDER_HOLD'] = '1'
         env['RR_EVIDENCE_LOGS_ONLY'] = '0'   # this run writes the held Rider frame as an image

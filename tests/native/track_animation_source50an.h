@@ -202,8 +202,16 @@ public:
     row->graphCount=row->hierarchy.nodeCount+1;
     a::SceneLimits48D visual{};visual.input_bytes=row->psg.size();visual.allow_signed32_quantized_positions=true;
     need(a::decodeScene48D(row->psg,row->scene,d.decode,nullptr,visual),"PSG visual decode rejected: "+row->psgMember);
-    need(!row->scene.lods.empty()&&!row->scene.world_space&&row->scene.identity_matrix_palette&&row->scene.nodes.size()==row->hierarchy.nodeCount,
-      "animation PSG is not a rigid node-palette model: "+row->psgMember);
+    // The original model resource (240258, original_standard_model_resource50la.cpp) takes both
+    // PSG forms: a node-palette model (palette trailer count 1, identity order) and the one-node
+    // model that ends after its surfaces (no palette; every vertex on node 0). Stock animation
+    // PSGs are all multi-node; converted N64 scenery is one-node. Both draw through node 0..n-1
+    // of the same graph. [I: the original character draw of a one-node animation model is not
+    // traced separately; the resource form is the original's.]
+    const bool rigidPalette=row->scene.identity_matrix_palette;
+    const bool oneNodeStatic=!row->scene.identity_matrix_palette&&row->hierarchy.nodeCount==1;
+    need(!row->scene.lods.empty()&&!row->scene.world_space&&(rigidPalette||oneNodeStatic)&&row->scene.nodes.size()==row->hierarchy.nodeCount,
+      "animation PSG is neither a rigid node-palette model nor a one-node model: "+row->psgMember);
     for(const auto& surface:row->scene.lods[0].surfaces){
      ++row->surfaceCount;row->vertexCount+=static_cast<std::uint32_t>(surface.vertices.size());row->indexCount+=static_cast<std::uint32_t>(surface.indices.size());
      need(surface.material_index<row->scene.materials.size(),"animation surface material outside the PSG material table");

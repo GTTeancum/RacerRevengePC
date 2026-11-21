@@ -378,6 +378,14 @@ public:
 // Rider19 Confirm -> Tournament Continue -> Course (first tournament course,
 // TA) Confirm. Emits only original Main Next3 and Confirm4 events; every
 // destination is admitted by the actual frontend, never selected here.
+// Test only (eyecheck R2-R5, DLC career; the runner sets these):
+//   RR_TEST_ADDON_RIDER=<package>/<item>: on the Rider screen press Rider Next (1)
+//     until that add-on is highlighted, then Confirm (the add-on Tournament
+//     Confirm itself also needs RR_TEST_ADDON_TOURNAMENT=1, read by the Rider screen);
+//   RR_TEST_TOURNAMENT_HOLD=1: hold on the Tournament screen (no Continue);
+//   RR_TEST_TOURNAMENT_GARAGE=1: on the Tournament screen press the original Garage
+//     input (event 5, 1F241C) and hold on the Garage once it has settled.
+// A hold idles until the run's wall budget.
 class TournamentRoute final {
     using Snapshot=rr::platform::OriginalUiFrontendSnapshot50KG;
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
@@ -385,6 +393,17 @@ class TournamentRoute final {
     using Aperture=rr::game::OriginalUiApertureState50KG;
     bool enabled_=false,awaitingDispatch_=false,awaitingMainMove_=false,courseLogged_=false;
     std::uint8_t mainMoves_=0,confirms_=0,firstSlot_=0;
+    // Test only (see above).
+    const char* addonKey_=nullptr;std::uint32_t addonTarget_=0,addonMoves_=0;bool awaitingRiderMove_=false;
+    bool holdTournament_=false,garage_=false,garagePressed_=false,holdLogged_=false;
+    static bool envOn(const char* name)noexcept{const char* v=std::getenv(name);return v&&v[0]=='1'&&!v[1];}
+    static bool garageSettled(const Snapshot& s)noexcept{
+        const auto& a=s.garageAperture;
+        return s.prepared&&s.active&&!s.faulted&&!s.quitRequested&&s.frameSubmitted&&!s.deferredQueue&&
+            s.route.screen==13&&s.route.page==1&&s.garageLoaded&&s.garageRootReturned&&s.garageTimingCommitted&&
+            s.garageTargetPublished&&a.bound&&a.inputEnabled268&&a.state==Aperture::open&&
+            s.garageManagerLifecycle==0&&s.garageManagerTransition==0;
+    }
     static void require(bool condition,const char* message){if(!condition)throw std::runtime_error(message);}
     static bool same(rr::game::OriginalUiTransitionRoute50KG a,rr::game::OriginalUiTransitionRoute50KG b)noexcept{
         return a.screen==b.screen&&a.page==b.page;
@@ -407,9 +426,13 @@ class TournamentRoute final {
     static constexpr std::uint8_t screens_[4]{4,5,9,6};
 public:
     static bool settledPublic(const Snapshot& s)noexcept{return settled(s);}
-    explicit TournamentRoute(bool enabled)noexcept:enabled_(enabled){}
+    explicit TournamentRoute(bool enabled)noexcept:enabled_(enabled){
+        if(!enabled_)return;
+        if(const char* key=std::getenv("RR_TEST_ADDON_RIDER");key&&*key)addonKey_=key;
+        holdTournament_=envOn("RR_TEST_TOURNAMENT_HOLD");garage_=envOn("RR_TEST_TOURNAMENT_GARAGE");
+    }
     bool enabled()const noexcept{return enabled_;}
-    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(mainMoves_+confirms_);}
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(mainMoves_+confirms_+addonMoves_+(garagePressed_?1u:0u));}
     bool actionsDispatched()const noexcept{return confirms_==4&&!awaitingDispatch_;}
     // Return -1 while waiting, Main Next3, or Confirm4.
     int poll(const Snapshot& s,std::int32_t mainGroup,std::int32_t mainSlot,bool courseReady){
@@ -417,6 +440,13 @@ public:
         require(!awaitingDispatch_,"tournament route dispatch receipt was not verified");
         require(!s.faulted&&!s.quitRequested,"tournament route original UI became unavailable");
         if(confirms_==4)return -1;
+        // Test only: the Garage entered from the Tournament screen; hold there.
+        if(garagePressed_){
+            require(s.route.screen==13||s.route.screen==9,"tournament route Garage press left Tournament/Garage");
+            if(garageSettled(s)&&!holdLogged_){holdLogged_=true;
+                std::fprintf(stderr,"tournament_route hold screen=13 from=tournament (no further input; the run ends at its wall budget)\n");}
+            return -1;
+        }
         const auto screen=screens_[confirms_];
         const bool expected=s.route.screen==screen&&s.route.page==1&&s.switches==confirms_;
         const bool outgoing=confirms_&&s.route.screen==screens_[confirms_-1]&&s.switches==confirms_-1u;
@@ -430,9 +460,27 @@ public:
         }else if(confirms_==1){
             // Rider opens on the profile's remembered tournament racer (6FC):
             // 19 when fresh, or the seeded --player-racer. Never moved here.
-            require(s.rider.rider4C4==expectedEntryRider50LA(),
+            if(!addonMoves_)require(s.rider.rider4C4==expectedEntryRider50LA(),
                 "tournament route Rider did not open on the profile's remembered racer");
-            if(!s.rider.selectedCharacterReady)return -1;
+            if(addonKey_){
+                // Test only: Rider Next until the add-on is highlighted (P1 carousel).
+                if(!addonTarget_){
+                    for(std::size_t i=0;i<rr::assets::dlc50DL::addonPodCount();++i)
+                        if(const auto* pod=rr::assets::dlc50DL::addonPodAt(i);pod&&pod->key==addonKey_)addonTarget_=pod->number;
+                    require(addonTarget_!=0,"RR_TEST_ADDON_RIDER is not an admitted add-on pod (check RR_DLC_ROOT)");
+                }
+                if(rr::game::dlc50DL::highlightedAddonRider()!=addonTarget_){
+                    require(addonMoves_<26u+rr::game::dlc50DL::addonRiderCount(),"tournament route add-on rider not reached");
+                    awaitingRiderMove_=awaitingDispatch_=true;return 1;
+                }
+                std::fprintf(stderr,"tournament_route addon_rider key=%s number=%u moves=%u confirm\n",addonKey_,addonTarget_,addonMoves_);
+            }else if(!s.rider.selectedCharacterReady)return -1;
+        }else if(confirms_==2&&(holdTournament_||garage_)){
+            // Test only: hold on the Tournament screen, or press its Garage input once.
+            if(garage_){std::fprintf(stderr,"tournament_route garage press screen=9\n");awaitingDispatch_=true;return 5;}
+            if(!holdLogged_){holdLogged_=true;
+                std::fprintf(stderr,"tournament_route hold screen=9 (no Continue; the run ends at its wall budget)\n");}
+            return -1;
         }else if(confirms_==3){
             // Whatever course the profile's career progress selects (the
             // mode2 Course entry places it); this route never moves it.
@@ -451,6 +499,14 @@ public:
             require(!s.faulted&&s.route.screen==4&&same(t.current,s.route)&&same(t.requested,s.route),
                 "tournament route Main Next changed the route");
             ++mainMoves_;awaitingMainMove_=awaitingDispatch_=false;return;
+        }
+        if(awaitingRiderMove_){
+            require(!s.faulted&&s.route.screen==5,"tournament route Rider Next changed the route");
+            ++addonMoves_;awaitingRiderMove_=awaitingDispatch_=false;return;
+        }
+        if(garage_&&confirms_==2&&!garagePressed_){
+            require(!s.faulted&&!s.quitRequested&&s.route.screen==9,"tournament route Garage press faulted the Tournament screen");
+            garagePressed_=true;awaitingDispatch_=false;return;
         }
         const auto source=screens_[confirms_];
         // Course launch keeps Course as its requested route (as Route above).
@@ -570,6 +626,8 @@ class TournamentReturnRoute final {
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
     bool enabled_=false,awaitingDispatch_=false,waitingChange_=false,ending_=false;
+    // Test only (eyecheck R5): RR_TEST_GARAGE_HOLD=1 holds on the race-return Garage (no Back).
+    bool garageHold_=false,garageHoldLogged_=false;
     std::uint8_t actions_=0,garageActions_=0,leadActions_=0;
     std::uint64_t switchesAtAction_=0,pollsSinceAction_=0;
     std::uint32_t activationsAtAction_=0;
@@ -606,7 +664,9 @@ class TournamentReturnRoute final {
     static constexpr std::uint8_t screens_[3]{13,9,6};
 public:
     static constexpr std::uint8_t maximumLeadActions=8;
-    explicit TournamentReturnRoute(bool enabled)noexcept:enabled_(enabled){}
+    explicit TournamentReturnRoute(bool enabled)noexcept:enabled_(enabled){
+        const char* v=enabled_?std::getenv("RR_TEST_GARAGE_HOLD"):nullptr;garageHold_=v&&v[0]=='1'&&!v[1];
+    }
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return actions_;}
     bool actionsDispatched()const noexcept{return garageActions_==3&&!awaitingDispatch_;}
@@ -660,7 +720,11 @@ public:
         }
         if(garageActions_&&screen!=screens_[garageActions_]&&screen==screens_[garageActions_-1])return -1;
         require(screen==screens_[garageActions_],"tournament return route left the bounded Hall/Win/Unlock/Garage/Tournament/Course route");
-        if(garageActions_==0){if(!garageSettled(s))return -1;awaitingDispatch_=true;return 6;}
+        if(garageActions_==0){if(!garageSettled(s))return -1;
+            if(garageHold_){if(!garageHoldLogged_){garageHoldLogged_=true;
+                std::fprintf(stderr,"tournament_return_route hold screen=13 from=race_return (no Back; the run ends at its wall budget)\n");}
+                return -1;}
+            awaitingDispatch_=true;return 6;}
         if(!TournamentRoute::settledPublic(s))return -1;
         if(garageActions_==2){
             require(s.course.mode34==2,"tournament return route Course left tournament mode");
