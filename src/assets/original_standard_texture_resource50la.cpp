@@ -1535,14 +1535,23 @@ bool OriginalStandardTextureResolver50LA::appendSources(
                     entry.count=grate?5:4;
                     entry.levels[0]={static_cast<std::int32_t>(width),static_cast<std::int32_t>(width),0,18,width*width*(depth/8)};
                 }else {
-                    // Preserve the original public specmap5 structural subset.
-                    if(bytes.size()!=12332)return fail(d,E::unsupported,0x29F538);
+                    // The one TGA size rule (every member, every course/pod; was the exact
+                    // 64x64 12332-byte pod specmap5 only): uncompressed type 2, square power of
+                    // two, 24 or 32 bits, levels down to 16 (64->3, 128->4, 256->5, the same
+                    // count rule as the 64 case and the RA branch above). RC.RES's own 256x256
+                    // textures\specmap5.tga is the 12E2B0 first registration on RC.
+                    // Bounded by the 5-level storage (Entry::levels, levels_/colorBacking_).
+                    if(bytes.size()<18)return fail(d,E::unsupported,0x29F538);
                     if(bytes[0]||bytes[1]||bytes[2]!=2)return fail(d,E::unsupported,0x29F700);
                     for(std::size_t i=3;i<12;++i)if(bytes[i])return fail(d,E::unsupported,0x29F59C,i);
-                    if(bytes[12]!=64||bytes[13]||bytes[14]!=64||bytes[15]||bytes[16]!=24||bytes[17])
+                    const std::size_t width=std::size_t(bytes[12])|(std::size_t(bytes[13])<<8);
+                    const std::uint8_t depth=bytes[16];
+                    std::int32_t count=0;for(std::size_t w=width;w>=16;w>>=1)++count;
+                    if(width<16||(width&(width-1))||count<1||static_cast<std::size_t>(count)>entry.levels.size()||
+                       !detail::OriginalTgaConversion50LA::sourceShape(bytes,width,width,depth))
                         return fail(d,E::unsupported,0x29F648,12);
-                    entry.count=3;
-                    entry.levels[0]={64,64,0,18,64u*64u*3u};
+                    entry.count=count;
+                    entry.levels[0]={static_cast<std::int32_t>(width),static_cast<std::int32_t>(width),0,18,width*width*(depth/8)};
                 }
             }else {
             const auto parsePst=[&](Storage::Entry& frame,std::size_t begin,std::size_t extent) {

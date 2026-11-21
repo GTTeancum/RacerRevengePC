@@ -259,55 +259,8 @@ bool Archive::open(const Identity& identity,const std::shared_ptr<Provider>& pro
         // actual SHA-256/size (PORT STAND-IN: the provider's authentication label; the original
         // mounts by name only).
         Provider::Diagnostic pd;
-        // 12E2B0 registration rule, every course and every member name: the source registry
-        // ignores a later equal-name registration, so the first registered member keeps the
-        // name (rc_cold_sources50la.h before 08f1ee6 recorded this for POD17 vs RC
-        // textures\specmap5.tga; the pods are registered by 2129C0 before this 12CEA0 mount).
-        // A course member whose name an earlier ACTIVE mount already serves with different
-        // bytes is therefore not registered by this mount; equal-byte names coalesce anyway
-        // and stay. The course's own static world keeps reading its retained decoded archive.
-        // PORT STAND-IN: applied here at the registration site because the provider's
-        // lookup132820 (original_standard_archive_provider50la.h) still answers "unknown" for
-        // unequal duplicates instead of returning the first registration; retire this into
-        // that lookup on the next header round.
-        {
-            if(!provider->sealed()){Provider::Diagnostic sd;(void)provider->sealNativeMounts(sd);}
-            std::vector<a::ResourceEntry48C> registered;registered.reserve(next->decoded.entries.size());
-            std::size_t ignored=0,undecided=0;const auto& bytes=next->decoded.decoded;
-            for(const auto& e:next->decoded.entries){
-                if(e.logical_offset>bytes.size()||e.bytes>bytes.size()-e.logical_offset)
-                    return refuse(d,step,0x132E40u,"course archive member outside its decoded bytes: "+e.name);
-                Provider::MemberView earlier;const auto found=provider->lookup132820(e.name,earlier);
-                if(found==Provider::Lookup::present&&earlier.data&&
-                   (earlier.size!=e.bytes||(e.bytes&&std::memcmp(earlier.data,bytes.data()+e.logical_offset,e.bytes)!=0))){
-                    // An earlier race's course archive still mounted (a teardown that did not
-                    // release it) is not a registration this race made: keep the member, so the
-                    // lookup stays ambiguous and refuses loudly instead of serving that
-                    // course's bytes. Only pod/UI/application registrations take the name.
-                    Provider::MountView owner;
-                    if(provider->mount(earlier.mount,owner)&&owner.archiveName&&owner.archiveName->size()>7&&
-                       sameName(std::string_view(*owner.archiveName).substr(0,7),"TRACKS/")&&
-                       !sameName(*owner.archiveName,next->container)){
-                        std::fprintf(stderr,"common_track_registration course=%s member=%s earlier_course_mount=%s kept=1 reason=stale_course_mount\n",
-                            std::string(identity.code.view()).c_str(),e.name.c_str(),owner.archiveName->c_str());
-                        registered.push_back(e);continue;
-                    }
-                    ++ignored;
-                    std::fprintf(stderr,"common_track_registration course=%s member=%s bytes=%u earlier_mount=%zu earlier_bytes=%zu rule=12E2B0_first_registration_kept\n",
-                        std::string(identity.code.view()).c_str(),e.name.c_str(),static_cast<unsigned>(e.bytes),earlier.mount,earlier.size);
-                    continue;
-                }
-                if(found==Provider::Lookup::unknown)++undecided;
-                registered.push_back(e);
-            }
-            std::fprintf(stderr,"common_track_registration course=%s members=%zu registered=%zu ignored=%zu undecided=%zu\n",
-                std::string(identity.code.view()).c_str(),next->decoded.entries.size(),registered.size(),ignored,undecided);
-            next->decoded.entries.swap(registered);
-            const bool mountedOk=provider->mountAuthenticatedRes(next->container,next->sha256,static_cast<std::size_t>(next->bytes),next->decoded,pd,lease);
-            next->decoded.entries.swap(registered);   // the Track keeps every decoded member
-            if(!mountedOk)
-                return refuse(d,step,0x132E40u,"course archive mount rejected (status "+std::to_string(unsigned(pd.status))+")");
-        }
+        if(!provider->mountAuthenticatedRes(next->container,next->sha256,static_cast<std::size_t>(next->bytes),next->decoded,pd,lease))
+            return refuse(d,step,0x132E40u,"course archive mount rejected (status "+std::to_string(unsigned(pd.status))+")");
         next->mounted=true;
         a::OriginalStandardTextureDiagnostic50LA td;
         if(!provider->sealNativeMounts(pd)||!resolver->bindProvider3E1A70(provider,td))

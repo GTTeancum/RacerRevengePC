@@ -2,6 +2,7 @@
 #include "import_decode48c.h"
 #include "original_ui_archive50kg.h"
 #include "original_ta_encoded_archive50la.h"
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <thread>
@@ -10,6 +11,7 @@
 #include <utility>
 #include <string_view>
 #include <array>
+#include <vector>
 
 namespace original_main_entry50KG { struct Application; }
 namespace rc_cold_sources50LA { class Owner; }
@@ -131,44 +133,33 @@ public:
     Lookup lookup132820(const std::string& requested,MemberView& out)const noexcept {
         out={};out.revision=revision_;
         if(!retainedSourcesAccessible()||!sealed_||!nameOkay(requested))return Lookup::unknown;
-        // Exact native POD17/RC collision authority is issued only by the
-        // authenticated RC owner. All other names retain ambiguity rejection.
-        if(sameName(requested,"textures\\specmap5.tga")){
-            const Mount* policy=nullptr;
-            for(std::size_t m=0;m<mounts_.size();++m){const auto& candidate=*mounts_[m];
-                if(!candidate.active)continue;
-                if(candidate.rcSpecmapEarlierMount==static_cast<std::size_t>(-1))continue;
-                if(policy||!candidate.rcSource||candidate.rcSpecmapEarlierMount>=m||
-                   candidate.rcSpecmapOrdinal>=candidate.rows.size())return Lookup::unknown;
-                policy=&candidate;
-            }
-            if(policy){
-                const auto earlier=policy->rcSpecmapEarlierMount;
-                const auto& pod=*mounts_[earlier];
-                if(!pod.active||policy->rcSpecmapEarlierOrdinal>=pod.rows.size())return Lookup::unknown;
-                const auto& winner=pod.rows[policy->rcSpecmapEarlierOrdinal];
-                const auto& retainedRc=policy->rows[policy->rcSpecmapOrdinal];
-                if(!sameName(winner.name,requested)||!sameName(retainedRc.name,requested)||
-                   winner.size!=12332||retainedRc.size!=196652)return Lookup::unknown;
-                // Identical ordinary POD rows may coalesce. Only the exact
-                // retained RC row may differ; any third unequal row rejects.
-                for(const auto& mount:mounts_)if(mount->active)for(const auto& row:mount->rows)
-                    if(sameName(requested,row.name) && &row!=&retainedRc&&!equalBytes(winner,row))
-                        return Lookup::unknown;
-                out={&winner.name,winner.data,winner.size,earlier,policy->rcSpecmapEarlierOrdinal,revision_,pod.generation};
-                return Lookup::present;
-            }
+        // 12E2B0: the source registry ignores a later equal-name registration, so the
+        // member of the EARLIEST-registered active mount serves the name, for every name
+        // and every course/pod (the track archive 12CEA0 registers before the pods 2129C0;
+        // RC.RES textures\specmap5.tga therefore wins over the pods' copy on RC). Registration
+        // order is the host-side Mount::registered serial (commit), not the slot index: a
+        // reactivated tombstone keeps its old slot but registers again. Equal bytes in other
+        // mounts are the same file. Two unequal rows inside ONE mount stay unknown.
+        std::size_t winner=static_cast<std::size_t>(-1);
+        for(std::size_t m=0;m<mounts_.size();++m){if(!mounts_[m]->active)continue;
+            if(winner!=static_cast<std::size_t>(-1)&&mounts_[m]->registered>=mounts_[winner]->registered)continue;
+            for(const auto& row:mounts_[m]->rows)if(sameName(requested,row.name)){winner=m;break;}
         }
-        const Row* matched=nullptr;
-        for(std::size_t m=0;m<mounts_.size();++m){if(!mounts_[m]->active)continue;const auto& rows=mounts_[m]->rows;
+        if(winner==static_cast<std::size_t>(-1))return Lookup::absent;
+        const Row* matched=nullptr;std::size_t ordinal=0;
+        {const auto& rows=mounts_[winner]->rows;
             for(std::size_t i=0;i<rows.size();++i)if(sameName(requested,rows[i].name)){
-                if(matched&&!equalBytes(*matched,rows[i])){
-                    out={};out.revision=revision_;return Lookup::unknown;
-                }
-                if(!matched){matched=&rows[i];out={&rows[i].name,rows[i].data,rows[i].size,m,i,revision_,mounts_[m]->generation};}
+                if(matched&&!equalBytes(*matched,rows[i])){out={};out.revision=revision_;return Lookup::unknown;}
+                if(!matched){matched=&rows[i];ordinal=i;}
             }
         }
-        return matched?Lookup::present:Lookup::absent;
+        if(!matched)return Lookup::absent;
+        for(std::size_t m=0;m<mounts_.size();++m){if(m==winner||!mounts_[m]->active)continue;
+            for(const auto& row:mounts_[m]->rows)if(sameName(requested,row.name)&&!equalBytes(*matched,row)){
+                noteDuplicateName(requested,winner,m);break;}
+        }
+        out={&matched->name,matched->data,matched->size,winner,ordinal,revision_,mounts_[winner]->generation};
+        return Lookup::present;
     }
     // This UI-specific accessor accepts only authenticated UI backing. No
     // registration, revision/seal change, cache activation or page admission.
@@ -345,10 +336,9 @@ private:
         // Distinct complete authenticated MC source, with exact typed lifetime.
         std::shared_ptr<const mc_cold_sources50LA::Owner> mcSource;
         std::thread::id mcThread{};
-        // Immutable private row identities, never a caller-set lookup flag.
-        std::size_t rcSpecmapEarlierMount=static_cast<std::size_t>(-1);
-        std::size_t rcSpecmapEarlierOrdinal=static_cast<std::size_t>(-1);
-        std::size_t rcSpecmapOrdinal=static_cast<std::size_t>(-1);
+        // Host-side 12E2B0 registration order (commit: first mount and every reactivation).
+        // Lookup serves an unequal duplicate name from the smallest value. Never guest memory.
+        mutable std::uint64_t registered=0;
         ~Mount(){if((rcSource&&rcThread!=std::this_thread::get_id())||
             (tbSource&&tbThread!=std::this_thread::get_id())||
             (gbSource&&gbThread!=std::this_thread::get_id())||
@@ -452,18 +442,21 @@ private:
                 if(revision_==std::numeric_limits<std::uint64_t>::max()||
                    old.generation==std::numeric_limits<std::uint64_t>::max())
                     return fail(d,Status::capacity);
+                if(registrationSerial_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::capacity);
                 old.admittedUi=next->ui;
-                ++old.generation;old.active=true;++revision_;sealed_=false;
+                ++old.generation;old.active=true;old.registered=++registrationSerial_;++revision_;sealed_=false;
                 if(nativeRace)nativeRace->entries_[nativeRace->count_++]={m,old.generation,&old};
             }
             d={};return true; // Active repeat is idempotent; retired repeat is genuine reentry.
         }
         if(mounts_.size()>=maxMounts||next->rows.size()>maxEntries-entryCount_||
-           next->retainedBytes>maxBytes-retainedBytes_||revision_==std::numeric_limits<std::uint64_t>::max())
+           next->retainedBytes>maxBytes-retainedBytes_||revision_==std::numeric_limits<std::uint64_t>::max()||
+           registrationSerial_==std::numeric_limits<std::uint64_t>::max())
             return fail(d,Status::capacity);
+        next->registered=++registrationSerial_;
         // Preserve every genuine mount/member, even unrelated duplicate names.
         // Query-local comparison rejects only an actually requested conflict;
-        // mount order never substitutes for unrecovered retail priority.
+        // 12E2B0 priority is the registration serial (lookup132820), never the slot.
         const auto entries=next->rows.size(),bytes=next->retainedBytes;
         mounts_.push_back(std::move(next));entryCount_+=entries;retainedBytes_+=bytes;
         if(nativeRace){const auto slot=mounts_.size()-1;
@@ -474,5 +467,19 @@ private:
     std::size_t entryCount_=0,retainedBytes_=0;
     std::uint64_t revision_=0;
     bool sealed_=false;
+    std::uint64_t registrationSerial_=0;
+    // archive_duplicate_name is logged once per name (host-side, bounded; a full list stops
+    // logging, never the lookup). noexcept: an allocation failure only skips the log line.
+    static constexpr std::size_t maxLoggedDuplicateNames=256;
+    mutable std::vector<std::string> loggedDuplicateNames_;
+    void noteDuplicateName(const std::string& name,std::size_t kept,std::size_t ignored)const noexcept {
+        try{
+            for(const auto& n:loggedDuplicateNames_)if(sameName(n,name))return;
+            if(loggedDuplicateNames_.size()>=maxLoggedDuplicateNames)return;
+            loggedDuplicateNames_.push_back(name);
+            std::fprintf(stderr,"archive_duplicate_name name=%s kept_mount=%s ignored_mount=%s rule=12E2B0_first_registration\n",
+                name.c_str(),kept<mounts_.size()?mounts_[kept]->name.c_str():"?",ignored<mounts_.size()?mounts_[ignored]->name.c_str():"?");
+        }catch(...){}
+    }
 };
 }

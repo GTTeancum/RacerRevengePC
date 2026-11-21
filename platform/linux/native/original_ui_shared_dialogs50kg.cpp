@@ -886,19 +886,36 @@ namespace rr::game {
 OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::beginSharedDialogRetirement142590(
  SharedDialogs& owner,std::size_t ordinal,C& c)noexcept {
  auto r=live();if(!r.okay())return r;
+ // PORT STAND-IN (retires the stand-in noted at advance4702048F0): a race-return
+ // first screen (Course6, Hall11, Win7, Unlock10) boots 470/47C per frontend
+ // but no manager has attached them under the dispatcher yet. The original
+ // keeps them attached across the race, so its 142590 never sees this state.
+ // Same release for both topologies; the never-attached one has no dispatcher
+ // links to repair. Keyed on the actual topology, never on a screen.
+ const bool unattached=[&]()noexcept {
+  // Both counted dialogs constructed (203C90/2054D0), neither ever appended by
+  // 1B86D0, and no reorder in flight: no dispatcher link names either one.
+  const auto loose=[](const C& n)noexcept {return !n.parent1C&&!n.previous10&&!n.next14&&!n.mask20;};
+  if(sharedDialogEverAttached_[0]||sharedDialogEverAttached_[1]||sharedDialogDetached_||
+     sharedDialogReorderOrdinal_||owner.reorderStep_)return false;
+  for(const C* node=dispatcher_.firstChild18;node;node=node->next14)
+   if(node==&owner.dialog470_.entity||node==&owner.controller47C_.entity)return false;
+  return loose(owner.dialog470_.entity)&&loose(owner.controller47C_.entity);
+ }();
  if(ordinal>1||sharedDialogsOwner_!=&owner||owner.scope_.get()!=this||managerLive_||managerRetiring_||
     managerSearchOwner_||!garageChildren_.empty()||sharedDialogDetached_||sharedDialogReorderOrdinal_||
     sharedDialogRetiring_[ordinal]||sharedDialogRetired_[ordinal]||!sharedDialogPrefixCurrent(owner,ordinal,c)||
-    c.parent1C!=&dispatcher_||c.next14)return {Status::phase,0x142590};
+    (!unattached&&(c.parent1C!=&dispatcher_||c.next14)))return {Status::phase,0x142590};
  if(ordinal==1){
   if((owner.phase_!=SharedDialogs::Phase::loaded&&owner.phase_!=SharedDialogs::Phase::controller47CConstructed&&
       owner.phase_!=SharedDialogs::Phase::failed)||!owner.dialog470_.loaded||!owner.controller47C_.resources||
      owner.popup47CDraw_||owner.nativePopup47CFifoPins_||sharedDialogRetired_[0]||sharedDialogRetiring_[0]||
-     !sharedDialogs_[0]||dispatcher_.firstChild18!=sharedDialogs_[0]||
-     sharedDialogs_[0]->parent1C!=&dispatcher_||sharedDialogs_[0]->previous10||
-     sharedDialogs_[0]->next14!=&c||c.previous10!=sharedDialogs_[0])return {Status::topology,0x1425B8};
+     !sharedDialogs_[0]||
+     (!unattached&&(dispatcher_.firstChild18!=sharedDialogs_[0]||
+      sharedDialogs_[0]->parent1C!=&dispatcher_||sharedDialogs_[0]->previous10||
+      sharedDialogs_[0]->next14!=&c||c.previous10!=sharedDialogs_[0])))return {Status::topology,0x1425B8};
  }else if(owner.phase_!=SharedDialogs::Phase::retiring||owner.retiringOrdinal_||!sharedDialogRetired_[1]||
-           sharedDialogs_[1]||dispatcher_.firstChild18!=&c||c.previous10)return {Status::topology,0x1425B8};
+           sharedDialogs_[1]||c.previous10||(!unattached&&dispatcher_.firstChild18!=&c))return {Status::topology,0x1425B8};
  // Last reference repairs genuine dispatcher links. The dying source object's
  // parent/previous/next values are not invented-null stores.
  if(c.previous10)c.previous10->next14=c.next14;
@@ -909,14 +926,21 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::beginSharedDialogRe
 }
 bool OriginalUiEntityScope50KG::sharedDialogRetirementCurrent(const SharedDialogs& owner,
  std::size_t ordinal,const C& c)const noexcept {
+ // Never-attached topology: see beginSharedDialogRetirement142590 (PORT STAND-IN).
+ const bool unattached=!sharedDialogEverAttached_[0]&&!sharedDialogEverAttached_[1]&&
+    !sharedDialogDetached_&&!c.parent1C&&!c.mask20&&!c.previous10&&!c.next14;
  if(ordinal>1||!live().okay()||sharedDialogsOwner_!=&owner||owner.scope_.get()!=this||
     sharedDialogs_[ordinal]!=&c||!sharedDialogRetiring_[ordinal]||sharedDialogRetired_[ordinal]||
     c.kind!=K::entity141300||c.sessionGeneration!=scopeGeneration_||c.objectKey!=key(&c)||
-    c.reference00||c.firstChild18||c.parent1C!=&dispatcher_||c.mask20!=0xffffffffu||c.next14||
+    c.reference00||c.firstChild18||
+    (!unattached&&(c.parent1C!=&dispatcher_||c.mask20!=0xffffffffu||c.next14))||
     contains(application_->entityAuthority_.view(),&c)||!application_->objectCount423F60_)return false;
+ if(unattached)return ordinal?!sharedDialogRetired_[0]:sharedDialogRetired_[1]&&
+   dispatcher_.firstChild18!=&c&&dispatcher_.firstChild18!=&owner.controller47C_.entity;
  return ordinal?c.previous10==&owner.dialog470_.entity&&!sharedDialogRetired_[0]:
    !c.previous10&&sharedDialogRetired_[1]&&!dispatcher_.firstChild18;
 }
+
 bool OriginalUiEntityScope50KG::sharedDialogRetiredNodesAbsent(const SharedDialogs& owner)const noexcept {
  const auto view=application_->entityAuthority_.view();
  return !contains(view,&dispatcher_)&&!contains(view,&owner.dialog470_.entity)&&

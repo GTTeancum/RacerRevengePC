@@ -673,6 +673,14 @@ void Context::run() {
        <<" texture_pc="<<canonical.texture.sourcePC<<" texture_row="<<canonical.texture.row
        <<" texture_source="<<canonical.texture.source<<" texture_offset="<<canonical.texture.byteOffset
        <<" racer_source_status="<<static_cast<unsigned>(failure.racerSource.status)
+       // Status names (original_racer_material_sources50la_fixture.h:13). "unsealed" at 132820
+       // on a member means the provider lookup answered unknown: two active mounts serve that
+       // name with different bytes (or the namespace is not sealed).
+       <<" racer_source_reason="<<[&]{
+           static const char* const names[]={"complete","input","lookup_unknown_ambiguous_or_unsealed","model",
+               "reference","missing_material","document","unsupported","missing_texture","conflict","allocation"};
+           const auto i=static_cast<unsigned>(failure.racerSource.status);
+           return i<sizeof(names)/sizeof(names[0])?names[i]:"unknown";}()
        <<" racer_source_pc="<<failure.racerSource.sourcePC<<" racer_source_member="<<failure.racerSource.member
        <<" racer_source_slot="<<failure.racerSource.modelSlot<<" racer_source_pass="<<failure.racerSource.pass
        <<" racer_source_map="<<failure.racerSource.map

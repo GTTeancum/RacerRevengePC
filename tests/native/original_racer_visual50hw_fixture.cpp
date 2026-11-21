@@ -3,6 +3,16 @@
 #include <iostream>
 
 namespace native_racer50HW {
+namespace visual_detail {
+// The largest converted 1555 level of a specular (map-2 / SpecularMapCompressed) TGA: square,
+// power of two, 16..256 (the one 250EE0 size rule of original_standard_texture_resource50la.cpp;
+// the pods' specmap5 is 64, RC.RES's specmap5 is 256), and its words cover side*side.
+inline bool squareSpecularLevel(const rr::assets::OriginalStandardTextureLevelView50LA& level) noexcept {
+    const auto w=level.width104,h=level.height110;
+    return w>=16&&w<=256&&w==h&&!(w&(w-1))&&
+        level.packed1555Words==static_cast<std::size_t>(w)*static_cast<std::size_t>(h);
+}
+} // namespace visual_detail
 
 Visual::Visual(const std::filesystem::path& repository,
            const std::filesystem::path& visualSelectionRoot,const Rig& rig) {
@@ -656,13 +666,14 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
             const a::OriginalStandardTextureResource50LA* resource=nullptr;
             std::size_t level=0;
             std::array<std::int32_t,5> texaWrap{};
+            std::uint32_t side=0;
             std::uint64_t identity=0;
             visual_detail::Bytes bytes;
         };
         std::vector<SpecularProjection> specularProjections;
         std::vector<a::MaterialTextureSlotInput50EA> specularSlots;
         std::vector<p::MaterialTextureSampler50EB> specularSamplers;
-        // One load-once 64x64 native1555 projection bank shared by every map
+        // One load-once native1555 projection bank (each at its level's own size) shared by every map
         // the original lowers from a specular TGA: the dual program's map 2 and
         // a later SpecularMapCompressed pass. The cold key is resource, level
         // and the consuming context's TEXA/wrap; slots stay distinct.
@@ -675,8 +686,12 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
             }
             s::need(specularProjections.size()<32,"Canonical second-map native bank capacity");
             const auto ta0=texaWrap[0],ta1=texaWrap[1],aem=texaWrap[2];
-            a::TextureMip48E native;native.width=native.height=64;native.rgba.resize(4096u*4u);
-            for(std::size_t pixel=0;pixel<4096;++pixel){
+            // The level's own square extent (any TGA the one 250EE0 size rule admits: 64 pod
+            // specmap5, 256 RC.RES specmap5); every read is inside packed1555Words.
+            s::need(visual_detail::squareSpecularLevel(level)&&level.packed1555,"Canonical second-map level extent");
+            const auto side=static_cast<std::uint32_t>(level.width104);const std::size_t pixels=std::size_t(side)*side;
+            a::TextureMip48E native;native.width=native.height=side;native.rgba.resize(pixels*4u);
+            for(std::size_t pixel=0;pixel<pixels;++pixel){
                 const auto word=level.packed1555[pixel];
                 native.rgba[4*pixel]=static_cast<std::uint8_t>((word&31u)<<3);
                 native.rgba[4*pixel+1]=static_cast<std::uint8_t>(((word>>5)&31u)<<3);
@@ -686,7 +701,7 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
             // The resource already owns the original row projection.
             // No second flip, RGB5 replication, mip generation, source
             // decoder or Controls/specmap3 identity enters this copy.
-            SpecularProjection projection;projection.resource=&texture;
+            SpecularProjection projection;projection.resource=&texture;projection.side=side;
             projection.texaWrap=texaWrap;projection.identity=visual_detail::nextSpecularIdentity50LA();
             a::DecodeError48C encodeError;
             s::need(a::encodeTextureLevel48E(native,projection.bytes,encodeError)&&
@@ -1050,9 +1065,9 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                             *extraTexture.sourceFormat()==a::OriginalStandardTextureSourceFormat50LA::tgaBgr24&&
                             extraTexture.formatAC()&&*extraTexture.formatAC()==1555&&
                             extraTexture.bitsPerPixelE8()&&*extraTexture.bitsPerPixelE8()==16&&
-                            extraTexture.level100(0,extraLevel)&&extraLevel.width104==64&&extraLevel.height110==64&&
+                            extraTexture.level100(0,extraLevel)&&visual_detail::squareSpecularLevel(extraLevel)&&
                             extraLevel.storage==a::OriginalStandardTextureLevelStorage50LA::tgaConverted1555&&
-                            extraLevel.packed1555&&extraLevel.packed1555Words==4096,
+                            extraLevel.packed1555,
                             "Canonical pod second-pass largest native1555 level is unsupported");
                         const auto extraIndex=projectSpecular50PP(extraTexture,extraLevel,{{ta0,ta1,aem,extraU,extraV}});
                         specularSlots.push_back({{component+1,static_cast<std::uint32_t>(ordinal),2,1},
@@ -1154,9 +1169,9 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                         *secondTexture.sourceFormat()==a::OriginalStandardTextureSourceFormat50LA::tgaBgr24&&
                         secondTexture.formatAC()&&*secondTexture.formatAC()==1555&&
                         secondTexture.bitsPerPixelE8()&&*secondTexture.bitsPerPixelE8()==16&&
-                        secondTexture.level100(0,secondLevel)&&secondLevel.width104==64&&secondLevel.height110==64&&
+                        secondTexture.level100(0,secondLevel)&&visual_detail::squareSpecularLevel(secondLevel)&&
                         secondLevel.storage==a::OriginalStandardTextureLevelStorage50LA::tgaConverted1555&&
-                        secondLevel.packed1555&&secondLevel.packed1555Words==4096,
+                        secondLevel.packed1555,
                         "Canonical second-map largest native1555 level is unsupported");
                     const std::array<std::int32_t,5> texaWrap{{ta0,ta1,aem,secondU,secondV}};
                     const std::uint32_t specularIndex=projectSpecular50PP(secondTexture,secondLevel,texaWrap);
@@ -1214,8 +1229,14 @@ void Visual::bindCanonicalEngineModels(const std::array<CanonicalEngineModelInpu
                 specularInput.push_back({projection.identity,&projection.bytes});
             const auto count=static_cast<std::uint32_t>(specularInput.size());
             const auto slotCount=static_cast<std::uint32_t>(specularSlots.size());
+            // Budgets from the projections actually built (each serialized as 16 + side*side*4).
+            std::size_t specularSerialized=0,specularRgba=0;std::uint32_t specularMaxSide=0;
+            for(const auto& projection:specularProjections){
+                s::need(projection.bytes.size()>16,"Canonical second-map projection extent");
+                specularSerialized+=projection.bytes.size();specularRgba+=projection.bytes.size()-16u;
+                specularMaxSide=std::max(specularMaxSide,projection.side);}
             const a::MaterialTextureAssetsInput50EA input{specularInput.data(),count,specularSlots.data(),slotCount,
-                {count,slotCount,std::size_t(count)*(4096u*4u+16u),std::size_t(count)*4096u*4u,64}};
+                {count,slotCount,specularSerialized,specularRgba,specularMaxSide}};
             a::MaterialTextureAssetDiagnostic50EA diagnostic;
             // Final fallible operation. 50EA transactionally owns exactly the
             // serialized native pixels. Nothing below can resize or allocate.
