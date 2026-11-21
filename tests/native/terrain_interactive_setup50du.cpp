@@ -1179,11 +1179,42 @@ SessionExit50DU Context::run() {
   }
   if(auto borrow=track.roles.collision->borrow()){
    if(const auto* actions=borrow.actions();actions&&actions->nativeGroup()&&actions->nativeGroup()->dispatches!=reportedTriggerDispatches){
-    reportedTriggerDispatches=actions->nativeGroup()->dispatches;
+    const auto& group=*actions->nativeGroup();
+    reportedTriggerDispatches=group.dispatches;
+    // cr-18: name the trigger(s) this query's collider is now a member of (the dispatched
+    // contact adds the pair after every action ran) instead of reading row 1 of the animation
+    // table for every course: through cr-16 "opening_active" was GC's door row whatever
+    // trigger dispatched (a LostAI entry by the secondary collider read as a failed door).
+    // Every course, every trigger kind. Streams only (no allocation in the player frame).
+    const std::uint32_t collider=source.filter?source.filter->identity:0u;
+    const auto* rows=actions->sourceOwner();
     std::cerr<<"TRIGGER WORLD ACTION: dispatches="<<reportedTriggerDispatches
-        <<" opening_active="<<(trackAnimations&&trackAnimations->rowCount()&&!trackAnimations->state(0).active90.empty()?
-            int(trackAnimations->state(0).active90[0]):-1)
+        <<" collider="<<(collider==secondaryFilter.identity?"secondary":"main")
+        <<" animation_activations="<<actions->counters().animationActivations
         <<" policy=native_swept_type2_segments\n";
+    for(std::size_t t=0;rows&&collider&&t<group.triggerCount&&t<group.triggers.size()&&t<rows->liveCount();++t){
+     const auto& entry=group.triggers[t].collider;bool member=false;
+     for(std::size_t k=0;k<entry.highWaterD0&&k<entry.membersCC.size();++k)member=member||entry.membersCC[k]==collider;
+     if(!member)continue;
+     const auto& authored=rows->source(t);
+     std::cerr<<"trigger_dispatch course="<<track.code()<<" trigger="<<(t+1)<<" actions="<<authored.actions.size()<<" kinds=";
+     for(std::size_t a=0;a<authored.actions.size();++a)
+      std::cerr<<(a?"+":"")<<course_trigger_sources50CT::actionKindName(authored.actions[a].kind);
+     std::cerr<<'\n';
+     // Animation 101170: the action's target row, set active by fire(); the runtime's next
+     // 101860 tick commits it and prints track_animation_started ... by=trigger<N>.
+     for(const auto& action:authored.actions){
+      if(action.kind!=course_trigger_sources50CT::ActionKind::Animation)continue;
+      const auto row=static_cast<std::size_t>(action.animationIndex);
+      const bool bound=trackAnimations&&row<trackAnimations->rowCount();
+      const auto* state=bound?&trackAnimations->state(row):nullptr;
+      std::cerr<<"trigger_animation_action course="<<track.code()<<" trigger="<<(t+1)<<" row="<<(row+1)
+          <<" applied="<<(state&&!state->active90.empty()&&state->active90[0]==1?1:0)
+          <<" pending_trigger="<<(state?state->pendingTrigger:0u)
+          <<" stopped="<<(state?state->stopped10:1u)
+          <<" same_runtime="<<(bound&&actions->animationOwner()==trackAnimations.get()?1:0)<<'\n';
+     }
+    }
    }
   }
   if(attempt.status==VehicleLiveQueryStatus50EQ::Complete)return true;

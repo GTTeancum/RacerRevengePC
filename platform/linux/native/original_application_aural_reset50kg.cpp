@@ -137,10 +137,18 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
            !gameplay.all8NonHumanMixerOwner26D070(*groups.mixer_,groups,
                engines.racers_[0].engine.identity.pod60))
             return refuse26D070(d,Status::backend,5);
-    }else if(!gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session)||
-       !engines.canStopResultsEngines26D070(*groups.mixer_,groups,session)||
-       engines.humanResetOwner_!=&gameplay.humanController_)
-        return refuse26D070(d,Status::backend,6);
+    }else{
+        const bool gameplayOk=gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session);
+        const bool enginesOk=engines.canStopResultsEngines26D070(*groups.mixer_,groups,session);
+        const bool resetOwnerOk=engines.humanResetOwner_==&gameplay.humanController_;
+        if(!gameplayOk||!enginesOk||!resetOwnerOk){
+            // Log only: which human-domain gate refused, and the actual field shape.
+            std::fprintf(stderr,"aural_stop26D070_human_gate gameplay=%d engines=%d reset_owner=%d "
+                "racer_count=%zu first_ai_slot=%zu\n",gameplayOk?1:0,enginesOk?1:0,resetOwnerOk?1:0,
+                engines.racerCount_,engines.firstAiSlot_);
+            return refuse26D070(d,Status::backend,6);
+        }
+    }
     // These SAME actual registered owners carry separate native transports.
     // A failed optional typed admission grants no slots: the unchanged final
     // residual-active fence then requires every such voice to be inactive.

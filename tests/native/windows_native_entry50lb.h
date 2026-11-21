@@ -8,6 +8,7 @@
 #endif
 #include <windows.h>
 #include "native_last_failure50pd.h"
+#include "common_race_log50cr.h"   // common_run_summary at the clean exit
 #include <exception>
 #include <io.h>
 #include <fcntl.h>
@@ -303,7 +304,15 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
         char* arguments[]={program,option,root,nullptr};
         std::cerr<<"native_player_entering_normal_original_menu\n";
         const int result=automatic?entry(3,arguments):entry(argc,argv);automaticEntryActive=false;
-        std::cerr<<"native_exit_code="<<result<<'\n';sessionMarker("SESSION END");
+        std::cerr<<"native_exit_code="<<result<<'\n';
+        // Test logging (common rewrite R11, PLAN 4/5.5): the one common_run_summary line, at the
+        // clean process exit only (a terminate or startup error never reaches here). result= and
+        // first_refusal= come from the run's refusal record (any common_load/teardown refusal
+        // makes it fail). Course, mode, pods, laps, routes and FPS are per race and stay on the
+        // race's own lines (common_race_start, common_lap, common_race_end, race_fps_summary);
+        // this line names none of them. It was defined but never emitted (cr-17).
+        if(result==0)common_race_log50CR::runSummary({.course="-",.mode="-",.routes="-"});
+        sessionMarker("SESSION END");
         std::fflush(stdout);std::fflush(stderr);
         if(result!=0)visibleFailure(L"The native game stopped with exit code "+std::to_wstring(result)+
             L". RacerRevenge.log contains startup, selection, loading and error diagnostics.",log);

@@ -178,6 +178,9 @@ StepSplit50GG stepSplit50GG;
 struct RenderCost50CR {
     double waterBuildMs=0.0,particleBuildMs=0.0,submitMs=0.0,submitWorstMs=0.0;
     std::uint64_t frames=0,waterFrames=0,particleFrames=0;
+    // Gameplay display completion (swapAndCapture) and its completeGameplayDisplay part.
+    double completionMs=0.0,completeDisplayMs=0.0,completionWorstMs=0.0;
+    std::uint64_t completions=0,captureFrames=0;
     static double ms(FrameHitch50DU::Clock::time_point a,FrameHitch50DU::Clock::time_point b) noexcept {
         return b<a?0.0:std::chrono::duration<double,std::milli>(b-a).count();
     }
@@ -3823,8 +3826,17 @@ void Context::run() {
       frameHitch50DU.completion=FrameHitch50DU::Clock::now();
       stall_watchdog50DU::mark("present_gameplay_frame");
       phase_timing50GK::Scope completionTiming(phaseTiming,phase_timing50GK::Phase::CompletionWait);
+      // cr-16 measurement: the completion lambda (GPU completion/history/swap inside
+      // completeGameplayDisplay) versus the whole swapAndCapture call (adds capture).
+      const auto completionStart=FrameHitch50DU::Clock::now();double completeDisplayMs=0.0;
       const bool displayAccepted=windowCapture.swapAndCapture(renderer,host,captureWindowImage,windowSwaps+1,
-          [&](){return renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);});
+          [&](){const auto t0=FrameHitch50DU::Clock::now();
+           const bool ok=renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);
+           completeDisplayMs=RenderCost50CR::ms(t0,FrameHitch50DU::Clock::now());return ok;});
+      {const double totalMs=RenderCost50CR::ms(completionStart,FrameHitch50DU::Clock::now());
+       renderCost50CR.completionMs+=totalMs;renderCost50CR.completeDisplayMs+=completeDisplayMs;
+       if(totalMs>renderCost50CR.completionWorstMs)renderCost50CR.completionWorstMs=totalMs;
+       ++renderCost50CR.completions;if(captureWindowImage)++renderCost50CR.captureFrames;}
       completionTiming.finish();
       displayWallTotals.record(false,displayAccepted,completionDiagnostic);
       if(!displayAccepted)displayWallTotals.reportAndReset("failure");
@@ -4178,7 +4190,10 @@ void Context::run() {
      std::cerr<<"render_cost_ms frames="<<c.frames<<" submit_avg/worst="<<c.submitMs/f<<'/'<<c.submitWorstMs
          <<" water_build_avg="<<c.waterBuildMs/f<<" water_frames="<<c.waterFrames
          <<" particle_build_avg="<<c.particleBuildMs/f<<" particle_frames="<<c.particleFrames
-         <<" last_particle_draws/quads="<<rendererDiagnostic.particleDraws<<'/'<<rendererDiagnostic.particleQuads<<'\n';}
+         <<" last_particle_draws/quads="<<rendererDiagnostic.particleDraws<<'/'<<rendererDiagnostic.particleQuads
+         <<" completion_avg/worst="<<(c.completions?c.completionMs/double(c.completions):0.0)<<'/'<<c.completionWorstMs
+         <<" complete_display_avg="<<(c.completions?c.completeDisplayMs/double(c.completions):0.0)
+         <<" completions="<<c.completions<<" capture_frames="<<c.captureFrames<<'\n';}
     renderCost50CR.reset();
     stepSplit50GG.resetWindow();
     raceFrames50AU.buckets={};raceFrames50AU.intervalWorstMs=0.0;

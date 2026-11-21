@@ -75,11 +75,23 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    std::cerr<<"original frontend collector retirement source="<<collector.sourcePC
        <<" status="<<static_cast<unsigned>(collector.status)<<'\n';return false;
   }
-  if(!originalMain.closeUi())return false;
+  // Diagnostic only: every silent refusal below names its owner once per try.
+  const auto refused=[&](const char* step){
+   std::cerr<<"frontend_close_refused owner=session step="<<step
+       <<" renderer_owns="<<renderer.ownsResources()<<" renderer_dependents="<<renderer.hasSessionDependents50LA()
+       <<" renderer_operation="<<(rendererDiagnostic.operation?rendererDiagnostic.operation:"")
+       <<" renderer_cleanup_incomplete="<<rendererDiagnostic.cleanupIncomplete
+       <<" coordinator_status="<<static_cast<unsigned>(originalMain.diagnostic.status)
+       <<" coordinator_pc="<<std::hex<<originalMain.diagnostic.sourcePC<<std::dec
+       <<" coordinator_renderer_operation="<<(originalMain.diagnostic.renderer.operation?originalMain.diagnostic.renderer.operation:"")
+       <<" route_screen="<<static_cast<unsigned>(originalMain.coordinator.route().screen)<<'\n';
+   return false;
+  };
+  if(!originalMain.closeUi())return refused("close_ui");
   if(!originalMain.closeAudio())clean=false;
-  if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic))return false;
-  if(renderer.ownsResources())return false;
-  if(!sourceDisplayLifetime->beginCloseAfterDependents())return false;
+  if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic))return refused("renderer_close");
+  if(renderer.ownsResources())return refused("renderer_still_owns_resources");
+  if(!sourceDisplayLifetime->beginCloseAfterDependents())return refused("display_begin_close_after_dependents");
   if(!originalMainApplication.retainsPlayerWindow50DU()&&
      host.ownsResources()&&!host.close(hostDiagnostic))clean=false;
   return clean;

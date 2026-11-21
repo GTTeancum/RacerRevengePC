@@ -1,6 +1,7 @@
 #include "original_native_list_method_custody50la.h"
 #include "../assets/original_parameter_lookup50cr.h"
 #include <thread>
+#include <cstdio>
 #include "../../tests/native/common_track50cr.h"
 #include "original_gc_gameplay_lighting_candidate.h"
 #include "original_light_flash50cr.h"
@@ -1359,7 +1360,13 @@ bool Owner::finishAiResetVisibility(ResetVisibilityLease& lease,Diagnostic& d) n
     auto& o=*storage_;auto& v=o.vehicles[lease.racer_];
     if(!lease.removed_||!lease.attached_||!v.resetPending||!o.bound(lease.racer_)||
        !lease.frame_->shape.registrationE0)return fail(d,Status::phase,0x2169a0);
-    if(lease.player_&&!lease.input_){
+    // The trigger LostAI 2255B0 (1B27C0 inside the racer's PostWorld query) also runs AFTER
+    // this frame's graphics call: the outer frame runs every racer's children (graphics,
+    // 228844) before every racer's physics (the query). Without this publication the
+    // racer's resetNeedsGraphics stayed set until the next frame's 228844, and that frame's
+    // draw refused the racer (beginDraw identity at 229E08), every course (cr14 TA slot 7,
+    // cr17 MB slot 5). Same rule and same scene checks as the post-graphics Player reset.
+    if((lease.player_&&!lease.input_)||lease.sourceTrigger_){
         // Player2255B0 occurs AFTER this frame's genuine graphics call. Its
         //216F6C..21723C reset has now rebuilt every displayed model scene and
         // bound. Replaying graphics/228844 would be an extra source operation.
@@ -1522,15 +1529,25 @@ bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229e08);
     auto& o=*storage_;
     if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
-    if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
+    if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot)){
+        std::fprintf(stderr,"selected_light_refusal op=beginDraw racer=%u reason=%s\n",slot,
+            slot>=o.racerCount?"slot_outside_field":!frameBinding(s,b)?"frame_binding":"racer_not_bound");
         return fail(d,Status::identity,0x229e08);
+    }
     if(s.phase!=VehicleFramePhase49W::Ready&&s.phase!=VehicleFramePhase49W::PostGraphics)
         return fail(d,Status::phase,0x229e08);
     const auto& v=o.vehicles[slot];
     if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||v.resetNeedsGraphics||!v.graphicsSequence||
        v.graphicsSequence!=expectedGraphicsSequence||
-       o.drawGeneration==std::numeric_limits<std::uint64_t>::max())
+       o.drawGeneration==std::numeric_limits<std::uint64_t>::max()){
+        std::fprintf(stderr,"selected_light_refusal op=beginDraw racer=%u reason=%s owner_sequence=%llu expected_sequence=%llu reset_pending=%d attached=%d\n",
+            slot,v.mainRoot!=b.lifecycle.main190?"main_root":v.roots!=modelRoots(b)?"model_roots":
+            v.resetNeedsGraphics?"reset_needs_graphics":!v.graphicsSequence?"no_graphics_yet":
+            v.graphicsSequence!=expectedGraphicsSequence?"graphics_sequence":"draw_generation_overflow",
+            static_cast<unsigned long long>(v.graphicsSequence),static_cast<unsigned long long>(expectedGraphicsSequence),
+            v.resetPending?1:0,v.attached?1:0);
         return fail(d,Status::identity,0x229e08);
+    }
     lease.owner_=this;lease.frame_=&s;lease.generation_=++o.drawGeneration;
     lease.membershipRevision_=v.resetOwner.membership7F0.revision;lease.racer_=slot;lease.roots_=v.roots;
     lease.componentCount_=modelCount(b);

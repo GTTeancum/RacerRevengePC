@@ -3015,22 +3015,32 @@ bool OriginalUiFrontend50KG::observeCourseRaHandoff50LA(
     selected=accepted;display=actual;return true;
 }
 Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
+    // Diagnostic only: name the first refusal so an unresolved close is not
+    // silent. It changes no owner, order or result.
+    const auto refuse=[&d](const char* step,Status status,std::uint32_t pc=0)noexcept {
+        result(d,status,pc);
+        std::fprintf(stderr,"frontend_close_refused owner=coordinator step=%s status=%u pc=%x renderer_operation=%s"
+            " renderer_cleanup_incomplete=%d light_pc=%x gpu_error=%u\n",step,unsigned(status),unsigned(d.sourcePC),
+            d.renderer.operation?d.renderer.operation:"",int(d.renderer.cleanupIncomplete),
+            unsigned(d.lightManager.sourcePC),unsigned(d.gpu.error));
+        return status;
+    };
     d={};auto* s=storage_.get();if(!s)return result(d,Status::noChange);
     if(ownsGarageCustody()||(s->active&&same(s->active->initialRoute,{13,1})&&s->active->garageEntryAttempted)){
         const auto retired=retireGarageBeforeClose(d);
-        if(retired!=Status::ok&&retired!=Status::noChange)return retired;
+        if(retired!=Status::ok&&retired!=Status::noChange)return refuse("garage_retire_before_close",retired,d.sourcePC);
     }
-    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);
+    if(s->inOperation||s->garageTextureDraw)return refuse("busy_in_operation",Status::busy);
     // Cancel only acquired unpublished native prefixes before ordinary Scope
     // consumers (including Shared470 pre-close). Validate all before mutation.
     {
         Operation operation(s->inOperation);
         for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
             if(manager&&manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
-               !manager->optionsNativeInputs->constructionAbortCurrent())return result(d,Status::cleanup);
+               !manager->optionsNativeInputs->constructionAbortCurrent())return refuse("options_native_abort_current",Status::cleanup);
         for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
             if(manager&&manager->optionsNativeInputs&&manager->optionsNativeInputs->construction&&
-               !manager->optionsNativeInputs->abortConstructionNative())return result(d,Status::cleanup);
+               !manager->optionsNativeInputs->abortConstructionNative())return refuse("options_native_abort",Status::cleanup);
     }
     // A failed/unsubmitted bounded Main/Options/Rider callback owns its own real
     // Display pin. Retire only that authenticated Session before the general
@@ -3045,19 +3055,19 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
             const bool optionsMatch=manager->options&&!manager->optionsRetired&&shared->menu470CloseOwnerCurrent(*manager->options,*s->renderer);
             const bool riderMatch=manager->rider&&!manager->riderRetired&&shared->menu470CloseOwnerCurrent(*manager->rider,*s->renderer);
             const auto matches=unsigned(mainMatch)+unsigned(optionsMatch)+unsigned(riderMatch);
-            if(matches>1u||(matches&&ownMenu))return result(d,Status::cleanup,0x204A00);
+            if(matches>1u||(matches&&ownMenu))return refuse("shared_menu470_owner_ambiguous",Status::cleanup,0x204A00);
             if(matches){ownMenu=manager;ownKind=mainMatch?1u:optionsMatch?2u:3u;}
         }
         if(shared->menu470Owner()||shared->menuUpdateFailedOwner_){
-            if(!ownMenu)return result(d,Status::cleanup,0x204A00);
+            if(!ownMenu)return refuse("shared_menu470_owner_unmatched",Status::cleanup,0x204A00);
             if(ownKind==1u){
-                if(ownMenu->main->teardownSource(s->renderer,d.main)!=MainStatus::ok)return result(d,Status::cleanup);
+                if(ownMenu->main->teardownSource(s->renderer,d.main)!=MainStatus::ok)return refuse("shared_menu470_main_teardown",Status::cleanup);
                 ownMenu->mainRetired=true;
             }else if(ownKind==2u){
-                if(ownMenu->options->teardownSource(s->renderer,d.options)!=OptionsStatus::ok)return result(d,Status::cleanup);
+                if(ownMenu->options->teardownSource(s->renderer,d.options)!=OptionsStatus::ok)return refuse("shared_menu470_options_teardown",Status::cleanup);
                 ownMenu->optionsRetired=true;
             }else{
-                if(ownMenu->rider->teardownSource(s->renderer,d.renderer,d.rider)!=RiderStatus::ok)return result(d,Status::cleanup);
+                if(ownMenu->rider->teardownSource(s->renderer,d.renderer,d.rider)!=RiderStatus::ok)return refuse("shared_menu470_rider_teardown",Status::cleanup);
                 ownMenu->riderRetired=true;
             }
         }
@@ -3068,34 +3078,34 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         d.renderer.error=VehicleWindowError50DS::request;
         d.renderer.operation="dependent primitive retirement must precede frontend close";
         d.renderer.cleanupIncomplete=true;
-        return result(d,Status::cleanup);
+        return refuse("renderer_session_dependents",Status::cleanup);
     }
     {
         Operation operation(s->inOperation);s->closing=true;s->frameRendered=false;s->frameSubmitted=false;
-        if(s->cold.riderPresentation&&!s->cold.riderPresentation->end())return result(d,Status::cleanup);
+        if(s->cold.riderPresentation&&!s->cold.riderPresentation->end())return refuse("rider_presentation_end",Status::cleanup);
         if(s->renderer){
             // Source owner retirement must occur while the exact live renderer
             // context exists. Failed retirement retains every owner for retry.
             for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
-                if(manager&&!s->retireSource(*manager,d))return result(d,Status::cleanup);
+                if(manager&&!s->retireSource(*manager,d))return refuse("manager_retire_source",Status::cleanup,d.sourcePC);
             if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
-                if(!shared->retireAttached142590(sd))return result(d,Status::cleanup,sd.sourcePC);}
+                if(!shared->retireAttached142590(sd))return refuse("shared_dialogs_retire_142590",Status::cleanup,sd.sourcePC);}
             // Retain the exact borrowed object even if failed close ended
             // resource ownership. An idempotent successful retry clears it.
-            if(!s->renderer->close(d.renderer))return result(d,Status::cleanup);
+            if(!s->renderer->close(d.renderer))return refuse("renderer_close",Status::cleanup);
             s->renderer=nullptr;s->bank=nullptr;
         }
-        if(!s->release(s->retiring,d))return result(d,Status::cleanup);
-        if(!s->release(s->pending,d))return result(d,Status::cleanup);
-        if(!s->release(s->active,d))return result(d,Status::cleanup);
-        if(!s->release(s->garageRestoration,d))return result(d,Status::cleanup);
-        if(!s->release(s->raceReturnBoot,d))return result(d,Status::cleanup);
+        if(!s->release(s->retiring,d))return refuse("release_retiring",Status::cleanup,d.sourcePC);
+        if(!s->release(s->pending,d))return refuse("release_pending",Status::cleanup,d.sourcePC);
+        if(!s->release(s->active,d))return refuse("release_active",Status::cleanup,d.sourcePC);
+        if(!s->release(s->garageRestoration,d))return refuse("release_garage_restoration",Status::cleanup,d.sourcePC);
+        if(!s->release(s->raceReturnBoot,d))return refuse("release_race_return_boot",Status::cleanup,d.sourcePC);
         // Cleanup retries retain this lease until every renderer/session/GPU
         // consumer is gone. Per-manager release above must not touch it.
-        if(!s->releaseLightManager(d))return result(d,Status::cleanup,d.lightManager.sourcePC);
+        if(!s->releaseLightManager(d))return refuse("release_light_manager",Status::cleanup,d.lightManager.sourcePC);
         if(const auto shared=s->cold.application->sharedDialogs){std::string error;
             if(!shared->inputs_.root||!shared->inputs_.root->finishSharedUiDispatcherAfterBanks1B7140(error))
-                return result(d,Status::cleanup,0x1B7140);
+                return refuse("shared_dispatcher_finish_1B7140",Status::cleanup,0x1B7140);
         }
     }
     storage_.reset();return result(d,Status::ok);

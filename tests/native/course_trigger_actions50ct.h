@@ -197,9 +197,15 @@ class Owner final {
    if(!preflight(call)){fail(Status::Action);return {A::InvalidBinding,site,0};}
    ActionEvent e;eventFor(call,e);
    if(!e.entering){
+    // 2A0B30 exit callbacks: the authored actions act on ENTRY only (2A0E20). The exit call
+    // completes with no destination work, as the MC chain this owner was generalised from
+    // (mc_trigger_actions50mc.h: exits count and complete) and every per-course owner it
+    // replaced (GA/GC: "all authored callbacks ignore exits"). cr-17 GC: the exit re-applied
+    // the PodSound sink, the gate voice was still playing BIGDOOR (VoiceOccupied), the sink
+    // returned false and the exit service refused ("track trigger exit service rejected")
+    // about a second after trigger 9 opened the door. The same re-apply replayed trigger
+    // Sound and re-ran Particles on every exit. Every course, every kind.
     increment(counters_.exits);
-    // 2A0B30 exit callbacks: only sink destinations act on an exit.
-    if(const auto* s=sinkFor(*e.authored);s&&*s){if(!s->apply(s->context,e)){fail(Status::Action);return {A::Blocked,s->sourcePc,0};}}
     return {A::Complete,site,0};
    }
    increment(counters_.entries);const auto& a=*e.authored;
@@ -363,32 +369,45 @@ public:
   next.valid=true;geometry_[c]=next;return true;
  }
  // 2A0B30: exit service of every live trigger against its current members.
+ // Every refusal is named once on stderr (trigger, collider, reason; streams only, no allocation).
+ Status refuseService(Status s,const char* reason,std::size_t trigger,std::uint32_t collider,unsigned status=0)noexcept{
+  std::cerr<<"trigger_exit_service_refused trigger="<<(trigger+1)<<" collider=0x"<<std::hex<<collider<<std::dec
+           <<" reason="<<reason<<" status="<<status<<" source_kinds=";
+  if(source_&&trigger<source_->liveCount()){const auto& a=source_->source(trigger).actions;
+   for(std::size_t k=0;k<a.size();++k)std::cerr<<(k?"+":"")<<src::actionKindName(a[k].kind);}
+  std::cerr<<'\n';return fail(s);
+ }
  Status serviceWorld()noexcept {
-  if(!ready())return fail(Status::Unprepared);
-  if(lease_||servicing_||group_->queryActive||terminal_!=Status::Complete)return terminal_==Status::Complete?fail(Status::Input):terminal_;
-  if(!g::validNativeTriggerGroup50MC(*group_))return fail(Status::Input);
+  if(!ready())return refuseService(Status::Unprepared,"owner_not_ready",~std::size_t{0},0);
+  if(lease_||servicing_||group_->queryActive||terminal_!=Status::Complete)
+   return terminal_==Status::Complete?refuseService(Status::Input,"query_or_service_open",~std::size_t{0},0):terminal_;
+  if(!g::validNativeTriggerGroup50MC(*group_))return refuseService(Status::Input,"group_invalid",~std::size_t{0},0);
   servicing_=true;struct End{bool& flag;~End(){flag=false;}}end{servicing_};
   for(std::size_t t=0;t<group_->triggerCount;++t){const auto& state=group_->triggers[t];const auto& authored=source_->source(t);
    std::array<g::TriggerOverlap50IN,g::triggerContactCapacity50IN> observations{};
    for(std::size_t slot=0;slot<state.collider.highWaterD0&&slot<observations.size();++slot){const auto id=state.collider.membersCC[slot];if(!id)continue;
-    const auto c=colliderIndex(id);if(c>=group_->colliders.size()||!geometry_[c].valid)return fail(Status::Input);
+    const auto c=colliderIndex(id);if(c>=group_->colliders.size()||!geometry_[c].valid)return refuseService(Status::Input,c>=group_->colliders.size()?"member_not_a_racer_collider":"member_geometry_unobserved",t,id);
     const auto& geometry=geometry_[c];bool overlap=false;
     if(authored.shapeType==6){
      g::Type2Node49X root{};root.center=geometry.center;root.half=geometry.half;
      g::Type2ResourceView49X view{};view.nodes=&root;view.nodeCount=1;
-     if(!g::nativeType2RootTriggerBoxOverlap50MA(view,geometry.world,authored.box,overlap))return fail(Status::Service);
+     if(!g::nativeType2RootTriggerBoxOverlap50MA(view,geometry.world,authored.box,overlap))return refuseService(Status::Service,"box_overlap_rejected",t,id);
     }else{
      g::TriggerSphereRootExitInput50IN input{};input.type2PreparedWorld=geometry.world;
      for(unsigned k=0;k<3;++k){input.sphere.localCenter.v[k]=authored.sphere.center.v[k];input.rootCenter.v[k]=geometry.center[k];input.rootHalf.v[k]=geometry.half[k];}
      input.sphere.localCenter.v[3]=input.rootCenter.v[3]=input.rootHalf.v[3]=1.f;
      for(unsigned k=0;k<4;++k)input.sphere.world.v[k*5]=1.f;
      input.sphere.radius50=authored.sphere.radius;volatile float square=authored.sphere.radius*authored.sphere.radius;input.sphere.radiusSquared54=square;
-     if(g::overlapTriggerSphereType2Root50IN(input,overlap)!=g::TriggerSphereRootExitStatus50IN::Complete)return fail(Status::Service);
+     if(const auto st=g::overlapTriggerSphereType2Root50IN(input,overlap);st!=g::TriggerSphereRootExitStatus50IN::Complete)
+      return refuseService(Status::Service,"sphere_overlap_rejected",t,id,static_cast<unsigned>(st));
     }
     observations[slot]={&group_->colliders[c],overlap};
    }
    const auto receipt=g::serviceNativeSourceTrigger50MC(*group_,t,observations.data(),state.collider.highWaterD0,group_->actions,group_->contact);
-   if(receipt.status!=g::SourceTriggerContactStatus50MC::Complete)return fail(Status::Service);
+   if(receipt.status!=g::SourceTriggerContactStatus50MC::Complete)
+    return refuseService(Status::Service,receipt.status==g::SourceTriggerContactStatus50MC::ActionInput?"exit_action_preflight":
+        receipt.status==g::SourceTriggerContactStatus50MC::ActionBlocked?"exit_action_blocked":"exit_contact_input",
+        t,0,static_cast<unsigned>(receipt.status));
   }
   return Status::Complete;
  }

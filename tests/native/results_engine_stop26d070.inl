@@ -79,7 +79,14 @@ inline bool native_original_ai_audio::Owner::canStopResultsEngines26D070(
     const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
     // Exact human Course domain. ALL8 uses its separate gate below; never
     // borrow a human controller or admit an alternative host subscriber.
-    if(!prepared_||!activated_||!session||firstAiSlot_!=1||racerCount_!=8||
+    // Field size is the actual roster this owner prepared from (packed1125C:
+    // one human plus 0..7 opponents), never a fixed 8. The source 26D070 stop
+    // walks the live Aural groups, not a racer count, so a solo Time Trial field
+    // (zero AI engine rows) stops the same groups as an 8-racer Single Race
+    // (cr-18: racerCount_!=8 refused every Time Trial Pause QUIT at step 6).
+    if(!prepared_||!activated_||!session||firstAiSlot_!=1||
+       racerCount_!=materialD44_.racerCount()||materialD44_.humanCount()!=firstAiSlot_||
+       racerCount_<firstAiSlot_||racerCount_>racers_.size()||
        !mode_||mode_!=mixer.originalSoundMode50KG()||!mode_->ready()||
        !humanResetOwner_||!humanResetOwner_->bound()||
        humanResetOwner_->identity().session!=session||!groups.uses(mixer))return false;

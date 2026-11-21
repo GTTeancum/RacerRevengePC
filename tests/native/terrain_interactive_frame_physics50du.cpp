@@ -55,6 +55,16 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(s.bodies.main.vehicleState40==3u||s.bodies.main.vehicleState40==4u){
   // Shared schedule contract: one consumed substep at this frame's factor.
   s.bodies.main.schedule.count=1;s.bodies.main.substepIndex=1;
+  // The frame closes as every frame does: the body phase markers (host bookkeeping of
+  // the frame transaction, no original field) return to their between-frames values
+  // with the frame phase. The destroy commit (commitOriginalDestroyed) jumps the frame
+  // to AfterBodyChildren from wherever the read/bind left the bodies (PostPlayer /
+  // PostBase); without this the bodies kept that stale phase for the whole wreck, so
+  // after 228110 the next ordinary frame entry (readAiVehicleFrame50IV /
+  // readVehicleFrame49W start(): phases()) refused with error=2 (Phase) - cr17 TA slot 7
+  // at the Pause RESTART setup tick. Same for the human and every AI, every course.
+  s.bodies.main.phase=MainBodyPhase49K::FrameReady;s.bodies.phase=CoupledBodyPhase49M::FrameReady;
+  s.bodies.secondary.phase=SecondaryPhase49M::Ready;
   s.phase=VehicleFramePhase49W::Ready;return true;
  }
  // Unattended test only (RR_TEST_UNDERTRACK, native_test_undertrack50ut.h):

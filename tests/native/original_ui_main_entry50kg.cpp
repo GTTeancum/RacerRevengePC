@@ -1475,15 +1475,23 @@ bool Frontend::advanceCourseRaLoadingPrefix50LA(std::uint32_t& pc)noexcept {
     }
 
 bool Frontend::closeUi() noexcept {
+        // Diagnostic only: name the refusing owner; no order or result changes.
+        const auto refuse=[&](const char* step)noexcept {
+            std::fprintf(stderr,"frontend_close_refused owner=frontend_ui step=%s race_return_screen=%u results_hall_entry=%d"
+                " pause_main_entry=%d pause_course_entry=%d\n",step,unsigned(nativeRaceReturnScreen_),
+                int(nativeResultsHallEntry_),int(nativePauseMainEntry_),int(nativePauseCourseEntry_));
+            return false;
+        };
         if(uploadLifetime_&&(uploadLifetime_->active_||
-            uploadLifetime_->thread_!=std::this_thread::get_id()))return false;
+            uploadLifetime_->thread_!=std::this_thread::get_id()))return refuse("upload_lifetime_active");
         const auto status=coordinator.close(diagnostic);
-        if(status!=Status::ok&&status!=Status::noChange)return false;
-        if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))return false;
+        if(status!=Status::ok&&status!=Status::noChange)return refuse("coordinator_close");
+        if(materialApplicationOwner&&!materialApplicationOwner->withdrawCourseRaLoadingPrefix50LA(*this))
+            return refuse("course_ra_loading_prefix_withdraw");
         if((nativeResultsHallEntry_||nativeRaceReturnScreen_)&&materialApplicationOwner&&
-           !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return false;
+           !materialApplicationOwner->cancelNativeResultsHallTransfer50LA())return refuse("results_hall_transfer_cancel");
         if((nativePauseMainEntry_||nativePauseCourseEntry_)&&materialApplicationOwner&&
-           !materialApplicationOwner->cancelNativePauseMenuTransfer50LA())return false;
+           !materialApplicationOwner->cancelNativePauseMenuTransfer50LA())return refuse("pause_menu_transfer_cancel");
         if(uploadLifetime_){uploadLifetime_->retired_=true;uploadLifetime_.reset();}
         return true;
     }
