@@ -696,6 +696,13 @@ bool VehicleWindowGl50DS::Storage::validateDynamicWorldFrame(const VehicleWindow
                 return fail(d, VehicleWindowError50DS::frame,
                     "dynamic-world normals must be finite unit vectors or explicit zero");
         }
+        if (frame.spanAlphas || frame.spanAlphaCount) {
+            if (!frame.spanAlphas || frame.spanAlphaCount != dynamicWorldSpanCount)
+                return fail(d, VehicleWindowError50DS::frame, "dynamic-world span alphas must match the cold span count");
+            for (U i = 0; i < frame.spanAlphaCount; ++i)
+                if (!std::isfinite(frame.spanAlphas[i]) || frame.spanAlphas[i] < 0.f || frame.spanAlphas[i] > 1.f)
+                    return fail(d, VehicleWindowError50DS::frame, "dynamic-world span alpha outside finite [0,1]");
+        }
         return true;
     }
 
@@ -1271,14 +1278,32 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
         for (U i = 0; i < dynamicWorldSpanCount; ++i) {
             const auto& span = dynamicWorldSpans[i];
             const auto& material = span.material;
-            const bool deferred = span.sourcePassCount == 1 &&
-                material.policy.blend != VehicleWindowBlend50DS::opaque;
+            // PORT EXTENSION (frame.dynamicWorld.spanAlphas, N64 data only): a faded span
+            // is drawn in the transparent pass, source-alpha blended, depth write off.
+            const float spanAlpha = frameDynamicWorld.spanAlphas ? frameDynamicWorld.spanAlphas[i] : 1.f;
+            if (spanAlpha <= 0.f) continue;
+            const bool faded = spanAlpha < 1.f;
+            const bool deferred = faded || (span.sourcePassCount == 1 &&
+                material.policy.blend != VehicleWindowBlend50DS::opaque);
             if (deferred != transparent) continue;
             diagnostic->dynamicWorldSpan = i;
             diagnostic->texture = material.textureIndex;
-            const auto& policy = material.policy;
+            VehicleWindowMaterialBinding50DS fadedPolicy = material.policy;
+            if (faded) {
+                if (fadedPolicy.blend == VehicleWindowBlend50DS::opaque) {
+                    fadedPolicy.blend = VehicleWindowBlend50DS::sourceAlpha; fadedPolicy.fixedBlendAlpha = false;
+                    // Source vertex alpha is GS units (0x80 = opaque): scale so an
+                    // opaque span reaches spanAlpha (texel alpha as decoded).
+                    fadedPolicy.alphaScale = spanAlpha * (255.f / 128.f);
+                } else fadedPolicy.alphaScale *= spanAlpha;
+                fadedPolicy.depthWrite = false;
+            }
+            const auto& policy = faded ? fadedPolicy : material.policy;
             const bool layeredDepth = span.sourcePass > 1;
-            if (!boundPolicy || boundPolicy->blend != policy.blend ||
+            if (faded) {
+                configureBlend(policy, layeredDepth);
+                boundPolicy = nullptr; // the next span re-establishes its own state
+            } else if (!boundPolicy || boundPolicy->blend != policy.blend ||
                 boundPolicy->depthWrite != policy.depthWrite ||
                 boundPolicy->depthEqual != policy.depthEqual ||
                 boundPolicy->fixedBlendAlpha != policy.fixedBlendAlpha ||
@@ -1295,8 +1320,8 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
             }
             gl.uniform1i(trackDiscardZeroAlphaUniform, span.sourceAlphaTest ? 2 : (span.discardZeroAlpha ? 1 : 0));
             gl.uniform1f(trackAlphaReferenceUniform,static_cast<float>(span.sourceAlphaReference));
-            gl.uniform1i(trackEffectModeUniform, effectMode(material.policy));
-            gl.uniform1f(trackAlphaScaleUniform, material.policy.alphaScale);
+            gl.uniform1i(trackEffectModeUniform, effectMode(policy));
+            gl.uniform1f(trackAlphaScaleUniform, policy.alphaScale);
             gl.uniform1i(trackUnlitUniform,
                 material.policy.unlit || material.policy.sourcePrelit ? 1 : 0);
             gl.uniform1i(trackSourceColorAbsentUniform, material.policy.sourceColorStreamAbsent ? 1 : 0);

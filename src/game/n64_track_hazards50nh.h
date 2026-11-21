@@ -42,7 +42,7 @@ struct N64HazardLimits50NH {
 };
 
 enum class N64Volume50NH : std::uint8_t { plane, capsule };
-enum class N64HazardKind50NH : std::uint8_t { explodePod, breakObject, animationToggle };
+enum class N64HazardKind50NH : std::uint8_t { explodePod, breakObject, animationToggle, animationPlay };
 enum class N64ExplodeSide50NH : std::uint8_t { random, left, right };
 enum class N64ExplodeGate50NH : std::uint8_t { all, local, localOrNearCamera };
 enum class N64AfterDestroy50NH : std::uint8_t { retire, respawn };
@@ -75,12 +75,27 @@ struct N64ToggleParams50NH {
     float guard = 3.f;                   // s between toggles (timer > 3.0)
     float rate = 20.f;                   // +-20 x the motion's own speed (13.33 s / 20 = 0.67 s)
 };
+// AnimationPlay: N64 312 falling pillar (0x8007D944 set-up / 0x8007D248 handler: ENABLED at
+// speed 0.6, once, 'Shak' 4.0) and 314 methane (0x8007D974 / 0x8007CC48: the planet FX object
+// moved to the marker, shown, its animations started, once). One-shot = the row's OneTimeOnly;
+// local-only = the row's LocalOnly.
+struct N64PlayParams50NH {
+    std::int32_t animationNumber = -1;
+    std::string animationNameRef;
+    float rate = 1.f;                    // signed playback rate; stops at the end (no loop)
+    bool show = false;                   // show a StartHidden row first (methane FX)
+    // Revenge's own CameraShake (1B5990 fields) issued with the fire; absent = no shake.
+    bool shake = false;
+    float shakeMagnitude = 0.f, shakeTime = 0.f, shakeDelay = 0.f;
+    std::int32_t shakeDecaying = 1;
+};
 struct N64HazardAction50NH {
     N64HazardKind50NH kind = N64HazardKind50NH::explodePod;
     std::uint32_t authoredAction = 0;    // 1-based TriggerNActionM
     N64ExplodeParams50NH explode;
     N64BreakParams50NH breakObject;
     N64ToggleParams50NH toggle;
+    N64PlayParams50NH play;
 };
 struct N64HazardRow50NH {
     std::uint32_t trigger = 0;           // 1-based TriggerN (log identity)
@@ -154,7 +169,7 @@ inline bool isN64HazardTrigger50NH(const assets::ParameterBlock48F& trigger) noe
     return false;
 }
 inline bool isN64HazardActionType50NH(std::string_view type) noexcept {
-    return type == "ExplodePod" || type == "BreakObject" || type == "AnimationToggle";
+    return type == "ExplodePod" || type == "BreakObject" || type == "AnimationToggle" || type == "AnimationPlay";
 }
 
 // Reads one N64 row. `number` is the 1-based TriggerN. Output written only on success.
@@ -211,7 +226,7 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
             d::need(a, "N64 TriggerNActionM missing");
             const auto* type = d::field(*a, "actiontype"); d::need(type, "N64 action ActionType");
             // A Revenge action on an N64 row would fire on the N64 test, not Revenge's: refused.
-            d::need(isN64HazardActionType50NH(*type), "N64 row action must be ExplodePod, BreakObject or AnimationToggle");
+            d::need(isN64HazardActionType50NH(*type), "N64 row action must be ExplodePod, BreakObject, AnimationToggle or AnimationPlay");
             auto& x = r.actions[r.actionCount++]; x.authoredAction = static_cast<std::uint32_t>(k); ++hazards;
             if (*type == "ExplodePod") {
                 x.kind = N64HazardKind50NH::explodePod;
@@ -256,6 +271,23 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 q.soundMaxDistance = d::numberOr(*a, "maxdistance", q.soundMaxDistance);
                 d::need(q.soundPitch > 0.f && q.soundPitchRandom >= 0.f && q.soundMinDistance >= 0.f &&
                         q.soundMaxDistance >= q.soundMinDistance, "BreakObject sound values");
+            } else if (*type == "AnimationPlay") {
+                x.kind = N64HazardKind50NH::animationPlay;
+                auto& q = x.play;
+                d::target(*a, q.animationNumber, q.animationNameRef);
+                d::need(q.animationNumber >= 1 || !q.animationNameRef.empty(), "AnimationPlay needs AnimationNumber or AnimationNameRef");
+                q.rate = d::numberOr(*a, "rate", q.rate);
+                d::need(q.rate != 0.f && q.rate >= -1000.f && q.rate <= 1000.f, "AnimationPlay Rate");
+                if (const auto* v = d::field(*a, "show")) q.show = d::boolean(*v);
+                const auto* m = d::field(*a, "shakemagnitude"); const auto* t = d::field(*a, "shaketime");
+                const auto* dc = d::field(*a, "shakedecaying"); const auto* dl = d::field(*a, "shakedelay");
+                q.shake = m || t || dc || dl;
+                if (m) q.shakeMagnitude = d::number(*m);
+                if (t) q.shakeTime = d::number(*t);
+                if (dl) q.shakeDelay = d::number(*dl);
+                if (dc) { const long v = std::strtol(dc->c_str(), nullptr, 0); d::need(v == 0 || v == 1, "AnimationPlay ShakeDecaying 0|1"); q.shakeDecaying = static_cast<std::int32_t>(v); }
+                d::need(q.shakeMagnitude >= 0.f && q.shakeMagnitude <= 1000.f && q.shakeTime >= 0.f && q.shakeTime <= 60.f &&
+                        q.shakeDelay >= 0.f && q.shakeDelay <= 60.f, "AnimationPlay shake values");
             } else {
                 x.kind = N64HazardKind50NH::animationToggle;
                 auto& q = x.toggle;
@@ -267,7 +299,7 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 if (const auto* v = d::field(*a, "firsttrigger")) d::need(*v == "Freeze", "AnimationToggle FirstTrigger (Freeze only)");
             }
         }
-        d::need(hazards == 1 && r.actionCount == 1, "an N64 row carries exactly one ExplodePod, BreakObject or AnimationToggle");
+        d::need(hazards == 1 && r.actionCount == 1, "an N64 row carries exactly one ExplodePod, BreakObject, AnimationToggle or AnimationPlay");
         out = std::move(r); error.clear(); return true;
     } catch (const n64_hazards50NH_detail::Fail& f) { error = f.message; }
     catch (...) { error = "N64 trigger row allocation failed"; }
@@ -482,6 +514,7 @@ inline bool resolveN64AnimationTarget50NH(std::int32_t number, const std::string
 //                           Gate All, AfterDestroy = RR_TEST_N64_AFTER (retire|respawn, default retire)
 //   break@N[/anim]          plane gate, BreakObject on animation row `anim` (0 = no target: pod side only)
 //   door@N/anim             capsule at node N, AnimationToggle on row `anim`
+//   play@N/anim             capsule at node N, AnimationPlay (once, rate 1, no show/shake) on row `anim`
 // Rows get no SurfaceObject (any surface), half height 80 ft, default half width 60 ft.
 // Parsed here; the caller places them from the stock map spline and appends them within limits.
 struct N64TestHazard50NH { N64HazardKind50NH kind = N64HazardKind50NH::explodePod; std::uint32_t node = 0; float arg = 0.f; bool hasArg = false; };
@@ -498,13 +531,15 @@ inline std::vector<N64TestHazard50NH> parseN64TestHazards50NH(const char* text, 
         if (kind == "explode") h.kind = N64HazardKind50NH::explodePod;
         else if (kind == "break") h.kind = N64HazardKind50NH::breakObject;
         else if (kind == "door") h.kind = N64HazardKind50NH::animationToggle;
+        else if (kind == "play") h.kind = N64HazardKind50NH::animationPlay;
         else { error = "RR_TEST_N64_HAZARD kind"; return {}; }
         const std::string rest = item.substr(atSign + 1); const auto slash = rest.find('/');
         char* e = nullptr; const long node = std::strtol(rest.substr(0, slash).c_str(), &e, 10);
         if (node < 0 || node > 4095 || (e && *e)) { error = "RR_TEST_N64_HAZARD node"; return {}; }
         h.node = static_cast<std::uint32_t>(node);
         if (slash != std::string::npos) { h.arg = std::strtof(rest.substr(slash + 1).c_str(), nullptr); h.hasArg = true; }
-        if (h.kind == N64HazardKind50NH::animationToggle && !h.hasArg) { error = "door@N needs /anim"; return {}; }
+        if ((h.kind == N64HazardKind50NH::animationToggle || h.kind == N64HazardKind50NH::animationPlay) && !h.hasArg) {
+            error = "door@N / play@N need /anim"; return {}; }
         if (out.size() >= N64HazardLimits50NH::rows) { error = "RR_TEST_N64_HAZARD too many entries"; return {}; }
         out.push_back(h);
     }

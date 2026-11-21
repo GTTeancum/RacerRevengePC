@@ -293,12 +293,16 @@ void Context::run() {
  // Host record that the restarted race's 1A7BD0 fade-in (race1B0 bit3) is still to be
  // requested (host bookkeeping, not race state; see the presented-frame service below).
  bool restartFadeIn1A7BD0Pending=false;
+ // Live intro pod frames of this race (log intro_pod_frames at GO): race 1 is the fresh
+ // race, each in-place 1AC8E0 restart counts the next (host log bookkeeping only).
+ std::uint64_t introPodFrames50CR=0;unsigned introRace50CR=1;
  // Host record that Pause row 10 in a Time Trial (1BDAB4, a record) opened Results page 3
  // over the paused race (App11C stays set, as in the original: no 1BE830). The page owns
  // the pad until its 1CA574..1CA6F0 confirm departs (host bookkeeping, not race state).
  bool pauseRecordPage1BDAB4=false;
  const auto resetLoopAfterRaceStart=[&](){
   restartFadeIn1A7BD0Pending=true;pauseRecordPage1BDAB4=false;
+  ++introRace50CR;introPodFrames50CR=0;
   // 1AFE30 at the restarted race's GO starts its recording again (287B60, bit1): the
   // race78 replay owner returns to its bound state (same race, same channels).
   {const char* why=nullptr;
@@ -2170,8 +2174,56 @@ void Context::run() {
       // binder emitters; the native engine cue starts on the first engine
       // update, which is this step's first racer update.
       std::cerr<<"race_start_go 1AEDD0 bodies_unlocked="<<unlocked<<" ai_engines="<<aiStarted<<'\n';
+      std::cerr<<"intro_pod_frames race="<<introRace50CR<<" frames="<<introPodFrames50CR
+          <<" reason="<<(introRace50CR>1u?"restart":"fresh")<<'\n';
+      introPodFrames50CR=0;
      }
      if(!cameraAllowsSimulation){
+      // Live intro pod frames (fresh race and every in-place 1AC8E0 restart alike, every
+      // course and pod, human and AI). The original updates every racer on every intro and
+      // countdown frame of 1A7B40 at the race's own fixed step; only 1AED30's body-axis lock
+      // (released at 1AEDD0) and the not-yet-started manager word (B4+58 bit1, copied into
+      // each racer's byte 58 and read by the racer's own control gates) hold the pods on the
+      // grid. Each racer runs one complete native frame here, in the race's slot order
+      // (opponents, then slot 0 inside its Bank visit, as the cold setup tick does), before
+      // this step's scene and camera children, which then read the racers Ready
+      // (heldBeforeStart). Proven from SLUS_202.68 (dis_all.txt): 1A7B40 calls 141ED0(race,dt)
+      // at 1A8304 on every update with no start test (1A82E0..1A8304 is only a one-time
+      // static guard), so every racer child updates during the intro cuts and countdown;
+      // the B4 child 1AF9C0 runs 1AFF50/1B0400/1B0920 (timing, ranking) only once B4+58 bit1
+      // is set (1AFA0C..1AFA44), so no ranking before GO; the player's 1A0DA0 navigation is
+      // gated inside its own frame on byte 58 ((58 & 3) == 2), as here.
+      // The player's pad is read every frame (1A1A20): slot 0 gets this poll's live packet,
+      // composed with controls not yet permitted (the same countdown hold the racing step
+      // applies), not a neutral one. A second human slot keeps the racing step's own packet.
+      // PORT STAND-IN (flagged): the port's racer-contact pass and host race session are
+      // host owners stepped only by the racing step; neither runs before GO (pods apart and
+      // axis-locked on the grid). Not proven which original owner performs racer contacts.
+      {
+       const platform::WindowInput50DQ introNoKeys{};
+       const auto introFrame=[&](std::size_t slot){
+        if(s.fields.vehicle58==0u){
+         if(slot==0){composePacket(false,input);sampleController(true);}
+         else{composePacket(false,introNoKeys,slot);sampleController();}
+        }
+        require50DU(advanceFrame(slot),"live intro pod frame rejected");
+       };
+       for(std::size_t racer=1;racer<racerBank.count();++racer){
+        if(!racerBank.active(racer))continue;
+        opponentFrame=true;
+        try{
+         captureDynamicBeforeFrame(racer);
+         if(originalAiEnabled)observeOriginalAiFleet();
+         racerBank.visit(racer,[&](){introFrame(racer);});
+        }catch(...){opponentFrame=false;throw;}
+        opponentFrame=false;
+       }
+       captureDynamicBeforeFrame(0);
+       if(originalAiEnabled)observeOriginalAiFleet();
+       racerBank.visit(0,[&](){introFrame(0);});
+       ++introPodFrames50CR;
+       heldLap50DU("intro_pod_frames");
+      }
       const auto frame=++sourceCameraTick;
       require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::heldBeforeStart,.016f).status==
           sourceCamera::Status::sceneChildComplete,"held original scene child rejected");

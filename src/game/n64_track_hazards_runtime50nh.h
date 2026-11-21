@@ -17,14 +17,18 @@
 //    original impact-damage rule 221754 (impact_damage_apply50nh.h); the target row is hidden
 //    and its collision removed, and the debris row started, through the animation port.
 //  - AnimationToggle: the door state machine on an animation row through the animation port.
+//  - AnimationPlay (312 pillar / 314 methane): show (StartHidden FX) + fire at the authored
+//    rate, once; an authored shake goes to Revenge's own CameraShake (camera_shake_relay50cs.h).
 //  - Respawn (AfterDestroy = Respawn): after RespawnDelay s of destroyed state the race loop
 //    restores the racer (228110 subset) and asks for the 2255B0 placement (228BBC path).
-// Animation port: implemented by the common track-animation runtime (helper 145d). Until it
+// Animation port: implemented by the common track-animation runtime through
+// tests/native/n64_track_animation_port50nh.h (bound at world load). Until it
 // is bound every animation-dependent action logs
 // "n64_trigger target_unbound reason=animation_runtime" and does nothing else.
 //
 // Host memory only; every index bounds-checked against N64HazardLimits50NH.
 #include "n64_track_hazards50nh.h"
+#include "camera_shake_relay50cs.h"
 #include "undertrack_reposition50et.h"
 #include "../assets/import_decode48c.h"
 #include <algorithm>
@@ -268,7 +272,16 @@ private:
 
     static std::string lower(std::string s) { for (auto& c : s) if (c >= 'A' && c <= 'Z') c = char(c - 'A' + 'a'); return s; }
     static const char* kindName(N64HazardKind50NH k) noexcept {
-        return k == N64HazardKind50NH::explodePod ? "ExplodePod" : k == N64HazardKind50NH::breakObject ? "BreakObject" : "AnimationToggle";
+        return k == N64HazardKind50NH::explodePod ? "ExplodePod" : k == N64HazardKind50NH::breakObject ? "BreakObject" :
+               k == N64HazardKind50NH::animationPlay ? "AnimationPlay" : "AnimationToggle";
+    }
+    static const std::int32_t& targetNumber(const N64HazardAction50NH& a) noexcept {
+        return a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNumber :
+               a.kind == N64HazardKind50NH::animationPlay ? a.play.animationNumber : a.toggle.animationNumber;
+    }
+    static const std::string& targetRef(const N64HazardAction50NH& a) noexcept {
+        return a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNameRef :
+               a.kind == N64HazardKind50NH::animationPlay ? a.play.animationNameRef : a.toggle.animationNameRef;
     }
     void clearRace() noexcept {
         explode_.fill({}); damage_.fill({}); respawn_.fill({}); placement_.fill(false);
@@ -288,8 +301,8 @@ private:
             std::cerr << "pod after=" << (a.explode.after == N64AfterDestroy50NH::respawn ? "respawn" : "retire")
                       << " gate=" << (a.explode.gate == N64ExplodeGate50NH::all ? "all" : a.explode.gate == N64ExplodeGate50NH::local ? "local" : "local_or_near_camera");
         else {
-            const auto& number = a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNumber : a.toggle.animationNumber;
-            const auto& ref = a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNameRef : a.toggle.animationNameRef;
+            const auto& number = targetNumber(a);
+            const auto& ref = targetRef(a);
             if (number >= 1) std::cerr << "animation#" << number; else if (!ref.empty()) std::cerr << ref; else std::cerr << "none";
         }
         std::cerr << " once=" << r.oneTimeOnly << '\n';
@@ -302,8 +315,8 @@ private:
             if (!animation_) continue;   // logged at use: target_unbound reason=animation_runtime
             struct Names { const N64TrackAnimationPort50NH* p; std::size_t size() const { return p->rowCount(); }
                            const std::string& operator[](std::size_t k) const { return p->referenceName(k); } } names{animation_};
-            const auto number = a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNumber : a.toggle.animationNumber;
-            const auto& ref = a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNameRef : a.toggle.animationNameRef;
+            const auto number = targetNumber(a);
+            const auto& ref = targetRef(a);
             if (number >= 1 || !ref.empty()) t.valid = resolveN64AnimationTarget50NH(number, ref, names, t.row);
             if (a.kind == N64HazardKind50NH::breakObject && (a.breakObject.effectAnimation >= 1 || !a.breakObject.effectNameRef.empty()))
                 t.effectValid = resolveN64AnimationTarget50NH(a.breakObject.effectAnimation, a.breakObject.effectNameRef, names, t.effect);
@@ -408,6 +421,25 @@ private:
                       << " since_toggle=" << since << " slot=" << slot << " trigger=" << r.trigger << '\n';
             return;
         }
+        case N64HazardKind50NH::animationPlay: {
+            // 312 pillar / 314 methane: (show,) start the row's sequence at the authored
+            // rate, once (the row's OneTimeOnly), plus Revenge's own CameraShake when authored.
+            const auto& q = a.play;
+            bool shown = false, fired = false, rated = false;
+            if (!animation_ || !targets_[e.row].valid) unbound(e.row, "AnimationPlay");
+            else {
+                const auto row = targets_[e.row].row;
+                if (q.show) shown = animation_->show(row);
+                fired = animation_->fire(row);
+                rated = q.rate == 1.f || animation_->setRate(row, q.rate, false);
+            }
+            if (q.shake) cameraShakeRelay50CS.request({q.shakeMagnitude, q.shakeTime, q.shakeDecaying, q.shakeDelay});
+            std::cerr << "n64_play trigger=" << r.trigger << " slot=" << slot << " target="
+                      << (animation_ && targets_[e.row].valid ? std::to_string(targets_[e.row].row) : std::string("unbound"))
+                      << " shown=" << shown << " fired=" << fired << " rate=" << q.rate << " rate_set=" << rated
+                      << " shake=" << (q.shake ? std::to_string(q.shakeMagnitude) + "/" + std::to_string(q.shakeTime) : std::string("none")) << '\n';
+            return;
+        }
         }
     }
     // RR_TEST_N64_HAZARD rows across the course's own map line (test only; see the parser).
@@ -438,20 +470,24 @@ private:
                 std::cerr << "n64_hazards test_refused reason=node entry=" << i << " node=" << t.node << '\n'; continue; }
             const auto& a = track->nodes[t.node]; const auto& b = track->nodes[a.next[0]];
             N64HazardRow50NH r; r.trigger = 1000u + static_cast<std::uint32_t>(i);
-            r.name = std::string("test_") + (t.kind == N64HazardKind50NH::explodePod ? "explode" : t.kind == N64HazardKind50NH::breakObject ? "break" : "door") + "_" + std::to_string(t.node);
+            r.name = std::string("test_") + (t.kind == N64HazardKind50NH::explodePod ? "explode" : t.kind == N64HazardKind50NH::breakObject ? "break" :
+                     t.kind == N64HazardKind50NH::animationPlay ? "play" : "door") + "_" + std::to_string(t.node);
             for (unsigned k = 0; k < 3; ++k) r.centre[k] = a.position[k];
             float dx = b.position[0] - a.position[0], dz = b.position[2] - a.position[2]; const float len = std::sqrt(dx * dx + dz * dz);
             if (!(len > 1e-3f)) { std::cerr << "n64_hazards test_refused reason=zero_link entry=" << i << '\n'; continue; }
             r.direction[0] = dx / len; r.direction[1] = 0.f; r.direction[2] = dz / len;
             r.halfHeight = 80.f; r.halfWidth = 60.f;
-            r.volume = t.kind == N64HazardKind50NH::animationToggle ? N64Volume50NH::capsule : N64Volume50NH::plane;
-            r.oneTimeOnly = t.kind == N64HazardKind50NH::breakObject;
+            r.volume = t.kind == N64HazardKind50NH::animationToggle || t.kind == N64HazardKind50NH::animationPlay ? N64Volume50NH::capsule : N64Volume50NH::plane;
+            r.oneTimeOnly = t.kind == N64HazardKind50NH::breakObject || t.kind == N64HazardKind50NH::animationPlay;
             auto& x = r.actions[0]; x.kind = t.kind; x.authoredAction = 1; r.actionCount = 1;
             if (t.kind == N64HazardKind50NH::explodePod) {
                 if (t.hasArg) { if (!(t.arg > 0.f && t.arg <= L::maxExtent)) { std::cerr << "n64_hazards test_refused reason=halfwidth entry=" << i << '\n'; continue; } r.halfWidth = t.arg; }
                 x.explode.gate = N64ExplodeGate50NH::all; x.explode.side = N64ExplodeSide50NH::random; x.explode.after = after;
             } else if (t.kind == N64HazardKind50NH::breakObject) {
                 if (t.hasArg && t.arg >= 1.f) x.breakObject.animationNumber = static_cast<std::int32_t>(t.arg);
+            } else if (t.kind == N64HazardKind50NH::animationPlay) {
+                if (!(t.arg >= 1.f)) { std::cerr << "n64_hazards test_refused reason=play_anim entry=" << i << '\n'; continue; }
+                x.play.animationNumber = static_cast<std::int32_t>(t.arg);
             } else {
                 if (!(t.arg >= 1.f)) { std::cerr << "n64_hazards test_refused reason=door_anim entry=" << i << '\n'; continue; }
                 x.toggle.animationNumber = static_cast<std::int32_t>(t.arg);

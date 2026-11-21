@@ -10,6 +10,8 @@
 #include "native_water_surface50ws.h"
 #include "../../src/game/native_destroyed_racers50pd.h"
 #include "../../src/game/n64_track_hazards_runtime50nh.h"
+#include "n64_track_animation_port50nh.h"
+#include "../../src/game/camera_shake_relay50cs.h"
 #include "../../src/game/native_chariot_rigid_mount50rm.h"
 #include "original_manager_fields.h"
 #include <functional>
@@ -1451,9 +1453,11 @@ SessionExit50DU Context::run() {
  // load (activateColdRace); every 1AC8E0 restart with race1B0 bit4 clear runs the SAME
  // tick after its 1AEA70 placements (restartSetupTick1AC8E0), so the replayed intro
  // draws the restarted pods on the fresh intro's path. setupTickSlot names the racer
- // being ticked for a refusal. PORT STAND-IN (existing, flagged): the original updates
- // every racer on every intro/countdown frame (1AED30 only locks axes); the port's
- // held phase runs no racer frame, only this tick.
+ // being ticked for a refusal. Every later intro/countdown step then runs one live native
+ // frame per racer (terrain_interactive_loop50du.cpp, the held start-gate branch; 1AED30
+ // only locks axes), as the original 1A7B40 does. PORT STAND-IN (flagged, narrowed): this
+ // first frame, before the first displayed image (cold publication / 1AC8E0 restart), is
+ // the quiet setup form (raceSetupFrame: no speech/audio/finish consumers).
  std::size_t setupTickSlot=0;
  const auto setupTickRacers=[&](const platform::WindowInput50DQ& noKeys){
   auto initializeGraphics=[&](std::size_t actualRacerSlot){
@@ -1900,6 +1904,9 @@ SessionExit50DU Context::run() {
   // PORT EXTENSION (n64_track_hazards_runtime50nh.h): N64 'Load'/'RSet' - every
   // hazard row as authored, nothing fired, no pending explode/damage/respawn.
   rr::game::n64HazardRuntime50NH.raceReset();
+  // ... and the animation rows those hazards changed (broken asteroids, toggled doors).
+  n64_track_animation_port50NH::n64TrackAnimationPort50NH.raceReset();
+  rr::game::cameraShakeRelay50CS.raceReset(); // no shake request carried into a race
   // Racer +50 (215A28) from each racer's own loaded PHY, and the 228110
   // restart restore check: a fresh race session must carry the cold-built
   // cockpit tether (anchors and length), not the one a limp rebound.
@@ -2482,6 +2489,9 @@ SessionExit50DU Context::run() {
   require50DU(::allocations==before,"successful original world animation allocated C++ storage");
   if(trackAnimations)++trackAnimationSteps;
   if(skySequences)skySequences->logPeriodic(track.code());
+  // CameraShake enters of this step's trigger queries (Revenge 1B2780 and the N64
+  // AnimationPlay Shake) reach the race camera before its update (camera_shake_relay50cs.h).
+  rr::game::cameraShakeRelay50CS.flush();
  };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  platform::MaterialTextureGl50EB specularGpuTextures50LA;
@@ -2950,6 +2960,7 @@ SessionExit50DU Context::run() {
   // ownership before the collision world fence and the Bank's serial
   // visibility/collision/trigger-membership retirement.
   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("camera_owner_still_borrowed");
+  rr::game::cameraShakeRelay50CS.unbind(); // raw borrow of this session (CameraShake relay)
   sourceCameraSession.reset();cameraAssets.reset();
   if(!closeColdPrefix())return closeRejected("all_peer_terminal_contact_retirement");
   if(!closeBankCollision())return closeRejected("serial_collision_retirement");
@@ -2971,6 +2982,9 @@ SessionExit50DU Context::run() {
     trackAnimationBinding.reset();
    }
    if(!trackAnimationWindow.releaseSource())return closeRejected("track_animation_window_gpu_still_open");
+   // The N64 hazard animation port borrows the runtime by raw pointer: unbind it first.
+   rr::game::n64HazardRuntime50NH.bindAnimation(nullptr);
+   n64_track_animation_port50NH::n64TrackAnimationPort50NH.bind(nullptr);
    std::cerr<<"common_teardown_detail role=animation session_holder_released="<<bool(trackAnimations)
        <<" use_count_before="<<trackAnimations.use_count()<<'\n';
    trackAnimations.reset();

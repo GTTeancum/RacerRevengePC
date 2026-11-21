@@ -1108,25 +1108,53 @@ bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,
     if(!storage_||!storage_->readable())return false;packed=storage_->packed1125D;comparison=storage_->comparison100C0;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG& d,OriginalUiRiderProfileStamp50KG expected)noexcept{
+    // Free Play (mode 0, page 5/1 -> 6/1) and two-player VS (mode 1): page 5/1
+    // P1 Confirm (1EA548/1EA58C/1EA5A8 -> 5/2 at 1EA630 with two humans) and page
+    // 5/2 P2 Confirm (1EAB7C 1125E, 1EABEC 100C0 when the earned-minus-unspent
+    // comparison prefers it, 1EAD5C 6F8 -> 6/1 at 1EAD60). Every write is the
+    // decision the original dispatcher re-derives here; nothing else changes.
     RiderSelectionFacts rider;
-    if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||expected.generation!=storage_->generation||
+    if(!storage_||!storage_->readable())return false;
+    const auto mode=storage_->common->mode34;const auto page=d.request.sourcePage;
+    if((mode!=0&&mode!=1)||expected.mode34!=mode||expected.generation!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!d.admitted||!d.profileProposalComplete||d.blockers||
-       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||
+       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||(page!=1&&page!=2)||(page==2&&mode!=1)||
        d.selectedRider<0||!riderSelectionFacts(static_cast<std::uint32_t>(d.selectedRider),rider)||!rider.unlock10FAC||
-       d.profileChanges.count!=3)return false;
-    game::OriginalUiRiderContext50KG c;c.mode34=0;c.selectedRider=d.selectedRider;c.playerIndex=0;c.packed1125C=storage_->common->playerBits1125C;
-    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=rider.unlock10FAC;c.comparisonRider100C0=storage_->comparison100C0;
-    c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;c.admission.nativePageMasks[6]=1u<<1;
+       d.profileChanges.count<2||d.profileChanges.count>3)return false;
+    const auto& s=*storage_;
+    game::OriginalUiRiderContext50KG c;c.mode34=mode;c.selectedRider=d.selectedRider;c.playerIndex=static_cast<std::uint8_t>(page-1);
+    c.packed1125C=s.common->playerBits1125C;
+    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=rider.unlock10FAC;c.comparisonRider100C0=s.comparison100C0;
+    if(page==2){
+        // 1EABC4..1EABDC: the current and the selected career's 2190 / 2194 words.
+        if(s.comparison100C0>=s.tournament.careers.size()||static_cast<std::size_t>(d.selectedRider)>=s.tournament.careers.size())return false;
+        const auto& cur=s.tournament.careers[s.comparison100C0];const auto& sel=s.tournament.careers[static_cast<std::size_t>(d.selectedRider)];
+        c.currentComparisonRow={true,s.comparison100C0,cur.earned2190,cur.unspent2194};
+        c.selectedComparisonRow={true,static_cast<std::uint32_t>(d.selectedRider),sel.earned2190,sel.unspent2194};
+    }
+    c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
+    // Destination masks: 5/2 (VS P1 -> P2 page) and 6/1 (Course); finish() admits only the decided target.
+    c.admission.nativePageMasks[5]=1u<<2;c.admission.nativePageMasks[6]=1u<<1;
     game::OriginalUiRouteDecision50KG exact;
-    if(game::dispatchOriginalUiRider50KG(0,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::ok||
+    if(game::dispatchOriginalUiRider50KG(c.playerIndex,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::ok||
        exact.inputPC!=d.inputPC||exact.selectedSlot!=d.selectedSlot||exact.selectedRider!=d.selectedRider||
        exact.request.kind!=d.request.kind||exact.request.targetScreen!=d.request.targetScreen||exact.request.targetPage!=d.request.targetPage||
-       exact.request.sourcePC!=d.request.sourcePC||exact.profileChanges.count!=3)return false;
-    for(std::size_t i=0;i<3;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
-    storage_->remembered[0]=d.selectedRider;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(d.selectedRider<<3));
-    storage_->comparison100C0=d.selectedRider;++storage_->generation;
+       exact.request.sourcePC!=d.request.sourcePC||exact.profileChanges.count!=d.profileChanges.count)return false;
+    for(std::size_t i=0;i<exact.profileChanges.count;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
+    auto& w=*storage_;const auto selected=static_cast<std::uint32_t>(d.selectedRider);
+    if(page==1){
+        w.remembered[mode==0?0:1]=selected;   // 6F0 (Free Play) / 6F4 (VS P1)
+        w.packed1125D=static_cast<std::uint8_t>((w.packed1125D&7u)|(selected<<3));
+        w.comparison100C0=selected;
+    }else{
+        w.packed1125E=static_cast<std::uint8_t>((w.packed1125E&0xE0u)|(selected&0x1Fu)); // 1EAB7C, planet bits kept
+        for(std::size_t i=0;i<exact.profileChanges.count;++i)
+            if(exact.profileChanges.values[i].field==game::OriginalUiProfileField50KG::comparisonRider100C0)w.comparison100C0=selected; // 1EABEC
+        w.remembered[2]=selected;              // 6F8
+    }
+    ++w.generation;
     game::dlc50DL::clearTournamentCareer(); // DLC career: the original rewrote 100C0 (PORT EXTENSION)
-    if(storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))(void)saveNativeBetaProgress();return true;
+    if(w.betaSettings&&(w.betaSettings->flags11050&1u))(void)saveNativeBetaProgress();return true;
 }
 bool OriginalUiRiderProfileOwner50KG::canPrepareRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG& d,
     OriginalUiRiderProfileStamp50KG expected)const noexcept {

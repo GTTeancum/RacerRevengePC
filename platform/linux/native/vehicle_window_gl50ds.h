@@ -400,6 +400,12 @@ struct VehicleWindowDynamicWorldFrame50DS {
     // Finite unit normals or exact zero. No transform/animation is inferred.
     const assets::WorldNormal50HK* sourceNormals = nullptr;
     std::uint32_t sourceNormalCount = 0;
+    // PORT EXTENSION (N64 data only; inert on stock): optional per-span opacity in
+    // [0,1], exactly one per cold dynamic-world span when supplied. 1 draws the span
+    // as authored; 0 skips it; between, it is drawn in the transparent pass with
+    // source-alpha blending, no depth write, alpha scaled. Null = every span 1.
+    const float* spanAlphas = nullptr;
+    std::uint32_t spanAlphaCount = 0;
 };
 struct VehicleWindowSky50DS {
     // Authored sky geometry only, copied cold into private GPU buffers. Its

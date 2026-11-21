@@ -9,6 +9,7 @@
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "../../src/game/n64_track_hazards_runtime50nh.h"
+#include "n64_track_animation_port50nh.h"
 #include "../../src/game/n64_airborne_gravity50ag.h"
 #include "../../src/assets/original_parameter_lookup50cr.h"
 #include "../../src/assets/track_start50ad.h"
@@ -755,6 +756,11 @@ SessionExit50DU Context::run() {
    hazardArchive=runtime_startup50fl::readBytes(trackSession->archive);hazardBytes=&hazardArchive;}
   rr::game::n64HazardRuntime50NH.loadCourse(courseN64Rows,rr::game::surfaceRules50ST,hazardBytes,
       track.identity.mapSpline.c_str(),track.identity.code.text.data());
+  // The hazards' animation targets (asteroid, debris, door rows) play on the ONE common
+  // track-animation runtime (no rows / no [Animations] = the port stays unbound).
+  auto& n64AnimationPort=n64_track_animation_port50NH::n64TrackAnimationPort50NH;
+  n64AnimationPort.bind(trackAnimations.get());
+  rr::game::n64HazardRuntime50NH.bindAnimation(trackAnimations?&n64AnimationPort:nullptr);
  }
  // The cold payload ledger of the one collision world: its own descriptors and
  // storage plus later cold owners' reservations, inside the race's one limit.

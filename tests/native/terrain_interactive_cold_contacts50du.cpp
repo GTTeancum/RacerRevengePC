@@ -15,6 +15,7 @@
 #include "undertrack_owners50ew_fixture.h"
 #include "source_announcer50ie_fixture.h"
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
+#include "../../src/game/camera_shake_relay50cs.h"   // CameraShake action -> race camera session
 #include "../../src/game/original_racer_selection50ij.h"
 #include "../../src/game/vehicle_draw_batch50co.h"
 #include <algorithm>
@@ -110,7 +111,17 @@ void ContactsContext::run() {
        .particles=track.roles.emitters?track_particle_emitters50CR::triggerSink(*track.roles.emitters):course_trigger_actions50CT::ActionSink{},
        // LostAI Reset TRUE (1B5A60 -> 2255B0 pose reset): the action owner's one
        // slot sink; the frame lends it per original-AI main690 query (frame_physics).
-       .lostAiReset=actions->lostAiResetSink().sink()};
+       .lostAiReset=actions->lostAiResetSink().sink(),
+       // CameraShake 1B2780: recorded for every race camera; the world step hands it to the
+       // camera session (camera_shake_relay50cs.h; same frame, flagged stand-in timing).
+       .cameraShake={.context=&rr::game::cameraShakeRelay50CS,
+        .preflight=[](void*,const course_trigger_actions50CT::ActionEvent& e)noexcept->bool{
+         return e.entering&&e.authored&&e.authored->kind==course_trigger_sources50CT::ActionKind::CameraShake;},
+        .apply=[](void* p,const course_trigger_actions50CT::ActionEvent& e)noexcept->bool{
+         const auto& a=*e.authored;
+         static_cast<rr::game::CameraShakeRelay50CS*>(p)->request({a.shakeMagnitude,a.shakeTime,a.shakeDecaying,a.shakeDelay});
+         return true;},
+        .sourcePc=0x1b2780u}};
    // The source half (rows, group, LostAI targets) was prepared before the
    // collision world took the owner (world.cpp); bind the destinations now.
    require50DU(actions==track.roles.triggerActions.get(),"the collision world lends a different trigger action owner");

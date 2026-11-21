@@ -33,6 +33,7 @@
 #include "course_archive_receipt50ci.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/track_start50ad.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
 #include "../../src/game/native_trigger_box_geometry50ma.h"
 #include "../../src/game/n64_track_hazards50nh.h"
 #include "../../src/game/terrain_query48j.h"
@@ -55,16 +56,16 @@ namespace course_trigger_sources50CT {
 namespace a=rr::assets;namespace g=rr::game;namespace ct=common_track50CR;
 
 // The original's own action types (resolver 1B5E70 -> 2DBB60). The reader reads
-// the five kinds below; another original type is a port gap (refused, named as
+// the six kinds below; another original type is a port gap (refused, named as
 // such); any other name is unknown to the original, which asserts on it (2DB760
 // -> 2DBAE4 "CreateActionClass undefined trigger type", 2DC16C "Error in .toy:
 // Undefined ActionType requested in Trigger%dAction%d."). The port keeps the
 // shipped behaviour: the race load is refused with that message.
-enum class ActionKind : std::uint8_t {LostAI,Animation,PodSound,Sound,Particles};
+enum class ActionKind : std::uint8_t {LostAI,Animation,PodSound,Sound,Particles,CameraShake};
 using Action=ActionKind;
 inline const char* actionKindName(ActionKind k)noexcept{
  return k==ActionKind::LostAI?"LostAI":k==ActionKind::Animation?"Animation":k==ActionKind::PodSound?"PodSound":
-  k==ActionKind::Sound?"Sound":"Particles";
+  k==ActionKind::Sound?"Sound":k==ActionKind::Particles?"Particles":"CameraShake";
 }
 inline bool originalActionType(std::string_view t)noexcept{
  static constexpr const char* names[]={"Animation","ResetAnimation","HideAnimation","EnableTrigger",
@@ -87,6 +88,9 @@ struct ActionSource {
  bool positional=false,isGlobalSound=false;  // Sound
  std::uint32_t emitterNumber=0,instanceNumber=0; // Particles, 1-based as authored
  bool turnOn=true;                           // Particles
+ // CameraShake 1B5990 (CameraShakeTriggerAction): Magnitude +10C, ShakeTime +110 (158B80,
+ // default 0), Decaying +114 (158B30, default 1), Delay +118 (158B80, default 0).
+ float shakeMagnitude=0.f,shakeTime=0.f,shakeDelay=0.f;std::int32_t shakeDecaying=1;
  std::optional<bool> authoredOneTimeOnly;    // any kind (per-action once flag, retained)
  const a::ParameterBlock48F* original=nullptr; // borrowed from the Track's decoded TOB
 };
@@ -237,6 +241,13 @@ class Owner final {
    act.kind=ActionKind::Particles;act.emitterNumber=integer(field(action,"emitternumber"));
    act.instanceNumber=integer(field(action,"instancenumber"));act.turnOn=boolean(field(action,"turnon"));
    need(act.emitterNumber>=1&&act.instanceNumber>=1,"Particles action emitter/instance number");
+  }else if(type=="CameraShake"){
+   // 1B5990: every field optional with the original defaults.
+   act.kind=ActionKind::CameraShake;
+   if(const auto* v=optional(action,"magnitude"))act.shakeMagnitude=number(*v);
+   if(const auto* v=optional(action,"shaketime"))act.shakeTime=number(*v);
+   if(const auto* v=optional(action,"decaying"))act.shakeDecaying=a::integer158920(*v);
+   if(const auto* v=optional(action,"delay"))act.shakeDelay=number(*v);
   }else if(g::isN64HazardActionType50NH(type)){
    need(false,"ExplodePod/BreakObject/AnimationToggle need N64Volume on their TriggerN row");
   }else if(originalActionType(type)){
@@ -320,7 +331,8 @@ public:
      const auto z=integer(field(b,"zone"));need(z>=1&&z<=zoneCount,"trigger zone outside the world");
      if(i)kinds+=',';
      kinds+=row.actions[0].kind==g::N64HazardKind50NH::explodePod?"N64ExplodePod":
-         row.actions[0].kind==g::N64HazardKind50NH::breakObject?"N64BreakObject":"N64AnimationToggle";
+         row.actions[0].kind==g::N64HazardKind50NH::breakObject?"N64BreakObject":
+         row.actions[0].kind==g::N64HazardKind50NH::animationPlay?"N64AnimationPlay":"N64AnimationToggle";
      n64.push_back(std::move(row));continue;
     }
     Source* slot=sources_.slot(sources_.size(),0x2A00A0u);   // bounds-checked; refused when it would not fit

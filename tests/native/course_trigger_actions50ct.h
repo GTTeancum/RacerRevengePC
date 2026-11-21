@@ -8,7 +8,8 @@
 // world service (exits), 2A013C chance roll (2DBDA0 RandomTriggerPercent),
 // 2DC630 ignore lists. Actions: LostAI 1B27C0 (racer C80 = TargetNodeIndex,
 // 1B5A60 Reset), Animation 101170 (track animation fire), PodSound 1B5B58,
-// Sound and Particles through their owners.
+// Sound and Particles through their owners, CameraShake 1B2780 (enter only:
+// every registered race camera, whichever racer entered) through its sink.
 //
 // Every course goes through the same code. What a course authors comes from
 // its TOB (course_trigger_sources50CT); what the race can EXECUTE comes from the
@@ -134,6 +135,7 @@ struct Destinations {
  ActionSink sound;         // Sound (the one positional-sound owner)
  ActionSink particles;     // Particles (the one particle owner's emitter switch)
  ActionSink lostAiReset;   // LostAI Reset TRUE: the racer pose reset beside the C80 write
+ ActionSink cameraShake;   // CameraShake 1B2780 -> 1ACEA0 -> 177720 (every race camera)
 };
 struct Counters {std::uint64_t entries=0,exits=0,lostAiWrites=0,animationActivations=0,sinkActions=0;};
 enum class Status {Complete,Unprepared,Input,Service,Action};
@@ -161,6 +163,7 @@ class Owner final {
    case src::ActionKind::PodSound:return &destinations_.podSound;
    case src::ActionKind::Sound:return &destinations_.sound;
    case src::ActionKind::Particles:return &destinations_.particles;
+   case src::ActionKind::CameraShake:return &destinations_.cameraShake;
    default:return nullptr;
   }
  }
@@ -300,7 +303,8 @@ public:
      a.kind==src::ActionKind::LostAI?(!a.reset||bool(destinations.lostAiReset)):
      a.kind==src::ActionKind::Animation?bool(destinations.animations):
      a.kind==src::ActionKind::PodSound?bool(destinations.podSound):
-     a.kind==src::ActionKind::Sound?bool(destinations.sound):bool(destinations.particles);
+     a.kind==src::ActionKind::Sound?bool(destinations.sound):
+     a.kind==src::ActionKind::CameraShake?bool(destinations.cameraShake):bool(destinations.particles);
     if(!bound){
      std::cerr<<"course_trigger_actions refused trigger="<<(i+1)<<" kind="<<src::actionKindName(a.kind)
               <<(a.kind==src::ActionKind::LostAI?" reset=1":"")<<" reason=no_destination\n";

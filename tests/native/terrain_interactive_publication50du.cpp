@@ -21,6 +21,8 @@
 #include "pod_cables50fd_fixture.h"
 #include "gc_particle_materials50kg_fixture.h"
 #include "track_animation_binding50an.h"
+#include "n64_track_animation_port50nh.h"   // N64 hazard rows: race-reset restore (inert on stock)
+#include "../../src/game/camera_shake_relay50cs.h" // CameraShake trigger action -> this race's camera session
 #include "original_camera_assets50kx.h"
 #include "original_ta_camera_issuer_candidate.h"
 // W0 common rewrite: the one stage and the one track's role owners (complete types).
@@ -1524,6 +1526,12 @@ void Context::run() {
      std::cerr<<"counted_controller course="<<track.code()<<" cuts=0 slot48=1 intro_lines=0\n";
     }
    }else sourceCameraSession=std::make_shared<sourceCamera::Session>(sourceCameraActual);
+   // CameraShake trigger enters (1B2780) reach this session's camera through the relay
+   // (camera_shake_relay50cs.h); unbound before the session is released (teardown).
+   rr::game::cameraShakeRelay50CS.raceReset();
+   rr::game::cameraShakeRelay50CS.bind(sourceCameraSession.get(),
+       [](void* p,const rr::game::OriginalCameraShakeAction& a)noexcept->bool{
+        return static_cast<sourceCamera::Session*>(p)->applyAuthoredShakeEnter(true,a);});
    const auto prepared=sourceCameraSession->prepare(sessionIndex+1,sourceCameraAssets.inputs,*sourceCameraDisplay);
    if(prepared.status!=sourceCamera::Status::complete)std::cerr<<"original_camera_cold_rejected status="
        <<static_cast<unsigned>(prepared.status)<<" source_pc="<<prepared.sourcePC
@@ -2353,6 +2361,11 @@ void Context::run() {
       why="161F60 track particle emitter restart rejected: "+d.reason;reason=why.c_str();return false;}
     }
     std::size_t rows=0,triggers=0;
+    // PORT EXTENSION (N64 data only): 'RSet' reloads the N64 track fresh - every hazard row
+    // as authored and the animation rows they changed restored, before 2702E0 re-poses them.
+    rr::game::n64HazardRuntime50NH.raceReset();
+    n64_track_animation_port50NH::n64TrackAnimationPort50NH.raceReset();
+    rr::game::cameraShakeRelay50CS.raceReset();
     if(trackAnimationBinding){track_animation_binding50AN::Diagnostic resetDiagnostic;
      if(!trackAnimationBinding->raceReset(resetDiagnostic)){reason="2702E0 track animation ResetAll (101D10/101B20) rejected";return false;}
      rows=trackAnimations?trackAnimations->rowCount():0;}

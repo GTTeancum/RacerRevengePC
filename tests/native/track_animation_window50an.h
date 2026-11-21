@@ -31,6 +31,9 @@ class Owner final {
  mat::Owner materials_;
  p::MaterialTextureGl50EB gpu_;
  std::vector<p::VehicleWindowTrackSpan50DS> spans_;
+ // PORT EXTENSION (N64 data only): per-span opacity of the current frame (runtime row alpha,
+ // extension (d)); handed to the draw only when some row is faded, so stock frames are unchanged.
+ mutable std::vector<float> spanAlphas_;
  bool loaded_=false;
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
@@ -51,7 +54,7 @@ public:
   if(!loaded()||!materials_.bank())return false;
   const auto& spans=runtime_->spans();const auto textures=materials_.textureCount();
   std::vector<p::MaterialTextureSampler50EB> samplers(textures);std::vector<std::uint8_t> samplerSet(textures,0);
-  spans_.assign(spans.size(),{});
+  spans_.assign(spans.size(),{});spanAlphas_.assign(spans.size(),1.f);
   for(std::size_t i=0;i<spans.size();++i){const auto& span=spans[i];const auto& m=materials_.spanMaterial(i);
    if(m.textureIndex>=textures)return false;
    material_alpha50gx_fixture::Policy alpha{};
@@ -93,7 +96,14 @@ public:
  bool bindFrame(p::VehicleWindowFrame50DS& frame)const noexcept{
   if(!loaded()||!gpu_.initialized())return false;const auto& mesh=runtime_->mesh();
   frame.dynamicWorld={mesh.vertices.data(),static_cast<std::uint32_t>(mesh.vertices.size()),
-    runtime_->normals().data(),static_cast<std::uint32_t>(runtime_->normals().size())};return true;
+    runtime_->normals().data(),static_cast<std::uint32_t>(runtime_->normals().size())};
+  const auto& spans=runtime_->spans();bool faded=false;
+  if(spanAlphas_.size()!=spans.size())return false;
+  for(std::size_t i=0;i<spans.size();++i){
+   if(spans[i].row>=runtime_->rowCount())return false;
+   const float alpha=runtime_->state(spans[i].row).alpha;spanAlphas_[i]=alpha;faded=faded||alpha<1.f;}
+  if(faded){frame.dynamicWorld.spanAlphas=spanAlphas_.data();frame.dynamicWorld.spanAlphaCount=static_cast<std::uint32_t>(spanAlphas_.size());}
+  return true;
  }
  bool close(p::MaterialTextureGlDiagnostic50EB& d)noexcept{return gpu_.close(d);}
 };

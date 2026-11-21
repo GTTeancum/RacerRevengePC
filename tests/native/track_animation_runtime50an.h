@@ -26,9 +26,8 @@
 //   (a) per-row signed playback rate, set-time, stop-at-end without loop
 //   (b) hide that also unregisters the row's collision (and show that re-registers it)
 //   (c) StartHidden row key (reader) and a per-frame world transform override with scale
-//   (d) per-row alpha fade: the state is kept, but the dynamic-world draw cannot carry alpha
-//       without the renderer header (vertex colours are fixed cold), so a faded row is NOT
-//       drawn and that is logged once.
+//   (d) per-row alpha fade: drawn through the dynamic window's per-span alphas
+//       (frame.dynamicWorld.spanAlphas, source-alpha blended in the transparent pass).
 // All of these are exposed through Control below, the one small interface trigger owners call.
 //
 // Visual vertices are projected once per shown frame in prepareDraw() from the node worlds the
@@ -377,9 +376,11 @@ public:
    bool any=false;
    for(std::size_t i=0;i<rows_.size();++i){auto& s=rows_[i];if(!s.visualPending)continue;d.row=i;
     const auto& row=sourceRow(i);const auto start=s.vertexStart,count=s.vertexCount;
-    const bool shown=s.enabled29&&s.alpha>=1.f;
+    // (d) a faded row stays projected; the window hands its alpha per span to the
+    // dynamic-world draw (frame.dynamicWorld.spanAlphas). Alpha 0 = not drawn.
+    const bool shown=s.enabled29&&s.alpha>0.f;
     if(s.alpha<1.f&&!fadeLogged_){fadeLogged_=true;
-     std::cerr<<"track_animation_fade course="<<label_<<" row="<<(i+1)<<" PORT EXTENSION: alpha fade kept but not drawn (dynamic-world draw carries no alpha without the renderer header)\n";}
+     std::cerr<<"track_animation_fade course="<<label_<<" row="<<(i+1)<<" PORT EXTENSION: alpha fade drawn through the dynamic-world span alphas\n";}
     if(row.hierarchy.nodeCount>palette_.size())return fail(d,"track animation draw palette extent",0x241280);
     auto* palette=palette_.data();
     for(std::uint32_t r=0;r<row.hierarchy.nodeCount;++r){
