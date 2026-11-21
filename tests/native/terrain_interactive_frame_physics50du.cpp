@@ -89,8 +89,8 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  if(n64RespawnDrop){
   const bool human=s.fields.vehicle58==0u;
   const bool owned=human?(humanCourseEnabled&&actualRacerSlot==0u):(originalRecoveryEnabled&&originalAiEnabled);
-  std::cerr<<"n64_respawn placement slot="<<actualRacerSlot<<" human="<<human<<" via="<<(owned?"228BBC_2255B0":"none")
-      <<" frame="<<completedFrames<<'\n';
+  rr::game::n64Log50NH("n64_respawn placement slot=%u human=%d via=%s frame=%llu\n",unsigned(actualRacerSlot),int(human),
+      owned?"228BBC_2255B0":"none",static_cast<unsigned long long>(completedFrames));
   if(!owned)n64RespawnDrop=false;
  }
  const bool testUndertrackDrop=actualRacerSlot<rr::game::nativeTestUndertrackPending50UT.size()&&

@@ -34,7 +34,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -43,6 +45,17 @@
 #include <vector>
 
 namespace rr::game {
+
+// Log lines written inside a racer's frame (the trigger fire path runs in the player physics
+// frame, which must not allocate): formatted on the stack, written with fputs. A line longer
+// than the buffer is cut, never allocated.
+inline void n64Log50NH(const char* format, ...) noexcept {
+    char line[768];
+    va_list args; va_start(args, format);
+    const int n = std::vsnprintf(line, sizeof line, format, args);
+    va_end(args);
+    if (n > 0) std::fputs(line, stderr);
+}
 
 // ---- Animation port (the common track-animation runtime implements it; 145d) ------------
 // Rows are the course's [Animations] rows in TOB order (row = AnimationNumber - 1).
@@ -214,8 +227,8 @@ public:
             const std::size_t key = (skips[k].row * L::slots + slot) * 4u + lapKey;
             if (key >= skipLogged_.size() || skipLogged_[key]) continue;
             skipLogged_[key] = true;
-            std::cerr << "n64_trigger skip trigger=" << hazards_.row(skips[k].row).trigger << " slot=" << slot
-                      << " lap=" << in.step.lap << " reason=" << skips[k].reason << '\n';
+            n64Log50NH("n64_trigger skip trigger=%u slot=%u lap=%u reason=%s\n", hazards_.row(skips[k].row).trigger,
+                       unsigned(slot), unsigned(in.step.lap), skips[k].reason);
         }
         for (std::size_t k = 0; k < n; ++k) handle(events[k], in);
     }
@@ -248,8 +261,8 @@ public:
     void respawnRestored(std::size_t slot, double raceSeconds) noexcept {
         if (slot >= L::slots) return;
         auto& r = respawn_[slot];
-        std::cerr << "n64_respawn slot=" << slot << " trigger=" << (r.row < hazards_.size() ? hazards_.row(r.row).trigger : 0u)
-                  << " after_s=" << raceSeconds - r.destroyedAt << " delay=" << r.delay << " restore=228110 placement=pending\n";
+        n64Log50NH("n64_respawn slot=%u trigger=%u after_s=%g delay=%g restore=228110 placement=pending\n", unsigned(slot),
+                   r.row < hazards_.size() ? hazards_.row(r.row).trigger : 0u, raceSeconds - r.destroyedAt, double(r.delay));
         r = {}; placement_[slot] = true; prevValid_[slot] = false;
     }
     bool takePlacement(std::size_t slot) noexcept {
@@ -288,6 +301,7 @@ private:
         prevValid_.fill(false); humanValid_.fill(false); haveClock_ = false; raceSeconds_ = 0.0;
     }
     std::string ownerName(std::uint32_t k) const { return k < ownerNames_.size() ? ownerNames_[k] : std::string("none"); }
+    const char* ownerNameView(std::uint32_t k) const noexcept { return k < ownerNames_.size() ? ownerNames_[k].c_str() : "none"; }
     void logLoad(std::size_t i) const {
         const auto& r = hazards_.row(i); const auto& a = r.actions[0];
         std::cerr << "n64_trigger load trigger=" << r.trigger << " name=" << (r.name.empty() ? "-" : r.name)
@@ -328,15 +342,14 @@ private:
     void unbound(std::size_t row, const char* action) noexcept {
         if (row < unboundLogged_.size() && unboundLogged_[row]) return;
         if (row < unboundLogged_.size()) unboundLogged_[row] = true;
-        std::cerr << "n64_trigger target_unbound trigger=" << hazards_.row(row).trigger << " action=" << action
-                  << " reason=animation_runtime\n";
+        n64Log50NH("n64_trigger target_unbound trigger=%u action=%s reason=animation_runtime\n", hazards_.row(row).trigger, action);
     }
     void endEffect(std::size_t i, bool log) noexcept {
         if (i >= effects_.size() || !effects_[i].live) return;
         if (animation_ && i < targets_.size() && targets_[i].effectValid) {
             animation_->clearTransform(targets_[i].effect); animation_->hide(targets_[i].effect, false);
         }
-        if (log) std::cerr << "n64_break_effect end trigger=" << hazards_.row(i).trigger << " t=" << effects_[i].age << '\n';
+        if (log) n64Log50NH("n64_break_effect end trigger=%u t=%g\n", hazards_.row(i).trigger, double(effects_[i].age));
         effects_[i] = {};
     }
     void handle(const N64HazardEvent50NH& e, const StepInput& in) noexcept {
@@ -344,22 +357,23 @@ private:
         const auto& r = hazards_.row(e.row); const auto& a = r.actions[e.action < r.actionCount ? e.action : 0];
         const auto slot = e.slot;
         // Carrier owner for the log: the first step owner the row's set holds.
-        std::string carrier = r.surfaceCount ? "none" : "any";
+        // Carrier name borrowed from the load-time table (no copy: this runs in the racer frame).
+        const char* carrier = r.surfaceCount ? "none" : "any";
+        bool carrierFound = !r.surfaceCount;
         if (r.surfaceCount && in.step.groundOwners)
-            for (std::size_t g = 0; g < in.step.groundOwnerCount && carrier == "none"; ++g)
-                for (const auto o : owners_[e.row]) if (o == in.step.groundOwners[g]) { carrier = ownerName(o); break; }
+            for (std::size_t g = 0; g < in.step.groundOwnerCount && !carrierFound; ++g)
+                for (const auto o : owners_[e.row]) if (o == in.step.groundOwners[g]) { carrier = ownerNameView(o); carrierFound = true; break; }
         // The capsule (door) fires every frame inside: its fire line is the door event line below.
-        if (a.kind != N64HazardKind50NH::animationToggle) {
-                std::cerr << "n64_trigger fire trigger=" << r.trigger << " slot=" << slot << " human=" << in.step.human
-                          << " volume=" << (r.volume == N64Volume50NH::plane ? "plane" : "capsule") << " sign=" << (e.crossingSign >= 0 ? "+1" : "-1")
-                          << " t=" << e.t << " race_s=" << raceSeconds_ << " pos=" << in.step.current[0] << ',' << in.step.current[1] << ','
-                          << in.step.current[2] << " mode=" << (in.flight ? "flight" : "normal") << " carrier_owner=" << carrier << '\n';
-        }
+        if (a.kind != N64HazardKind50NH::animationToggle)
+            n64Log50NH("n64_trigger fire trigger=%u slot=%u human=%d volume=%s sign=%s t=%g race_s=%g pos=%g,%g,%g mode=%s carrier_owner=%s\n",
+                       r.trigger, unsigned(slot), int(in.step.human), r.volume == N64Volume50NH::plane ? "plane" : "capsule",
+                       e.crossingSign >= 0 ? "+1" : "-1", double(e.t), raceSeconds_, double(in.step.current[0]), double(in.step.current[1]),
+                       double(in.step.current[2]), in.flight ? "flight" : "normal", carrier);
         switch (a.kind) {
         case N64HazardKind50NH::explodePod: {
             if (e.refused) {
-                std::cerr << "n64_explode refused slot=" << slot << " trigger=" << r.trigger << " reason=" << e.refused
-                          << " dist=" << in.step.nearestCameraDistance << '\n';
+                n64Log50NH("n64_explode refused slot=%u trigger=%u reason=%s dist=%g\n", unsigned(slot), r.trigger, e.refused,
+                           double(in.step.nearestCameraDistance));
                 return;
             }
             if (explode_[slot].pending) return;
@@ -376,10 +390,15 @@ private:
             const auto hits = hazards_.breakDamage(q, in.boosting, 2, parts, amounts, N64BreakDamageRequest50NH::capacity);
             auto& d = damage_[slot];
             if (!d.pending) { d = {}; d.pending = true; d.row = e.row; }
-            std::string damageText;
+            char damageText[N64BreakDamageRequest50NH::capacity * 24 + 1] = "";
+            std::size_t used = 0;
             for (std::size_t k = 0; k < hits && d.count < N64BreakDamageRequest50NH::capacity; ++k) {
                 d.mask[d.count] = parts[k] ? 0x10u : 1u; d.amount[d.count] = amounts[k]; ++d.count;
-                damageText += (damageText.empty() ? "" : ",") + std::to_string(parts[k] ? 0 : 1) + ":" + std::to_string(amounts[k]);
+                if (used + 1 < sizeof damageText) {
+                    const int w = std::snprintf(damageText + used, sizeof damageText - used, "%s%d:%g", used ? "," : "",
+                                                parts[k] ? 0 : 1, double(amounts[k]));
+                    if (w > 0) used = std::min(sizeof damageText - 1, used + static_cast<std::size_t>(w));
+                }
             }
             const float thrust = N64TrackHazards50NH::decelerator(q.thrustDeceleration, in.dt);
             const float pitch = hazards_.soundPitch(q);
@@ -394,12 +413,12 @@ private:
                     auto& fx = effects_[e.row]; fx.live = true; fx.follow = in.step.human; fx.slot = slot; fx.age = 0.f;
                 }
             }
-            std::cerr << "n64_break trigger=" << r.trigger << " slot=" << slot << " target="
-                      << (animation_ && targets_[e.row].valid ? std::to_string(targets_[e.row].row) : std::string("unbound"))
-                      << " hidden=" << hidden << " collision_owners=" << (hidden ? 1 : 0)
-                      << " thrust_factor=" << thrust << " thrust_applied=0 boosting=" << in.boosting
-                      << " damage=" << damageText << " effect=" << (animation_ && targets_[e.row].effectValid ? effect : "none")
-                      << " sound=" << (q.sound.empty() ? "-" : q.sound) << " pitch=" << pitch << " sound_played=0\n";
+            const bool targetValid = animation_ && targets_[e.row].valid;
+            n64Log50NH("n64_break trigger=%u slot=%u target=%lld hidden=%d collision_owners=%d thrust_factor=%g thrust_applied=0 boosting=%d"
+                       " damage=%s effect=%s sound=%s pitch=%g sound_played=0\n", r.trigger, unsigned(slot),
+                       targetValid ? static_cast<long long>(targets_[e.row].row) : -1LL, int(hidden), hidden ? 1 : 0, double(thrust),
+                       int(in.boosting), damageText, animation_ && targets_[e.row].effectValid ? effect : "none",
+                       q.sound.empty() ? "-" : q.sound.c_str(), double(pitch));
             return;
         }
         case N64HazardKind50NH::animationToggle: {
@@ -411,14 +430,15 @@ private:
             const auto c = tg.machine.fire(q, animation_->time(row));
             if (!c.apply) {
                 if (!tg.guardLogged) { tg.guardLogged = true;
-                    std::cerr << "n64_door anim=" << row << " event=guard time=" << animation_->time(row) << " since_toggle=" << since << " slot=" << slot << '\n'; }
+                    n64Log50NH("n64_door anim=%u event=guard time=%g since_toggle=%g slot=%u\n", unsigned(row),
+                               double(animation_->time(row)), double(since), unsigned(slot)); }
                 return;
             }
             tg.guardLogged = false;
             if (c.setTime) animation_->setTime(row, c.time);
             animation_->setRate(row, c.rate, c.loop);
-            std::cerr << "n64_door anim=" << row << " event=" << c.event << " time=" << animation_->time(row) << " rate=" << c.rate
-                      << " since_toggle=" << since << " slot=" << slot << " trigger=" << r.trigger << '\n';
+            n64Log50NH("n64_door anim=%u event=%s time=%g rate=%g since_toggle=%g slot=%u trigger=%u\n", unsigned(row), c.event,
+                       double(animation_->time(row)), double(c.rate), double(since), unsigned(slot), r.trigger);
             return;
         }
         case N64HazardKind50NH::animationPlay: {
@@ -434,10 +454,9 @@ private:
                 rated = q.rate == 1.f || animation_->setRate(row, q.rate, false);
             }
             if (q.shake) cameraShakeRelay50CS.request({q.shakeMagnitude, q.shakeTime, q.shakeDecaying, q.shakeDelay});
-            std::cerr << "n64_play trigger=" << r.trigger << " slot=" << slot << " target="
-                      << (animation_ && targets_[e.row].valid ? std::to_string(targets_[e.row].row) : std::string("unbound"))
-                      << " shown=" << shown << " fired=" << fired << " rate=" << q.rate << " rate_set=" << rated
-                      << " shake=" << (q.shake ? std::to_string(q.shakeMagnitude) + "/" + std::to_string(q.shakeTime) : std::string("none")) << '\n';
+            n64Log50NH("n64_play trigger=%u slot=%u target=%lld shown=%d fired=%d rate=%g rate_set=%d shake=%s magnitude=%g time=%g\n",
+                       r.trigger, unsigned(slot), animation_ && targets_[e.row].valid ? static_cast<long long>(targets_[e.row].row) : -1LL,
+                       int(shown), int(fired), double(q.rate), int(rated), q.shake ? "yes" : "none", double(q.shakeMagnitude), double(q.shakeTime));
             return;
         }
         }

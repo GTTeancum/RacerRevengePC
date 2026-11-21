@@ -976,9 +976,13 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         }
         if(fromTournament)backend.tournamentPredecessor=cold.predecessorTournament;
         // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step A): add-on pod models for the
-        // free-play carousel, loaded while this session is still private. The layout
+        // add-on carousel (free play, VS and the P1 Tournament page: the same carousel
+        // condition as below), loaded while this session is still private. The layout
         // source is the authored pod widget of the default entry rider 19 (PORT STAND-IN).
-        if((cold.prospectiveMode==0||cold.prospectiveMode==1)&&game::dlc50DL::addonRiderCount()){
+        // Without them an add-on Tournament Confirm had no character _sel preflight and
+        // was refused at 1EA694 (cr-30 eye check).
+        if((cold.prospectiveMode==0||cold.prospectiveMode==1||(cold.prospectiveMode==2&&s->addonPlayer==0))&&
+           game::dlc50DL::addonRiderCount()){
             std::uint16_t layout=0,characterLayout=0;
             game::OriginalUiRiderAddonModels50DL::Input addon;
             for(const auto control:page->groups[1].controls){

@@ -451,9 +451,10 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    for(std::size_t k=0;k<hit.count&&k<hit.mask.size();++k)ok=rr::game::applyImpactDamage50NH(in,st,hit.mask[k],hit.amount[k])&&ok;
    if(ok){s.fields.damage7D0=st.damage7D0[0];s.fields.damage7D4=st.damage7D0[1];
     z.cooldown7E0=st.cooldown7E0;z.environmentalD38=st.environmentalD38;z.environmentalD3C=st.environmentalD3C;}
-   std::cerr<<"n64_break_damage slot="<<actualRacerSlot<<" trigger="<<rr::game::n64HazardRuntime50NH.triggerOf(hit.row)
-       <<" hits="<<hit.count<<" d7D0="<<before0<<"->"<<s.fields.damage7D0<<" d7D4="<<before1<<"->"<<s.fields.damage7D4
-       <<" rule=221754 applied="<<ok<<'\n';
+   // Racer frame: stack-formatted (no allocation inside the player physics frame).
+   rr::game::n64Log50NH("n64_break_damage slot=%u trigger=%u hits=%u d7D0=%g->%g d7D4=%g->%g rule=221754 applied=%d\n",
+       unsigned(actualRacerSlot),rr::game::n64HazardRuntime50NH.triggerOf(hit.row),unsigned(hit.count),
+       double(before0),double(s.fields.damage7D0),double(before1),double(s.fields.damage7D4),int(ok));
   }}
  bool consumersCompleted=consumeVehicleImpacts49Z(s,x.bindings,consumer,consumerEvents,x.workspace,x.diagnostic);
  if(dynamicContactEnabled&&(consumersCompleted||
@@ -634,16 +635,16 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   if(rr::game::n64HazardRuntime50NH.takeExplode(actualRacerSlot,q)){
    const auto trigger=rr::game::n64HazardRuntime50NH.triggerOf(q.row);
    if(!originalAiEnabled||s.bodies.main.vehicleState40){
-    std::cerr<<"n64_explode refused slot="<<actualRacerSlot<<" trigger="<<trigger<<" reason="
-        <<(originalAiEnabled?"state":"no_destroy_owner")<<" state40="<<s.bodies.main.vehicleState40<<'\n';
+    rr::game::n64Log50NH("n64_explode refused slot=%u trigger=%u reason=%s state40=%u\n",unsigned(actualRacerSlot),trigger,
+        originalAiEnabled?"state":"no_destroy_owner",unsigned(s.bodies.main.vehicleState40));
    }else{
     const ImpactTransitionResult50C forced=q.left?
         ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225e7cu,0x90u,0x227370u}:
         ImpactTransitionResult50C{ImpactTransitionStatus50C::unsupportedTransition,0x225ec0u,0x94u,0x227a40u};
     const bool limp=isLimpEntry(forced);
-    std::cerr<<"n64_explode slot="<<actualRacerSlot<<" trigger="<<trigger<<" side="<<(q.left?"left":"right")
-        <<" gate="<<q.gate<<" dist="<<q.dist<<" handler="<<(q.left?"227370":"227A40")<<" path="<<(limp?"limp":"wreck")
-        <<" after="<<(q.after==rr::game::N64AfterDestroy50NH::respawn?"respawn":"retire")<<" frame="<<completedFrames<<'\n';
+    rr::game::n64Log50NH("n64_explode slot=%u trigger=%u side=%s gate=%s dist=%g handler=%s path=%s after=%s frame=%llu\n",
+        unsigned(actualRacerSlot),trigger,q.left?"left":"right",q.gate,double(q.dist),q.left?"227370":"227A40",limp?"limp":"wreck",
+        q.after==rr::game::N64AfterDestroy50NH::respawn?"respawn":"retire",static_cast<unsigned long long>(completedFrames));
     rr::game::n64HazardRuntime50NH.explodeDispatched(actualRacerSlot,q);
     if(!limp)return commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor);
     require50DU(commitOriginalDestroyed(actualRacerSlot,forced,preparedOuterFactor),"N64 explode limp entry rejected");
