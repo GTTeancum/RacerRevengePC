@@ -103,9 +103,16 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     ::source_announcer50IE::Owner& announcer,::live_audio50HF::Owner& gameplay,
     ::native_original_ai_audio::Owner& engines,::race_audio50HQ::Owner* countdown,
     std::uint64_t session,Diagnostic& d)noexcept {
-    d={};if(thread_!=std::this_thread::get_id())return fail(d,Status::affinity,0x26d070);
+    // Every refusal below keeps its original Status and pc 26D070; the step number names
+    // which preflight gate refused, in source order (cr15: Results input stopped after the
+    // Results replay with no way to tell which owner refused). Log only, no store.
+    const auto refuse26D070=[](Diagnostic& out,Status status,unsigned step)noexcept {
+        std::fprintf(stderr,"aural_stop26D070_refused step=%u status=%u\n",step,static_cast<unsigned>(status));
+        return fail(out,status,0x26d070);
+    };
+    d={};if(thread_!=std::this_thread::get_id())return refuse26D070(d,Status::affinity,1);
     if(issuer_!=&root||root.sourceAural00Owner_.get()!=this||!current()||
-       !backendCurrent()||!nativeStreamSlotsCurrent())return fail(d,Status::owner,0x26d070);
+       !backendCurrent()||!nativeStreamSlotsCurrent())return refuse26D070(d,Status::owner,2);
     auto& i=**interfaceA0_;auto& main=*i.main;auto* intro=i.raceIntroLease;
     // Real race Music118, Announcer120, engines and UI124 are native
     // representations of ORIGINAL audio even where their logical voices do
@@ -118,22 +125,22 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     if(!groups.current()||groups.coldApplication_!=entities_||!groups.coldStarted_||
        groups.taIntroTransport_.get()!=intro||!groups.mixer_||
        (intro&&(intro->mixer_!=groups.mixer_||!intro->current())))
-        return fail(d,Status::owner,0x26d070);
+        return refuse26D070(d,Status::owner,3);
     const bool all8=engines.firstAiSlot_==0u; //Actual prepared owner, never a caller policy flag.
     if(groups.mixer_==i.mixer||!music.canStopResultsNative26D070(*groups.mixer_,groups)||
        !feedback.canStopResultsNative26D070(*groups.mixer_,groups)||
        !announcer.canStopResultsNative26D070(*groups.mixer_,groups))
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,4);
     if(all8){
         if(groups.coldSession_!=session||
            !engines.canStopAll8Engines26D070(*groups.mixer_,groups,session)||
            !gameplay.all8NonHumanMixerOwner26D070(*groups.mixer_,groups,
                engines.racers_[0].engine.identity.pod60))
-            return fail(d,Status::backend,0x26d070);
+            return refuse26D070(d,Status::backend,5);
     }else if(!gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session)||
        !engines.canStopResultsEngines26D070(*groups.mixer_,groups,session)||
        engines.humanResetOwner_!=&gameplay.humanController_)
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,6);
     // These SAME actual registered owners carry separate native transports.
     // A failed optional typed admission grants no slots: the unchanged final
     // residual-active fence then requires every such voice to be inactive.
@@ -157,11 +164,11 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     if(auxiliaryCount>audioMaximumVoices50HD||lapCount>audioMaximumVoices50HD||worldCount>audioMaximumVoices50HD||
        !groups.mixer_->canRecordControlChanges(3u+(intro?intro->count_:0u)+
            (all8?0u: ::gameplay_audio50HE::cueCount)+engines.resultsEngineStopCount26D070()+auxiliaryCount+lapCount+countdownCount+worldCount))
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,7);
     const auto announcerSlot=announcer.resultsStopVoice26D070();
     if(announcerSlot>=groups.count_||announcerSlot==::race_music50IE::voice||
        announcerSlot==::original_camera_cycle_audio50KX::Owner::voice)
-        return fail(d,Status::owner,0x26d070);
+        return refuse26D070(d,Status::owner,8);
     std::array<bool,audioMaximumVoices50HD> typed{};
     const auto claim=[&](std::size_t slot)noexcept {
         if(slot>=groups.count_||typed[slot]||
@@ -169,42 +176,44 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
         typed[slot]=true;return true;
     };
     if(!claim(::race_music50IE::voice)||!claim(::original_camera_cycle_audio50KX::Owner::voice)||
-       !claim(announcerSlot))return fail(d,Status::owner,0x26d070);
+       !claim(announcerSlot))return refuse26D070(d,Status::owner,9);
     if(!all8)for(std::size_t n=0;n<::gameplay_audio50HE::cueCount;++n){std::size_t slot;
         if(gameplay.resultsGameplayStopVoice26D070(n,slot)&&!claim(slot))
-            return fail(d,Status::owner,0x26d070);
+            return refuse26D070(d,Status::owner,10);
     }
     for(std::size_t n=0;n<engines.resultsEngineStopCount26D070();++n)
-        if(!claim(engines.resultsEngineStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+        if(!claim(engines.resultsEngineStopVoice26D070(n)))return refuse26D070(d,Status::owner,11);
     for(std::size_t n=0;n<auxiliaryCount;++n)
-        if(!claim(engines.resultsAuxiliaryStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+        if(!claim(engines.resultsAuxiliaryStopVoice26D070(n)))return refuse26D070(d,Status::owner,12);
     for(std::size_t n=0;n<lapCount;++n)
-        if(!claim(gameplay.resultsLapStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+        if(!claim(gameplay.resultsLapStopVoice26D070(n)))return refuse26D070(d,Status::owner,13);
     for(std::size_t n=0;n<countdownCount;++n)
-        if(!claim(countdown->resultsCountdownStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+        if(!claim(countdown->resultsCountdownStopVoice26D070(n)))return refuse26D070(d,Status::owner,14);
     for(std::size_t n=0;n<worldCount;++n)
-        if(!claim(engines.resultsWorldStopVoice26D070(n)))return fail(d,Status::owner,0x26d070);
+        if(!claim(engines.resultsWorldStopVoice26D070(n)))return refuse26D070(d,Status::owner,15);
     for(std::size_t slot=0;slot<groups.count_;++slot){
         const bool typedIntro=intro&&slot>=intro->first_&&slot-intro->first_<intro->count_;
         const bool typedProvider=typed[slot];
-        if(typedIntro&&typedProvider)return fail(d,Status::owner,0x26d070);
-        if(!typedIntro&&!typedProvider&&groups.mixer_->active(slot))return fail(d,Status::backend,0x26d070);
+        if(typedIntro&&typedProvider)return refuse26D070(d,Status::owner,16);
+        if(!typedIntro&&!typedProvider&&groups.mixer_->active(slot)){
+            std::fprintf(stderr,"aural_stop26D070_unclaimed_active_voice slot=%zu\n",slot);
+            return refuse26D070(d,Status::backend,17);}
     }
     const bool closed=main.ordinaryOutputRetired_;
     if(!main.canRecordControlChange(1)||main.pendingNativeGroupControls()||
        !main.precedingGroupControlsCurrent()||
        (closed?!root.frontendAudioClosedReceiptCurrent():!main.current()))
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,18);
     if(i.streamRetirementAuthorized||!i.mixer->canStopNativeSource26D070(*this,intro!=nullptr)||
        (intro&&(!intro->current()||intro->aural_.get()!=this||
                 !intro->mixer_->canRecordControlChanges(intro->count_))))
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,19);
     std::array<std::uint64_t,8> refs{};
     if(!i.mixer->nativeSourceStreamReferences267CB0(*this,0.f,false,refs))
-        return fail(d,Status::backend,0x26d070);
+        return refuse26D070(d,Status::backend,20);
     for(std::size_t n=0;n<refs.size();++n)
         if(refs[n]&&(!i.streamSlots[n].occupied||refs[n]!=i.streamSlots[n].generation))
-            return fail(d,Status::owner,0x26d070);
+            return refuse26D070(d,Status::owner,21);
     // All potentially failing observations precede mutation. Existing drain
     // uses exact Playback revisions, includes older overlaps, stops PCM and
     // retires source routes. Retain the lease, assets and stream grace slots.

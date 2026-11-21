@@ -9,6 +9,7 @@
 #include "../assets/original_application_localization50kg.h"
 #include <bit>
 #include <cmath>
+#include <cstdio>
 #include <thread>
 
 namespace rr::game {
@@ -115,6 +116,28 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
         out.nextSourcePC=pc;out.blocked=out.sourceEffectsCommitted;return p.stop(d,status,pc,why);
     };
     const auto changed=[&](){p.displayCpu.reset();p.nativeDisplay.reset();out.sourceEffectsCommitted=true;};
+    // Read-only diagnostic of a refused Results 26D070 stop (cr15 MA 1CA708 / MC 1C8EF0 after
+    // the Results replay): names the FIRST owner gate of the stop condition that failed, then
+    // the Aural stop's own status/pc when the stop itself ran. No store, no retry.
+    const auto logStopRefused26D070=[&](std::uint32_t pc,const platform::OriginalApplicationAural50KG::Diagnostic& ad){
+        const auto aural=application.sourceAural00Owner_;const auto scope=race.endHud_.lock();
+        const char* gate="stop26D070";
+        if(!aural)gate="aural00_absent";
+        else if(!race.raceAudio_)gate="race_audio_absent";
+        else if(!scope)gate="end_hud_scope_absent";
+        else if(!scope->music_)gate="music_absent";
+        else if(!scope->announcer_)gate="announcer_absent";
+        else if(!scope->gameplay_)gate="gameplay_absent";
+        else if(!scope->engines_)gate="engines_absent";
+        else if(!observer.camera_||!scope->endStateCurrent(race,*observer.camera_))gate="end_state_not_current";
+        else if(race.music10C_&&!race.music10C_->nativeBackendCurrent(*scope))gate="music10C_backend_not_current";
+        const bool musicFadePending=scope&&scope->music_&&scope->music_->fadePending();
+        const auto musicPhase=scope&&scope->music_?static_cast<unsigned>(scope->music_->nativeFade().phase):0xffu;
+        std::fprintf(stderr,"results_stop26D070_refused pc=%x gate=%s aural_status=%u aural_pc=%x music10C=%d"
+            " music_fade_pending=%d music_fade_phase=%u replay=%d\n",pc,gate,static_cast<unsigned>(ad.status),
+            static_cast<unsigned>(ad.sourcePC),int(bool(race.music10C_)),int(musicFadePending),musicPhase,
+            int((race.flags1B0KnownMask_&0x10u)&&(race.flags1B0KnownValue_&0x10u)));
+    };
     const auto feedback=[&](std::uint32_t key,std::uint32_t pc){
         // Actual SAME Camera's race10C+160 emitter. Its explicit Results
         // preparation owns authored keys1..6; other preparation policies
@@ -307,8 +330,9 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                                    (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                    !aural->stopResultsNative26D070(application,*race.raceAudio_,*scope->music_,audio,
                                        *scope->announcer_,*scope->gameplay_,*scope->engines_,scope->countdown_,
-                                       race.entity_.sessionGeneration,ad))
-                                    return stop(Impl::S::owner,0x1c8ef0,"Results summary actual native stop unavailable");
+                                       race.entity_.sessionGeneration,ad)){
+                                    logStopRefused26D070(0x1c8ef0,ad);
+                                    return stop(Impl::S::owner,0x1c8ef0,"Results summary actual native stop unavailable");}
                                 changed();
                                 // Summary differs from name DONE: fade0 FIRST,
                                 // then feedback2. Do not borrow .5/order/AD8.
@@ -474,9 +498,10 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                                (race.music10C_?!race.music10C_->nativeBackendCurrent(*musicScope):!musicScope->music_)||
                                !aural->stopResultsNative26D070(application,*race.raceAudio_,*musicScope->music_,audio,
                                    *musicScope->announcer_,*musicScope->gameplay_,*musicScope->engines_,
-                                   musicScope->countdown_,race.entity_.sessionGeneration,ad))
+                                   musicScope->countdown_,race.entity_.sessionGeneration,ad)){
+                                logStopRefused26D070(special?0x1ca608u:0x1ca708u,ad);
                                 return stop(Impl::S::owner,special?0x1ca608u:0x1ca708u,
-                                    "Results actual same-Application native Aural command0B stop unavailable; name retained");
+                                    "Results actual same-Application native Aural command0B stop unavailable; name retained");}
                             changed(); // Native transport effects are consumed, never replayable.
                             if(!feedback(2,special?0x1ca620u:0x1ca720u))return false;
                             if(!musicScope->endStateCurrent(race,*observer.camera_)||
@@ -602,8 +627,9 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                                (race.music10C_?!race.music10C_->nativeBackendCurrent(*scope):!scope->music_)||
                                !aural->stopResultsNative26D070(application,*race.raceAudio_,*scope->music_,audio,
                                    *scope->announcer_,*scope->gameplay_,*scope->engines_,scope->countdown_,
-                                   race.entity_.sessionGeneration,ad))
-                                return stop(Impl::S::owner,0x1c984c,"Results tournament actual native stop unavailable");
+                                   race.entity_.sessionGeneration,ad)){
+                                logStopRefused26D070(0x1c984c,ad);
+                                return stop(Impl::S::owner,0x1c984c,"Results tournament actual native stop unavailable");}
                             changed();
                             // Unlike summary: .5; unlike name DONE: Music BEFORE feedback.
                             if(!scope->endStateCurrent(race,*observer.camera_)||

@@ -146,7 +146,7 @@ RaceFrameRecorder50AU raceFrames50AU;
 struct StepSplit50GG {
     static constexpr std::size_t parts=14,totalIndex=13,none=parts;
     const phase_timing50GK::Totals* base=nullptr; // run()'s simulationTotals[parts]
-    std::array<double,parts> current{},worst{};
+    std::array<double,parts> current{},worst{},sum{}; // sum: every step of the window (avg split)
     double worstTotal=0.0,sumTotal=0.0;
     std::uint64_t steps=0;bool open=false;
     std::size_t indexOf(const phase_timing50GK::Totals* p) const noexcept {
@@ -161,13 +161,29 @@ struct StepSplit50GG {
         if(open){
             const double total=current[13]+current[10]+current[11]+current[12];
             ++steps;sumTotal+=total;
+            for(std::size_t i=0;i<parts;++i)sum[i]+=current[i];
             if(total>worstTotal){worstTotal=total;worst=current;}
         }
         current={};open=true;
     }
-    void resetWindow() noexcept {worst={};worstTotal=0.0;sumTotal=0.0;steps=0;}
+    void resetWindow() noexcept {worst={};sum={};worstTotal=0.0;sumTotal=0.0;steps=0;}
 };
 StepSplit50GG stepSplit50GG;
+// cr-16 render cost split (measurement only; host memory, no game state).
+// Always on: two steady_clock reads around each timed call, printed once per
+// window_submit_fps line (about every 5 s) and reset there, for every course.
+// water_build = the CPU water surface build (native_water_surface50WS::buildFrame),
+// particle_build = the one particle render build, submit = renderer.submit (CPU
+// side of every GL pass, water/particle/flare draws included).
+struct RenderCost50CR {
+    double waterBuildMs=0.0,particleBuildMs=0.0,submitMs=0.0,submitWorstMs=0.0;
+    std::uint64_t frames=0,waterFrames=0,particleFrames=0;
+    static double ms(FrameHitch50DU::Clock::time_point a,FrameHitch50DU::Clock::time_point b) noexcept {
+        return b<a?0.0:std::chrono::duration<double,std::milli>(b-a).count();
+    }
+    void reset() noexcept {*this=RenderCost50CR{};}
+};
+RenderCost50CR renderCost50CR;
 void resetRaceFrameSession50AU() noexcept {
     auto& r=raceFrames50AU;
     r.count=0;r.full=false;r.active=false;r.totalMs=0.0;r.worstMs=0.0;r.catchupSteps=0;r.discardedAtStartNs=0;
@@ -3162,8 +3178,12 @@ void Context::run() {
      // A9: the one water runtime exists only when the track's SCB names water.
      const native_water_runtime50JC::Owner* waterRuntime=track.roles.water.get();
      std::uint32_t waterZone48=0;
-     if(waterRuntime&&sourceCameraSession->readCameraPrimaryZone48(waterZone48))
+     if(waterRuntime&&sourceCameraSession->readCameraPrimaryZone48(waterZone48)){
+      const auto waterBuildStart=FrameHitch50DU::Clock::now();
       native_water_surface50WS::buildFrame(*waterRuntime,sourceCameraSession->view(),waterZone48,renderFrame);
+      renderCost50CR.waterBuildMs+=RenderCost50CR::ms(waterBuildStart,FrameHitch50DU::Clock::now());
+      if(renderFrame.waterStrips)++renderCost50CR.waterFrames;
+     }
     }
     if(playerDestroyed&&native_wreck_debris50PD::cameraViewBound(0)){
      // How squarely the presented camera looks at the player's debris.
@@ -3279,7 +3299,11 @@ void Context::run() {
          *sourceCameraSession,originalAiSession,sourcePositionStatsResources.diagnostic);
      if(!prepared)std::cerr<<"original_position_stats_display_rejected source_pc="
          <<sourcePositionStatsResources.diagnostic.sourcePC<<" material_pc="
-         <<sourcePositionStatsResources.diagnostic.material.sourcePC<<'\n';
+         <<sourcePositionStatsResources.diagnostic.material.sourcePC
+         // view0 place mirrors (the 191DB0 capture requires fields == rank and observed bound)
+         <<" rank0_ccc="<<originalAiSession.rank[0].placeCCC<<" fields0_ccc="<<originalAiSession.fields[0].placeCCC
+         <<" observed0_ccc="<<originalAiSession.observed[0].placeCCC<<" observed0_bound="<<originalAiSession.observed[0].bound
+         <<" fields0_bound="<<originalAiSession.fields[0].bound<<'\n';
      require50DU(prepared,"original PositionStats display preparation rejected");
      renderFrame.originalPositionStats=sourcePositionStatsHud.get();
      // Original HUD owners provide this admitted race view; ALL8 RA also
@@ -3293,8 +3317,11 @@ void Context::run() {
     if(track.hasWater()){
      require50DU(track.roles.water&&sourceCameraSession,
          "water particle render requires the track's water runtime and the active gameplay camera");
+     const auto particleBuildStart=FrameHitch50DU::Clock::now();
      const auto result=particleRender.build(sourceCameraSession->view(),sourceCameraSession->viewport(),
          sourceTrackFog,lightOwner,drawLights[0]);
+     renderCost50CR.particleBuildMs+=RenderCost50CR::ms(particleBuildStart,FrameHitch50DU::Clock::now());
+     ++renderCost50CR.particleFrames;
      if(result!=OriginalGcParticleRenderStatus50KG::complete)
       std::cerr<<"particle render source boundary="<<static_cast<unsigned>(result)<<'\n';
      require50DU(result==OriginalGcParticleRenderStatus50KG::complete,
@@ -3680,7 +3707,11 @@ void Context::run() {
     bool submitted=false;
     // Common rewrite (I4): one submit for every course; the renderer draws the
     // track's one particle window from its request (track.roles.particles, R8).
-    submitted=renderer.submit(next,renderFrame,rendererDiagnostic);
+    {const auto submitStart=FrameHitch50DU::Clock::now();
+     submitted=renderer.submit(next,renderFrame,rendererDiagnostic);
+     const double submitMs=RenderCost50CR::ms(submitStart,FrameHitch50DU::Clock::now());
+     renderCost50CR.submitMs+=submitMs;++renderCost50CR.frames;
+     if(submitMs>renderCost50CR.submitWorstMs)renderCost50CR.submitWorstMs=submitMs;}
 
     // Release on BOTH boolean outcomes before publication/fade/input work.
     // Exceptions unwind this local before the earlier Frame; no source state
@@ -4136,7 +4167,19 @@ void Context::run() {
          <<'/'<<split.worstTotal
          <<" worst_step children/racer_physics/world_service/ai_manager/camera/contacts/field/presentation/fleet_other "
          <<w[2]<<'/'<<w[5]<<'/'<<w[7]<<'/'<<w[8]<<'/'<<w[9]<<'/'<<w[10]<<'/'<<w[11]<<'/'<<w[12]
-         <<'/'<<(w[0]+w[1]+w[4]+w[6])<<'\n';}
+         <<'/'<<(w[0]+w[1]+w[4]+w[6])<<'\n';
+     // cr-16: the average split of every step of the window (same parts as worst_step).
+     const auto& a=split.sum;const double n=split.steps?double(split.steps):1.0;
+     std::cerr<<"step_avg_ms steps="<<split.steps
+         <<" children/racer_physics/world_service/ai_manager/camera/contacts/field/presentation/fleet_other "
+         <<a[2]/n<<'/'<<a[5]/n<<'/'<<a[7]/n<<'/'<<a[8]/n<<'/'<<a[9]/n<<'/'<<a[10]/n<<'/'<<a[11]/n<<'/'<<a[12]/n
+         <<'/'<<(a[0]+a[1]+a[4]+a[6])/n<<'\n';}
+    {const auto& c=renderCost50CR;const double f=c.frames?double(c.frames):1.0;
+     std::cerr<<"render_cost_ms frames="<<c.frames<<" submit_avg/worst="<<c.submitMs/f<<'/'<<c.submitWorstMs
+         <<" water_build_avg="<<c.waterBuildMs/f<<" water_frames="<<c.waterFrames
+         <<" particle_build_avg="<<c.particleBuildMs/f<<" particle_frames="<<c.particleFrames
+         <<" last_particle_draws/quads="<<rendererDiagnostic.particleDraws<<'/'<<rendererDiagnostic.particleQuads<<'\n';}
+    renderCost50CR.reset();
     stepSplit50GG.resetWindow();
     raceFrames50AU.buckets={};raceFrames50AU.intervalWorstMs=0.0;
     if(audioEnabled){

@@ -16,6 +16,7 @@
 #include "original_race_native_retirement50la.h"
 #include "original_course_race_targets50kx.h"
 #include "live_audio50hf_fixture.h"
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <limits>
@@ -87,7 +88,33 @@ namespace original_consumed_stage50DU {
 Owner::Owner(const original_main_entry50KG::Application& app,live_audio50HF::Owner& audio)noexcept
     :application_(app),audio_(audio){}
 
-Owner::~Owner()noexcept {if(!close())std::terminate();}
+Owner::~Owner()noexcept {
+    if(close())return;
+    // A refused close at destruction (normally during unwinding of an earlier failure, cr15:
+    // "native_terminate" from this destructor) must end as a logged failure, not
+    // std::terminate. The still-counted race (World::~World terminates while counted) and
+    // the unreleased Track are deliberately retained, never destroyed: each is moved into a
+    // never-freed host holder, so no destructor runs on a half-retired owner and no memory
+    // is written or freed behind a refused retirement. Host memory only.
+    // PORT STAND-IN (flagged): failure-path custody; the original has no refusable close.
+    const bool race=bool(race_),track=bool(track_);
+    bool retained=true;
+    if(race_){
+        auto* hold=new(std::nothrow) std::shared_ptr<rr::game::OriginalRaceConstructor50LA>(std::move(race_));
+        if(!hold)retained=false; // allocation failed: race_ is unchanged and still owned below
+    }
+    if(track_){
+        auto* hold=new(std::nothrow) std::shared_ptr<common_track50CR::Track>(std::move(track_));
+        if(!hold)retained=false;
+    }
+    std::fprintf(stderr,"consumed_stage_close_refused at=destructor race=%d track=%d retained=%d"
+        " audio_error=%u material_pc=%x uncaught=%d\n",int(race),int(track),int(retained),
+        static_cast<unsigned>(closeAudioDiagnostic.error),static_cast<unsigned>(closeMaterialDiagnostic.sourcePC),
+        std::uncaught_exceptions());
+    std::fflush(stderr);
+    // Only an out-of-memory holder leaves an owner whose destructor could terminate.
+    if(!retained)std::terminate();
+}
 
 bool Owner::begin(original_course_targets50KX::ConsumedLaunch& launch,std::uint64_t session,
     std::uint32_t racer,rr::game::OriginalRacerModelRenderGlobals50LA& modelGlobals,

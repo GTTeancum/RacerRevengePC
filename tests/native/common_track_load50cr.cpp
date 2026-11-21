@@ -26,6 +26,7 @@
 // documents.tob, applied to the standard models by the static world (continuation).
 #include "track_atm50cr.h"
 #include "track_particle_emitters50cr.h"  // Roles::emitters teardown (quiesce, closeAfterPool)
+#include "native_water_runtime50jc_fixture.h" // Roles::water teardown preflight (its resources() reference)
 #include "../../src/game/original_track_particle_cold50la.h" // Roles::particles teardown (pool close)
 #include "mc_world_semantics50mc.h"
 #include "course_archive_receipt50ci.h"
@@ -49,6 +50,7 @@
 #include "../../src/game/vehicle_animation49t.h"
 #include <charconv>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <memory>
@@ -257,8 +259,55 @@ bool Archive::open(const Identity& identity,const std::shared_ptr<Provider>& pro
         // actual SHA-256/size (PORT STAND-IN: the provider's authentication label; the original
         // mounts by name only).
         Provider::Diagnostic pd;
-        if(!provider->mountAuthenticatedRes(next->container,next->sha256,static_cast<std::size_t>(next->bytes),next->decoded,pd,lease))
-            return refuse(d,step,0x132E40u,"course archive mount rejected (status "+std::to_string(unsigned(pd.status))+")");
+        // 12E2B0 registration rule, every course and every member name: the source registry
+        // ignores a later equal-name registration, so the first registered member keeps the
+        // name (rc_cold_sources50la.h before 08f1ee6 recorded this for POD17 vs RC
+        // textures\specmap5.tga; the pods are registered by 2129C0 before this 12CEA0 mount).
+        // A course member whose name an earlier ACTIVE mount already serves with different
+        // bytes is therefore not registered by this mount; equal-byte names coalesce anyway
+        // and stay. The course's own static world keeps reading its retained decoded archive.
+        // PORT STAND-IN: applied here at the registration site because the provider's
+        // lookup132820 (original_standard_archive_provider50la.h) still answers "unknown" for
+        // unequal duplicates instead of returning the first registration; retire this into
+        // that lookup on the next header round.
+        {
+            if(!provider->sealed()){Provider::Diagnostic sd;(void)provider->sealNativeMounts(sd);}
+            std::vector<a::ResourceEntry48C> registered;registered.reserve(next->decoded.entries.size());
+            std::size_t ignored=0,undecided=0;const auto& bytes=next->decoded.decoded;
+            for(const auto& e:next->decoded.entries){
+                if(e.logical_offset>bytes.size()||e.bytes>bytes.size()-e.logical_offset)
+                    return refuse(d,step,0x132E40u,"course archive member outside its decoded bytes: "+e.name);
+                Provider::MemberView earlier;const auto found=provider->lookup132820(e.name,earlier);
+                if(found==Provider::Lookup::present&&earlier.data&&
+                   (earlier.size!=e.bytes||(e.bytes&&std::memcmp(earlier.data,bytes.data()+e.logical_offset,e.bytes)!=0))){
+                    // An earlier race's course archive still mounted (a teardown that did not
+                    // release it) is not a registration this race made: keep the member, so the
+                    // lookup stays ambiguous and refuses loudly instead of serving that
+                    // course's bytes. Only pod/UI/application registrations take the name.
+                    Provider::MountView owner;
+                    if(provider->mount(earlier.mount,owner)&&owner.archiveName&&owner.archiveName->size()>7&&
+                       sameName(std::string_view(*owner.archiveName).substr(0,7),"TRACKS/")&&
+                       !sameName(*owner.archiveName,next->container)){
+                        std::fprintf(stderr,"common_track_registration course=%s member=%s earlier_course_mount=%s kept=1 reason=stale_course_mount\n",
+                            std::string(identity.code.view()).c_str(),e.name.c_str(),owner.archiveName->c_str());
+                        registered.push_back(e);continue;
+                    }
+                    ++ignored;
+                    std::fprintf(stderr,"common_track_registration course=%s member=%s bytes=%u earlier_mount=%zu earlier_bytes=%zu rule=12E2B0_first_registration_kept\n",
+                        std::string(identity.code.view()).c_str(),e.name.c_str(),static_cast<unsigned>(e.bytes),earlier.mount,earlier.size);
+                    continue;
+                }
+                if(found==Provider::Lookup::unknown)++undecided;
+                registered.push_back(e);
+            }
+            std::fprintf(stderr,"common_track_registration course=%s members=%zu registered=%zu ignored=%zu undecided=%zu\n",
+                std::string(identity.code.view()).c_str(),next->decoded.entries.size(),registered.size(),ignored,undecided);
+            next->decoded.entries.swap(registered);
+            const bool mountedOk=provider->mountAuthenticatedRes(next->container,next->sha256,static_cast<std::size_t>(next->bytes),next->decoded,pd,lease);
+            next->decoded.entries.swap(registered);   // the Track keeps every decoded member
+            if(!mountedOk)
+                return refuse(d,step,0x132E40u,"course archive mount rejected (status "+std::to_string(unsigned(pd.status))+")");
+        }
         next->mounted=true;
         a::OriginalStandardTextureDiagnostic50LA td;
         if(!provider->sealNativeMounts(pd)||!resolver->bindProvider3E1A70(provider,td))
@@ -584,14 +633,49 @@ bool Track::release()noexcept{
             std::fprintf(stderr,"common_teardown_holders role=%s holders=%ld preflight=1\n",name,count-allowed);
         };
         const auto check=[&](const auto& role,const char* name,long allowed=1)noexcept{if(role)held(role.use_count(),allowed,name);};
+        // Holders that live INSIDE this Track and that the in-order release below drops
+        // itself, each proven by pointer / control-block identity (never a guessed count):
+        //  - the water runtime's resources reference (water is released before its resources);
+        //  - the navigation store's 1ACF70 world lease (an alias of the collision world's
+        //    control block; navigation is undone first, below);
+        //  - the trigger action owner (roles.triggerActions, the same object the collision
+        //    world holds as StorageRequest.actions): its trigger rows, its group and its
+        //    Animation-action destination, all dropped by its close() at the collision
+        //    world's retirement;
+        //  - the collision world's own animation runtime reference and its animation
+        //    lane's runtime, both dropped by that same retirement.
+        // cr15: these internal references made the preflight refuse EVERY teardown
+        // (collisions/triggers/trigger_source +1, animation +3, MC water_resources +1).
+        const auto sameOwner=[](const auto& a,const auto& b)noexcept{
+            return a&&b&&!a.owner_before(b)&&!b.owner_before(a);};
+        long waterInternal=0,collisionInternal=0,triggersInternal=0,sourceInternal=0,animationInternal=0;
+        if(roles.water&&roles.waterResources&&roles.water->resources().get()==roles.waterResources.get())waterInternal=1;
+        if(roles.navigation&&sameOwner(roles.navigation->worldLease,roles.collision))collisionInternal=1;
+        // Credited only while the action owner itself is held by this Track and (at most) the
+        // collision world; any further holder keeps its references alive past the release.
+        if(roles.triggerActions&&!roles.triggerActions->closed()&&roles.triggerActions.use_count()<=2){
+            const auto& actions=*roles.triggerActions;
+            if(roles.triggers&&actions.nativeGroup()==roles.triggers.get())triggersInternal=1;
+            if(roles.triggerSource&&actions.sourceOwner()==roles.triggerSource.get())sourceInternal=1;
+            if(roles.animation&&actions.animationOwner()==roles.animation.get())++animationInternal;
+        }
+        if(roles.collision&&roles.animation){
+            if(auto* lane=roles.collision->animationLane()){
+                ++animationInternal; // the world's animations_ (animationLane() is non-null only while it holds one)
+                if(lane->runtime()==roles.animation.get())++animationInternal; // the lane's runtime_
+            }
+        }
+        std::fprintf(stderr,"common_teardown_internal water_resources=%ld collisions=%ld triggers=%ld trigger_source=%ld animation=%ld\n",
+            waterInternal,collisionInternal,triggersInternal,sourceInternal,animationInternal);
         check(roles.sounds,"sounds");check(roles.audio,"aub");check(roles.water,"water");
-        check(roles.waterResources,"water_resources");check(roles.emitters,"particles.emitters");
+        check(roles.waterResources,"water_resources",1+waterInternal);check(roles.emitters,"particles.emitters");
         check(roles.particles,"particles",roles.emitters?2:1);
         check(roles.sky,"sky");check(roles.lights,"lights");check(roles.fog,"fog");
         check(roles.staticWorld,"static_world");
-        check(roles.collision,"collisions",roles.storage?2:1);
-        check(roles.triggers,"triggers");check(roles.triggerSource,"trigger_source");check(roles.atm,"atm");
-        check(roles.uvAnimation,"uv_animation");check(roles.animation,"animation");
+        check(roles.collision,"collisions",(roles.storage?2:1)+collisionInternal);
+        check(roles.triggers,"triggers",1+triggersInternal);check(roles.triggerSource,"trigger_source",1+sourceInternal);
+        check(roles.atm,"atm");
+        check(roles.uvAnimation,"uv_animation");check(roles.animation,"animation",1+animationInternal);
         if(blocked){log::teardownRole("archive",false);return false;}
     }
     // Reverse role order, teardown step 18. The original retires the race (racers, AI, lap

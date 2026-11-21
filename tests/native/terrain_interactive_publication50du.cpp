@@ -2087,6 +2087,15 @@ void Context::run() {
     });
     // CCC (place) and CD4 (retirement) as the AI manager's rank rows mirror them.
     originalAiSession.rank[slot].placeCCC=0;originalAiSession.rank[slot].retirementCD4=0;
+    // The original racer has ONE CCC word; the port keeps three host mirrors of it (rank,
+    // fields, observed: native_ai_session50iv_fixture.h rank() writes all three together).
+    // 216690 stores CCC = 0 once, so all three mirrors take that one store; leaving
+    // fields/observed at the previous race's place made every view0 reader that checks
+    // fields == rank (PositionStats 191DB0, the 1A7DD0 end dispatch) refuse until the next
+    // rank pass (cr15 TA: "original PositionStats display preparation rejected" right after
+    // the Pause RESTART). Host arrays, slot < rank capacity checked above.
+    if(slot<std::size(originalAiSession.fields))originalAiSession.fields[slot].placeCCC=0;
+    if(slot<std::size(originalAiSession.observed))originalAiSession.observed[slot].placeCCC=0;
     return true;
    }catch(...){return false;}
   };

@@ -191,7 +191,19 @@ bool readMaterials274160(Track& t,const LoadInputs& in,Diagnostic& d)noexcept{
         trackData(t,log::Role::materials,t.identity.scbMember,t.counts.materials);
         trackDataNamed(t,"materials.count",t.identity.scbMember,t.counts.materials);
         trackDataNamed(t,"materials.selections",t.identity.scbMember,selections->size());
-        trackDataNamed(t,"materials.second_passes",t.identity.scbMember,secondPasses);
+        // materials.second_passes is the number of second-pass DRAW SPANS (every placed surface
+        // whose selected material authors a pass 2 adds one span): the quantity the old world
+        // pins counted (expectedSecondPasses, ++ per span; surfaces + second-pass spans = spans,
+        // e.g. RC 1688+79=1767, TB 1069+307=1376, GB 1211+273=1484, SC 4091+4=4095). It is read
+        // from the static world's own spans, so the host data check prints it as well.
+        // materials.second_pass_selections is the per-material count (pass-2 selections; the
+        // value this line printed through cr-15: RC 1, SC 1, TB 256, GB 249); no receipt.
+        {
+            std::uint64_t secondPassSpans=0;
+            if(const auto* spans=world->spans())for(const auto& span:*spans)secondPassSpans+=span.sourcePass==2;
+            trackDataNamed(t,"materials.second_passes",t.identity.scbMember,secondPassSpans);
+        }
+        if(!hostOnly)trackDataNamed(t,"materials.second_pass_selections",t.identity.scbMember,secondPasses);
         trackDataNamed(t,"materials.textures",t.identity.scbMember,t.counts.textures);
         trackDataNamed(t,"storage.texture_rgba_bytes",t.identity.scbMember,bank->rgbaByteCount());
         // AA1 is authored data on each pass (PLAN B-C15): every course now

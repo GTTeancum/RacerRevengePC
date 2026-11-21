@@ -2,6 +2,7 @@
 #include "../../../src/game/track_zone_visibility50zv.h"
 #include "native_fxaa_pass.h"
 #include <memory>
+#include <chrono>
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -3043,6 +3044,10 @@ bool VehicleWindowGl50DS::Storage::drawWater() noexcept {
         gl.enable(0x0BE2); gl.blendEquation(0x8006); gl.blendFunc(0x0302, 0x0303); // SRC_ALPHA, ONE_MINUS_SRC_ALPHA
         gl.enable(0x0B71); gl.depthFunc(0x0203); gl.depthMask(frameWaterDepthWrite ? 1 : 0); gl.disable(0x0B44);
         gl.colorMask(1, 1, 1, 0);
+        // cr-16 measurement only (host CPU time of this pass's GL calls, logged
+        // with the native_water_draw line; no GL or game state).
+        static double waterGlMsSum = 0.0; static double waterGlMsWorst = 0.0;
+        const auto waterGlStart = std::chrono::steady_clock::now();
         bool accepted = check("bind water state and upload strips");
         std::uint64_t passes = 0;
         // Original order: strip k pass A, strip k pass B, strip k+1 pass A ...
@@ -3057,12 +3062,17 @@ bool VehicleWindowGl50DS::Storage::drawWater() noexcept {
                 ++passes;
             }
         accepted = accepted && check("draw water strips");
-        if (accepted && (++waterDraws == 1 || waterDraws % 625 == 0))
+        {   const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - waterGlStart).count();
+            waterGlMsSum += ms; if (ms > waterGlMsWorst) waterGlMsWorst = ms; }
+        if (accepted && (++waterDraws == 1 || waterDraws % 625 == 0)) {
+            const double draws = waterDraws == 1 ? 1.0 : 625.0;
             std::fprintf(stderr, "native_water_draw draws=%llu strips=%u passes=%llu alpha_ref=%u depth_write=%u "
-                "blend=src_alpha depth=lequal texture_function=modulate froth_texture=%u\n",
+                "blend=src_alpha depth=lequal texture_function=modulate froth_texture=%u gl_cpu_ms_avg/worst=%.3f/%.3f\n",
                 static_cast<unsigned long long>(waterDraws), static_cast<unsigned>(frameWaterStrips),
                 static_cast<unsigned long long>(passes), static_cast<unsigned>(frameWaterAlphaReference),
-                frameWaterDepthWrite ? 1u : 0u, waterFrothTexture ? 1u : 0u);
+                frameWaterDepthWrite ? 1u : 0u, waterFrothTexture ? 1u : 0u, waterGlMsSum / draws, waterGlMsWorst);
+            waterGlMsSum = 0.0; waterGlMsWorst = 0.0;
+        }
         gl.colorMask(1, 1, 1, 1); gl.depthMask(1); gl.blendFunc(0x0302, 0x0303); gl.disable(0x0BE2);
         drawGl.bindVertexArray(0); gl.bindTexture(texture2D, 0);
         resetPodState();

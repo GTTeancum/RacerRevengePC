@@ -96,8 +96,15 @@ class Owner final : public native_results_world_stop26D070::Owner {
  const TriggerClip* triggerClipFor(const course_trigger_actions50CT::ActionEvent& e)const noexcept {
   if(thread_!=std::this_thread::get_id()||!e.authored||e.authored->kind!=course_trigger_sources50CT::ActionKind::Sound||
      e.authored->positional)return nullptr;
-  try{const auto name=pcmName(e.authored->filename);
-   for(const auto& c:triggerClips_)if(c.name==name)return &c;}catch(...){}
+  // Compared in place against pcmName(filename) (filename with '/' separators
+  // plus ".vag"): no string is built in the race frame (no-allocation guard).
+  const auto& raw=e.authored->filename;
+  for(const auto& c:triggerClips_){
+   if(c.name.size()!=raw.size()+4||c.name.compare(raw.size(),4,".vag")!=0)continue;
+   bool same=true;
+   for(std::size_t i=0;i<raw.size()&&same;++i){char x=raw[i];if(x=='\\')x='/';same=x==c.name[i];}
+   if(same)return &c;
+  }
   return nullptr;
  }
  bool ownsActive26D070(std::size_t slot)const noexcept {

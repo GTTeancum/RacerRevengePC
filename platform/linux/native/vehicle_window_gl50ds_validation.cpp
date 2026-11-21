@@ -410,8 +410,14 @@ bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWin
     if (!request.trackAnimationCount)
         return (!request.trackAnimations && !request.trackAnimationTextures) ||
             fail(d, VehicleWindowError50DS::request, "animation bank/descriptors require a nonzero count");
-    if (request.trackAnimationCount > maxVehicleWindowTrackAnimations50DS ||
-        !request.trackAnimations || !request.trackAnimationTextures ||
+    // Bounded by the data, not a fixed row cap: one animation row per distinct placed
+    // span of the track table (duplicates are refused below), and the renderer's tables
+    // are heap-sized from this count (createTrackAnimations). The former 128-row guard
+    // (maxVehicleWindowTrackAnimations50DS, unchanged in the header and no longer read)
+    // refused RA's 346 crowd spans (every other stock course places 26..76).
+    if (request.trackAnimationCount > request.track.spanCount)
+        return fail(d, VehicleWindowError50DS::material, "track animation rows exceed the track's placed spans");
+    if (!request.trackAnimations || !request.trackAnimationTextures ||
         request.track.mode != VehicleWindowMode50DS::callerMaterialTextures ||
         !request.trackAnimationTextures->validBorrow(request.context, request.isCurrent,
             request.trackAnimationTextures->publicationToken()))

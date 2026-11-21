@@ -763,9 +763,16 @@ SessionExit50DU Context::run() {
   // The track's one positional-sound owner (track.roles.sounds): present
   // exactly when the AUB authors SoulTree/ambient rows or the triggers author
   // world sounds (common reader). Its transports join the Results 26D070 stop.
-  if(auto* sounds=track.roles.sounds.get();sounds&&originalAiAudioEnabled){
+  // An AUB whose [Sounds] lists author no SoulTree row, on a track whose triggers author no
+  // Sound action, builds nothing: the 279910/2787B0 row loop runs zero times and no
+  // transport exists (the owner's own contract: ready()==false, authored()==false). The
+  // ready() demand applies only when there is something to play; a zero-row track (the
+  // NV add-on: 0 SoulTree, 0 ambient, 0 trigger sounds) races without positional sound.
+  if(auto* sounds=track.roles.sounds.get();sounds&&originalAiAudioEnabled&&!sounds->authored()){
+   std::cerr<<"positional_sounds site=common course="<<track.code()<<" transport=none reason=no_authored_rows\n";
+  }else if(sounds&&originalAiAudioEnabled){
    require50DU(sounds->ready(),"the track's positional sound rows (05.12) are not ready");
-   if(sounds->authored())require50DU(originalAiAudio->registerResultsWorldSound26D070(sounds->resultsWorldTransport26D070()),
+   require50DU(originalAiAudio->registerResultsWorldSound26D070(sounds->resultsWorldTransport26D070()),
        "positional audio Results stop registration rejected");
    // Trigger world sounds (PodSound doors, global Sounds; World4D8 one-shots).
    require50DU(originalAiAudio->registerResultsWorldSound26D070(
@@ -875,7 +882,14 @@ SessionExit50DU Context::run() {
  }
  require50DU(laps.map().sameOwner(mapView)&&laps.ai().sameOwner(aiView)&&laps.field()==raceRacerCount,
      "lap tracker views differ from the track's navigation");
- lapOwner.track=laps.markers();
+ // The human lap owner reads the one map view (its own spline count, bounded by the view's
+ // capacity), never the legacy 256-row LapProgressTrack50GF path: a map spline longer than
+ // 256 points (TC 268, and the 257-293 courses) refused its first scan crossing at the start
+ // line (live1A0DA0 navigation error 9 at 1A10D0 node 0). Every course, one binding.
+ require50DU(lapOwner.bindTrack(mapView,laps.markers())&&lapOwner.trackBound(),
+     "the human lap owner refused the track's map view and lap markers (2A1980)");
+ std::cerr<<"common_lap_bind owner=human map_nodes="<<mapView.count()<<" capacity="<<mapView.capacity()
+     <<" markers="<<laps.markers().progressCount48<<" bound="<<lapOwner.trackBound()<<'\n';
  // AI/map metadata: the AI consumers read the one shared store through
  // AiTrackMetadataView50IU (navigation_view50cr.h; 1AAB30 reads the loaded spline), sized from
  // each spline's own count (TB/TC/MB/GB 257-293 points). No fixed-size copy is made: the

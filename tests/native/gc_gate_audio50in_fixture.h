@@ -28,6 +28,12 @@ class Owner final {
     p::AudioClip50HD clip_{};   // the first PodSound file (stock: the only one)
     // C12: every PodSound action's own file, by normalized name (stock TB/GA/GB/GC: one each).
     std::vector<std::pair<std::string,p::AudioClip50HD>> clips_;
+    // stored is already normalized ('/' separators, lower case); raw is an authored name.
+    static bool sameNormalized(const std::string& stored,const std::string& raw)noexcept{
+        if(stored.size()!=raw.size())return false;
+        for(std::size_t i=0;i<raw.size();++i){char c=raw[i];if(c=='\\')c='/';
+            if(c>='A'&&c<='Z')c=static_cast<char>(c+32);if(c!=stored[i])return false;}
+        return true;}
     static std::string normalized(std::string n){
         for(auto&c:n){if(c=='\\')c='/';if(c>='A'&&c<='Z')c=static_cast<char>(c+32);}return n;}
     p::AudioMixer50HD*mixer_=nullptr;
@@ -111,7 +117,9 @@ public:
     // The action's own file (C12); an unknown or empty name plays the first file.
     void start(const std::string& file)noexcept {
         const p::AudioClip50HD* chosen=nullptr;
-        try{const auto n=normalized(file);for(const auto&c:clips_)if(c.first==n)chosen=&c.second;}catch(...){}
+        // Compared in place against the normalized stored names: no copy in the
+        // race frame (the player-frame no-allocation guard, cr-15 GA/GB/GC).
+        for(const auto&c:clips_)if(sameNormalized(c.first,file)){chosen=&c.second;break;}
         startClip(chosen?*chosen:clip_);
     }
     void start()noexcept {startClip(clip_);}

@@ -1421,7 +1421,9 @@ SessionExit50DU Context::run() {
    // listener, shared World4D8 and process RNG; runs once at the existing
    // countdown/committed-world boundary before the shared mix. Pause exits
    // before this boundary.
-   if(track.roles.sounds){
+   // A track whose AUB/triggers author no positional row has no transport (authored()==false,
+   // the 279910 loop ran zero times): nothing is serviced, every course by its data.
+   if(track.roles.sounds&&track.roles.sounds->authored()){
     require50DU(track.roles.sounds->ready(),"track positional audio lost its actual retained source");
     const auto positional=track.roles.sounds->service(&listener,1,s.noiseOwner());
     require50DU(positional.complete,"track positional audio service rejected");
