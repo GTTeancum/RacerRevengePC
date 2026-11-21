@@ -189,7 +189,7 @@ class Owner final {
         std::vector<std::pair<std::uint32_t,std::uint32_t>> spanTiles;
         std::vector<std::uint32_t> spanImage;   // overlay image or noImage (base)
         std::int32_t current=0;                 // +44
-        std::uint64_t fired=0,steps=0;
+        std::uint64_t fired=0,steps=0,flashSteps=0; // flashSteps: steps leaving a span on a sequence image
     };
     std::unique_ptr<Storage> storage_;
     rr::platform::MaterialTextureGl50EB gpu_;
@@ -372,6 +372,7 @@ public:
         }
         // 12C540 per base span.
         const auto& q=s.sequences[static_cast<std::size_t>(s.current)];
+        bool anyFlash=false;
         for(std::size_t i=0;i<s.spanTiles.size();++i){
             const auto [face,tile]=s.spanTiles[i];const auto& panel=s.panels[face][tile];
             std::uint32_t image=noImage;
@@ -382,8 +383,9 @@ public:
                 image=s.tileImage[static_cast<std::size_t>(cube)][face][tile]; // noImage = cube lacks the tile: base.
                 break;
             }
-            s.spanImage[i]=image;
+            s.spanImage[i]=image;anyFlash=anyFlash||image!=noImage;
         }
+        if(anyFlash&&!paused&&selected_)++s.flashSteps;
         return true;
     }
     // Upload the overlay bank with the base sky's sampling (linear, clamp-to-edge).
@@ -418,7 +420,7 @@ public:
     void logPeriodic(std::string_view course,std::uint64_t every=600){
         if(!storage_||!every||!storage_->steps||storage_->steps%every||storage_->steps==loggedStep_)return;
         loggedStep_=storage_->steps;
-        std::cerr<<"sky_flash course="<<course<<" overlays="<<overlays()<<" fired="<<fired()<<'\n';
+        std::cerr<<"sky_flash course="<<course<<" overlays="<<overlays()<<" fired="<<fired()<<" flash_steps="<<storage_->flashSteps<<" steps="<<storage_->steps<<'\n';
     }
     void logLoad(std::string_view course)const{
         std::cerr<<"sky_flash course="<<course<<" overlays="<<overlays()<<" sequences="<<sequenceCount()

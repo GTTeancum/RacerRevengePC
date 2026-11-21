@@ -1054,6 +1054,7 @@ bool VehicleWindowGl50DS::Storage::drawSky() noexcept {
         gl.uniform1i(shader->uniforms().effectMode, 3); // Unlit source RGB, opaque.
         drawGl.bindVertexArray(skyVertexArray);
         drawGl.bindBuffer(elementBuffer, skyIndexBuffer);
+        U flashTiles = 0;
         for (U i = 0; i < skySpanCount; ++i) {
             const auto& span = skySpans[i];
             // 12C540: a sequence tile swaps only its texture (same quad, opaque).
@@ -1067,6 +1068,20 @@ bool VehicleWindowGl50DS::Storage::drawSky() noexcept {
                 reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
             if (!check("draw actual authored sky tile")) return false;
             ++diagnostic->skyDraws; diagnostic->skyIndices += span.indexCount;
+            if (image != vehicleWindowSkyBaseImage50DS) ++flashTiles;
+        }
+        // Proof line for the sky cube sequences (only when a sequence bank exists, so every
+        // course without one logs nothing): every 600 sky frames, how many drew a flash tile.
+        if (request.sky.sequenceTextures) {
+            ++skyDrawFrames;
+            if (flashTiles) { ++skyFlashDrawFrames; skyFlashDrawTiles += flashTiles; }
+            if (skyDrawFrames % 600u == 0u) {
+                char line[192];
+                const int n = std::snprintf(line, sizeof line, "sky_flash_draw sky_frames=%llu flash_frames=%llu tiles=%llu\n",
+                    static_cast<unsigned long long>(skyDrawFrames), static_cast<unsigned long long>(skyFlashDrawFrames),
+                    static_cast<unsigned long long>(skyFlashDrawTiles));
+                if (n > 0) std::fputs(line, stderr);
+            }
         }
         frameSkySpanImages = nullptr; // Borrowed through this submit only.
         resetPodState();

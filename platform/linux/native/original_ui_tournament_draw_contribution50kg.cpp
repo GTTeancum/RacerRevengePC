@@ -235,7 +235,14 @@ bool OriginalUiTournamentDrawContribution50KG::staticRows(const OriginalUiTourna
   const auto add=[&](const std::string& name){MaterialRow row;if(!MaterialRow::prepare(*app,name,row,detail))return false;
    for(const auto& old:next)if(old.same(row))return true;next.push_back(row);return true;};
   for(const auto& m:*widgets.materials())if(!add(m.registeredName))return fail(d,E::schedule,detail.sourcePC);
-  for(const auto& m:*career.materials())if(!add(m.registeredName))return fail(d,E::schedule,detail.sourcePC);
+  // DLC career: the add-on portrait/background (career materials 13/14) are static
+  // page rows with port-owned ranks (schedule), not APPSTART Mat_Stbl rows; the
+  // portrait has no PSM row at all. They are not static ledger rows (cr-31 eye check:
+  // staticRows refused the add-on career at 298C80).
+  for(std::size_t i=0;i<career.materials()->size();++i){
+   if(career.addonCareer()&&(i==13||i==14))continue;
+   if(!add((*career.materials())[i].registeredName))return fail(d,E::schedule,detail.sourcePC);
+  }
   std::sort(next.begin(),next.end(),[](const auto& a,const auto& b){return a.rank()<b.rank();});out=std::move(next);return true;
  }catch(...){return fail(d,E::allocation);}
 }

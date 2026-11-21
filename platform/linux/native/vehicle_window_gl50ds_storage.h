@@ -453,6 +453,9 @@ struct VehicleWindowGl50DS::Storage {
     // Per-span sequence image of the current submit (null = every span base).
     // Borrowed through this submit only; validated before any GL work.
     const std::uint32_t* frameSkySpanImages = nullptr;
+    // Proof counters for the sky cube sequences (sky_flash_draw log line): sky frames drawn,
+    // frames with at least one sequence tile, sequence tiles drawn.
+    std::uint64_t skyDrawFrames = 0, skyFlashDrawFrames = 0, skyFlashDrawTiles = 0;
     // Address-only identity of actual successful cold geometry upload. Never
     // dereferenced; CPU bytes remain owned by the original immutable sky owner.
     const assets::Mesh48B* nativeSkyMeshIdentity129280=nullptr;

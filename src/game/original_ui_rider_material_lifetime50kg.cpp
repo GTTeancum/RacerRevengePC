@@ -1,6 +1,8 @@
 #include "original_ui_rider_material_lifetime50kg.h"
 #include "../assets/original_ui_garage_scene_assets50kg.h"
 #include "../assets/original_ui_garage_watto_assets50kg.h"
+#include "../assets/dlc_registry50dl.h"
+#include <vector>
 #include <cstring>
 #include <limits>
 #include <utility>
@@ -81,6 +83,27 @@ bool OriginalUiRiderMaterialRow50KG::prepare(const assets::OriginalUiArchive50KG
         if(rank>=tableRows)return fail(d,E::table,0x298724);++rank;
     }
     if(rank!=tableRows)return fail(d,E::table,0x298724);
+    if(!found){
+        // PORT EXTENSION, NOT ORIGINAL (DLC): the rows appended after the 3235
+        // Mat_Stbl rows for the material names admitted add-on pods bring, in
+        // the order and with the rule the standard material table appends them
+        // (original_standard_material_table50la.cpp appendAddonNames: pod names,
+        // then menu names, each once; every name is stem-named and belongs to one
+        // pod, so none is a stock row). No add-on pods: nothing here, exactly as before.
+        std::uint32_t extra=0;std::vector<const std::string*> seen;
+        for(const auto* list:{&rr::assets::dlc50DL::addonPodMaterialNames(),&rr::assets::dlc50DL::addonPodUiMaterialNames()})
+            for(const auto& raw:*list){
+                if(found)break;
+                bool repeated=false;for(const auto* old:seen)if(sameName(*old,raw.c_str())&&old->size()==raw.size())repeated=true;
+                if(repeated)continue;
+                if(name.size()==raw.size()&&sameName(name,raw.c_str())){
+                    next.table_=source.identity;next.rank_=tableRows+extra;next.offset_=static_cast<std::uint32_t>(tableBytes);
+                    found=true;break;
+                }
+                try{seen.push_back(&raw);}catch(...){return fail(d,E::row,0x298C80);}
+                ++extra;
+            }
+    }
     if(!found)return fail(d,E::row,0x298C80);
     out=next;return true;
 }
