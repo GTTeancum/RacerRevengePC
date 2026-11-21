@@ -311,7 +311,9 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
         // makes it fail). Course, mode, pods, laps, routes and FPS are per race and stay on the
         // race's own lines (common_race_start, common_lap, common_race_end, race_fps_summary);
         // this line names none of them. It was defined but never emitted (cr-17).
-        if(result==0)common_race_log50CR::runSummary({.course="-",.mode="-",.routes="-"});
+        // Exit 3 is the capture harness's wall-budget end (timed_out, cleanup_complete): the
+        // unattended runs end that way by design (--return-hold), after a full clean shutdown.
+        if(result==0||result==3)common_race_log50CR::runSummary({.course="-",.mode="-",.routes="-"});
         sessionMarker("SESSION END");
         std::fflush(stdout);std::fflush(stderr);
         if(result!=0)visibleFailure(L"The native game stopped with exit code "+std::to_wstring(result)+
