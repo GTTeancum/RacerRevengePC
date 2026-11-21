@@ -843,12 +843,15 @@ def main():
                 terminate='native_terminate' in quit_texts or 'exit=terminate' in quit_texts)
             me = result['mainExit']
             result['routeCompleted'] = bool(
-                result.get('exitCode') == 0 and not result.get('watchdogExpired', True) and
+                # Exit 3 in test navigation means only "no race evidence collected" (drive50du:312);
+                # a player's EXIT GAME (no navigation) exits 0. Accept 3 here when not timed out.
+                result.get('exitCode') in (0, 3) and not result.get('watchdogExpired', True) and
+                '"timed_out":true' not in quit_texts and
                 me['rowReady'] and 'pc_native_exit_game dialog=confirm' in quit_texts and
                 'pc_native_exit_game exit_requested=1' in quit_texts and
                 close and close[-1][0] == '4' and
                 (close[-1][1] == '0' if args.main_exit == 'fresh' else int(close[-1][1]) > 0) and
-                me['nativeExitCode'] == ['0'] and markers and markers[-1].strip() == 'SESSION END' and
+                me['nativeExitCode'] in (['0'], ['3']) and markers and markers[-1].strip() == 'SESSION END' and
                 not me['refusals'] and not me['terminate'] and
                 (not logs_only or result.get('noImagesWritten', True)))
         quit_lines = re.findall(r'(?:test_pause_quit|pause_quit|pause_quit_admission|pause_request|pause_open|pause_row|pause_close|'
