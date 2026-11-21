@@ -325,6 +325,9 @@ struct Owner::Storage {
             std::uint32_t sourceOrdinal=0;
         };
         std::vector<Point> points;
+        // Per-frame transaction scratch for points, sized once at load to points.size()
+        // (serviceTimedLights runs inside the no-allocation world-animation step).
+        std::vector<Point> scratchPoints;
         std::uint64_t revision=0;
     };
     std::unique_ptr<TimedLights> timed;
@@ -750,6 +753,7 @@ bool Owner::Storage::readLights2783D0(Diagnostic& d) {
     if(timed){
         timed->savedGlobal=globalAmbient50;
         timed->savedZones.assign(ambient60.begin(),ambient60.end());
+        timed->scratchPoints.assign(timed->points.size(),TimedLights::Point{});
     }
     //278370..2783A4 ->1498A0 DIRECT copy, after all light registrations.
     //These authored per-zone overrides must never be halved a second time.
@@ -1793,11 +1797,16 @@ bool Owner::serviceTimedLights(float delta,std::uint32_t& sharedRng,bool paused,
     if(o.particleThread!=std::this_thread::get_id())return fail(d,Status::phase,0x2754e0);
     if(paused)return true;
     if(o.timed->revision==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::arithmetic,0x2754e0);
-    if(o.timed->savedZones.size()!=o.ambient60.size())return fail(d,Status::identity,0x2754e0);
-    auto next=*o.timed;auto raw=sharedRng;bool flash=false;
-    if(next.ambientFlash&&!original_light_flash50CR::advanceAmbient(next.ambient,delta,raw,flash))
+    auto& t=*o.timed;
+    if(t.savedZones.size()!=o.ambient60.size()||t.scratchPoints.size()!=t.points.size())
+        return fail(d,Status::identity,0x2754e0);
+    // Transactional without a heap copy of the timed state: the ambient state is
+    // scalar, the points advance in the scratch sized at load.
+    auto ambient=t.ambient;auto raw=sharedRng;bool flash=false;
+    if(t.ambientFlash&&!original_light_flash50CR::advanceAmbient(ambient,delta,raw,flash))
         return fail(d,Status::arithmetic,0x2754e0);
-    for(auto& point:next.points){
+    for(std::size_t i=0;i<t.points.size();++i){
+        auto& point=t.scratchPoints[i];point=t.points[i];
         if(point.local>=o.localLightCount||o.localLights[point.local].sourceOrdinal!=point.sourceOrdinal)
             return fail(d,Status::identity,0x147650);
         if(!original_light_flash50CR::advancePoint(point.state,delta,point.color,point.color))
@@ -1805,13 +1814,14 @@ bool Owner::serviceTimedLights(float delta,std::uint32_t& sharedRng,bool paused,
     }
     // Publish atomically after all bounded scalar work succeeds. This is a
     // native fixed-boundary schedule, not original child-list chronology.
-    if(next.ambientFlash){
-        o.globalAmbient50=flash?next.flash:next.savedGlobal;
-        for(std::size_t z=0;z<o.ambient60.size();++z)o.ambient60[z]=flash?next.flash:next.savedZones[z];
+    if(t.ambientFlash){
+        o.globalAmbient50=flash?t.flash:t.savedGlobal;
+        for(std::size_t z=0;z<o.ambient60.size();++z)o.ambient60[z]=flash?t.flash:t.savedZones[z];
     }
-    for(const auto& point:next.points)for(unsigned channel=0;channel<3u;++channel)
+    for(const auto& point:t.scratchPoints)for(unsigned channel=0;channel<3u;++channel)
         o.localLights[point.local].rgb[channel]=point.color[channel];
-    *o.timed=std::move(next);sharedRng=raw;++o.timed->revision;o.selectedReady.fill(false);return true;
+    for(std::size_t i=0;i<t.points.size();++i)t.points[i]=t.scratchPoints[i];
+    t.ambient=ambient;sharedRng=raw;++t.revision;o.selectedReady.fill(false);return true;
 }
 }
 
@@ -1861,7 +1871,7 @@ std::size_t Owner::retainedPayloadBytes()const noexcept {
  if(!storage_)return 0;
  const auto& o=*storage_;std::size_t n=sizeof(Owner)+sizeof(Storage)+o.topology.bytes()+
   (o.animations?sizeof(Storage::AnimationLane)+o.animations->rows.capacity()*sizeof(Storage::AnimationLane::Row):0u)+
-  (o.timed?sizeof(Storage::TimedLights)+o.timed->points.capacity()*sizeof(Storage::TimedLights::Point)+
+  (o.timed?sizeof(Storage::TimedLights)+(o.timed->points.capacity()+o.timed->scratchPoints.capacity())*sizeof(Storage::TimedLights::Point)+
    o.timed->savedZones.capacity()*sizeof(light::Vec4):0u);
  auto add=[&](std::size_t x){n=x>std::numeric_limits<std::size_t>::max()-n?std::numeric_limits<std::size_t>::max():n+x;};
  auto vector=[&](const auto& v){using T=typename std::decay_t<decltype(v)>::value_type;if(v.capacity()>std::numeric_limits<std::size_t>::max()/sizeof(T))n=std::numeric_limits<std::size_t>::max();else add(v.capacity()*sizeof(T));};

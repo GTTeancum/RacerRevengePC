@@ -14,6 +14,7 @@
 #include "../../src/assets/original_track_cut_identity50la.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/import_world48f.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
 #include <cstdio>
 #include <iostream>
 #include <string>
@@ -72,13 +73,14 @@ inline bool derive(const char* trackId,const a::ResArchive48C& archive,std::stri
         if(!tobEntry)throw std::runtime_error("archive lacks its TOB");
         id.members={};id.frames={};id.zones={};id.zoneOffsets={};
         row(*tobEntry,ordinal,next.names[0],next.shas[0],id.members[0],&tob);
-        a::ParameterDocument48F document;a::DecodeError48C why;
-        if(!a::decodeParameters48F(tob,document,why))throw std::runtime_error("TOB decode "+why.code);
+        // The TOB is decoded as the 05.02 TOB step decodes it (duplicate labels retained: TB and
+        // other stock TOBs repeat labels) and fields are found by the one original lookup
+        // (157D00 block, 1583AC midpoint field search), so every course derives its cut rows
+        // from its own archive by the same rule.
+        a::ParameterDocument48F document;a::DecodeError48C why;a::WorldLimits48F limits{};limits.retainDuplicateLabels=true;
+        if(!a::decodeParameters48F(tob,document,why,nullptr,limits))throw std::runtime_error("TOB decode "+why.code);
         const auto field=[&](const std::string& block,const char* key)->const a::ParameterField48F*{
-            const a::ParameterField48F* out=nullptr;
-            for(const auto& b:document.blocks)if(b.name==block)for(const auto& f:b.fields)if(f.name==key){
-                if(out)throw std::runtime_error("duplicate TOB field");out=&f;}
-            return out;
+            return a::packedField1583AC(a::findBlock157D00(document,block),key);
         };
         const auto decimal=[](const a::ParameterField48F& f){
             if(f.value.empty()||f.value.size()>4)throw std::runtime_error("TOB decimal extent");

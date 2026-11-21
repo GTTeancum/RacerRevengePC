@@ -2941,6 +2941,19 @@ SessionExit50DU Context::run() {
    // 1A6840 order: race-owned services before the World (see setup).
    if(retireEndCandidateProducer&&!retireEndCandidateProducer())
     return closeRejected("end_candidate_producer_retirement");
+   // Every port-side holder of the track's animation runtime (track.roles.animation) goes
+   // before the stage close, so the Track's release finds it singly owned, as the original
+   // destroys its race-side users before the track bank: the binding (its memberships
+   // were retired above), the animation window (its GPU side closed above) and this
+   // session's own reference. Each step is checked and logged.
+   if(trackAnimationBinding){
+    if(trackAnimationBinding->needsClose())return closeRejected("track_animation_binding_still_open");
+    trackAnimationBinding.reset();
+   }
+   if(!trackAnimationWindow.releaseSource())return closeRejected("track_animation_window_gpu_still_open");
+   std::cerr<<"common_teardown_detail role=animation session_holder_released="<<bool(trackAnimations)
+       <<" use_count_before="<<trackAnimations.use_count()<<'\n';
+   trackAnimations.reset();
    // One stage close for every course: audio, the counted race and its World
    // at race+74 (1B2870 retire), then the Track's own release (roles in
    // reverse order, then the archive 1316A0; R1/R3).

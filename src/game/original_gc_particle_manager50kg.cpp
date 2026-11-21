@@ -1061,6 +1061,7 @@ OriginalGcParticleReceipt50KG OriginalGcParticleManager50KG::populateColdFog(std
         // attached fire owners. Parent registers those owners before this call.
         OriginalGcParticleEmitterState50KG state{};state.particleGroup=f.group;
         state.fogPeriod=f.period;state.fogIncreasing=true;
+        state.fogDistanceSquared220=f.distanceSquared;state.fogInverseDistanceSquared224=f.inverseDistanceSquared;
         s.fogOwnerIds[volume]=registerEmitter(state);
         if(!s.fogOwnerIds[volume]){result.status=Status::allocation;return result;}
         const auto owner=s.fogOwnerIds[volume];
@@ -1227,13 +1228,16 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::advanceFogPhases(flo
     return Status::complete;
 }
 float OriginalGcParticleManager50KG::fogBrightness(const OriginalGcParticle50KG& p,
-    const std::array<float,3>& camera) const noexcept {
-    if(!gcFogAuthoringPrepared()||!(p.flags&0x80u))return std::numeric_limits<float>::quiet_NaN();
-    const auto& f=storage_->fog;float distanceSquared=0;
+    const std::array<float,3>& camera,float base) const noexcept {
+    // 162518: the fade distance is the particle's OWN emitter's (+48 -> +220/+224), so
+    // the GC cold fog and the common course fog emitters take the same path.
+    const auto* e=(p.flags&0x80u)?emitter(p.ownerId):nullptr;
+    if(!e)return std::numeric_limits<float>::quiet_NaN();
+    float distanceSquared=0;
     for(unsigned lane=0;lane<3;++lane){const auto d=sub(p.position[lane],camera[lane]);distanceSquared=add(distanceSquared,mul(d,d));}
     float birth=sub(1,mul(p.ageMilliseconds,p.inverseLife));
-    if(distanceSquared<f.distanceSquared)birth=mul(birth,mul(distanceSquared,f.inverseDistanceSquared));
-    return mul(birth,64);
+    if(distanceSquared<e->fogDistanceSquared220)birth=mul(birth,mul(distanceSquared,e->fogInverseDistanceSquared224));
+    return mul(birth,base);
 }
 bool OriginalGcParticleManager50KG::coldFogPopulated() const noexcept{return gcFogAuthoringPrepared()&&storage_->fogPopulated;}
 } // namespace rr::game

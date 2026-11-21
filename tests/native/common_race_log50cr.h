@@ -304,10 +304,19 @@ inline void raceStart(const RaceStart& v,std::ostream* sink=nullptr){
 // Source (W0 round 2, r4): common_lap50CR::Tracker::applyCrossing prints it, one line
 // per accepted crossing; the per-race marker count is common_track_data role=lap_markers
 // (Track::logTrackData from Counts::lapMarkers, counted at step 08).
+// Called inside the no-allocation player/opponent physics frames (1A0DA0 crossing), so
+// it formats into a fixed stack buffer: no ostringstream, and no ostream float
+// insertion (MSVC num_put formats floating values through a heap std::string).
+// "%g" is the stream's default float format (precision 6), so the line is unchanged.
 inline void lap(std::size_t slot,std::uint32_t lapCC8,float time,float bestCB4,std::uint32_t markerFF8,std::ostream* sink=nullptr){
-    std::ostringstream o;
-    o<<"common_lap racer="<<slot<<" lap="<<lapCC8<<" time="<<time<<" best="<<bestCB4<<" marker="<<markerFF8;
-    detail::emit(sink,o);
+    char b[160];
+    const int n=std::snprintf(b,sizeof b,"common_lap racer=%zu lap=%u time=%g best=%g marker=%u\n",
+        slot,static_cast<unsigned>(lapCC8),static_cast<double>(time),static_cast<double>(bestCB4),
+        static_cast<unsigned>(markerFF8));
+    if(n<=0)return;
+    const auto len=static_cast<std::streamsize>(static_cast<std::size_t>(n)<sizeof b?n:static_cast<int>(sizeof b)-1);
+    std::ostream& o=sink?*sink:std::cerr;
+    o.write(b,len);o.flush();
 }
 
 // common_race_end site=1A7DD0 subtype=<s> branch=1A7E18|1ABBE8|1ABC1C route=results|tt_restart|practice|spectator next=<row pc>

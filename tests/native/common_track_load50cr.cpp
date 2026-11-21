@@ -26,6 +26,7 @@
 // documents.tob, applied to the standard models by the static world (continuation).
 #include "track_atm50cr.h"
 #include "track_particle_emitters50cr.h"  // Roles::emitters teardown (quiesce, closeAfterPool)
+#include "../../src/game/original_track_particle_cold50la.h" // Roles::particles teardown (pool close)
 #include "mc_world_semantics50mc.h"
 #include "course_archive_receipt50ci.h"
 #include "native_course_archive_release50pd.h"
@@ -570,6 +571,29 @@ template<class T> bool releaseRole(std::shared_ptr<T>& role,const char* name,boo
 }
 bool Track::release()noexcept{
     bool all=true;
+    // Preflight, before any role is touched: a role another owner still holds refuses the
+    // whole release with nothing released, so no partly released Track (a destroyed
+    // collision Storage that race-side references still name) is ever left behind for a
+    // retried close. Expected internal holders: the emitter owner's reference to the
+    // particle manager, the storage alias of the collision world (same control block).
+    {
+        bool blocked=false;
+        const auto held=[&](long count,long allowed,const char* name)noexcept{
+            if(count<=allowed)return;
+            blocked=true;
+            std::fprintf(stderr,"common_teardown_holders role=%s holders=%ld preflight=1\n",name,count-allowed);
+        };
+        const auto check=[&](const auto& role,const char* name,long allowed=1)noexcept{if(role)held(role.use_count(),allowed,name);};
+        check(roles.sounds,"sounds");check(roles.audio,"aub");check(roles.water,"water");
+        check(roles.waterResources,"water_resources");check(roles.emitters,"particles.emitters");
+        check(roles.particles,"particles",roles.emitters?2:1);
+        check(roles.sky,"sky");check(roles.lights,"lights");check(roles.fog,"fog");
+        check(roles.staticWorld,"static_world");
+        check(roles.collision,"collisions",roles.storage?2:1);
+        check(roles.triggers,"triggers");check(roles.triggerSource,"trigger_source");check(roles.atm,"atm");
+        check(roles.uvAnimation,"uv_animation");check(roles.animation,"animation");
+        if(blocked){log::teardownRole("archive",false);return false;}
+    }
     // Reverse role order, teardown step 18. The original retires the race (racers, AI, lap
     // state: every reader of the splines) and the World (1B2870, its zone-index binding)
     // before the track bank 1316A0. Here the navigation store is the Track's own: its 1ACF70
@@ -590,17 +614,33 @@ bool Track::release()noexcept{
     releaseRole(roles.audio,"aub",all);
     releaseRole(roles.water,"water",all);
     releaseRole(roles.waterResources,"water_resources",all);
-    // The ground-effects owner emits into the particle manager: it stops emitting and
-    // releases its placements before the manager (its pool) goes (W0 round 2, r7 #3).
+    // The ground-effects owner emits into the particle manager (W0 round 2, r7 #3), in the
+    // order its own close requires: it stops emitting (quiesce), the manager closes its
+    // pool (World+4A0 close, 160C70 order; nothing else closes it), then the emitter
+    // releases its placements and its manager reference (closeAfterPool), and only then
+    // the Track drops both roles. Every result is logged (common_teardown_detail).
     if(roles.emitters){
-        bool released=false;
-        if(roles.emitters.use_count()==1){
-            const bool quiet=roles.emitters->quiesce();
-            released=quiet&&roles.emitters->closeAfterPool();
+        bool released=false,quiet=false,poolClosed=false,afterPool=false;
+        const long holders=roles.emitters.use_count();
+        if(holders==1){
+            quiet=roles.emitters->quiesce();
+            poolClosed=!roles.particles||roles.particles->closed()||(quiet&&roles.particles->close());
+            afterPool=quiet&&poolClosed&&roles.emitters->closeAfterPool();
+            released=afterPool;
             if(released)roles.emitters.reset();
         }
+        std::fprintf(stderr,"common_teardown_detail role=particles.emitters use_count=%ld quiesce=%d particles_close=%d close_after_pool=%d\n",
+            holders,int(quiet),int(poolClosed),int(afterPool));
         log::teardownRole("particles.emitters",released);
-        if(!released)all=false;
+        // A refused pool close stops here: no later role (the collision Storage that the
+        // race-side references name) is released behind a failed one.
+        if(!released){log::teardownRole("archive",false);return false;}
+    }else if(roles.particles&&!roles.particles->closed()){
+        // No emitter owner: the manager's own pool close before the role is dropped.
+        const bool poolClosed=roles.particles->close();
+        std::fprintf(stderr,"common_teardown_detail role=particles use_count=%ld particles_close=%d\n",
+            static_cast<long>(roles.particles.use_count()),int(poolClosed));
+        if(!poolClosed){log::teardownRole("archive",false);return false;}
     }
     releaseRole(roles.particles,"particles",all);
     releaseRole(roles.sky,"sky",all);

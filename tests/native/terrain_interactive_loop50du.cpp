@@ -545,7 +545,7 @@ void Context::run() {
     discardTrackBaseline();bool closeRequested=false;
     require50DU(host.pollLoading50DU(closeRequested,hostDiagnostic),"Pause retained input close pump failed");
     hostClock.pause(monotonicNow50DU());
-    if(closeRequested)break; //Publication guard cancels backend before event storage unwinds.
+    if(closeRequested){std::cerr<<"race_loop_exit reason=window_close_during_pause_input"<<'\n';break;} //Publication guard cancels backend before event storage unwinds.
     std::uint32_t pc=0;
     require50DU(originalMainApplication.advanceNativePauseReturn50LA(pc),
         "Pause retained return failed with original effects and event custody retained");
@@ -560,7 +560,7 @@ void Context::run() {
     require50DU(host.pollLoading50DU(closeRequested,hostDiagnostic),
         "Results retained input close pump failed");
     hostClock.pause(monotonicNow50DU());
-    if(closeRequested)break; // Existing teardown cancels backend BEFORE pins.
+    if(closeRequested){std::cerr<<"race_loop_exit reason=window_close_during_pump"<<'\n';break;} // Existing teardown cancels backend BEFORE pins.
     require50DU(bool(sourceFadeOut),"Results actual blocking backend absent");
     rr::game::OriginalResults104Diagnostic50LA continuation;
     require50DU(originalMainApplication.advanceResultsDone50LA(*sourceFadeOut,continuation),
@@ -984,6 +984,7 @@ void Context::run() {
    if(hostInput.inputError){terminalInputError=hostInput.inputError;std::cerr<<"stdin input error "<<terminalInputError<<'\n';}
    windowCapture.request(input);
    if(captureRun.deadlineExpired()){
+    std::cerr<<"race_loop_exit reason=capture_wall_budget_expired"<<'\n';
     if(originalUiActive)originalMain.requestQuit();
     else {composePacket(false,input);sampleController();}
     break;
@@ -992,6 +993,7 @@ void Context::run() {
     // Own the real input stream before ALL host menus, driving packets,
     // restart/checkpoint paths and world/audio steps. No fallthrough exists.
     if(input.quitRequested){
+     std::cerr<<"race_loop_exit reason=window_quit_request ui=1"<<'\n';
      originalMain.requestQuit();reportUiState("quit");break;
     }
     capturePending=capturePending||hostInput.captureRequested;
@@ -1154,11 +1156,13 @@ void Context::run() {
    // Window close, explicit stdin quit, and EOF remain terminal. Escape is
    // host navigation only, never a native vehicle action or an implicit exit.
    if(input.quitRequested){
+    // Window close / quit event (window_host50dq) or stdin EOF: always logged.
+    std::cerr<<"race_loop_exit reason=window_quit_request ui=0 completed_frames="<<completedFrames<<'\n';
     composePacket(false,input);sampleController(); // Route a final held release before cleanup.
     break;
    }
    if(sourcePauseParentAttached){
-    if(input.quitRequested)break;
+    if(input.quitRequested){std::cerr<<"race_loop_exit reason=window_quit_request spectator=1"<<'\n';break;}
     const auto& pauseInfo=host.info();
     const bool active=input.focused&&!input.minimized&&!input.activityLost&&
         !input.eventBudgetExhausted&&sourceCameraSession&&sourceCameraSession->hasView()&&
@@ -1435,6 +1439,12 @@ void Context::run() {
      if(dispatched&&sourcePauseObservation.countedPending())
       sourcePauseObservation.updateCountedRace1A7C1C(openGate);
      const bool refused=!dispatched||(openGate&&openGate!=2u);
+     // 1A7C2C: race1B0 bit3 (a race fade-in not yet accepted) keeps the request pending;
+     // the original retries every update. Logged once per pending stretch, never silent.
+     {static bool reportedPending=false;
+      if(dispatched&&openGate==2u){if(!reportedPending){reportedPending=true;
+        std::cerr<<"pause_pending site=1A7C2C gate=2 reason=race1B0_bit3_fade_in_not_accepted\n";}}
+      else if(!sourcePauseObservation.countedPending())reportedPending=false;}
      if(refused&&edges[0]){
       static std::uint32_t reportedGate=0;
       const auto gate=!dispatched?counted.gate:100u+openGate;
@@ -1457,7 +1467,8 @@ void Context::run() {
           <<" record="<<(counted.row==CountedRow::record)<<" refused="<<counted.refused
           <<" pc="<<std::hex<<counted.sourcePC<<std::dec<<'\n';
       // Row 9 departed: 17DE10(App,6,4,1) queued; the original main menu takes over.
-      if(counted.row==CountedRow::main&&counted.departed){returnOriginalMainRequested=true;break;}
+      if(counted.row==CountedRow::main&&counted.departed){
+       std::cerr<<"race_loop_exit reason=pause_row9_main_menu"<<'\n';returnOriginalMainRequested=true;break;}
       // 1BDAB4 record: Results page 3 is open over the paused race and owns input.
       if(counted.row==CountedRow::record)pauseRecordPage1BDAB4=true;
       // Row 10 departed: the frontend receiver takes the queued 17DE10 on the next iteration.
@@ -3766,6 +3777,15 @@ void Context::run() {
       sourceMainBaseReady=true;
       require50DU(sourceCameraSession->advanceRaceFadeInPrefix().status==sourceCamera::Status::complete,
           "actual restored-camera publication did not admit original fade-in prefix");
+      // 1A7C18 of the fresh race: the accepted fade-in clears the race's own race1B0
+      // bit3 too (1A7C2C skips every Pause open while it is set), every course.
+      // PORT STAND-IN (flagged): the original runs 1A7BD0 on the race itself; the port's
+      // fresh fade-in runs on the Session's race1B0 projection, so this bridges it back.
+      if(const auto& owned=originalMainApplication.sourceRace28COwner_){
+       const bool cleared=native_race_replay50PD::Owner::acceptedFreshFadeIn1A7C18(*owned,sourceCameraSession->raceFlags1B0_);
+       std::cerr<<"fade_in_fresh 1A7C18 race_bit3_cleared="<<cleared<<'\n';
+       require50DU(cleared,"fresh race fade-in completed with the Session's race1B0 bit3 still set");
+      }
      }else{
       // Includes history staging, existing GPU completion and the actual
       // window swap. This is not a GPU-only timer and adds no synchronization.

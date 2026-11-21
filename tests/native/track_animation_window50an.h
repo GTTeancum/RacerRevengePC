@@ -41,6 +41,10 @@ public:
  }
  bool loaded()const noexcept{return loaded_&&runtime_&&runtime_->ready();}
  bool ownsResources()const noexcept{return gpu_.ownsResources();}
+ // Teardown: after close() released the GPU side, the window drops its reference to the
+ // track's animation runtime (track.roles.animation) so the Track can release it.
+ // Refused while GPU resources remain.
+ bool releaseSource()noexcept{if(gpu_.ownsResources())return false;runtime_.reset();loaded_=false;return true;}
  const mat::Owner& materials()const noexcept{return materials_;}
  bool createGpu(const p::MaterialTextureGlRequest50EB& caller,const a::OriginalUiMaterialTemplates50KG& templates,
       const a::OriginalUiMaterialRuntime50KG& uiRuntime,p::MaterialTextureGlDiagnostic50EB& d){

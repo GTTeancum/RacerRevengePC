@@ -36,6 +36,9 @@ struct OriginalGcParticleEmitterState50KG {
     float gravity=0,bouncePlane=0,bounceFactor=0;
     float fogPeriod=-1,fogPhase=0,fogPhaseRatio=0;
     bool fogIncreasing=true;
+    // 1602B0 fog emitter +220 DistanceToFade squared and +224 its reciprocal; the
+    // 162518 render reads them through the particle's own emitter (+48), every course.
+    float fogDistanceSquared220=0,fogInverseDistanceSquared224=0;
 };
 // Source160E24..40 successfully constructs this optional auxiliary owner.
 //162F14 initializes its +18 gate to zero. This native slice owns the dormant
@@ -232,8 +235,10 @@ public:
     // Caller invokes after manager advance in the original scene child order.
     // 160160 has no early pause gate: do not add the manager's pause gate here.
     OriginalGcParticleStatus50KG advanceFogPhases(float elapsedSeconds) noexcept;
+    // 162518..16259C for one 0x80 particle: base = the render's starting brightness
+    // (64, or +148 for a Glows particle). NaN when the particle or its emitter is not fog.
     float fogBrightness(const OriginalGcParticle50KG&,
-        const std::array<float,3>& activeCameraPosition) const noexcept;
+        const std::array<float,3>& activeCameraPosition,float base) const noexcept;
     bool coldFogPopulated() const noexcept;
 private:
     friend class rr::platform::OriginalUiGarageDrawContribution50KG;

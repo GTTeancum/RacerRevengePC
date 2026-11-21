@@ -401,7 +401,8 @@ bool initialize(State& s,Placement& p,std::size_t index,bool registerRow,ct::Dia
     if(registerRow){
         g::OriginalGcParticleEmitterState50KG e{};e.particleGroup=f.particleGroup1B8;e.framesPerSet=f.framesPerSet;
         e.inverseFramesPerSet=f.inverseFramesPerSet;e.gravity=f.gravityMultiplier;e.bouncePlane=f.groundLevel;e.bounceFactor=f.restitution;
-        if(row->pub.effect==Effect::fog){e.fogPeriod=f.oscillationPeriod22C;e.fogIncreasing=true;}
+        if(row->pub.effect==Effect::fog){e.fogPeriod=f.oscillationPeriod22C;e.fogIncreasing=true;
+            e.fogDistanceSquared220=f.distanceSquared220;e.fogInverseDistanceSquared224=f.inverseDistanceSquared224;}
         const auto id=s.manager->registerEmitter(e);
         if(!id)return refuse(d,0x15aea0u,"manager registry insertion failed for placement "+std::to_string(index));
         if(index){const auto* prior=s.placements.at(index-1);

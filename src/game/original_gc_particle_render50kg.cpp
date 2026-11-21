@@ -155,7 +155,8 @@ S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
         //160BB0/160C5C constructor writes manager+148=255; ordinary admitted
         //GC has no separate brightness mutator. Non-glowing source starts64.
         float brightness=(p.flags&0x2000u)?255.f:64.f;
-        if(p.flags&0x80u)brightness=manager.fogBrightness(p,{{core.position.x,core.position.y,core.position.z}});
+        // 162508..16259C: the fog fade multiplies this same starting value (64 or +148).
+        if(p.flags&0x80u)brightness=manager.fogBrightness(p,{{core.position.x,core.position.y,core.position.z}},brightness);
         else if(p.flags&2u)brightness=mul(brightness,sub(1,mul(p.ageMilliseconds,p.inverseLife)));
         else if(p.flags&0x1000u){
             const float initialCube=mul(p.initialSize,mul(p.initialSize,p.initialSize));
