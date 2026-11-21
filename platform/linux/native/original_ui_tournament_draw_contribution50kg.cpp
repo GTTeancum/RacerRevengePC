@@ -259,6 +259,8 @@ bool OriginalUiTournamentDrawContribution50KG::prepareBank(D& d) noexcept {
   const auto addInput=[&](const assets::OriginalUiImageBankInput50KG* input,std::uint32_t& first){
    if(!input)return false;first=static_cast<std::uint32_t>(inputs.owners.size());
    for(const auto& a:input->archives){bool found=false;for(const auto& b:inputs.archives)if(a==b)found=true;if(!found)inputs.archives.push_back(a);}
+   // DLC career art (PORT EXTENSION): the add-on archives each owner names.
+   for(const auto& a:input->addonArchives){bool found=false;for(const auto& b:inputs.addonArchives)if(a==b)found=true;if(!found)inputs.addonArchives.push_back(a);}
    inputs.owners.insert(inputs.owners.end(),input->owners.begin(),input->owners.end());
    if(input->ipumCache){if(inputs.ipumCache&&inputs.ipumCache!=input->ipumCache)return false;inputs.ipumCache=input->ipumCache;}return true;};
   if(!addInput(s.resources->bankInput(),s.widgetOwner)||!addInput(s.career->bankInput(),s.careerOwner)||
@@ -770,6 +772,20 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
         ++ordinal;
     }
     if(ordinal!=3235)return fail(d,E::schedule);
+    // PORT EXTENSION (DLC career): the add-on career's own portrait and
+    // background (career materials 13/14 when the career resources carry an
+    // add-on archive) are not APPSTART Mat_Stbl.txt rows: they take port-owned
+    // ranks after the 3235 stock ranks. A stock name in that place (a package
+    // name colliding with a stock row) is refused, for that add-on career only.
+    // Without add-on art nothing here changes.
+    if(career&&career->bankInput()&&!career->bankInput()->addonArchives.empty()&&career->materials()&&career->materials()->size()>14){
+        const std::string addonNames[2]{(*career->materials())[13].registeredName,(*career->materials())[14].registeredName};
+        for(std::size_t i=0;i<input.size();++i)for(std::uint32_t k=0;k<2;++k){
+            if(!same(input[i].registeredName,addonNames[k].c_str()))continue;
+            if(ranks[i]!=unresolved||input[i].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule,0x298C80);
+            ranks[i]=ordinal+k;
+        }
+    }
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
         if(input[i].kind==RegistrationKind::ledgerDynamic&&

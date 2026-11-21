@@ -1153,14 +1153,13 @@ bool OriginalUiRiderProfileOwner50KG::canCommitRiderConfirmToTournament(const ga
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG& d,
     OriginalUiRiderProfileStamp50KG expected)noexcept {
     if(!canCommitRiderConfirmToTournament(d,expected))return false;
-    // PORT EXTENSION, NOT ORIGINAL (DLC career, dlc_career50dl.h): an add-on
-    // Confirm runs this original Confirm for its anchor stock rider (the add-on
-    // is what the P1 Rider page highlights); it latches the add-on career first,
-    // so a refused latch changes nothing. A stock Confirm clears the latch.
+    // PORT EXTENSION (DLC career, dlc_career50dl.h): the Rider session latched
+    // (add-on Confirm) or cleared (stock Confirm) the add-on career before this
+    // destination was prepared. An add-on highlight without its latch is refused.
     if(const unsigned addon=game::dlc50DL::highlightedAddonRider(0u)){
-        if(!game::dlc50DL::latchTournamentCareer(static_cast<unsigned>(d.selectedRider),addon,
-               storage_->tournament.base0180,storage_->constructorPrizeHalves100C8))return false;
-    }else game::dlc50DL::clearTournamentCareer();
+        const auto* latched=game::dlc50DL::activeAddonCareer(static_cast<unsigned>(d.selectedRider));
+        if(!latched||latched->number!=addon)return false;
+    }
     //1EA54C/1EA58C/1EA5A8. This chooses a genuine career; no progress write.
     storage_->remembered[3]=d.selectedRider;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(d.selectedRider<<3));
     storage_->comparison100C0=d.selectedRider;++storage_->generation;

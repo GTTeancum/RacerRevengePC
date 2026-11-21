@@ -2,6 +2,9 @@
 #include "original_ui_material_adapter50kg.h"
 #include "original_ui_lit_material_adapter50km.h"
 #include "../../../src/assets/original_ui_win_material50pd.h"
+#include "../../../src/assets/dlc_registry50dl.h"
+#include "../../../src/game/dlc_career50dl.h"
+#include "../../../src/game/dlc_addon_ui_archive50dl.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -73,6 +76,15 @@ struct OriginalUiWinDrawResources50PD::Storage {
     std::array<std::uint64_t,game::originalUiWinWidgetStorage50PD> textRevision{};
     std::array<std::uint32_t,game::originalUiWinWidgetStorage50PD> widgetMaterial{};
     std::array<OriginalUiWinBackground50PD,27> backgrounds{};
+    // PORT EXTENSION (DLC career): the 2077F0 %02d_bkg rule applied to each
+    // admitted add-on pod's own background (ui.background PSM + PST in its own
+    // archive), keyed by registry number. A pod without one has no entry, and
+    // its Win page is refused rather than showing the anchor's background.
+    std::map<unsigned,OriginalUiWinBackground50PD> addonBackgrounds;
+    std::vector<std::shared_ptr<const assets::OriginalUiArchive50KG>> addonArchives;
+    // Binding indices of those add-on backgrounds: they take port-owned registry
+    // tokens after the stock Mat_Stbl.txt ranks (never looked up in it).
+    std::vector<std::size_t> addonBindings;
     std::array<OriginalUiWinPrompt50PD,4> prompts{};
     std::array<std::array<std::string,3>,3> messages; // [place-1][circuit-1]
     game::OriginalUiExitText50KG exitText;
@@ -146,6 +158,43 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
                b.material.passes.size()!=1||b.pass().textureCount!=1||!same(b.pass().textureName,name))return fail(d,Error::material,0x2DF0B0);
             if(!addImages(b,in.backgrounds,"ui/textures/",name,false,false))return false;
             s->backgrounds[c].career=c;s->backgrounds[c].material=static_cast<std::uint32_t>(s->bindings.size());s->bindings.push_back(std::move(b));}
+        // PORT EXTENSION (DLC career): the same rule on each add-on pod's package
+        // background. Bounded by the bank's add-on archive limit; a pod whose art
+        // does not load is logged and gets no entry (its Win page refuses).
+        for(std::size_t i=0;i<rr::assets::dlc50DL::addonPodCount()&&
+            s->addonArchives.size()<std::min<std::size_t>(64,assets::OriginalUiImageBankAddonLimits50DL::archives);++i){ // bound: one 256-image owner
+            const auto* pod=rr::assets::dlc50DL::addonPodAt(i);if(!pod)continue;
+            game::dlc50DL::AddonCareerArt50DL art;std::string why;
+            if(!game::dlc50DL::loadAddonCareerArt50DL(pod->number,art,why)||art.backgroundPst.empty()||art.backgroundPsm.empty()){
+                std::fprintf(stderr,"dlc_career win_background key=%s status=none reason=\"%s\"\n",pod->key.c_str(),
+                    why.empty()?"package lists no background":why.c_str());continue;}
+            std::string path,leaf;game::dlc50DL::addonMemberStem50DL(art.backgroundPst,path,leaf);
+            OriginalUiWinMaterialBinding50PD b;b.registeredName="ui/textures/"+leaf;b.kind=Kind::screen;
+            const auto member=art.archive->find(art.backgroundPst);
+            // Every check is done on this background alone, before it joins the
+            // page: material, a name no stock binding uses, its own decode and
+            // native material policy. A failure skips this add-on (its Win page
+            // refuses); the stock page never depends on it.
+            bool ok=member.identity&&member.data&&
+               assets::readOriginalUiMaterial50KG(*art.archive,art.backgroundPsm,s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material)&&
+               b.material.passes.size()==1&&b.pass().textureCount==1&&same(b.pass().textureName,leaf);
+            for(const auto& other:s->bindings)if(ok&&same(other.registeredName,b.registeredName))ok=false; // name taken
+            if(ok&&in.win->find(b.registeredName+".psm").identity)ok=false; // a stock UIWin material name (models are read after this)
+            const assets::OriginalUiImageSource50KG source{0x5447000000000000ull|(std::uint64_t(s->addonArchives.size()+1)<<32),member,0,member.size,{}};
+            if(ok){
+                assets::OriginalUiScreenAssets50KG alone;assets::OriginalUiScreenAssetDiagnostic50KG ad;
+                assets::OriginalUiNativeMaterial50KG policy;assets::OriginalUiMaterialDiagnostic50KG md;
+                const auto* decoded=alone.load({source},ad)?alone.decodedTexture(0):nullptr;
+                ok=decoded&&assets::prepareOriginalUiNativeMaterial50KG(b.pass(),*decoded,policy,md);
+            }
+            if(!ok){d.material={};
+                std::fprintf(stderr,"dlc_career win_background key=%s status=none reason=\"background material, name or image refused\"\n",pod->key.c_str());continue;}
+            // Port-owned image identity (namespace 0x5447); the bank finds the member in addonArchives.
+            b.images.push_back(addSource(source));
+            OriginalUiWinBackground50PD bg;bg.career=pod->number;bg.material=static_cast<std::uint32_t>(s->bindings.size());
+            s->addonBindings.push_back(s->bindings.size());
+            s->bindings.push_back(std::move(b));s->addonBackgrounds[pod->number]=bg;s->addonArchives.push_back(art.archive);
+        }
         // Model materials (DefaultMT): each authored PSM pass is its own binding.
         for(std::size_t m=0;m<6;++m){const auto* scene=s->models[m].scene();
             for(const auto& name:scene->materials){const auto registered="ui/textures/"+name;
@@ -186,7 +235,11 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
                 auto inserted=ranks.emplace(normalized(std::string(reinterpret_cast<const char*>(table.data+first),at-first)),++token);
                 if(!inserted.second)inserted.first->second=0;}
             if(token!=3235)return fail(d,Error::registry,0x298724);
-            for(auto& b:s->bindings){const auto it=ranks.find(normalized(b.registeredName));if(it==ranks.end()||!it->second)return fail(d,Error::registry,0x298724);b.registryToken=it->second;}}
+            for(std::size_t i=0;i<s->bindings.size();++i){auto& b=s->bindings[i];
+                // DLC career backgrounds: port-owned tokens after the 3235 stock ranks.
+                const auto addon=std::find(s->addonBindings.begin(),s->addonBindings.end(),i);
+                if(addon!=s->addonBindings.end()){b.registryToken=token+1u+static_cast<std::uint32_t>(addon-s->addonBindings.begin());continue;}
+                const auto it=ranks.find(normalized(b.registeredName));if(it==ranks.end()||!it->second)return fail(d,Error::registry,0x298724);b.registryToken=it->second;}}
         auto originalImages=std::make_shared<assets::OriginalUiScreenAssets50KG>();
         if(!originalImages->load(sources,d.resource)){
             const auto& r=d.resource;const auto image=r.image<sources.size()&&sources[r.image].member.identity?sources[r.image].member.identity->name:"?";
@@ -194,6 +247,7 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
                 unsigned(r.error),r.image,image,r.texture.code.c_str(),r.texture.detail.c_str());
             return fail(d,Error::resource,0x24DA30);}
         assets::OriginalUiImageBankInput50KG bankInput;bankInput.archives={in.appStart,in.win,in.fonts,in.controllerPopup,in.overlays,in.backgrounds};bankInput.owners={originalImages};
+        bankInput.addonArchives=s->addonArchives; // DLC career backgrounds (empty without add-on pods)
         assets::OriginalUiImageBankDiagnostic50KG bankDiagnostic;if(!s->imageBank.load(bankInput,bankDiagnostic))return fail(d,Error::resource);
         for(std::uint32_t i=0;i<sources.size();++i){const auto* map=s->imageBank.mapping(0,i);if(!map||map->combinedIndex!=i)return fail(d,Error::resource);}
         s->images=s->imageBank.images();const auto* bank=s->images?s->images->textures():nullptr;if(!bank)return fail(d,Error::resource);
@@ -232,11 +286,13 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
         // Load 2077F0..207D68: four 320x224 tiles; sample endpoints 319/223 times
         // the 2DF180 reciprocal dimensions; tile1 mirrors U, tile2 V, tile3 both.
         // ScreenTexture 2DF0B0 depth15 (packet Z = video max - 15).
-        for(auto& bg:s->backgrounds){if(!bg.career)continue;const auto& b=s->bindings[bg.material];const auto* atlas=bank->texture(b.images[0]);
+        const auto tiles=[&](OriginalUiWinBackground50PD& bg)->bool{const auto& b=s->bindings[bg.material];const auto* atlas=bank->texture(b.images[0]);
             if(!atlas||!atlas->texture.width||!atlas->texture.height)return fail(d,Error::resource);
             const float us=1.f/float(atlas->texture.width),vs=1.f/float(atlas->texture.height);const float u=319.f*us,v=223.f*vs;const auto* name=b.registeredName.c_str();
             bg.tiles[0]=quad(name,0,0,320,224,0,0,u,v,15,0x2DF550);bg.tiles[1]=quad(name,320,0,320,224,u,0,0,v,15,0x2DF550);
-            bg.tiles[2]=quad(name,0,224,320,224,0,v,u,0,15,0x2DF550);bg.tiles[3]=quad(name,320,224,320,224,u,v,0,0,15,0x2DF550);}
+            bg.tiles[2]=quad(name,0,224,320,224,0,v,u,0,15,0x2DF550);bg.tiles[3]=quad(name,320,224,320,224,u,v,0,0,15,0x2DF550);return true;};
+        for(auto& bg:s->backgrounds){if(!bg.career)continue;if(!tiles(bg))return false;}
+        for(auto& [number,bg]:s->addonBackgrounds)if(!tiles(bg))return false; // DLC career
         // Shared page 1D7A10 prompt positions (cross page+2A0 at 484,378).
         constexpr float promptX[]={484,397,285,160};constexpr std::uint32_t promptPC[]={0x1D7A2C,0x1D7A44,0x1D7A5C,0x1D7A74};
         for(std::size_t i=0;i<4;++i){auto& p=s->prompts[i];const auto& b=s->bindings[p.material];const auto* atlas=bank->texture(b.images[0]);if(!atlas)return fail(d,Error::resource);
@@ -281,6 +337,11 @@ bool OriginalUiWinDrawResources50PD::prepareDynamicText(std::uint16_t id,Diagnos
     }catch(...){return fail(d,Error::allocation);}
 }
 const OriginalUiWinBackground50PD* OriginalUiWinDrawResources50PD::background(std::uint32_t career)const noexcept{
+    // PORT EXTENSION (DLC career): an add-on career (100C0 = its anchor) shows
+    // its own background, or none (the page refuses); never the anchor's.
+    if(storage_)if(const auto* addon=game::dlc50DL::activeAddonCareer(career)){
+        const auto it=storage_->addonBackgrounds.find(addon->number);
+        return it!=storage_->addonBackgrounds.end()?&it->second:nullptr;}
     return storage_&&career<27&&storage_->backgrounds[career].career?&storage_->backgrounds[career]:nullptr;}
 const std::array<OriginalUiWinPrompt50PD,4>* OriginalUiWinDrawResources50PD::prompts()const noexcept{return storage_?&storage_->prompts:nullptr;}
 const std::string* OriginalUiWinDrawResources50PD::message(game::OriginalUiWinCircuit50PD c)const noexcept{

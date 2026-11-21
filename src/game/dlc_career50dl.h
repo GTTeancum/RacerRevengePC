@@ -73,6 +73,11 @@ struct AddonCareer50DL {
 bool latchTournamentCareer(unsigned anchorRider,unsigned addonNumber,
     const std::array<std::array<float,6>,27>& base0180,
     const std::array<std::int16_t,13>& constructorPrizes) noexcept;
+// The same latch with the stock tables bound at startup (bindStockCareerTables):
+// the Rider session calls this at the add-on tournament Confirm, before the
+// Tournament destination is prepared, so every snapshot taken for that
+// destination already reads the add-on career. Refused when none are bound.
+bool latchTournamentCareer(unsigned anchorRider,unsigned addonNumber) noexcept;
 void clearTournamentCareer() noexcept;
 // The latched career when the profile's selected career (100C0) is its
 // anchor; nullptr otherwise (stock career, or nothing latched). The profile

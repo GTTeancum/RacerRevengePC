@@ -1297,7 +1297,21 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
             return finish(Status::unavailableDestination,0x1EA694);
         }
         s->addonConfirmRider=stock;
-    }
+        // DLC career (dlc_career50dl.h). HOLD (coordinator, 2026-11-21): the
+        // Tournament screen still loads the ANCHOR's pod model (1EEC40
+        // loadTournament by 100C0), and no anchor model may show with add-on
+        // data, so the add-on Tournament Confirm is refused until the add-on
+        // pod model path reaches that screen. When it does, this refusal is
+        // replaced by the latch, before the Tournament destination is prepared:
+        //   if(!game::dlc50DL::latchTournamentCareer(stock,s->addonPod()->number))
+        //       return finish(Status::profile,0x1EA58C);
+        // Free Play, Time Trial and VS Confirms of add-on pods are unaffected.
+        if(s->cold.prospectiveMode==2){
+            std::fprintf(stderr,"dlc_rider_confirm key=%s status=refused reason=\"add-on tournament career waits for the add-on pod model on the Tournament screen\"\n",
+                s->addonPod()->key.c_str());
+            return finish(Status::unavailableDestination,0x1EA58C);
+        }
+    }else if(in.originalInput==4&&s->cold.prospectiveMode==2)game::dlc50DL::clearTournamentCareer(); // stock tournament Confirm
     const auto selected=in.originalInput==4?s->confirmRider():s->state.rider4C4;
     if(selected>=profile.riders.size())return finish(Status::unsupportedState,0x1EA460);
     game::OriginalUiRiderContext50KG context;context.playerIndex=0;context.selectedRider=selected;context.mode34=profile.mode34;

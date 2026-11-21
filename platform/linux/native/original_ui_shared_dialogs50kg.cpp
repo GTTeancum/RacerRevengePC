@@ -426,7 +426,18 @@ bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexce
 }
 bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcept {
  d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuRiderDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
- if(!loadedCurrent()||!initialMainAttached_||scope_->managerLive_||reorderingPage_||
+ // PORT STAND-IN (same rule as reappend1B86D0's Garage first attach, and the
+ // never-attached topology handled at advance4702048F0/142590): a race-return
+ // frontend whose first screen performs no 1B86D0 (Course6, Hall11, Win7,
+ // Unlock10) boots 470/47C per frontend but leaves them off the dispatcher. The
+ // original keeps them attached across the race, so the next manager's 1B86D0
+ // (Rider 1E809C, Options, Main 1D7CF4 re-entry) simply detaches and re-appends
+ // them. Here that same first 1B86D0 appends them and establishes the menu
+ // topology. Keyed on the actual topology, never on a screen. Main's initial
+ // reset (initialMainResetPending_) belongs to the boot reorder only.
+ const bool neverAttached=!initialMainAttached_&&!reorderStep_&&!completedReorders_&&!initialMainResetPending_&&
+    dialog470_.entity.parent1C!=&scope_->dispatcher_&&controller47C_.entity.parent1C!=&scope_->dispatcher_;
+ if(!loadedCurrent()||(!initialMainAttached_&&!neverAttached&&!reorderStep_)||scope_->managerLive_||reorderingPage_||
     completedReorders_==std::numeric_limits<std::uint64_t>::max())return fail(d,Status::phase,0x1B86D0);
  const auto app=application_.lock();
  if(!reorderStep_){dialog470_.timer294=.25f;dialog470_.delta290=0;reorderStep_=1;}
@@ -435,6 +446,7 @@ bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcep
  if(reorderStep_==2){app->controllerPopupState.timer3C4=.25f;app->controllerPopupState.delta3C0=0;reorderStep_=3;}
  if(reorderStep_==3){d.entity=scope_->reappendSharedDialog1B86D0(*this,1,controller47C_.entity);
   if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);reorderStep_=4;}
+ initialMainAttached_=true; // first attach (see above); unchanged when already attached
  ++completedReorders_;reorderStep_=0;reorderedPage_=nullptr;reorderedGrant_.reset();
  d.sourceEffectsCommitted=true;d.sourcePC=0x1B872C;return true;
 }

@@ -280,6 +280,7 @@
     "src/assets/dlc_registry50dl.cpp",
     "src/game/dlc_rider_entries50dl.cpp",
     "src/game/dlc_career50dl.cpp",
+    "src/game/dlc_addon_ui_archive50dl.cpp",
     "src/game/dlc_course_entries50dl.cpp",
     "src/game/original_ui_rider_addon_models50dl.cpp",
     "src/assets/dlc_progress50dl.cpp",

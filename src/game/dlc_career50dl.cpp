@@ -99,6 +99,12 @@ bool latchTournamentCareer(unsigned anchorRider,unsigned addonNumber,
         line("latch",s.career,stored.aiStored?"latched":"latched_seeded_ai");return true;
     }catch(...){line("latch",refused,"refused","allocation");return false;}
 }
+bool latchTournamentCareer(unsigned anchorRider,unsigned addonNumber) noexcept {
+    const auto& s=state();
+    if(!s.stockBound){AddonCareer50DL r;r.number=addonNumber;r.anchor=anchorRider;line("latch",r,"refused","stock tables not bound");return false;}
+    const auto base=s.stockBase;const auto prizes=s.stockPrizes;
+    return latchTournamentCareer(anchorRider,addonNumber,base,prizes);
+}
 void clearTournamentCareer() noexcept {
     auto& s=state();
     if(s.latched)line("clear",s.career,"cleared");
