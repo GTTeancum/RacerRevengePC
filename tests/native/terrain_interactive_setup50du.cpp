@@ -772,12 +772,14 @@ SessionExit50DU Context::run() {
    std::cerr<<"positional_sounds site=common course="<<track.code()<<" transport=none reason=no_authored_rows\n";
   }else if(sounds&&originalAiAudioEnabled){
    require50DU(sounds->ready(),"the track's positional sound rows (05.12) are not ready");
+   // One registration: the owner's one logical transport carries every voice it plays (the
+   // SoulTree/ambient rows AND the trigger world one-shots, playTrigger on the same logical_).
+   // Registering the owner as well listed each active voice twice, and the Results stop
+   // refused its duplicate claim (cr16: aural_stop26D070_refused step=15 on TA and RA, the
+   // Results input never ran). The old per-course code had two separate owners with
+   // separate voices; the merged common owner must be listed once.
    require50DU(originalAiAudio->registerResultsWorldSound26D070(sounds->resultsWorldTransport26D070()),
        "positional audio Results stop registration rejected");
-   // Trigger world sounds (PodSound doors, global Sounds; World4D8 one-shots).
-   require50DU(originalAiAudio->registerResultsWorldSound26D070(
-       static_cast<native_results_world_stop26D070::Owner&>(*sounds)),
-       "trigger world sound Results stop registration rejected");
   }
  coldLoadDiagnostics.begin("audio_roster_banks");
   if(raceEnabled&&!originalAiAudioEnabled){
