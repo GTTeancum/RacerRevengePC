@@ -9,6 +9,9 @@
 #include "../../src/game/native_surface_traction50st.h"
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "../../src/game/n64_track_hazards_runtime50nh.h"
+#include "../../src/game/n64_airborne_gravity50ag.h"
+#include "../../src/assets/original_parameter_lookup50cr.h"
+#include "../../src/assets/track_start50ad.h"
 #include "native_wreck_debris_sim50pd.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "terrain_interactive_world50du.h"
@@ -706,6 +709,36 @@ SessionExit50DU Context::run() {
   const auto floorMember=rr::game::n64FloorMember50NH(track.identity.scbMember.c_str());
   rr::game::zeroGravity50ZG.loadCourse(surfaceArchive,track.identity.mapSpline.c_str(),track.identity.aiSpline.c_str(),
       ground.owners,rr::game::surfaceRules50ST,floorMember.c_str());
+ }
+ // PORT EXTENSION, NOT ORIGINAL (n64_airborne_gravity50ag.h): N64-canonical
+ // airborne gravity from this course's own SCB [Environment] AirborneGravity
+ // (ft/s^2). Every course, every race load; absent (every stock course) = each
+ // pod's own PHY value, unchanged. A repeated block/field, malformed number or
+ // value outside (0, 3220] is refused (logged) and the pods keep their own value.
+ {
+  rr::game::clearN64AirborneGravity50AG();
+  const rr::assets::ParameterBlock48F* environment=nullptr;bool repeated=false;
+  for(const auto& b:actualWorld.parameters.blocks)if(b.name=="environment"){if(environment)repeated=true;environment=&b;}
+  const rr::assets::ParameterField48F* field=environment?rr::assets::packedField1583AC(*environment,"airbornegravity"):nullptr;
+  std::size_t repeats=0;
+  if(environment)for(const auto& f:environment->fields)if(f.name=="airbornegravity")++repeats;
+  if(!field){
+   std::cerr<<"airborne_gravity course="<<track.identity.code.text.data()<<" source=phy"
+       <<(repeated?" environment_blocks_repeated=1":"")<<'\n';
+  }else{
+   const std::string& t=field->value;float value=0.f;bool parsed=false;
+   if(!repeated&&repeats==1&&!t.empty()&&t.size()<=12){
+    char buffer[14]{};std::size_t at=0,i=0;
+    if(t[0]=='-'||t[0]=='+')buffer[at++]=t[i++];
+    if(i<t.size()&&t[i]=='.')buffer[at++]='0';
+    for(;i<t.size()&&at<sizeof buffer-1;++i)buffer[at++]=t[i];
+    parsed=i==t.size()&&rr::assets::parseTrackNumber50AD(buffer,at,value);
+   }
+   if(parsed&&rr::game::setN64AirborneGravity50AG(value))
+    std::cerr<<"airborne_gravity course="<<track.identity.code.text.data()<<" source=track value="<<value<<'\n';
+   else std::cerr<<"airborne_gravity course="<<track.identity.code.text.data()<<" source=phy refused=\""<<t
+       <<"\" repeated="<<(repeated||repeats>1?1:0)<<'\n';
+  }
  }
  // PORT EXTENSION, NOT ORIGINAL (n64_track_hazards_runtime50nh.h): the N64
  // hazard rows of this course's TOB (energy column, breakable asteroids, door),

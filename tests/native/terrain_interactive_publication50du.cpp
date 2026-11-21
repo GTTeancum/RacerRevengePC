@@ -1011,6 +1011,10 @@ void Context::run() {
   }
   std::cerr<<"track_fog_fractions course="<<track.code()<<" visibility="<<loadedTrackFog.authoredFraction3C
       <<" haziness="<<loadedTrackFog.authoredFraction40<<'\n';
+  // Far range proof line: far=4000 authored=0 on every stock course.
+  std::cerr<<"track_fog_far course="<<track.code()<<" far="<<loadedTrackFog.far50
+      <<" authored="<<(roles.fog->fog().farAuthored?1:0)<<" near="<<loadedTrackFog.near54
+      <<" start="<<loadedTrackFog.start34<<" end="<<loadedTrackFog.end38<<'\n';
   // ONE renderer request for every course (B-C20): the renderer reads the
   // track's role owners (static world, fog, sky, particles, water, ATM, UV and
   // track animation) from this one Track. The consumed stage owns the Track;
@@ -1047,13 +1051,16 @@ void Context::run() {
    const float* color=trackClearRgba;
    require50DU(color,"authenticated world fog RGB missing");
    for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
-   constexpr float minimum=1333.300048828125f,maximum=4000.f;
-   // 273C30: end = 4000/3 + visibility x (4000 - 4000/3); start = (end - 64) x
+   // 273C30: end = near + visibility x (far - near); start = (end - base) x
    // (1 - haziness), from this course's own [Fog] block (one reader, every course).
+   // near/far/base are the 13E920 range 1A98DC left in World3EC: 1333.3 / 4000 / 64
+   // on every stock course; far is the N64-canonical FarDistance on a DLC course
+   // that authors it (original_race_fog_far50nf.h).
+   const float minimum=loadedTrackFog.near54,maximum=loadedTrackFog.far50;
    const float haziness=loadedTrackFog.authoredFraction40;
    const float visibility=loadedTrackFog.authoredFraction3C;
    fog.end=minimum+visibility*(maximum-minimum);
-   fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
+   fog.start=(fog.end-loadedTrackFog.minimum58)*(1.f-haziness);fog.enabled=true;
    std::cerr<<"Authored native world fog: start "<<fog.start
        <<" end "<<fog.end<<"; source ranges established, native world shader parity pending\n";
   }

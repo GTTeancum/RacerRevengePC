@@ -1,6 +1,7 @@
 #include "dlc_rider_entries50dl.h"
 // PORT EXTENSION, NOT ORIGINAL BEHAVIOUR: see dlc_rider_entries50dl.h.
 #include "../assets/dlc_registry50dl.h"
+#include "dlc_career50dl.h"
 #include "original_ui_course_race_domain50kg.h"
 #include <atomic>
 #include <cstdio>
@@ -73,7 +74,9 @@ std::string riderKey(unsigned racer){
 bool addonRiderMayBeAi(unsigned racer,bool addonCourse) noexcept {
     const auto* pod=reg::addonPod(racer);
     if(!pod)return true;                       // stock racers: the stock field rules decide
-    return addonCourse&&pod->aiOnAddonCourses; // never on a stock course (D6)
+    // User rule (2026-11-21, final): AI only on an add-on course (single play),
+    // never on a stock course and never in the tournament (stock courses only).
+    return addonCourse&&pod->aiOnAddonCourses;
 }
 void applyTestAddonRider() noexcept {
     try{std::call_once(testOnce,[]{
@@ -89,12 +92,16 @@ void applyTestAddonRider() noexcept {
     });}catch(...){}
 }
 unsigned latchRaceRider(unsigned profileRider,bool freePlay,const char* track) noexcept {
-    const unsigned addon=freePlay?selectedAddonRider():0u;
+    // Free play: the port-owned selection. Otherwise the latched add-on career
+    // of a tournament launch of its anchor (dlc_career50dl.h; 0 = none, the
+    // stock rider races exactly as before).
+    const unsigned addon=freePlay?selectedAddonRider():tournamentRaceAddon(profileRider);
     const auto* pod=addon?reg::addonPod(addon):nullptr;
     if(!pod){raceAddon.store(0);raceProfile.store(0);return profileRider;}
     raceProfile.store(profileRider);raceAddon.store(addon);
-    std::fprintf(stderr,"dlc_race_player racer=%u key=%s stem=%s pod=%s profile_rider=%u track=%s mode=free_play\n",
-        addon,pod->key.c_str(),pod->stem.c_str(),pod->podId.c_str(),profileRider,track?track:"-");
+    std::fprintf(stderr,"dlc_race_player racer=%u key=%s stem=%s pod=%s profile_rider=%u track=%s mode=%s\n",
+        addon,pod->key.c_str(),pod->stem.c_str(),pod->podId.c_str(),profileRider,track?track:"-",
+        freePlay?"free_play":"tournament");
     return addon;
 }
 void clearRaceRider() noexcept {raceAddon.store(0);raceProfile.store(0);}

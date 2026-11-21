@@ -1,5 +1,6 @@
 #include "secondary_body49m.h"
 #include "vehicle_aero48e.h"
+#include "n64_airborne_gravity50ag.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -118,7 +119,8 @@ bool produceSecondaryForces49M(const SecondaryBodyState49M&in,const SecondaryBod
     if(!finiteMatrix(secondary)||!finiteMatrix(c.mainSceneWorld100))return false;
     Math f;auto r=in;
     // 218A3C: this reads the CURRENT probe104 after main response219CF4.
-    const float gravity=c.probe104?c.gravity378:c.gravity37C;
+    // PORT EXTENSION (n64_airborne_gravity50ag.h): airborne +37C or the course's N64 value.
+    const float gravity=c.probe104?c.gravity378:n64AirborneGravityOr50AG(c.gravity37C);
     const V g{{0.0f,f.mul(f.neg(p.body.mass),gravity),0.0f,1.0f}};
     f.addLoad(r.root.loads.force,g);
     const float low=c.effective4346D0,high=c.effective4346D8;

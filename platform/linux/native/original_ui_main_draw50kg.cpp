@@ -1,4 +1,5 @@
 #include "original_ui_main_draw50kg.h"
+#include "original_ui_main_exit_game50xg.h"
 #include "original_ui_menu_warning_packet50kg.h"
 #include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_shared_dialog_material_history50kg.h"
@@ -784,6 +785,9 @@ bool OriginalUiMainDraw50KG::projectMainPage(bool shown,OriginalUiMainDrawDiagno
     if(selected<1||selected>5){s.failed=true;return fail(d,Error::input,0x1e64ac);}
     const auto* text=s.resources->textGeometry(static_cast<std::uint16_t>(selected+4));
     if(!text||text->lines().empty()){s.failed=true;return fail(d,Error::geometry);}
+    // PC-NATIVE ADDITION (EXIT GAME row, original_ui_main_exit_game50xg.h): while that row
+    // owns the selection, its Main session draws these same arrows around it instead.
+    if(originalUiMainExitRowOwns50XG(this))return true;
     const auto right=s.resources->materialIndex("ui/textures/arrwrght");
     const auto left=s.resources->materialIndex("ui/textures/arrwleft");
     const auto& mats=*s.resources->materials();
@@ -1092,6 +1096,11 @@ void OriginalUiMainDraw50KG::finishSourceSubmission(std::uint64_t generation,boo
             s.poisonHistory(this);menuShared_->failMenu470Submission(*this);return;}
         if(accepted)menuAcceptedEpoch_=menuInvocationEpoch_;}
 }
+// PC-NATIVE ADDITION (EXIT GAME row): one host-side pointer, compared only, never dereferenced.
+namespace {const OriginalUiMainDraw50KG* exitRowOwner50XG=nullptr;}
+void setOriginalUiMainExitRowOwner50XG(const OriginalUiMainDraw50KG* draw)noexcept{exitRowOwner50XG=draw;}
+void clearOriginalUiMainExitRowOwner50XG(const OriginalUiMainDraw50KG* draw)noexcept{if(exitRowOwner50XG==draw)exitRowOwner50XG=nullptr;}
+bool originalUiMainExitRowOwns50XG(const OriginalUiMainDraw50KG* draw)noexcept{return draw&&exitRowOwner50XG==draw;}
 const std::vector<OriginalUiMainSubmittedPacket50KG>* OriginalUiMainDraw50KG::packets()const noexcept{return storage_?&storage_->packets:nullptr;}
 const std::vector<std::uint32_t>* OriginalUiMainDraw50KG::drainedPacketIndices()const noexcept{return storage_&&storage_->drained?&storage_->order:nullptr;}
 }

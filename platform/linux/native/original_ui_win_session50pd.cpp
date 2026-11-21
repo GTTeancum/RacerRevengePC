@@ -1,5 +1,7 @@
 #include "original_ui_win_session50pd.h"
 #include "../../../src/game/original_unlock_checks50pd.h"
+#include "../../../src/game/dlc_career50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -214,6 +216,11 @@ S OriginalUiWinSession50PD::render(const OriginalUiMainFrameClock50KG& clock,D& 
     // secondary 17FA10 on widget 1. They affect the NEXT ordinary widget draw.
     OriginalUiRiderProfileColors50KG colors;
     if(ok)ok=s->cold.profile->colors(s->career,colors);
+    // PORT EXTENSION (DLC career): the same 208AF4 rule on the add-on pod's own
+    // colours (package ui.colors) when its career won; the anchor's otherwise.
+    if(ok)if(const auto* addon=rr::game::dlc50DL::activeAddonCareer(s->career))
+        if(const auto* pod=rr::assets::dlc50DL::addonPod(addon->number);pod&&pod->ui.colorsAuthored){
+            colors.accent17FA00=pod->ui.accentColor;colors.secondary17FA10=pod->ui.secondaryColor;}
     if(ok)for(std::uint16_t id:{std::uint16_t(3),std::uint16_t(5),std::uint16_t(6),std::uint16_t(7),std::uint16_t(8)})
         if(!(ok=page.setWidgetColor(id,colors.accent17FA00,d.page)))break;
     if(ok)ok=page.setWidgetColor(game::originalUiWinContinue50PD,colors.secondary17FA10,d.page);

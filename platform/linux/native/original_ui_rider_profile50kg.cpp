@@ -15,6 +15,7 @@
 #include "../../../src/assets/dlc_progress50dl.h"
 #include "../../../src/assets/dlc_registry50dl.h"
 #include "../../../src/game/dlc_rider_entries50dl.h"
+#include "../../../src/game/dlc_career50dl.h"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -169,6 +170,43 @@ namespace {
 // first: the add-on row answers, and no stock Hall row / course field is written.
 template<class S> unsigned addonRaceCourse146R(const S& s) noexcept {
     return s.common?rr::game::dlc50DL::addonCourseForLaunch(s.common->mode34,s.subtype11258):0u;
+}
+// PORT EXTENSION, NOT ORIGINAL (DLC career, dlc_career50dl.h). The latched
+// add-on career when the profile is in mode 2 and its selected career 100C0
+// is that add-on's anchor; nullptr = the stock career (every site below then
+// runs exactly as before). While it answers, the selected career's data comes
+// from the add-on career and its writes go there, never into the 27 stock
+// careers, the stock names, the stock availability byte or the stock save.
+template<class S> const rr::game::dlc50DL::AddonCareer50DL* addonCareer50DL(const S& s) noexcept {
+    return s.common&&s.common->known&&s.common->mode34==2u?
+        rr::game::dlc50DL::activeAddonCareer(s.comparison100C0):nullptr;
+}
+// PORT EXTENSION, NOT ORIGINAL (DLC career; user decision 2026-11-21 "Pods
+// should all be treated the same"). The course availability 11018 the profile
+// READS: bits 0..4 are the better of the stock byte and the availability every
+// add-on career earned by the same 187D80 rule (dlc50DL::
+// addonCareerAvailability); bits 5..7 stay the stock byte's. The stock byte is
+// never written by an add-on career. With no add-on career this IS the stock byte.
+template<class S> std::uint8_t readAvailability50DL(const S& s) noexcept {
+    const std::uint8_t stock=s.common?s.common->availability11018:0u;
+    std::uint8_t out=stock;
+    const unsigned addon=rr::game::dlc50DL::addonCareerAvailability();
+    if(addon>(stock&31u))out=static_cast<std::uint8_t>((out&0xe0u)|(addon>13u?13u:addon));
+    // Gallery tier (bits 5..6): the better of the stock tier and the tier
+    // add-on careers were granted (DLC side save /3; 188440 is never applied
+    // to the stock byte by an add-on career).
+    const unsigned tier=assets::dlc50DL::progressOwner().addonCareerUnlocks().galleryTier&3u;
+    if(tier>((out>>5)&3u))out=static_cast<std::uint8_t>((out&0x9fu)|(tier<<5));
+    return out;
+}
+// PORT EXTENSION (DLC career): the unlock word 10FAC the profile READS for
+// stock pod r: the stock word, or 1 when an add-on career's result granted
+// that pod (DLC side save /3). The stock words themselves are never written by
+// an add-on career; with no grant this IS the stock word.
+template<class S> std::uint32_t unlockWord50DL(const S& s,std::size_t r) noexcept {
+    if(r>=s.unlock10FAC.size())return 0;
+    if(s.unlock10FAC[r])return s.unlock10FAC[r];
+    return assets::dlc50DL::progressOwner().addonCareerUnlocks().stockPods[r]?1u:0u;
 }
 // The race's rival (1ABE70 / 187E30 read 11280 of the selected course): the
 // add-on row's rival when it is a stock racer 1..26, otherwise none (-1: no
@@ -361,6 +399,8 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
         next->planetColors={{{0xc2a684,0x80674a},{0x8cc46e,0x628036},{0xc0b5a5,0x8c8479},
             {0xf4f1a2,0xa8a66f},{0xce766d,0xffbab2},{0xb26a36,0xe5a373}}};
+        // DLC career (PORT EXTENSION): the stock tables a fresh add-on career is seeded from (read-only copy).
+        game::dlc50DL::bindStockCareerTables(next->tournament.base0180,next->constructorPrizeHalves100C8);
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x17F970);}
 }
@@ -819,7 +859,7 @@ bool OriginalUiRiderProfileOwner50KG::hallSnapshotForMode(std::uint32_t mode,
     if(!hallRecordsReady()||(mode!=5&&mode!=2&&mode!=0))return false;
     const auto& s=*storage_;game::OriginalUiHallProfile50KG p;
     p.ownerReady=true;p.mode34=mode;p.remembered6EC=s.rememberedHall6EC;
-    p.packed1125E=s.packed1125E;p.availability11018=s.common->availability11018;
+    p.packed1125E=s.packed1125E;p.availability11018=readAvailability50DL(s); // DLC merge (PORT EXTENSION)
     p.bit0_7E4=s.bit0_7E4;p.courseOrder100C4=s.courseOrder100C4;
     if(mode==2){
         // No prospective mode2: 1AB5BC's 17DE10(6,11,1) leaves P+34 alone.
@@ -907,7 +947,8 @@ bool OriginalUiRiderProfileOwner50KG::commitHallBack(std::uint16_t slot,
     const game::OriginalUiRouteDecision50KG& decision,OriginalUiRiderProfileStamp50KG expected) noexcept {
     if(!hallRecordsReady()||storage_->common->mode34!=5||expected.mode34!=5||
        expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max()||
-       slot<1||slot>13||slot>(storage_->common->availability11018&31u)||
+       slot<1||slot>13||slot>(readAvailability50DL(*storage_)&31u)|| // DLC merge (PORT EXTENSION)
+       
        !decision.admitted||!decision.profileProposalComplete||decision.blockers||
        decision.action!=game::OriginalUiRouteAction50KG::request||decision.selectedSlot!=slot||
        decision.inputPC!=0x1E3F70||decision.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||
@@ -942,7 +983,7 @@ bool OriginalUiRiderProfileOwner50KG::riderSelectionFacts(std::uint32_t rider,
     RiderSelectionFacts& out) const noexcept {
     if(!storage_||!storage_->readable()||rider>=storage_->authored.size()||
        !storage_->authored[rider].present)return false;
-    out={rider,storage_->unlock10FAC[rider],storage_->hidden0730[rider]};return true;
+    out={rider,unlockWord50DL(*storage_,rider),storage_->hidden0730[rider]};return true; // DLC merge
 }
 bool OriginalUiRiderProfileOwner50KG::courseRiderSelectionSnapshot(RiderSelectionFacts& out) const noexcept {
     if(!storage_||!storage_->readable()||(storage_->common->mode34!=0&&storage_->common->mode34!=2))return false;
@@ -959,7 +1000,7 @@ bool OriginalUiRiderProfileOwner50KG::selectionSnapshotForMode(std::uint32_t mod
     result.remembered6F0=s.remembered[0];result.remembered6F4=s.remembered[1];
     result.remembered6F8=s.remembered[2];result.remembered6FC=s.remembered[3];
     for(unsigned rider=0;rider<27;++rider){auto& row=result.riders[rider];
-        row.ownerReady=true;row.unlock10FAC=s.unlock10FAC[rider];row.hidden730=s.hidden0730[rider];
+        row.ownerReady=true;row.unlock10FAC=unlockWord50DL(s,rider);row.hidden730=s.hidden0730[rider];
         row.careerByteOwnerReady=true;row.career1938=s.tournament.careers[rider].pods[rider].medals1938[0];
     }
     out=result;return true;
@@ -969,7 +1010,7 @@ bool OriginalUiRiderProfileOwner50KG::statSnapshot(std::uint32_t rider,float pan
     if(!storage_||!storage_->readable()||rider>=27||!storage_->authored[rider].present||!std::isfinite(panelY))return false;
     const auto& s=*storage_;game::OriginalUiRiderStatInput50KG result;
     result.profileReady=true;result.selectedRider=rider;result.observedRider=rider;result.mode34=s.common->mode34;
-    result.unlocked10FAC=s.unlock10FAC[rider];result.panelY4DC=panelY;
+    result.unlocked10FAC=unlockWord50DL(s,rider);result.panelY4DC=panelY;
     result.accentColor17FA00=s.authored[rider].colors.accent17FA00;
     const auto& career=s.tournament.careers[rider];
     result.current1920=career.pods[rider].abilities1920;result.maximum0408=s.authored[rider].maximum0408;
@@ -990,7 +1031,7 @@ bool OriginalUiRiderProfileOwner50KG::canResetRiderCareer1800E0(
     //1EA870 requires prompt42C bit2. Its actual1EAFB0 producer requires
     //mode2, an unlocked selected rider, and that career's diagonal medal0.
     //The session, not this numeric predicate, owns the selected4C4/result2.
-    return s.unlock10FAC[rider]!=0&&s.tournament.careers[rider].pods[rider].medals1938[0]!=0;
+    return unlockWord50DL(s,rider)!=0&&s.tournament.careers[rider].pods[rider].medals1938[0]!=0;
 }
 bool OriginalUiRiderProfileOwner50KG::resetRiderCareer1800E0(
     std::uint32_t rider,OriginalUiRiderProfileStamp50KG expected) noexcept {
@@ -1052,7 +1093,7 @@ bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRemem
     game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
-    p.packed1125E=s.packed1125E;p.cardFlag100BC=s.saveProfile.dirty100BCBit0();p.availability11018=s.common->availability11018;
+    p.packed1125E=s.packed1125E;p.cardFlag100BC=s.saveProfile.dirty100BCBit0();p.availability11018=readAvailability50DL(s); // DLC merge
     p.nativeBetaStorage=s.betaStatus!=BetaPersistenceStatus::notStarted&&s.betaStatus!=BetaPersistenceStatus::disabledFixture;
     p.planet0Primary79C=s.planetColors[0].primary79C;p.planet0Secondary7A0=s.planetColors[0].secondary7A0;p.courseOrder100C4=s.courseOrder100C4;out=p;return true;
 }
@@ -1077,6 +1118,7 @@ bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::Ori
     for(std::size_t i=0;i<3;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
     storage_->remembered[0]=d.selectedRider;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(d.selectedRider<<3));
     storage_->comparison100C0=d.selectedRider;++storage_->generation;
+    game::dlc50DL::clearTournamentCareer(); // DLC career: the original rewrote 100C0 (PORT EXTENSION)
     if(storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))(void)saveNativeBetaProgress();return true;
 }
 bool OriginalUiRiderProfileOwner50KG::canPrepareRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG& d,
@@ -1098,7 +1140,7 @@ bool OriginalUiRiderProfileOwner50KG::canCommitRiderConfirmToTournament(const ga
        d.profileChanges.count!=3||storage_->tournamentResultArmed)return false;
     game::OriginalUiRiderContext50KG c;c.mode34=2;c.selectedRider=d.selectedRider;c.playerIndex=0;
     c.packed1125C=storage_->common->playerBits1125C;c.unlockOwnerReady=true;
-    c.selectedUnlockWord10FAC=storage_->unlock10FAC[d.selectedRider];c.comparisonRider100C0=storage_->comparison100C0;
+    c.selectedUnlockWord10FAC=unlockWord50DL(*storage_,static_cast<std::size_t>(d.selectedRider));c.comparisonRider100C0=storage_->comparison100C0;
     c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;c.admission.nativePageMasks[9]=1u<<1;
     game::OriginalUiRouteDecision50KG exact;
     if(game::dispatchOriginalUiRider50KG(0,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::ok||
@@ -1111,6 +1153,14 @@ bool OriginalUiRiderProfileOwner50KG::canCommitRiderConfirmToTournament(const ga
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG& d,
     OriginalUiRiderProfileStamp50KG expected)noexcept {
     if(!canCommitRiderConfirmToTournament(d,expected))return false;
+    // PORT EXTENSION, NOT ORIGINAL (DLC career, dlc_career50dl.h): an add-on
+    // Confirm runs this original Confirm for its anchor stock rider (the add-on
+    // is what the P1 Rider page highlights); it latches the add-on career first,
+    // so a refused latch changes nothing. A stock Confirm clears the latch.
+    if(const unsigned addon=game::dlc50DL::highlightedAddonRider(0u)){
+        if(!game::dlc50DL::latchTournamentCareer(static_cast<unsigned>(d.selectedRider),addon,
+               storage_->tournament.base0180,storage_->constructorPrizeHalves100C8))return false;
+    }else game::dlc50DL::clearTournamentCareer();
     //1EA54C/1EA58C/1EA5A8. This chooses a genuine career; no progress write.
     storage_->remembered[3]=d.selectedRider;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(d.selectedRider<<3));
     storage_->comparison100C0=d.selectedRider;++storage_->generation;
@@ -1135,7 +1185,8 @@ bool OriginalUiRiderProfileOwner50KG::resultsCareerPageFields1C4CD8(
     //the selected source track into a different course-order row.
     for(std::size_t i=0;i<s.courseOrder100C4.size();++i)
         if(s.courseOrder100C4[i]==selected){next.order=static_cast<std::uint32_t>(i);break;}
-    const auto& diagonal=s.tournament.careers[career].pods[career];
+    const auto* addon=addonCareer50DL(s); // DLC career: its own row (PORT EXTENSION)
+    const auto& diagonal=addon?addon->own:s.tournament.careers[career].pods[career];
     next.priorMedal1938=diagonal.medals1938[next.order];
     next.remaining1946=diagonal.remainingPrizes1946[next.order];
     next.title1127C=s.trackText[selected].title1127C;
@@ -1150,7 +1201,8 @@ bool OriginalUiRiderProfileOwner50KG::resultsCareerProgress219C(std::uint8_t& ou
     if(!storage_||!storage_->readable())return false;
     const auto& s=*storage_;const auto career=s.comparison100C0;
     if(career>=s.tournament.careers.size()||!s.authored[career].present)return false;
-    out=s.tournament.careers[career].progress219C&31u;return true;
+    const auto* addon=addonCareer50DL(s); // DLC career (PORT EXTENSION)
+    out=(addon?addon->career.progress219C:s.tournament.careers[career].progress219C)&31u;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::resultsSelectedOrder187B10(std::uint32_t& out)const noexcept {
     if(!storage_||!storage_->readable())return false;
@@ -1165,18 +1217,23 @@ bool OriginalUiRiderProfileOwner50KG::unlockFacts187E30(game::OriginalUnlockFact
     const auto& s=*storage_;const auto track=std::uint32_t(s.packed1125F&15u);
     if(track>=s.trackText.size()||s.comparison100C0>=s.tournament.careers.size())return false;
     game::OriginalUnlockFacts50PD f;
-    f.unlock10FAC=s.unlock10FAC;f.word7E8=s.word7E8;f.rival11280=raceRival146R(s,track);
+    for(std::size_t r=0;r<f.unlock10FAC.size();++r)f.unlock10FAC[r]=unlockWord50DL(s,r); // DLC merge
+    f.word7E8=s.word7E8;f.rival11280=raceRival146R(s,track);
     f.career100C0=s.comparison100C0;
     if(!resultsSelectedOrder187B10(f.order187B10))return false;
     for(std::size_t c=0;c<s.tournament.careers.size();++c)
         f.diagonalMedals[c]=s.tournament.careers[c].pods[c].medals1938;
+    // PORT EXTENSION (DLC career): the selected career is an add-on's; the two
+    // checks that read the selected career's own row read its own medals
+    // (original rule, add-on data); the fixed-career checks read stock rows.
+    if(const auto* addon=addonCareer50DL(s)){f.selectedAddonCareer=true;f.selectedAddonMedals=addon->own.medals1938;}
     for(std::size_t i=0;i<13;++i){
         const auto& d=s.defaultHall7EC.courses[i];const auto& l=s.hallRecords.courses[i];
         f.defaultLap7EC[i]=d.lap102F0[0];f.liveLap102F0[i]=l.lap102F0[0];
         f.defaultRace838[i]=d.race1033C[0];f.liveRace1033C[i]=l.race1033C[0];
         f.defaultKnockouts884[i]=d.knockouts10388[0];f.liveKnockouts10388[i]=l.knockouts10388[0];
     }
-    f.availability11018=s.common->availability11018;
+    f.availability11018=readAvailability50DL(s); // DLC merge (gallery tier)
     out=f;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::unlockSpritePods209BE0(std::uint32_t& out)const noexcept {
@@ -1201,7 +1258,13 @@ bool OriginalUiRiderProfileOwner50KG::raceAcknowledgementFacts1AB5BC(game::Origi
     f.mode34=s.common->mode34;f.order187B10=u.order187B10;f.boundary102CC=s.tournament.tournamentBoundary102CC;
     f.record7E4=s.bit0_7E4;
     //1AB730 reads M[C][C][s1] with s1 = order; only taken when order+1 == 13.
-    f.finalMedal=u.order187B10<13?u.diagonalMedals[u.career100C0][u.order187B10]:0;
+    f.finalMedal=u.order187B10<13&&u.career100C0<u.diagonalMedals.size()?u.diagonalMedals[u.career100C0][u.order187B10]:0;
+    // PORT EXTENSION (DLC career): the add-on career's own medal and its own
+    // circuit-boundary flag (the stock 102CC is never written by it).
+    if(const auto* addon=addonCareer50DL(s)){
+        f.finalMedal=u.order187B10<13?addon->own.medals1938[u.order187B10]:0;
+        f.boundary102CC=addon->boundary102CC;
+    }
     f.unlockPending187E30=game::evaluateOriginalUnlocks187E30(u).any();
     out=f;return true;
 }
@@ -1217,6 +1280,24 @@ bool OriginalUiRiderProfileOwner50KG::grantUnlock20B480(std::size_t check,std::u
     const auto pending=game::evaluateOriginalUnlocks187E30(f);
     if(!pending.pending[check])return false;
     auto& s=*storage_;
+    // PORT EXTENSION (DLC career): a grant the add-on career's own result earned
+    // (the race rival 187EE0, the selected-career checks 3 and the 1882D0
+    // gallery) goes to the DLC side save, merged at read time; the stock
+    // unlock words and 11018 are not written. Checks on stock rows only stay
+    // the original's stock grant.
+    if(addonCareer50DL(s)&&(check==0||check==3||check==7)){
+        auto& progress=assets::dlc50DL::progressOwner();
+        if(check==7){
+            if(galleryTier!=pending.galleryTier||!progress.grantGalleryTier(static_cast<std::uint8_t>(galleryTier&3u)))return false;
+        }else{
+            const auto pod=game::originalUnlockPod50PD(f,check);
+            if(pod<0||pod>=27||!progress.grantStockPod(static_cast<unsigned>(pod)))return false;
+        }
+        ++s.generation;after={s.generation,s.common->mode34};
+        std::fprintf(stderr,"dlc_career unlock check=%zu tier=%u stock_save=untouched\n",check,galleryTier);
+        if(s.betaSettings&&(s.betaSettings->flags11050&1u))(void)progress.saveIfChanged();
+        return true;
+    }
     if(check==7){
         if(galleryTier!=pending.galleryTier)return false;
         //188440: byte11018 = (byte & ~0x60) | ((N & 3) << 5).
@@ -1251,10 +1332,19 @@ bool OriginalUiRiderProfileOwner50KG::tournamentCareerSnapshot(std::uint32_t ind
     if(!storage_||!storage_->readable()||index>=27||!storage_->authored[index].present)return false;
     const auto& c=storage_->tournament.careers[index];TournamentCareerSnapshot p;
     p.career100C0=index;p.earned2190=c.earned2190;p.unspent2194=c.unspent2194;p.kills2198=c.kills2198;
-    p.progress219C=c.progress219C;p.availability11018=storage_->common->availability11018;
+    p.progress219C=c.progress219C;p.availability11018=readAvailability50DL(*storage_); // DLC merge
     p.cardFlag100BC=storage_->saveProfile.dirty100BCBit0();
     p.nativeBetaStorage=storage_->betaStatus!=BetaPersistenceStatus::notStarted&&storage_->betaStatus!=BetaPersistenceStatus::disabledFixture;
-    p.medals1938=c.pods[index].medals1938;p.remainingPrizes1946=c.pods[index].remainingPrizes1946;p.stamp=stamp();out=p;return true;
+    p.medals1938=c.pods[index].medals1938;p.remainingPrizes1946=c.pods[index].remainingPrizes1946;
+    // PORT EXTENSION (DLC career): the selected career is an add-on's. The
+    // snapshot keeps the anchor as career100C0 (the original field's value)
+    // and carries the add-on career's scalars and own row.
+    if(const auto* addon=addonCareer50DL(*storage_);addon&&index==storage_->comparison100C0){
+        p.earned2190=addon->career.earned2190;p.unspent2194=addon->career.unspent2194;
+        p.kills2198=addon->career.kills2198;p.progress219C=addon->career.progress219C;
+        p.medals1938=addon->own.medals1938;p.remainingPrizes1946=addon->own.remainingPrizes1946;
+    }
+    p.stamp=stamp();out=p;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::selectedGarageProfileSnapshot(GarageProfileSnapshot& out)const noexcept {
     if(!storage_||!storage_->readable()||storage_->common->mode34!=2)return false;
@@ -1269,6 +1359,12 @@ bool OriginalUiRiderProfileOwner50KG::selectedGarageProfileSnapshot(GarageProfil
     next.maximum0408=s.authored[selected].maximum0408;
     next.current1920=s.tournament.careers[selected].pods[selected].abilities1920;
     next.colors=s.authored[selected].colors;
+    // PORT EXTENSION (DLC career): the add-on pod's own PHY range and its own
+    // row. Colours stay the anchor's (PORT STAND-IN until the Garage reads the
+    // package ui.colors).
+    if(const auto* addon=addonCareer50DL(s)){
+        next.base0180=addon->base;next.maximum0408=addon->maximum;next.current1920=addon->own.abilities1920;
+    }
     const auto after=stamp();
     if(next.career.stamp.generation!=before.generation||next.career.stamp.mode34!=before.mode34||
        after.generation!=before.generation||after.mode34!=before.mode34)return false;
@@ -1319,16 +1415,28 @@ bool OriginalUiRiderProfileOwner50KG::applyGaragePurchase1FEB90(
         volatile float ability=0.05f*count;next.current1920[row]=ability;
     }
     next.career.unspent2194=static_cast<std::uint32_t>(page.available34B0);
+    auto& s=*storage_;
+    // PORT EXTENSION (DLC career): the purchase goes to the add-on career and
+    // the DLC side save (refused whole when it does not fit); the 27 stock
+    // careers and the stock card-dirty bit 100BC are not touched.
+    if(addonCareer50DL(s)){
+        if(!game::dlc50DL::commitAddonGarage(s.comparison100C0,next.current1920,next.career.unspent2194))return false;
+        ++next.career.stamp.generation;++s.generation;after=next;return true;
+    }
     next.career.cardFlag100BC=true;++next.career.stamp.generation;
-    auto& s=*storage_;auto& career=s.tournament.careers[next.career.career100C0];
+    auto& career=s.tournament.careers[next.career.career100C0];
     career.pods[next.career.career100C0].abilities1920=next.current1920; //1FEBF0
     career.unspent2194=next.career.unspent2194;                       //1FEC30
     s.saveProfile.markDirty1AB648();                                //1FEC58 bit0
     ++s.generation;after=next;return true;
 }
 void OriginalUiRiderProfileOwner50KG::autosaveGaragePurchase() noexcept {
-    if(storage_&&storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))
-        (void)saveNativeBetaProgress();
+    if(storage_&&storage_->betaSettings&&(storage_->betaSettings->flags11050&1u)){
+        // DLC career: nothing stock changed; the same save moment writes only
+        // the DLC side save (PORT EXTENSION).
+        if(addonCareer50DL(*storage_))(void)assets::dlc50DL::progressOwner().saveIfChanged();
+        else (void)saveNativeBetaProgress();
+    }
 }
 bool OriginalUiRiderProfileOwner50KG::selectedTournamentCourseSnapshot(
     TournamentCareerSnapshot& career,game::OriginalUiCourseRememberedProfile50KG& course) const noexcept {
@@ -1361,6 +1469,14 @@ bool OriginalUiRiderProfileOwner50KG::selectedTournamentCourseRecordSnapshot(
 }
 bool OriginalUiRiderProfileOwner50KG::tournamentPodCareerSnapshot(std::uint32_t career,std::uint32_t pod,
     game::OriginalTournamentPodCareer50KG& out)const noexcept{
+    // PORT EXTENSION (DLC career): the selected (anchor) career is an add-on's:
+    // its own row for the add-on pod, its AI row for a stock pod.
+    if(storage_&&storage_->readable()&&career<27)
+        if(const auto* addon=addonCareer50DL(*storage_);addon&&career==storage_->comparison100C0){
+            if(pod==addon->number){out=addon->own;return true;}
+            if(pod>=27||!storage_->authored[pod].present)return false;
+            out=addon->career.pods[pod];return true;
+        }
     if(!storage_||!storage_->readable()||career>=27||pod>=27||!storage_->authored[career].present||!storage_->authored[pod].present)return false;
     out=storage_->tournament.careers[career].pods[pod];return true;
 }
@@ -1368,7 +1484,8 @@ bool OriginalUiRiderProfileOwner50KG::tournamentTextMetadataSnapshot(std::uint32
     TournamentTextMetadataSnapshot& out)const noexcept {
     if(!storage_||!storage_->readable()||career>=storage_->authored.size()||
        !storage_->authored[career].present)return false;
-    const auto& s=*storage_;const auto progress=std::uint8_t(s.tournament.careers[career].progress219C&31u);
+    const auto& s=*storage_;const auto* addon=career==s.comparison100C0?addonCareer50DL(s):nullptr; // DLC career
+    const auto progress=std::uint8_t((addon?addon->career.progress219C:s.tournament.careers[career].progress219C)&31u);
     if(progress>s.courseOrder100C4.size()||s.racerNames3C[career]<0)return false;
     // Original1EF230..244 retains progress13 for the completed text branch,
     // but clamps its local course-order index to12. Never read a 14th course.
@@ -1392,6 +1509,12 @@ bool OriginalUiRiderProfileOwner50KG::resultsNameCourse1C9C80(std::uint32_t& cou
 bool OriginalUiRiderProfileOwner50KG::resultsFirstName1C9CA4(
     OriginalPersistedProfileName50KG& out)const noexcept {
     if(!storage_||!storage_->readable())return false;
+    // PORT EXTENSION (DLC career): the add-on career's own 219D name.
+    if(const auto* addon=addonCareer50DL(*storage_)){
+        OriginalPersistedProfileName50KG name;
+        if(!name.replaceCString(addon->name))return false;
+        out=name;return true;
+    }
     // Source1C9CAC: mode2 uses actual career100C0/219D; other modes use
     // player0's10F68. Existing owned-name readers preserve known NUL prefix.
     return storage_->common->mode34==2u?careerName219D(storage_->comparison100C0,out):
@@ -1458,9 +1581,25 @@ bool OriginalUiRiderProfileOwner50KG::commitTournamentRaceResult(const game::Lap
        storage_->tournamentLaunchManager!=&manager||storage_->tournamentLaunchApplication!=&application||
        !sameCourseRace(storage_->tournamentLaunchSelection,launch)||(manager.flags58&3u)!=3u||
        humans!=((storage_->common->playerBits1125C>>5)&3u)||count!=launch.entrants||!racers||
-       racers[0].pod60!=launch.rider||racers[0].class58!=0)return false;
+       racers[0].pod60!=(addonCareer50DL(*storage_)?addonCareer50DL(*storage_)->number:launch.rider)||
+       racers[0].class58!=0)return false;
     CourseRaceSelection current;
     if(!courseRaceSnapshot(current)||!sameCourseRace(current,launch))return false;
+    if(addonCareer50DL(*storage_)){
+        // PORT EXTENSION, NOT ORIGINAL (DLC career): the same 1875C0/187D80 body
+        // on the add-on career (its own pod is the human row 0). The stock
+        // careers, the stock availability byte 11018 and the stock save are
+        // not written; the DLC side save follows the same autosave moment.
+        if(!game::dlc50DL::commitAddonResult(storage_->comparison100C0,storage_->packed1125F,racers,count,humans,
+               storage_->tournament.base0180,storage_->tournament.maximum0408,readAvailability50DL(*storage_),
+               application.rawRandom308030,receipt)){
+            std::fprintf(stderr,"tournament_commit_receipt status=%u pc=%x career=dlc\n",unsigned(receipt.status),receipt.sourcePC);return false;}
+        storage_->tournamentResultArmed=false;storage_->tournamentLaunchManager=nullptr;storage_->tournamentLaunchApplication=nullptr;
+        ++storage_->generation;
+        if(storage_->betaSettings&&(storage_->betaSettings->flags11050&1u))
+            (void)assets::dlc50DL::progressOwner().saveIfChanged();
+        return true;
+    }
     receipt=game::applyOriginalTournamentResult50KG(storage_->tournament,storage_->comparison100C0,storage_->packed1125F,
         racers,count,humans,storage_->common->availability11018,application.rawRandom308030);
     if(receipt.status!=game::OriginalTournamentResultStatus50KG::complete){
@@ -1606,6 +1745,7 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseLaunch(const game::OriginalUiR
     s.subtype11258=tournament?1u:c.subtypeSlot14F4;
     if(!tournament){s.rememberedCourse[0]=c.courseSlot14E4;s.rememberedCourse[1]=c.laps14EC;
         s.rememberedCourse[2]=c.entrants14F0;s.rememberedCourse[3]=c.subtypeSlot14F4;}
+    game::dlc50DL::noteCourseLaunch(tournament); // DLC career: which launch the race helper serves (PORT EXTENSION)
     ++s.generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitCourseBack(const game::OriginalUiRouteDecision50KG& d,const game::OriginalUiCourseContext50KG& source,
@@ -1653,6 +1793,12 @@ bool OriginalUiRiderProfileOwner50KG::storeResultsName1CA528(std::uint32_t mode,
     OriginalPersistedProfileName50KG* target=nullptr;
     if(mode==3u&&s.common->mode34==2u){
         if(s.comparison100C0>=names.careerNames_.size())return false;
+        // PORT EXTENSION (DLC career): the name goes to the add-on career, never
+        // into the anchor's stock 219D.
+        if(addonCareer50DL(s)){
+            if(!game::dlc50DL::storeAddonCareerName(s.comparison100C0,name))return false;
+            ++s.generation;if(s.tournamentResultArmed)++s.tournamentEndStoreBumps;return true;
+        }
         target=&names.careerNames_[s.comparison100C0]; //1CA514..528.
     }else target=&names.playerNames_[mode==3u?0u:1u]; //1CA544/1CA56C.
     if(!target->replaceCString(name))return false;

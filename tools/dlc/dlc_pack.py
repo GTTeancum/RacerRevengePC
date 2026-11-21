@@ -592,6 +592,56 @@ def pst_shape(b):
         return None
 
 
+def psg_materials(b):
+    """Material entry names of a PSG v3 model (layout of import_scene48d.cpp: 12-byte header,
+    224-byte nodes, u32 count, 64-byte names), or None when it does not read as one."""
+    try:
+        magic, ver, nodes = struct.unpack_from('<3I', b, 0)
+        if magic != 0x00677370 or ver != 3 or not 1 <= nodes <= 256:
+            return None
+        at = 12 + 224 * nodes
+        count, = struct.unpack_from('<I', b, at)
+        if not 1 <= count <= 4096 or at + 4 + 64 * count > len(b):
+            return None
+        return [b[at + 4 + 64 * i:at + 68 + 64 * i].split(b'\0', 1)[0].decode('latin-1') for i in range(count)]
+    except struct.error:
+        return None
+
+
+# Same rule as src/assets/pod_flame50w.cpp (buildPodFlameOwners50W): a flame material is one whose
+# single shader pass is DiffuseTexTransCompressed with TextureMap_1 = flame. Every engine model that
+# carries flames lists its flame material exactly 4 times, one entry per LOD, even where the last LOD
+# draws no flame (stock POD12 englt1: 4 flame12l entries, 3 drawn surfaces), all with the same name.
+FLAME_ENTRIES = 4
+
+
+def check_flames(names, data, w):
+    def is_flame(material):
+        m = names.get(f'textures\\{material.lower()}.psm')
+        if not m:
+            return False
+        _, lo, sz = m
+        p = ini(data[lo:lo + sz]).get('shaderpass_1', {})
+        return p.get('microprogramname', '').lower() == 'diffusetextranscompressed' and \
+            p.get('texturemap_1', '').lower() == 'flame'
+    for n, (spelling, lo, sz) in sorted(names.items()):
+        if ext(n) != 'psg':
+            continue
+        mats = psg_materials(data[lo:lo + sz])
+        if not mats:
+            continue
+        flames = [x for x in mats if is_flame(x)]
+        if not flames:
+            continue
+        kinds = sorted({x.lower() for x in flames})
+        need(len(kinds) == 1, f'{w}: engine model {spelling} lists different flame materials ({", ".join(kinds)}); '
+             'every flame entry of one engine must name the same flame material')
+        need(len(flames) == FLAME_ENTRIES,
+             f'{w}: engine model {spelling} lists its flame material {flames[0]} {len(flames)} time(s); the game needs '
+             f'exactly {FLAME_ENTRIES}, one entry per LOD, also for a LOD that draws no flame '
+             '(stock POD12 englt1 lists flame12l 4 times over 3 drawn flame surfaces)')
+
+
 _STOCK_RES = {}
 
 
@@ -647,6 +697,7 @@ def check_items(p, stock):
                 need(re.fullmatch(r'\d{1,3}', v) is not None and int(v) <= 255, f'{w}: sounds.ini {k} exceeds its uint8 storage')
         for table in ('curses.ini', 'taunts.ini', 'special.ini'):
             text_member(speech + table)
+        check_flames(names, data, w)
         cam = (p['folder'] / pod['camera']).stat().st_size
         need(0 < cam <= CAMERA_BYTES, f'{w}: camera {pod["camera"]} is empty or larger than 64 KiB')
         try:

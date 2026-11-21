@@ -23,6 +23,14 @@ struct OriginalUnlockFacts50PD {
     std::array<float,13> defaultRace838{},liveRace1033C{};
     std::array<std::uint32_t,13> defaultKnockouts884{},liveKnockouts10388{};
     std::uint8_t availability11018=0;            // gallery tier in bits 5..6
+    // PORT EXTENSION, NOT ORIGINAL (DLC career, src\game\dlc_career50dl.h):
+    // the SELECTED career is an add-on pod's (its 100C0 holds a stock anchor).
+    // The two checks that read the selected career's own diagonal (187F90-class
+    // check 3 and the 1882D0 gallery) read these medals instead of
+    // M[100C0][100C0]; the fixed-career checks keep reading the stock careers.
+    // false: every check reads exactly the original rows.
+    bool selectedAddonCareer=false;
+    std::array<std::uint8_t,13> selectedAddonMedals{};
 };
 enum class OriginalUnlockCheck50PD:std::uint8_t {
     rival187EE0,youngAnakin187F90,sebulba188010,clegg188070,
@@ -45,6 +53,10 @@ inline OriginalUnlockChecks50PD evaluateOriginalUnlocks187E30(const OriginalUnlo
     const auto U=[&](std::size_t pod)noexcept {return pod<f.unlock10FAC.size()&&f.unlock10FAC[pod]!=0;};
     const auto M=[&](std::size_t career,std::size_t order)noexcept->std::uint8_t {
         return career<f.diagonalMedals.size()&&order<13?f.diagonalMedals[career][order]:0;};
+    // The selected career's own medal (M[C][C][o]); an add-on career's own row (DLC).
+    const auto S=[&](std::size_t order)noexcept->std::uint8_t {
+        if(f.selectedAddonCareer)return order<13?f.selectedAddonMedals[order]:0;
+        return M(f.career100C0,order);};
     // 187EE0: U[R]==0 and 7E8 != 0. R outside 0..26 would index another
     // profile word in the original; no authored course has such a rival.
     r.pending[0]=f.rival11280>=0&&f.rival11280<27&&!U(std::size_t(f.rival11280))&&f.word7E8!=0;
@@ -57,7 +69,7 @@ inline OriginalUnlockChecks50PD evaluateOriginalUnlocks187E30(const OriginalUnlo
     }
     r.pending[1]=!U(1)&&lap;
     r.pending[2]=!U(14)&&originalUnlockMedalPodium50PD(M(18,12));        // byte B94C
-    r.pending[3]=!U(3)&&f.career100C0<27&&M(f.career100C0,3)==1;           // +193B
+    r.pending[3]=!U(3)&&f.career100C0<27&&S(3)==1;                         // +193B
     r.pending[4]=!U(25)&&race;
     r.pending[5]=!U(21)&&knockouts;
     r.pending[6]=!U(26)&&U(1)&&U(25)&&U(21)&&
@@ -68,7 +80,7 @@ inline OriginalUnlockChecks50PD evaluateOriginalUnlocks187E30(const OriginalUnlo
     const bool finale=next==4u||next==8u||next==13u;
     if(finale&&f.career100C0<27){
         std::uint32_t wins=0;
-        for(const std::size_t o:{std::size_t(3),std::size_t(7),std::size_t(12)})if(M(f.career100C0,o)==1)++wins;
+        for(const std::size_t o:{std::size_t(3),std::size_t(7),std::size_t(12)})if(S(o)==1)++wins;
         const std::uint32_t tier=(f.availability11018>>5)&3u;
         if(tier<wins){r.pending[7]=true;r.galleryTier=wins;}
     }

@@ -11,6 +11,7 @@
 #include "original_position_stats_adapter50la.h"
 #include "../../src/game/original_racer_selection50ij.h"
 #include "../../src/game/original_opponent_selection50kg.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_roster_operation50la.h"
@@ -80,7 +81,11 @@ void Context::run() const {
        mode2Stamp.mode34==2&&mode2Career.stamp.mode34==2&&mode2Course.mode34==2&&
        mode2Career.stamp.generation==mode2Stamp.generation&&
        courseProfile->stamp().generation==mode2Stamp.generation&&
-       mode2Career.career100C0==playerRacer60&&mode2Selection.rider==playerRacer60&&
+       // DLC career (PORT EXTENSION): an add-on racing a tournament career keeps its
+       // anchor stock rider in 100C0 / 1125D; the raced number maps back to it
+       // (identity for every stock racer, so the stock check is unchanged).
+       mode2Career.career100C0==rr::game::dlc50DL::profileRider(playerRacer60)&&
+       mode2Selection.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&
        mode2Selection.subtype==1&&mode2Selection.entrants==raceRacerCount&&
        raceRacerCount==raceRacerCapacity&&((mode2Selection.packed1125C>>5)&3u)==1u&&
        ((mode2Selection.packed1125C>>7)&15u)==7u&&

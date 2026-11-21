@@ -500,6 +500,15 @@ bool checkedHash(const std::uint8_t* data,std::size_t bytes,const char* expected
     if(result==HashResult::cancelled)return fail(d,Error::cancelled,mip);
     return result==HashResult::match?true:fail(d,error,mip);
 }
+// One rule for every rider page, decided by the texture's own stored format:
+// a member whose PST kind (u32 at +4) is not an IPU page (2) holds no IPU
+// image, and the ordinary PST path reads it. Every stock source is kind 2, so
+// stock bytes keep the exact IPU admission below. Read-only, bounds-checked.
+bool notIpuPage(const std::shared_ptr<const OriginalUiArchive50KG>& archive,const char* member) { // callers hold the try
+    if(!archive||!archive->loaded()||!member)return false;
+    const auto view=archive->find(member);
+    return view.data&&view.size>=8&&u32(view.data+4)!=2u;
+}
 bool decodeOriginalMips(const std::shared_ptr<const OriginalUiArchive50KG>& archive,
     const char* member,std::size_t expectedBytes,const char* expectedSha,
     const SourceMipRecord* mips,std::size_t count,
@@ -559,6 +568,8 @@ bool OriginalUiIpumTextureCache50KG::loadOriginal(std::shared_ptr<const Original
     try {
         if(storage_)return fail(d,Error::alreadyLoaded);
         if(!catalogValid())return fail(d,Error::cacheUnavailable);
+        // Same general rule as every additional rider page (no slot-19 contract).
+        if(notIpuPage(archive,sourceMember)){d={};return true;}
         std::vector<std::vector<std::uint8_t>> images;
         if(!decodeOriginalMips(archive,sourceMember,sourceBytes,sourceSha256,sourceMips,
             originalUiIpumMipCount50KG,images,d,hooks,limits)||!load(std::move(archive),images,d,hooks,limits))return false;
@@ -574,13 +585,7 @@ bool OriginalUiIpumTextureCache50KG::loadAdditionalOriginal(std::size_t sourceIn
         if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
         if(additional_[sourceIndex])return fail(d,Error::alreadyLoaded);
         const auto& record=additionalSources[sourceIndex];
-        // Decided by the texture's own stored format, for every rider: a member
-        // whose PST kind (u32 at +4) is not an IPU page (2) has no IPU image;
-        // the ordinary PST path reads it. Every stock source is kind 2.
-        if(archive&&archive->loaded()){
-            const auto view=archive->find(record.member);
-            if(view.data&&view.size>=8&&u32(view.data+4)!=2u){d={};return true;}
-        }
+        if(notIpuPage(archive,record.member)){d={};return true;} // general rule, see notIpuPage
         std::vector<std::vector<std::uint8_t>> images;
         if(!decodeOriginalMips(archive,record.member,record.sourceBytes,record.sourceSha256,
             record.sourceMips,record.mipCount,images,d,hooks,limits)||
@@ -597,6 +602,7 @@ bool OriginalUiIpumTextureCache50KG::load(std::shared_ptr<const OriginalUiArchiv
         if(storage_)return fail(d,Error::alreadyLoaded);
         if(cancelled(hooks))return fail(d,Error::cancelled);
         if(!catalogValid())return fail(d,Error::cacheUnavailable);
+        if(notIpuPage(archive,sourceMember)){d={};return true;} // general rule, see notIpuPage
         if(!archive||!archive->loaded()||
             archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
             std::strcmp(archive->identity()->sha256,archiveSha256)!=0)return fail(d,Error::archive);
@@ -688,10 +694,7 @@ bool OriginalUiIpumTextureCache50KG::loadAdditional(std::size_t sourceIndex,std:
         if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
         if(additional_[sourceIndex])return fail(d,Error::alreadyLoaded);
         const auto& record=additionalSources[sourceIndex];
-        if(archive&&archive->loaded()){ // Not an IPU page by its own PST kind: nothing to retain.
-            const auto view=archive->find(record.member);
-            if(view.data&&view.size>=8&&u32(view.data+4)!=2u){d={};return true;}
-        }
+        if(notIpuPage(archive,record.member)){d={};return true;} // Not an IPU page: nothing to retain.
         const auto* sourceMember=record.member;const auto* sourceSha256=record.sourceSha256;
         const auto sourceBytes=record.sourceBytes;const auto mipCount=record.mipCount;
         const auto& sourceMips=record.sourceMips;const auto& retainedMipRecords=record.retainedMips;

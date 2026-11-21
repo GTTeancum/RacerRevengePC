@@ -1,4 +1,5 @@
 #include "advancement_selectors49k.h"
+#include "n64_airborne_gravity50ag.h"
 #include <cmath>
 #include <cfenv>
 #include <cstring>
@@ -31,7 +32,9 @@ bool selectGravity49K(const GravitySelection49K& s,float& out) noexcept {
     for(float x:{s.brake350_EC,s.cachedSpeed340_34,s.sceneUpY,s.vehicle378,s.vehicle37C,s.effective434730,s.effective434738})
         if(!std::isfinite(x))return false;
     float value=0.0f;Math f;
-    if(!s.incoming348_104)value=s.vehicle37C;
+    // PORT EXTENSION (n64_airborne_gravity50ag.h): N64 airborne gravity when the
+    // course authors it; otherwise the pod's own +37C (stock, unchanged).
+    if(!s.incoming348_104)value=n64AirborneGravityOr50AG(s.vehicle37C);
     else if(!(s.brake350_EC>0.0f&&s.cachedSpeed340_34<fp(0x4212aa7fu))) {
         if(s.effective434738!=0.0f) {
             const float f2=f.sub(s.sceneUpY,s.effective434738);

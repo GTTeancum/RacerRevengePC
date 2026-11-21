@@ -30,7 +30,8 @@ bool resolveOriginalUiWinCircuit50PD(const OriginalUnlockFacts50PD& f,OriginalUi
     else if(next==8u){circuit=2;order=7;}       //+193F
     else if(next==13u){circuit=3;order=12;}     //+1944
     else {pc=0x208668;return false;}             // "No Tier was completed..." assert
-    const auto place=f.diagonalMedals[f.career100C0][order];
+    // DLC career (PORT EXTENSION): an add-on selected career's own medal.
+    const auto place=f.selectedAddonCareer?f.selectedAddonMedals[order]:f.diagonalMedals[f.career100C0][order];
     // 2086CC..208724: places 1..3 select a slot; anything else asserts.
     if(place<1||place>3){pc=0x20874C;return false;}
     out={circuit,place};return true;

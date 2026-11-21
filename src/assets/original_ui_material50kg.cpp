@@ -1971,10 +1971,10 @@ bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& 
         if (image->texture.width != base.width || image->texture.height != base.height ||
             image->texture.rgba != base.rgba)
             return fail(d,Error::texture,"published native image must equal original largest mip",0x24eb90u);
-        // Preserve the established19 contract; additions still pass every
-        // source-backed common lit raster/sampler/blend validation below.
-        if((same(name,"19c_1")&&texture->mips.size()!=5)||
-           pass.gs[Field::alphaBlendingOnOff].value!=0||pass.gs[Field::alphaTestOnOff].value!=0)
+        // One rule for every rider page: the mip count is the page's own (PST
+        // +8, admitted by the cache and checked equal above), never a per-page
+        // constant. Stock 19c_1 stores 5, so it is unchanged.
+        if(pass.gs[Field::alphaBlendingOnOff].value!=0||pass.gs[Field::alphaTestOnOff].value!=0)
             return fail(d,Error::profile,"actual opaque alpha-test-off Rider IPUM pass",0x2476a0u);
         OriginalUiRider19IpumMaterial50KM next;
         if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,

@@ -2,6 +2,8 @@
 #include "original_ui_tournament_session50kg.h"
 #include "original_ui_main_draw50kg.h"
 #include "vehicle_window_gl50ds.h"
+#include "../../../src/game/dlc_career50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -201,7 +203,15 @@ S OriginalUiTournamentSession50KG::bind(const OriginalUiTournamentSessionCold50K
   if(s->nav.page->groups.size()!=3||s->nav.page->controls.size()!=3||!s->nav.page->hasPopup)return result(d,S::resource);
   s->widgets=std::make_shared<OriginalUiTournamentWidgets50KG>();if(!s->widgets->bind(cold.widgets,d.widget))return result(d,S::widget);
   const auto localized=[&](std::int32_t id)->const std::string*{if(id<0)return nullptr;const auto*e=cold.english->at(std::size_t(id));return e?&e->text:nullptr;};
-  const auto*name=localized(s->textMetadata.racerName3C);const auto*money=localized(321);const auto*earned=localized(323);const auto*kills=localized(324);
+  // PORT EXTENSION (DLC career, dlc_career50dl.h): an add-on career's racer name
+  // and colours are the package's (name_key text, ui.colors); 100C0 holds its anchor.
+  std::string addonName;const std::string* addonNamePtr=nullptr;
+  if(const auto* addon=rr::game::dlc50DL::activeAddonCareer(s->state.career))
+   if(const auto* pod=rr::assets::dlc50DL::addonPod(addon->number)){
+    addonName=pod->name;addonNamePtr=&addonName;
+    if(pod->ui.colorsAuthored){s->colors.accent17FA00=pod->ui.accentColor;s->colors.secondary17FA10=pod->ui.secondaryColor;}
+   }
+  const auto*name=addonNamePtr?addonNamePtr:localized(s->textMetadata.racerName3C);const auto*money=localized(321);const auto*earned=localized(323);const auto*kills=localized(324);
   if(!name||!money||!earned||!kills)return result(d,S::resource,0x1EF0F4);
   std::string courseLine;
   if(s->textMetadata.progressIndex==13){

@@ -269,6 +269,14 @@ def main():
                              'not the tournament Results replay), choose Main Menu and confirm it, as a player '
                              'would (Down, Enter, Down, Enter, 1 s apart; sets RR_TEST_RESULTS_EXIT). The race '
                              'returns to the original Main and the run then idles at Main until --seconds')
+    # PC-NATIVE ADDITION, NOT ORIGINAL: the Main menu EXIT GAME row.
+    parser.add_argument('--main-exit', choices=['fresh', 'return'],
+                        help='Test only (PC-native EXIT GAME row): on Main, press Up until EXIT GAME is '
+                             'highlighted, Enter to open its dialog, Enter to confirm, one key per settled '
+                             'frame as a player would (sets RR_TEST_MAIN_EXIT). "fresh": the first Main, no '
+                             'race. "return": the frontend after a race (use with --results-exit main); Back '
+                             'is pressed on Rider/Course/Hall/Options until Main. The run passes when the game '
+                             'closed itself cleanly: native_exit_code=0 and a plain SESSION END')
     parser.add_argument('--hold-results', action='store_true',
                         help='Test only: stay on the Results screen the race ends on (native free-play panel or '
                              'the tournament Results replay) and write ONE frame of it as an image 3 s after it '
@@ -408,6 +416,11 @@ def main():
         parser.error('--hold-rider works only with --route ' + ' / '.join(ADDON_RIDER_ROUTES))
     if args.hold_results and (args.results_exit or args.results_confirm):
         parser.error('--hold-results holds the Results screen; it cannot be combined with --results-exit or --results-confirm')
+    if args.main_exit == 'return' and not args.results_exit:
+        parser.error('--main-exit return needs --results-exit main (the race must return to the frontend)')
+    if args.main_exit and (args.hold_results or args.hold_results_hall or args.hold_rider or args.hold_course or
+                           args.eyecheck_dlc_hall is not None or args.restart_once):
+        parser.error('--main-exit ends the run from Main; it cannot be combined with a hold, eye check or --restart-once')
     if args.eyecheck_dlc_hall is not None:
         if not addon_key.fullmatch(args.eyecheck_dlc_hall):
             parser.error('--eyecheck-dlc-hall expects <package-id>/<item-id>, e.g. arcade-ark-roose/a2r-ark')
@@ -510,7 +523,8 @@ def main():
     # the game window being in front. RR_TEST_IGNORE_FOCUS stops focus loss
     # from pausing or releasing those inputs; a real minimise/close still does.
     injected = (args.hold_throttle or args.steer_invert or args.camera_cycle or args.results_confirm or args.results_exit or args.hold_results or
-                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None or args.pause_quit or args.pause_restart)
+                args.destroy or args.undertrack or getattr(args, 'pad_hold_a', False) or args.player_racer is not None or args.pause_quit or args.pause_restart or
+                args.main_exit)
     if injected:
         env['RR_TEST_IGNORE_FOCUS'] = '1'
     if args.pause_quit:
@@ -546,6 +560,8 @@ def main():
         # exit is the player confirming its pages: 1AB5BC then leaves for
         # Hall11 (a record), Unlock10 or Course6, as the original does.
         env.setdefault('RR_TEST_RESULTS_CONFIRM', '2')
+    if args.main_exit:
+        env['RR_TEST_MAIN_EXIT'] = args.main_exit
     if args.hold_results:
         env['RR_TEST_RESULTS_HOLD'] = '1'
     if args.hold_results_hall:
@@ -808,6 +824,33 @@ def main():
                 seededSlowHall=args.seed_slow_dlc_hall)
         quit_texts = log_text + ''.join((output / name).read_text(errors='replace')
                                         for name in ('stderr.log', 'stdout.log') if (output / name).is_file())
+        if args.main_exit:
+            # PC-NATIVE ADDITION (EXIT GAME): the game closed itself from Main through the
+            # window-Close path. Proof is in the log, not a frame: the dialog was confirmed,
+            # the frontend took the clean close, the process returned 0 and the log ends with
+            # a plain SESSION END (no exit=terminate, no refused close step).
+            markers = re.findall(r'=+ RacerRevenge (SESSION [^\r\n]*?) UTC', log_text)
+            close = re.findall(r'pc_native_exit_game frontend_close route_screen=(\d+) session=(\d+) race_return=(\d)', quit_texts)
+            result['mainExit'] = dict(
+                mode=args.main_exit,
+                rowReady='pc_native_exit_game row=ready' in quit_texts,
+                rowUnavailable=re.findall(r'pc_native_exit_game row=unavailable[^\r\n]*', quit_texts),
+                steps=re.findall(r'(?:test_main_exit|pc_native_exit_game) [^\r\n]*', quit_texts),
+                frontendClose=close,
+                nativeExitCode=re.findall(r'native_exit_code=(-?\d+)', quit_texts),
+                sessionMarkers=markers,
+                refusals=re.findall(r'frontend_close_refused[^\r\n]*', quit_texts),
+                terminate='native_terminate' in quit_texts or 'exit=terminate' in quit_texts)
+            me = result['mainExit']
+            result['routeCompleted'] = bool(
+                result.get('exitCode') == 0 and not result.get('watchdogExpired', True) and
+                me['rowReady'] and 'pc_native_exit_game dialog=confirm' in quit_texts and
+                'pc_native_exit_game exit_requested=1' in quit_texts and
+                close and close[-1][0] == '4' and
+                (close[-1][1] == '0' if args.main_exit == 'fresh' else int(close[-1][1]) > 0) and
+                me['nativeExitCode'] == ['0'] and markers and markers[-1].strip() == 'SESSION END' and
+                not me['refusals'] and not me['terminate'] and
+                (not logs_only or result.get('noImagesWritten', True)))
         quit_lines = re.findall(r'(?:test_pause_quit|pause_quit|pause_quit_admission|pause_request|pause_open|pause_row|pause_close|'
                                 r'pause_owner|pause_navigation|original_pause_owner|time_trial_restart) [^\r\n]*', quit_texts)
         if args.pause_quit or args.pause_restart or quit_lines:

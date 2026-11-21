@@ -132,16 +132,40 @@ struct Parse {
         const auto v=at->get<std::uint64_t>();if(v>max)return fail(where+"."+key+": must be 0.."+std::to_string(max));
         out=v;return true;
     }
-    bool career(const Json& c,ProgressCareer& out,const std::string& where){
-        if(!c.is_object()||!onlyKeys(c,{"earned","unspent","kills","progress","pod"},where))
-            return reason.empty()?fail(where+": must be a career object"):false;
+    bool career(const Json& c,ProgressCareer& out,const std::string& where,bool v3){
+        if(!c.is_object())return fail(where+": must be a career object");
+        const bool keys=v3?onlyKeys(c,{"earned","unspent","kills","progress","pod","ai","name","boundary"},where):
+            onlyKeys(c,{"earned","unspent","kills","progress","pod"},where);
+        if(!keys)return reason.empty()?fail(where+": must be a career object"):false;
         std::uint64_t v=0;ProgressCareer next;
         if(!unsignedIn(c,"earned",0xffffffffull,v,where))return false;next.earned2190=std::uint32_t(v);
         if(!unsignedIn(c,"unspent",0xffffffffull,v,where))return false;next.unspent2194=std::uint32_t(v);
         if(!unsignedIn(c,"kills",0xffffffffull,v,where))return false;next.kills2198=std::uint32_t(v);
         if(!unsignedIn(c,"progress",ProgressLimits::progress,v,where))return false;next.progress219C=std::uint8_t(v);
-        const auto pod=c.find("pod");const auto pw=where+".pod";
-        if(pod==c.end()||!pod->is_object()||!onlyKeys(*pod,{"abilities","medals","remaining_prizes"},pw))
+        const auto pod=c.find("pod");
+        if(pod==c.end())return fail(where+".pod: must be an object");
+        if(!podRow(*pod,next.pod,where+".pod"))return false;
+        if(v3){
+            if(const auto ai=c.find("ai");ai!=c.end()){
+                if(!ai->is_array()||ai->size()!=27)return fail(where+".ai: must be a list of 27 pod rows");
+                for(std::size_t i=0;i<27;++i)if(!podRow((*ai)[i],next.ai[i],where+".ai["+std::to_string(i)+"]"))return false;
+                next.aiStored=true;
+            }
+            if(const auto n=c.find("name");n!=c.end()){
+                if(!n->is_string())return fail(where+".name: must be a string");
+                next.name=n->get<std::string>();
+            }
+            if(c.find("boundary")!=c.end()){
+                if(!unsignedIn(c,"boundary",1,v,where))return false;
+                next.boundary102CC=std::uint32_t(v);
+            }
+        }
+        if(!validCareer(next))return fail(where+": career values out of range");
+        out=next;return true;
+    }
+    bool podRow(const Json& row,game::OriginalTournamentPodCareer50KG& out,const std::string& pw){
+        const Json* pod=&row;game::OriginalTournamentPodCareer50KG next;
+        if(!pod->is_object()||!onlyKeys(*pod,{"abilities","medals","remaining_prizes"},pw))
             return reason.empty()?fail(pw+": must be an object"):false;
         const auto list=[&](const char* key,std::size_t n)->const Json*{
             const auto at=pod->find(key);
@@ -153,19 +177,18 @@ struct Parse {
             const float f=static_cast<float>(e.get<double>());
             if(!(f==0.f||rule::ordinary(f)))return fail(pw+".abilities: finite values only");
             if(!(f>=0.f))return fail(pw+".abilities: values must be >= 0");
-            next.pod.abilities1920[i]=f;}
+            next.abilities1920[i]=f;}
         const auto* medals=list("medals",13);if(!medals)return false;
         for(std::size_t i=0;i<13;++i){const auto& e=(*medals)[i];
             if(!e.is_number_integer()||(!e.is_number_unsigned()&&e.get<std::int64_t>()<0)||e.get<std::uint64_t>()>ProgressLimits::medal)
                 return fail(pw+".medals: whole numbers 0..8");
-            next.pod.medals1938[i]=std::uint8_t(e.get<std::uint64_t>());}
+            next.medals1938[i]=std::uint8_t(e.get<std::uint64_t>());}
         const auto* prizes=list("remaining_prizes",13);if(!prizes)return false;
         for(std::size_t i=0;i<13;++i){const auto& e=(*prizes)[i];
             if(!e.is_number_integer())return fail(pw+".remaining_prizes: whole numbers");
             const auto x=e.get<std::int64_t>();
             if(x<-32768||x>32767)return fail(pw+".remaining_prizes: must fit 16 bits");
-            next.pod.remainingPrizes1946[i]=std::int16_t(x);}
-        if(!validCareer(next))return fail(where+": career values out of range");
+            next.remainingPrizes1946[i]=std::int16_t(x);}
         out=next;return true;
     }
     bool table(const Json& hall,DlcProgress50DL::Table& out,const std::string& where){
@@ -269,13 +292,15 @@ bool DlcProgress50DL::parse(const std::string& text,State& out,bool& newerSchema
     const auto schema=root.find("schema");
     if(schema==root.end()||!schema->is_string())return p.fail("missing schema");
     const auto name=schema->get<std::string>();
-    // /2 is written; /1 (no careers) is still read and is rewritten as /2.
-    const bool v1=name==progressSchemaV1;
-    if(name!=progressSchema&&!v1){
+    // /3 is written; /2 (careers without ai/name/boundary, no unlocks) and /1
+    // (no careers) are still read and rewritten as /3.
+    const bool v1=name==progressSchemaV1,v2=name==progressSchemaV2,v3=name==progressSchema;
+    if(!v3&&!v2&&!v1){
         if(name.rfind("rrpc-dlc-progress/",0)==0){newerSchema=true;return p.fail("schema \""+name+"\" is not "+progressSchema);}
         return p.fail("schema \""+name+"\" is not "+progressSchema);
     }
-    if(!p.onlyKeys(root,{"schema","courses","stock_course_addon_pod_records","pods","careers"},"file"))return false;
+    if(!(v3?p.onlyKeys(root,{"schema","courses","stock_course_addon_pod_records","pods","careers","unlocks"},"file"):
+            p.onlyKeys(root,{"schema","courses","stock_course_addon_pod_records","pods","careers"},"file")))return false;
     if(const auto c=root.find("courses");c!=root.end()){
         if(!c->is_object()||c->size()>ProgressLimits::courses)return p.fail("courses: must be an object of at most 1024 entries");
         for(auto it=c->begin();it!=c->end();++it){
@@ -329,8 +354,23 @@ bool DlcProgress50DL::parse(const std::string& text,State& out,bool& newerSchema
         for(auto it=careers->begin();it!=careers->end();++it){
             const auto where="careers."+it.key();
             if(!validItemKey(it.key()))return p.fail(where+": not an item key");
-            ProgressCareer c;if(!p.career(*it,c,where))return false;
+            ProgressCareer c;if(!p.career(*it,c,where,v3))return false;
             next.careers.emplace(it.key(),c);
+        }
+    }
+    if(const auto u=root.find("unlocks");v3&&u!=root.end()){
+        if(!u->is_object())return p.fail("unlocks: must be an object");
+        if(!p.onlyKeys(*u,{"stock_pods","gallery_tier"},"unlocks"))return false;
+        if(const auto pods=u->find("stock_pods");pods!=u->end()){
+            if(!pods->is_array()||pods->size()>27)return p.fail("unlocks.stock_pods: must be a list of at most 27 pods");
+            for(const auto& e:*pods){
+                if(!e.is_number_unsigned()||e.get<std::uint64_t>()>26)return p.fail("unlocks.stock_pods: pods 0..26 only");
+                next.unlocks.stockPods[e.get<std::size_t>()]=true;
+            }
+        }
+        if(u->find("gallery_tier")!=u->end()){
+            std::uint64_t t=0;if(!p.unsignedIn(*u,"gallery_tier",3,t,"unlocks"))return false;
+            next.unlocks.galleryTier=std::uint8_t(t);
         }
     }
     out=std::move(next);return true;
@@ -368,17 +408,27 @@ bool DlcProgress50DL::serialise(const State& state,std::string& text,std::string
         for(const auto& [key,unlocked]:state.pods){Json p=Json::object();p["unlocked"]=unlocked;pods[key]=p;}
         root["pods"]=pods;
         Json careers=Json::object();
+        const auto rowJson=[](const game::OriginalTournamentPodCareer50KG& r){
+            Json pod=Json::object();Json abilities=Json::array(),medals=Json::array(),prizes=Json::array();
+            for(const auto f:r.abilities1920)abilities.push_back(floatJson(f));
+            for(const auto m:r.medals1938)medals.push_back(unsigned(m));
+            for(const auto x:r.remainingPrizes1946)prizes.push_back(int(x));
+            pod["abilities"]=abilities;pod["medals"]=medals;pod["remaining_prizes"]=prizes;return pod;};
         for(const auto& [key,c]:state.careers){
             if(!validCareer(c)){reason="career "+key+" out of range";return false;}
-            Json pod=Json::object();Json abilities=Json::array(),medals=Json::array(),prizes=Json::array();
-            for(const auto f:c.pod.abilities1920)abilities.push_back(floatJson(f));
-            for(const auto m:c.pod.medals1938)medals.push_back(unsigned(m));
-            for(const auto r:c.pod.remainingPrizes1946)prizes.push_back(int(r));
-            pod["abilities"]=abilities;pod["medals"]=medals;pod["remaining_prizes"]=prizes;
             Json e=Json::object();e["earned"]=c.earned2190;e["unspent"]=c.unspent2194;e["kills"]=c.kills2198;
-            e["progress"]=unsigned(c.progress219C);e["pod"]=pod;careers[key]=e;
+            e["progress"]=unsigned(c.progress219C);e["pod"]=rowJson(c.pod);
+            if(c.aiStored){Json ai=Json::array();for(const auto& r:c.ai)ai.push_back(rowJson(r));e["ai"]=ai;}
+            if(!c.name.empty())e["name"]=c.name;
+            if(c.boundary102CC)e["boundary"]=c.boundary102CC;
+            careers[key]=e;
         }
         root["careers"]=careers;
+        if(state.unlocks.galleryTier>3u){reason="gallery tier out of range";return false;}
+        Json unlocks=Json::object();Json stockPods=Json::array();
+        for(std::size_t i=0;i<state.unlocks.stockPods.size();++i)if(state.unlocks.stockPods[i])stockPods.push_back(i);
+        unlocks["stock_pods"]=stockPods;unlocks["gallery_tier"]=unsigned(state.unlocks.galleryTier);
+        root["unlocks"]=unlocks;
         text=root.dump(2)+"\n";
         if(text.size()>ProgressLimits::fileBytes){reason="file would exceed 1 MiB";return false;}
         return true;
@@ -667,10 +717,28 @@ DlcProgress50DL::SaveStatus DlcProgress50DL::saveIfChanged() noexcept {
 }
 
 // ---- Add-on pod careers (schema /2). PORT EXTENSION, NOT ORIGINAL.
+namespace {
+bool validPodRow(const game::OriginalTournamentPodCareer50KG& r) noexcept {
+    for(const auto f:r.abilities1920)if(!(f==0.f||rule::ordinary(f))||!(f>=0.f))return false;
+    for(const auto m:r.medals1938)if(m>ProgressLimits::medal)return false;
+    return true;
+}
+}
 bool validCareer(const ProgressCareer& c) noexcept {
-    if(c.progress219C>ProgressLimits::progress)return false;
-    for(const auto f:c.pod.abilities1920)if(!(f==0.f||rule::ordinary(f))||!(f>=0.f))return false;
-    for(const auto m:c.pod.medals1938)if(m>ProgressLimits::medal)return false;
+    if(c.progress219C>ProgressLimits::progress||c.boundary102CC>1u||!validPodRow(c.pod))return false;
+    if(c.aiStored)for(const auto& r:c.ai)if(!validPodRow(r))return false;
+    if(c.name.size()>ProgressLimits::nameChars)return false;
+    for(const char ch:c.name)if(static_cast<unsigned char>(ch)<0x20u||static_cast<unsigned char>(ch)>0x7Eu)return false;
+    return true;
+}
+bool DlcProgress50DL::grantStockPod(unsigned pod) noexcept {
+    if(pod>=state_.unlocks.stockPods.size())return false;   // bounds: stock pods 0..26
+    if(!state_.unlocks.stockPods[pod]){state_.unlocks.stockPods[pod]=true;dirty_=true;}
+    return true;
+}
+bool DlcProgress50DL::grantGalleryTier(std::uint8_t tier) noexcept {
+    if(tier>3u)return false;                                 // bounds: 11018 bits 5..6
+    if(tier>state_.unlocks.galleryTier){state_.unlocks.galleryTier=tier;dirty_=true;}
     return true;
 }
 ProgressCareer seededCareer(const float (&baseAbilities)[6]) noexcept {

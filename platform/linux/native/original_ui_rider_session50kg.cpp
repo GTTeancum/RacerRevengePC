@@ -7,6 +7,7 @@
 #include "original_ui_rider_addon_overlay50dl.h"
 #include "../../../src/assets/dlc_registry50dl.h"
 #include "../../../src/game/dlc_rider_entries50dl.h"
+#include "../../../src/game/dlc_career50dl.h"
 #include "../../../src/game/original_ui_rider_addon_models50dl.h"
 #include <cmath>
 #include <cstdio>
@@ -220,6 +221,14 @@ struct OriginalUiRiderSession50KG::Storage {
     // The rider every original Confirm field receives: the highlighted stock rider,
     // or for an add-on the stock rider of the last stock Confirm (packed1125D).
     std::uint32_t confirmRider() const noexcept {return addonSlot?addonConfirmRider:state.rider4C4;}
+    // PORT EXTENSION (DLC career, dlc_career50dl.h): the 1EA870/1800E0 career
+    // reset gate. A stock slot is the original's; an add-on slot (P1, Tournament)
+    // applies the same rule to the add-on pod's own career.
+    bool careerResetAllowed() const noexcept {
+        if(!addonSlot)return cold.profile->canResetRiderCareer1800E0(state.rider4C4,cold.profile->stamp());
+        const auto* pod=addonPod();
+        return pod&&addonPlayer==0&&cold.commonProfile->mode34==2u&&game::dlc50DL::canResetAddonCareer(pod->number);
+    }
     void addonLog(const char* action) const noexcept {
         const auto* pod=addonPod();
         std::fprintf(stderr,"dlc_rider_carousel player=%u action=%s slot=%zu key=%s number=%u anchor_rider=%u anchor_slot=%u\n",
@@ -288,6 +297,12 @@ struct OriginalUiRiderSession50KG::Storage {
         game::OriginalUiRiderSelectionProfile50KG p;game::OriginalUiRiderAppearance50KG a;
         if(!liveProfile(p)||state.rider4C4>=p.riders.size()){fault(Status::profile,0x1EAFB0);return false;}
         p.riders[state.rider4C4].unlock10FAC=1;
+        // DLC career: the 1EAFB0 reset prompt reads the add-on career's own medal 0.
+        if(cold.prospectiveMode==2){
+            game::dlc50DL::AddonCareerView50DL career;const auto* pod=addonPod();
+            if(!pod||!game::dlc50DL::addonCareerView(pod->number,career)){fault(Status::profile,0x1EAFB0);return false;}
+            p.riders[state.rider4C4].career1938=career.own.medals1938[0];
+        }
         if(game::projectOriginalUiRiderAppearance50KG(state.rider4C4,p,a)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            !game::applyOriginalUiRiderLighting50KG(true,savedLighting,lighting)){fault(Status::profile,0x1EAFB0);return false;}
         for(std::size_t i=0;i<a.count;++i)if(!widget(a.widgets[i].widget,Operation::setEnabled,a.widgets[i].enable,a.widgets[i].sourcePC))return false;
@@ -498,7 +513,11 @@ struct OriginalUiRiderSession50KG::Storage {
         // Match the Tournament destination, including completed standings;
         // earned/unsaved native progress does not require a fresh career.
         // The frontend still retains every destination owner before writes/audio.
-        if(mode==2){
+        if(mode==2&&addonSlot){
+            // PORT EXTENSION (DLC career): the add-on pod's own career, same gate.
+            game::dlc50DL::AddonCareerView50DL career;const auto* pod=addonPod();
+            if(!pod||!game::dlc50DL::addonCareerView(pod->number,career)||(career.progress219C&31u)>13u)return false;
+        }else if(mode==2){
             OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
             if(!cold.profile->tournamentCareerSnapshot(state.rider4C4,career)||
                (career.cardFlag100BC&&!career.nativeBetaStorage)||
@@ -506,7 +525,7 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         // PORT EXTENSION: an add-on rider has no confirm voice (DLC voice absent),
         // so the original per-rider voice preflight does not gate its Confirm.
-        return confirmAudioReady()&&(mode==0||mode==2)&&(!addonSlot||(mode!=2&&addonPod()))&&
+        return confirmAudioReady()&&(mode==0||mode==2)&&(!addonSlot||(addonPod()&&(mode!=2||addonPlayer==0)))&&
             cold.commonProfile->mode34==mode&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
             cold.profile->riderSelectionFacts(confirmRider(),rider)&&rider.unlock10FAC&&
             confirmAnimationPreflight(d)&&(addonSlot?boundedRiderConfirmEnabled&&cold.application->clock101A50:
@@ -1031,8 +1050,10 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         if(!s->backend.bindMaterialConsumer(&s->collector,s.get(),&Storage::consumeMaterialEvents))return result(d,Status::backend);
         // PORT EXTENSION (DLC D3/D4): add-on riders join the free-play carousel only.
         if(const auto addons=game::dlc50DL::addonRiderCount()){
-            // Free play: mode0 (one human) and mode1 (two-player VS). Never Tournament.
-            s->addonCarousel=cold.prospectiveMode==0||cold.prospectiveMode==1;
+            // Free play: mode0 (one human) and mode1 (two-player VS); Tournament
+            // (mode2, P1 page) for the add-on pod's own career (dlc_career50dl.h).
+            s->addonCarousel=cold.prospectiveMode==0||cold.prospectiveMode==1||
+                (cold.prospectiveMode==2&&s->addonPlayer==0);
             game::dlc50DL::setHighlightedAddonRider(s->addonPlayer,0);
             std::fprintf(stderr,"dlc_rider_carousel player=%u action=%s mode=%u addons=%zu stock_slots=%zu\n",
                 unsigned(s->addonPlayer)+1u,s->addonCarousel?"ready":"off",cold.prospectiveMode,addons,page->groups[1].controls.size());
@@ -1168,6 +1189,17 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
             popup.result3D8=0;s->resetPending=false;return finish(Status::ok,0x1EAF04);
         }
         if(popup.result3D8!=2u)return finish(Status::unsupportedState,0x1EAEA4);
+        if(s->addonSlot){
+            // PORT EXTENSION (DLC career): 1800E0 on the add-on pod's own career
+            // (DLC side save); the anchor's stock career is not touched. The
+            // add-on appearance is then projected as the original 1EAFB0 does.
+            const auto* pod=s->addonPod();
+            if(!s->idleInput()||!pod||!s->careerResetAllowed())return finish(Status::unavailableDestination,0x1EAEC8);
+            if(!game::dlc50DL::resetAddonCareer(pod->number))return finish(Status::profile,0x1EAEC8);
+            popup.result3D8=0;s->resetPending=false;
+            if(!s->addonAppearance()){d=s->callbackFault;return d.status;}
+            return finish(Status::ok,0x1EAEE8);
+        }
         game::OriginalUiRiderSelectionProfile50KG before,after;
         game::OriginalUiRiderAppearance50KG appearance;
         Storage::NativeProjection projected;
@@ -1230,7 +1262,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
         if(!(s->state.promptMask42C&4u))return finish(Status::noChange,0x1EA870);
         if(!shared||s->resetPending||!s->idleInput()||!s->sharedEntryComplete||
            s->cold.prospectiveMode!=2u||!s->collector.sharedPopupInputCurrent(*shared)||
-           !s->cold.profile->canResetRiderCareer1800E0(s->state.rider4C4,s->cold.profile->stamp())||
+           !s->careerResetAllowed()||
            (s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!s->cold.audio->canPlayMenuEffect(1)))
             return finish(Status::unavailableDestination,0x1EAA20);
         OriginalUiSharedDialogs50KG::Diagnostic sd;
@@ -1256,7 +1288,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     s->addonConfirmRider=0;
     if(in.originalInput==4&&s->addonSlot){
         std::uint8_t packed=0;std::uint32_t comparison=0;
-        if(!s->addonPod()||s->addonPlayer!=0||s->cold.prospectiveMode==2||!s->cold.profile->riderConfirmSnapshot(packed,comparison))
+        if(!s->addonPod()||s->addonPlayer!=0||!s->cold.profile->riderConfirmSnapshot(packed,comparison)) // mode 2: DLC career (dlc_career50dl.h)
             return finish(Status::profile,0x1EA58C);
         const std::uint32_t stock=packed>>3u;
         if(stock>=27||!profile.riders[stock].ownerReady||!profile.riders[stock].unlock10FAC){
@@ -1714,7 +1746,7 @@ bool OriginalUiRiderSession50KG::sharedResetInputCurrent(const OriginalUiSharedD
         s->idleInput()&&s->processCurrent()&&s->lightCurrent()&&s->cold.prospectiveMode==2u&&
         (s->state.promptMask42C&4u)&&!s->cold.application->controllerPopupState.active3CC&&
         !s->cold.application->controllerPopupState.result3D8&&s->collector.sharedPopupInputCurrent(shared)&&
-        s->cold.profile->canResetRiderCareer1800E0(s->state.rider4C4,s->cold.profile->stamp());
+        s->careerResetAllowed();
 }
 Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& clock,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
@@ -1741,6 +1773,14 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
         stats.unlocked10FAC=1;stats.medal1938={};stats.careerTrack219C=0;
         for(std::size_t lane=0;lane<stats.current1920.size();++lane){
             stats.current1920[lane]=pod->baseAbilities[lane];stats.maximum0408[lane]=pod->maxAbilities[lane];
+        }
+        // DLC career (Tournament): the career's own row, medals and progress, as
+        // statSnapshot gives a stock rider its career's diagonal row.
+        if(s->cold.prospectiveMode==2){
+            game::dlc50DL::AddonCareerView50DL career;
+            if(!game::dlc50DL::addonCareerView(pod->number,career))return result(d,Status::profile,0x1EBBF0);
+            stats.current1920=career.own.abilities1920;stats.medal1938=career.own.medals1938;
+            stats.careerTrack219C=career.progress219C&31u;
         }
         auto& overlay=s->addonOverlay;overlay={};
         overlay.collector=&s->collector;overlay.suppressed=ids;overlay.nameWidget=ids[1];

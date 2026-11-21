@@ -1,4 +1,5 @@
 #include "original_camera_start_effects.h"
+#include "original_race_fog_far50nf.h"
 #include "original_video_blocking_color50la.h"
 #include "body_scene48g.h"
 #include "scalar_minmax48o.h"
@@ -346,7 +347,9 @@ OriginalCountdownStep advanceOriginalRaceCountdown1AFA84(OriginalRaceStartCountd
 OriginalCameraStartResult restoreOriginalRaceFog1A98DC(OriginalRaceFogFields& fog,
     std::uint32_t& rendererColor) noexcept {
     if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x13e968);
-    auto n=fog;Arithmetic a;n.far50=4000;n.near54=constant(0x44a6a99a);n.minimum58=64;n.color30|=0xff000000u;
+    // far50: the original constant 4000 unless the course's Fog block authors the
+    // N64-canonical FarDistance (DLC only; stock never does, so stock stays 4000).
+    auto n=fog;Arithmetic a;n.far50=raceFogFarDistance50NF();n.near54=constant(0x44a6a99a);n.minimum58=64;n.color30|=0xff000000u;
     const float distance=a.sub(n.far50,n.near54);
     n.end38=a.add(n.near54,a.mul(n.authoredFraction3C,distance));
     n.start34=a.mul(a.sub(1,n.authoredFraction40),a.sub(n.end38,n.minimum58));

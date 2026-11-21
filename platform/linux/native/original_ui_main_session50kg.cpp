@@ -1,7 +1,18 @@
 #include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
+#include "original_ui_main_exit_game50xg.h"
+#include "../../../src/assets/material_texture_assets50ea.h"
+#include "../../../src/assets/original_ui_overlay_text50kg.h"
+#include "../../../src/assets/original_ui_screen_assets50kg.h"
+#include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
+#include "../../../src/game/original_ui_main_layout50kg.h"
+#include "../../../src/game/original_ui_text50kg.h"
+#include "../../../src/game/original_ui_text_geometry50kg.h"
+#include "../../../src/game/original_ui_text_position50kg.h"
+#include "../../../src/game/original_ui_text_widget50kg.h"
 #include <cmath>
+#include <cstdio>
 #include <exception>
 #include <cstring>
 #include <new>
@@ -20,9 +31,20 @@ bool widgetOkay(WidgetStatus s) noexcept {
     return s==WidgetStatus::ok || s==WidgetStatus::noChange || s==WidgetStatus::hidden || s==WidgetStatus::lockedOut;
 }
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok || s==ApertureStatus::noChange;}
+// PC-NATIVE ADDITION (EXIT GAME, original_ui_main_exit_game50xg.h): process-wide host
+// status of the Main session that last published it, and the one-shot exit request.
+// owner is compared only, never dereferenced.
+OriginalUiMainExitGameStatus50XG exitGameStatus50XG{};
+const void* exitGameStatusOwner50XG=nullptr;
+bool exitGameRequest50XG=false;
 Status result(OriginalUiMainSessionDiagnostic50KG& d,Status s,std::uint32_t pc=0) noexcept {
     d.status=s;d.sourcePC=pc;return s;
 }
+}
+// PC-NATIVE ADDITION (EXIT GAME, original_ui_main_exit_game50xg.h).
+OriginalUiMainExitGameStatus50XG originalUiMainExitGameStatus50XG() noexcept {return exitGameStatus50XG;}
+bool takeOriginalUiMainExitGameRequest50XG() noexcept {
+    const bool requested=exitGameRequest50XG;exitGameRequest50XG=false;return requested;
 }
 void resetOriginalUiMainProfileFields50KG(OriginalUiMainProfile50KG& p) noexcept {
     p.savedSlot6E0=1;
@@ -47,6 +69,317 @@ struct OriginalUiMainSession50KG::Storage {
     OriginalUiMainRouteProposal50KG pendingRoute{};
     bool updateAudioPrepared=false;
     OriginalUiMainSessionUpdate50KG preparedUpdate{};
+
+    // ---- PC-NATIVE ADDITION, NOT ORIGINAL: EXIT GAME row and its yes/no dialog. ----
+    // Host memory only (see original_ui_main_exit_game50xg.h). The original Main page has
+    // five Group 1 rows and no exit; nothing below adds to ui.dat, the widget bank or the
+    // navigation arrays. The row sits after the last enabled row in the wrap ring
+    // (last -> EXIT -> first). It is drawn from a host copy of the slot-5 row descriptor
+    // (Main's own font, material, colours and fade) one row pitch lower, with Main's own
+    // selection arrows. The dialog copies the shared 47C popup: its materials, its layout
+    // constants (2055B0/2064C0 in original_ui_controller_popup_geometry50kg.cpp), its
+    // original state machine run on a HOST copy of the state (never APP UI+47C) and its
+    // sounds (1 open/Confirm, 5 Cancel). Message text "EXIT GAME?" is PC-native; the
+    // Confirm/Cancel labels are the original LOC 9/10 strings the 47C popup prepared.
+    struct ExitGame {
+        bool prepared=false,rowSelected=false,confirmed=false,requested=false;
+        assets::OriginalUiOverlayText50KG rowDescriptor;
+        game::OriginalUiTextGeometry50KG row;
+        std::uint32_t rowMaterial=0,arrowRight=0,arrowLeft=0;
+        float rowZ=0,arrowZ=0;
+        // 0 message, 1 Confirm label, 2 Cancel label (2055B0 ScreenTexts +270/+2E0/+350).
+        std::array<game::OriginalUiTextLayout50KG,3> text{};
+        std::uint32_t dim=0,overlay=0,font=0,cross=0,triangle=0;
+        float crossWidth=0,crossHeight=0,triangleWidth=0,triangleHeight=0;
+        float overlayReciprocalWidth=0,overlayReciprocalHeight=0;
+        game::OriginalUiControllerPopupState50KG dialog=game::OriginalUiControllerPopup50KG::initialState();
+    } exitGame;
+    ~Storage(){
+        clearOriginalUiMainExitRowOwner50XG(&collector);
+        if(exitGameStatusOwner50XG==this){exitGameStatus50XG={};exitGameStatusOwner50XG=nullptr;}
+    }
+    void publishExitGame() noexcept {
+        const auto& e=exitGame;exitGameStatusOwner50XG=this;
+        exitGameStatus50XG={e.prepared,e.rowSelected,e.dialog.active3CC,
+            e.dialog.active3CC&&e.dialog.result3D8==1&&e.dialog.timer3C4<=0,e.requested};
+    }
+    // Page entry/opening/closing callbacks reselect the original row themselves
+    // (openingAC groupDeselect + selectSlot(savedSlot6E0)); the host row simply lets go.
+    void resetExitGame() noexcept {
+        if(exitGame.requested)return; // exit already handed to the frontend loop
+        exitGame.rowSelected=false;exitGame.confirmed=false;
+        exitGame.dialog=game::OriginalUiControllerPopup50KG::initialState();
+        clearOriginalUiMainExitRowOwner50XG(&collector);publishExitGame();
+    }
+    static float exitRounded(float v) noexcept {volatile float out=v;return out;}
+    // The 47C ScreenText setup (2E08D0 capacity, 2E1504 centring for justification 3).
+    static bool exitText(game::OriginalUiTextLayout50KG& out,const std::string& bytes,std::size_t capacity,
+        float x,float y,bool centred,const assets::OriginalUiFont50KG& font,const assets::Texture48B& atlas) noexcept {
+        if(bytes.empty()||bytes.size()>capacity||bytes.find('\0')!=std::string::npos)return false;
+        game::OriginalUiTextInput50KG input{&font,&atlas,reinterpret_cast<const std::uint8_t*>(bytes.data()),bytes.size(),0,0};
+        game::OriginalUiTextLayout50KG measured;game::OriginalUiTextDiagnostic50KG td;
+        std::int32_t width=0,height=0;
+        if(!game::layoutOriginalUiText50KG(input,measured,td)||
+           !game::roundOriginalUiTextMetric50KG(measured.widthBeforeScaleAndRounding,1,width)||
+           !game::roundOriginalUiTextMetric50KG(measured.firstGlyphHeightBeforeScaleAndRounding,1,height))return false;
+        float px=x,py=y;
+        if(centred){std::int32_t cx=0,cy=0;
+            if(!game::roundOriginalUiTextMetric50KG(exitRounded(x-exitRounded(float(width)/2.f)),1,cx)||
+               !game::roundOriginalUiTextMetric50KG(exitRounded(y-exitRounded(float(height)/2.f)),1,cy))return false;
+            px=float(cx);py=float(cy);}
+        input.localX=px;input.localY=py;
+        return game::layoutOriginalUiText50KG(input,out,td);
+    }
+    static bool exitDepth(const OriginalUiMainVideoOwner50KG& video,float assigned,float& z) noexcept {
+        // Same SUB.S/FTOI0 rule as the Main draw's packetDepth (integer depths only).
+        if(!std::isfinite(assigned)||(assigned>=0&&std::floor(assigned)!=assigned)||video.packetZMaximum<=0)return false;
+        const float value=assigned<0?-assigned:float(video.packetZMaximum)-assigned;
+        if(!std::isfinite(value)||value<0||value>16777215.f)return false;
+        z=float(static_cast<std::uint32_t>(value));return true;
+    }
+    // Cold preparation from Main's own loaded resources. Any refusal leaves the row
+    // unavailable (logged once); it never faults or changes the original Main.
+    void prepareExitGame() noexcept {
+        auto& e=exitGame;const char* why=nullptr;
+        try {
+            auto& r=*cold.resources;const auto& m=manager();
+            const auto* materials=r.materials();const auto* images=r.images();const auto* textures=r.textures();
+            const auto* video=r.video();
+            const auto* d8=m.textDescriptor(8);const auto* d9=m.textDescriptor(9);
+            const auto* g9=r.textGeometry(9);
+            const auto material=[&](const char* name,bool textured)->std::uint32_t {
+                const auto i=r.materialIndex(name);
+                if(!materials||i>=materials->size()||(*materials)[i].animated||
+                   (*materials)[i].images.size()!=(textured?1u:0u))return ~0u;
+                return i;};
+            const auto image=[&](std::uint32_t m)->const assets::Texture48B* {
+                const auto* t=textures?textures->texture((*materials)[m].images[0]):nullptr;
+                return t&&t->texture.width&&t->texture.height?&t->texture:nullptr;};
+            if(!materials||!images||!textures||!video)why="resources";
+            else if(!d8||!d9||!g9||d9->lines.size()!=1||g9->lines().size()!=1||
+                    d9->textSource==assets::OriginalUiTextSource50KG::dynamic)why="row_template";
+            else if(d9->y-d8->y<=0||d9->y-d8->y>64)why="row_pitch";
+            if(!why){
+                // Row: host copy of the slot-5 row descriptor, one row pitch lower.
+                const auto pitch=d9->y-d8->y;
+                e.rowMaterial=r.widgetMaterial(9);
+                if(e.rowMaterial>=materials->size()||(*materials)[e.rowMaterial].images.size()!=1||
+                   (*materials)[e.rowMaterial].animated)why="row_material";
+                else {
+                    const auto index=(*materials)[e.rowMaterial].images[0];
+                    const auto* font=images->font(index);const auto* atlas=image(e.rowMaterial);
+                    e.rowDescriptor=*d9;e.rowDescriptor.lines={"EXIT GAME"};e.rowDescriptor.y=d9->y+pitch;
+                    game::OriginalUiTextGeometryDiagnostic50KG gd;
+                    if(!font||!atlas||!e.row.prepare(e.rowDescriptor,*font,*atlas,gd)||e.row.lines().size()!=1)why="row_glyphs";
+                    else if(e.row.lines()[0].position.positionedY+float(e.row.lines()[0].measuredHeight)>=378.f)
+                        why="row_below_prompts"; // keep clear of the base prompt icons at y378
+                    else if(!exitDepth(*video,d9->depth,e.rowZ)||!exitDepth(*video,1,e.arrowZ))why="row_depth";
+                }
+            }
+            if(!why){
+                e.arrowRight=r.materialIndex("ui/textures/arrwrght");e.arrowLeft=r.materialIndex("ui/textures/arrwleft");
+                if(e.arrowRight>=materials->size()||e.arrowLeft>=materials->size()||
+                   (*materials)[e.arrowRight].images.empty()||(*materials)[e.arrowLeft].images.empty())why="arrows";
+            }
+            if(!why){
+                // Dialog: the 47C popup's own materials (dim, overlay, font, cross, triangle).
+                e.dim=material("ui/textures/dimpopup",false);e.overlay=material("ui/textures/overlay1popup",true);
+                e.font=material("font/venus14popup",true);e.cross=material("ui/textures/icon_x_popup",true);
+                e.triangle=material("ui/textures/icon_tri_popup",true);
+                const auto popup=r.controllerPopup();
+                const auto* geometry=popup?popup->geometry():nullptr;
+                if(e.dim==~0u||e.overlay==~0u||e.font==~0u||e.cross==~0u||e.triangle==~0u)why="dialog_materials";
+                else if(!geometry||!geometry->prepared())why="dialog_labels";
+                else {
+                    const auto* font=images->font((*materials)[e.font].images[0]);const auto* atlas=image(e.font);
+                    const auto* cross=image(e.cross);const auto* triangle=image(e.triangle);const auto* overlay=image(e.overlay);
+                    // garagePurchaseTexts: [1] = LOC9, [2] = LOC10, the 47C's prepared labels.
+                    const auto& labels=geometry->garagePurchaseTexts();
+                    if(!font||!atlas||!cross||!triangle||!overlay)why="dialog_images";
+                    else if(!exitText(e.text[0],"EXIT GAME?",60,320,204,true,*font,*atlas)||
+                            !exitText(e.text[1],labels[1].text,40,412,257,false,*font,*atlas)||
+                            !exitText(e.text[2],labels[2].text,40,232,257,false,*font,*atlas))why="dialog_glyphs";
+                    else {
+                        e.crossWidth=float(cross->width);e.crossHeight=float(cross->height);
+                        e.triangleWidth=float(triangle->width);e.triangleHeight=float(triangle->height);
+                        e.overlayReciprocalWidth=exitRounded(1.f/float(overlay->width));
+                        e.overlayReciprocalHeight=exitRounded(1.f/float(overlay->height));
+                    }
+                }
+            }
+        }catch(...){why="allocation";}
+        e.prepared=!why;
+        if(why)std::fprintf(stderr,"pc_native_exit_game row=unavailable reason=%s\n",why);
+        else std::fprintf(stderr,"pc_native_exit_game row=ready x=%.0f y=%.0f\n",
+            double(e.row.lines()[0].position.positionedX),double(e.row.lines()[0].position.positionedY));
+        publishExitGame();
+    }
+    struct ExitEnabledSlots {std::uint16_t first=0,last=0;};
+    ExitEnabledSlots exitEnabledSlots(const game::OriginalUiNavigation50KG& nav) const noexcept {
+        ExitEnabledSlots out;const auto& controls=nav.page->groups[1].controls;
+        for(std::size_t i=0;i<controls.size()&&i<5;++i){const auto c=controls[i];
+            if(c<0||static_cast<std::size_t>(c)>=nav.controls.size())continue;
+            const auto& state=nav.controls[static_cast<std::size_t>(c)];
+            if(!state.enabled||state.blocked)continue;
+            if(!out.first)out.first=static_cast<std::uint16_t>(i+1);
+            out.last=static_cast<std::uint16_t>(i+1);
+        }
+        return out;
+    }
+    bool exitControl(std::uint16_t slot,game::OriginalUiControlOperation50KG op,std::uint32_t pc) noexcept {
+        // One original command on one existing Group 1 control, through the manager's own
+        // preflighted batch (the same deselect/select the original movement issues).
+        const auto* nav=manager().navigation(1);
+        if(!nav||!nav->page||nav->page->groups.size()<2||!slot||slot>nav->page->groups[1].controls.size())return false;
+        const auto control=nav->page->groups[1].controls[slot-1];
+        if(control<0||static_cast<std::size_t>(control)>=nav->page->controls.size())return false;
+        game::OriginalUiCommands50KG commands;
+        commands.values[0]={static_cast<std::uint16_t>(control),op,false,pc};commands.count=1;
+        return widgetOkay(manager().applyCommands(1,commands,callbackFault.widget));
+    }
+    bool exitSound(std::uint8_t id,Status& status) noexcept {
+        // Refused before any effect (not a fault): the coordinator maps this to "unavailable".
+        if(cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&(!cold.audio||!cold.audio->canPlayMenuEffect(id))){
+            status=Status::unavailableDestination;return false;}
+        return true;
+    }
+    // Returns true when the EXIT GAME addition consumed this input (status is the result).
+    bool exitInput(const OriginalUiMainSessionInput50KG& in,const game::OriginalUiMainContext50KG& context,
+        Status& status) noexcept {
+        auto& e=exitGame;
+        if(!e.prepared)return false;
+        if(e.confirmed||e.requested){status=Status::noChange;return true;} // closing to exit
+        if(e.dialog.active3CC){
+            // Modal, like the 47C: only Confirm4 and Back6 on controller 0 act.
+            game::OriginalUiControllerPopupPlan50KG plan;
+            if(game::OriginalUiControllerPopup50KG::input(e.dialog,in.controller,in.originalInput,true,plan)!=
+               game::OriginalUiControllerPopupStatus50KG::ok){fault(Status::unsupportedState,0x2062D0);status=Status::unsupportedState;return true;}
+            status=Status::noChange;
+            if(!plan.accepted)return true;
+            if(plan.soundRequested&&!exitSound(plan.soundId,status))return true;
+            e.dialog=plan.state;
+            if(plan.soundRequested&&!audioEffect(plan.soundId)){status=Status::audio;return true;}
+            e.confirmed=e.dialog.result3D8==2;
+            std::fprintf(stderr,"pc_native_exit_game dialog=%s\n",e.confirmed?"confirm":"cancel");
+            publishExitGame();status=Status::ok;return true;
+        }
+        if(in.controller!=0||context.popupActive||context.sourceInputBlocked||
+           cold.application->controllerPopupState.active3CC)return false;
+        if(in.originalInput!=2&&in.originalInput!=3&&in.originalInput!=4)return false;
+        const auto* nav=manager().navigation(1);
+        if(!nav||!nav->page||nav->page->groups.size()<2||!nav->groups[1].enabled)return false;
+        const auto slots=exitEnabledSlots(*nav);const auto selected=nav->groups[1].selectedSlot;
+        if(!slots.first)return false;
+        if(e.rowSelected){
+            if(in.originalInput==4){
+                // Open the dialog exactly as a Confirm+Cancel 47C Start would (2060A0).
+                game::OriginalUiControllerPopupPlan50KG plan;
+                if(game::OriginalUiControllerPopup50KG::startController2(e.dialog,plan)!=game::OriginalUiControllerPopupStatus50KG::ok){
+                    fault(Status::unsupportedState,0x2060A0);status=Status::unsupportedState;return true;}
+                plan.state.hasCancel3D4=true;
+                if(!game::OriginalUiControllerPopup50KG::valid(plan.state)){fault(Status::unsupportedState,0x2060A0);status=Status::unsupportedState;return true;}
+                if(!exitSound(1,status))return true;
+                e.dialog=plan.state;
+                if(!audioEffect(1)){status=Status::audio;return true;}
+                std::fprintf(stderr,"pc_native_exit_game dialog=open\n");
+                publishExitGame();status=Status::ok;return true;
+            }
+            // Leave the row: Next wraps to the first enabled row, Previous to the last.
+            const bool forward=in.originalInput==3;const auto target=forward?slots.first:slots.last;
+            if(!exitSound(forward?4:3,status))return true;
+            bool okay=false;
+            if(target==selected)okay=exitControl(selected,game::OriginalUiControlOperation50KG::select,forward?0x2A518C:0x2A5244);
+            else okay=widgetOkay(manager().moveControl(1,1,forward,callbackFault.widget));
+            if(!okay){fault(Status::widget,0x2A5110);status=Status::widget;return true;}
+            e.rowSelected=false;clearOriginalUiMainExitRowOwner50XG(&collector);
+            std::fprintf(stderr,"pc_native_exit_game select=original slot=%u\n",unsigned(manager().navigation(1)->groups[1].selectedSlot));
+            publishExitGame();status=audioEffect(forward?4:3)?Status::ok:Status::audio;return true;
+        }
+        if(in.originalInput==4)return false;
+        const bool forward=in.originalInput==3;
+        if(selected!=(forward?slots.last:slots.first))return false; // ordinary original move
+        if(!exitSound(forward?4:3,status))return true;
+        if(!exitControl(selected,game::OriginalUiControlOperation50KG::deselect,forward?0x2A5110:0x2A51D0)){
+            fault(Status::widget,0x2A5110);status=Status::widget;return true;}
+        e.rowSelected=true;setOriginalUiMainExitRowOwner50XG(&collector);
+        std::fprintf(stderr,"pc_native_exit_game select=row from_slot=%u\n",unsigned(selected));
+        publishExitGame();status=audioEffect(forward?4:3)?Status::ok:Status::audio;return true;
+    }
+    static game::OriginalUiOverlayQuad50KG exitQuad(const char* name,float x,float y,float w,float h,
+        float u0,float v0,float u1,float v1,std::array<std::uint8_t,4> color,std::uint32_t pc) noexcept {
+        game::OriginalUiOverlayQuad50KG q;q.materialName=name;q.sourcePC=pc;q.authoredDepth=1;q.sourcePacketColor=color;
+        const float right=exitRounded(x+exitRounded(w*1.f)),bottom=exitRounded(y+exitRounded(h*1.f));
+        q.vertices={{{x,y,u0,v0},{right,y,u1,v0},{x,bottom,u0,v1},{right,bottom,u1,v1}}};return q;
+    }
+    bool exitGlyphs(const game::OriginalUiTextLayout50KG& glyphs,std::uint32_t material,float z,
+        std::array<std::uint8_t,4> color,OriginalUiMainDrawSegment50KG segment,std::uint32_t pc,
+        OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+        if(glyphs.count>glyphs.quads.size())return false;
+        for(std::size_t i=0;i<glyphs.count;++i){const auto& g=glyphs.quads[i].vertices; // TL,TR,BR,BL
+            game::OriginalUiOverlayQuad50KG q;q.sourcePC=pc;q.authoredDepth=1;q.sourcePacketColor=color;
+            q.vertices={{{g[0].x,g[0].y,g[0].u,g[0].v},{g[1].x,g[1].y,g[1].u,g[1].v},
+                         {g[3].x,g[3].y,g[3].u,g[3].v},{g[2].x,g[2].y,g[2].u,g[2].v}}}; // ScreenTexture TL,TR,BL,BR
+            if(!collector.appendOverlay(q,material,z,segment,0,d))return false;
+        }
+        return true;
+    }
+    // After projectMainPage (same point as the original row arrows).
+    bool drawExitRow(OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+        const auto& e=exitGame;
+        if(!e.prepared||!state.mainPageShown)return true;
+        // Mirror the Options row (widget 8): visibility, fade alpha and colours.
+        const auto* widget=manager().textWidget(8);const auto* line=widget?widget->line(0):nullptr;
+        const auto* descriptor=widget?widget->descriptor():nullptr;
+        if(!widget||!line||!descriptor||!widget->shown()||!line->overlayEnabled||!line->blinkOn)return true;
+        const auto color=e.rowSelected?(descriptor->hasHighlightColor?descriptor->highlightColor:line->color):
+            (descriptor->hasHighlightColor?widget->widgetColor():line->color);
+        const auto packet=game::originalUiTextPacketColor50KG(color,static_cast<std::int16_t>(line->alphaCurrent));
+        if(packet[3]>128)return true;
+        const auto& row=e.row.lines()[0];
+        if(!exitGlyphs(row.glyphs,e.rowMaterial,e.rowZ,packet,OriginalUiMainDrawSegment50KG::mainPage,0x2e0a30,d))return false;
+        if(!e.rowSelected)return true;
+        const auto& materials=*cold.resources->materials();
+        const auto* right=cold.resources->textures()->texture(materials[e.arrowRight].images[0]);
+        const auto* left=cold.resources->textures()->texture(materials[e.arrowLeft].images[0]);
+        if(!right||!left)return false;
+        // Slot5's arrow rule (1E6410..684) placed around this row's own line.
+        const game::OriginalUiMainArrowInput50KG input{5,row.position.positionedX,row.position.positionedY,row.measuredWidth,
+            right->texture.width,right->texture.height,left->texture.width,left->texture.height};
+        game::OriginalUiMainArrows50KG arrows;
+        return game::layoutOriginalUiMainArrows50KG(input,arrows)&&
+            collector.appendOverlay(arrows.beforeText,e.arrowRight,e.arrowZ,OriginalUiMainDrawSegment50KG::mainPage,0,d)&&
+            collector.appendOverlay(arrows.afterText,e.arrowLeft,e.arrowZ,OriginalUiMainDrawSegment50KG::mainPage,0,d);
+    }
+    // After the Main particles, before drain: the same packets in the same order as 2064C0.
+    bool drawExitDialog(game::OriginalUiControllerPopupState50KG& next,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+        auto& e=exitGame;next=e.dialog;
+        if(!e.prepared||!e.dialog.active3CC)return true;
+        game::OriginalUiControllerPopupRender50KG render;
+        if(game::OriginalUiControllerPopup50KG::render(e.dialog,render)!=game::OriginalUiControllerPopupStatus50KG::ok)return false;
+        next=render.state;
+        constexpr float z=16777214.f; // 47C packet depth (Video+60 minus depth1)
+        const auto text=game::originalUiTextPacketColor50KG(0x00cccccc,255);
+        const auto segment=OriginalUiMainDrawSegment50KG::controllerPopup;
+        if(render.drawDim&&!collector.appendOverlay(exitQuad("ui/textures/dimpopup",0,0,640,448,0,0,0,0,{{12,12,12,79}},0x206DCC),
+            e.dim,z,segment,0,d))return false;
+        if(render.drawMessage&&!exitGlyphs(e.text[0],e.font,z,text,segment,0x206DFC,d))return false;
+        if(render.drawConfirm&&(!collector.appendOverlay(exitQuad("ui/textures/icon_x_popup",380,247,e.crossWidth,e.crossHeight,
+            0,0,1,1,{{127,127,127,63}},0x2072AC),e.cross,z,segment,0,d)||!exitGlyphs(e.text[1],e.font,z,text,segment,0x2072B4,d)))return false;
+        if(render.drawCancel&&(!collector.appendOverlay(exitQuad("ui/textures/icon_tri_popup",200,247,e.triangleWidth,e.triangleHeight,
+            0,0,1,1,{{127,127,127,63}},0x2072C8),e.triangle,z,segment,0,d)||!exitGlyphs(e.text[2],e.font,z,text,segment,0x2072D0,d)))return false;
+        if(render.drawStrips){
+            const float u32=exitRounded(32.f*e.overlayReciprocalWidth),v32=exitRounded(32.f*e.overlayReciprocalHeight);
+            const float v18=exitRounded(18.f*e.overlayReciprocalHeight);
+            for(std::size_t i=0;i<3;++i){const auto& s=render.strips[i];
+                if(!collector.appendOverlay(exitQuad("ui/textures/overlay1popup",s.x,s.y,s.width,s.height,
+                    0,i==0?0:i==1?v32:v18,i==0?1:u32,i==1?0:i==0?1:v32,{{121,66,13,63}},0x2072F4),
+                    e.overlay,z,segment,0,d))return false;
+            }
+        }
+        return true;
+    }
+    // ---- end PC-NATIVE ADDITION ----
+
     game::OriginalUiTransitionOwner50KG& lifecycle() noexcept {
         return cold.externalTransition?*cold.externalTransition:transition;
     }
@@ -113,8 +446,10 @@ struct OriginalUiMainSession50KG::Storage {
         case Notice::requestedPage90:
             s.widgetPhase(Phase::requestedPage90,event.sourcePC);s.state.mainPageShown=true;break;
         case Notice::previousPage94:
+            s.resetExitGame(); // PC-NATIVE ADDITION (EXIT GAME)
             s.widgetPhase(Phase::previousPage94,event.sourcePC);s.state.mainPageShown=false;break;
         case Notice::pageEntry74: {
+            s.resetExitGame(); // PC-NATIVE ADDITION (EXIT GAME)
             if(!s.popupAttached){
                 const auto owner=s.cold.resources->controllerPopup();
                 if(!owner||!owner->loaded()||owner->poisoned()||
@@ -154,9 +489,11 @@ struct OriginalUiMainSession50KG::Storage {
         auto& s=*static_cast<Storage*>(p);
         if(!s.operational())return;
         switch(event.kind){
-        case Hook::openingAC:s.widgetPhase(Phase::openingAC,event.callPC);if(!s.state.faulted)s.startMusic();break;
+        case Hook::openingAC:s.resetExitGame(); // PC-NATIVE ADDITION (EXIT GAME)
+            s.widgetPhase(Phase::openingAC,event.callPC);if(!s.state.faulted)s.startMusic();break;
         case Hook::openedB0:s.state.promptMask42C=1;s.widgetPhase(Phase::openedB0,event.callPC);break;
         case Hook::closingB4:
+            s.resetExitGame(); // PC-NATIVE ADDITION (EXIT GAME)
             s.state.promptMask42C=0;s.widgetPhase(Phase::closingB4,event.callPC);
             if(s.state.faulted)break;
             // Source1E6A34 ->234440(stream,1.0f), after real widget effects.
@@ -266,6 +603,7 @@ Status OriginalUiMainSession50KG::bind(const OriginalUiMainSessionCold50KG& cold
             d=next->callbackFault;storage_=std::move(next);return d.status;
         }
         next->state.bound=true;storage_=std::move(next);
+        storage_->prepareExitGame(); // PC-NATIVE ADDITION (EXIT GAME); refusal only disables the row
         if(const auto shared=storage_->cold.application->sharedDialogs){
             if(!storage_->collector.bindSharedMenu470(*this,shared)){
                 storage_->fault(Status::draw,0x204A00);d=storage_->callbackFault;return d.status;
@@ -313,6 +651,13 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
     // Page-only dispatch cannot certify a destination. Actual labels remain selectable.
     // The coordinator may inspect an unaccepted exact proposal in external mode.
     Status status=Status::noChange;
+    // PC-NATIVE ADDITION (EXIT GAME): the host row/dialog takes the inputs it owns before
+    // the original page callback; everything else reaches the original Main unchanged.
+    if(s->exitInput(in,context,status)){
+        s->inOperation=false;receipt.status=status;
+        if(s->state.faulted){d=s->callbackFault;return d.status;}
+        return result(d,status);
+    }
     if(in.originalInput==2 || in.originalInput==3 || in.originalInput==4){
         const auto ws=s->manager().dispatchMain(in.controller,static_cast<game::OriginalUiMainInput50KG>(in.originalInput),
             context,receipt.decision,d.widget);
@@ -438,6 +783,13 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
         if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
            game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
         else s->cold.application->controllerPopupState=popupUpdate.state;
+    }
+    // PC-NATIVE ADDITION (EXIT GAME): the host dialog copy saves this tick's delta (206420).
+    if(!s->state.faulted&&s->exitGame.dialog.active3CC){
+        game::OriginalUiControllerPopupPlan50KG exitUpdate;
+        if(game::OriginalUiControllerPopup50KG::update(s->exitGame.dialog,in.elapsedSeconds,exitUpdate)!=
+           game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
+        else s->exitGame.dialog=exitUpdate.state;
     }
     if(!s->cold.externalTransition && s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){
         s->cold.audio->pause(in.paused);
@@ -570,6 +922,10 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
     // it does not replace the manager's immutable authored pose or page camera.
     s->state.framePublished=false;s->inOperation=true;s->rendering=true;
     game::OriginalUiControllerPopupRender50KG popupRender;
+    // PC-NATIVE ADDITION (EXIT GAME): the row owns the arrows only while it is selected.
+    if(s->exitGame.rowSelected)setOriginalUiMainExitRowOwner50XG(&s->collector);
+    else clearOriginalUiMainExitRowOwner50XG(&s->collector);
+    game::OriginalUiControllerPopupState50KG exitDialogNext=s->exitGame.dialog;
     bool okay=s->collector.begin(clock,d.draw);
     if(okay){
         if(const auto shared=s->cold.application->sharedDialogs){
@@ -581,14 +937,30 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
     }
     okay=okay&&
         s->collector.projectControllerRequiredPopup(popupRender,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw) &&
-        s->collector.projectMainPage(s->state.mainPageShown,d.draw);
+        s->collector.projectMainPage(s->state.mainPageShown,d.draw) &&
+        s->drawExitRow(d.draw); // PC-NATIVE ADDITION (EXIT GAME row)
     if(okay)okay=apertureOkay(s->aperture.render48(s->lifecycle().snapshot().lifecycle));
     okay=okay && !s->state.faulted;
     if(okay)okay=s->collector.projectMainBasePrompts(s->state.promptMask42C,d.draw) &&
         s->collector.projectOnTopWidgets(true,d.draw) &&
-        s->collector.projectMainParticles(s->fire,s->scene,s->particleRenderState,d.draw) && s->collector.drain(d.draw);
+        s->collector.projectMainParticles(s->fire,s->scene,s->particleRenderState,d.draw) &&
+        s->drawExitDialog(exitDialogNext,d.draw) && // PC-NATIVE ADDITION (EXIT GAME dialog)
+        s->collector.drain(d.draw);
     s->rendering=false;s->inOperation=false;
     if(!okay){if(s->state.faulted){d=s->callbackFault;return d.status;}return result(d,Status::draw);}
+    // PC-NATIVE ADDITION (EXIT GAME): publish the host dialog's render step only after the
+    // frame drained, like the 47C; a confirmed dialog that has finished closing hands the
+    // exit to the frontend loop (the window-Close path).
+    if(s->exitGame.dialog.active3CC){
+        s->exitGame.dialog=exitDialogNext;
+        if(!exitDialogNext.active3CC){
+            if(s->exitGame.confirmed&&!s->exitGame.requested){
+                s->exitGame.requested=true;exitGameRequest50XG=true;
+                std::fprintf(stderr,"pc_native_exit_game exit_requested=1\n");
+            }else if(!s->exitGame.confirmed)s->exitGame.dialog.result3D8=0; // cancelled: row stays selected
+        }
+        s->publishExitGame();
+    }
     // The retained shared owner has already committed the genuine47C body
     // before its fallible projection. Never replay or roll back that prefix.
     if(!s->cold.application->sharedDialogs)s->cold.application->controllerPopupState=popupRender.state;

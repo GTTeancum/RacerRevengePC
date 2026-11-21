@@ -8,6 +8,7 @@
 #include "../../../src/game/original_camera_start_native.h"
 #include "../../../src/assets/original_ui_garage_watto_assets50kg.h"
 #include "../../../src/assets/original_ui_garage_scene_assets50kg.h"
+#include "../../../src/game/dlc_career50dl.h"
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 #include <bit>
@@ -2321,6 +2322,17 @@ void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
            selected.career.career100C0>=frontend.garageCareerResources_.size()||
            !rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)||
            selected.career.stamp.mode34!=2){
+            d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
+        }
+        // PORT EXTENSION (DLC career, dlc_career50dl.h). The Garage model is the
+        // selected career's UIGARAGE/<100C0>E.RES; for an add-on career 100C0 holds
+        // its anchor, so that model would be the ANCHOR's pod with the add-on's
+        // stats. Refused until the add-on ui.garage_model joins this bank path
+        // (scene assets, selected bank 1D1D68, IPUM append 12CEA0, model bank
+        // binding: dlc-career-design.txt L3). The Tournament screen stays up.
+        if(const auto* addon=rr::game::dlc50DL::activeAddonCareer(selected.career.career100C0)){
+            std::fprintf(stderr,"dlc_career garage key=%s status=refused reason=\"add-on garage model not yet in the Garage bank path\" anchor_model=never\n",
+                addon->key.c_str());
             d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
         }
         if(garageCustodyOwner_||garageCustodyAttempted_){

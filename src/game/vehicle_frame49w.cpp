@@ -3,6 +3,7 @@
 #include "vehicle_frame49w.h"
 #include "vehicle_frame_surface50st.h"
 #include "native_zero_gravity_step50zg.h"
+#include "n64_airborne_gravity50ag.h"
 #include "vehicle_aero_untilted50zg.h"
 #include "pod_live_query50iz.h"
 #include "chariot_scene49u.h"
@@ -151,7 +152,8 @@ bool secondaryForces(const S&live,S&s,const VehicleFrameBindings49W&b,const Vehi
  // PC enhancement (native_zero_gravity_step50zg.h): no gravity in zero-g
  // flight or recovery (N64 0x8006A9D4 / ApplyGravity skipped in ZOFF). The
  // racer's own gravity fields are read-only here and stay untouched.
- Math f;const float g=zeroGravityStepAny50ZG()?0.f:m.components.probe348.field104?s.fields.gravity378:s.fields.gravity37C;
+ // PORT EXTENSION (n64_airborne_gravity50ag.h): airborne +37C or the course's N64 value.
+ Math f;const float g=zeroGravityStepAny50ZG()?0.f:m.components.probe348.field104?s.fields.gravity378:n64AirborneGravityOr50AG(s.fields.gravity37C);
  if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x218a3c);if(!noiseContinuation(live,s,d))return false;RR_VEHICLE_FRAME49W_FORCE_CUT(0x218a3c,s,b.lifecycle.physical19C);if(!noiseContinuation(live,s,d))return false;f.addLoad(z.root.loads.force,{{0,f.mul(f.neg(par.body.mass),g),0,1}});
  const float lo=x.effective4346D0,hi=x.effective4346D8;
  float damping=f.add(lo,f.div(f.mul(f.sub(z.cachedSpeed34,fp(0x422fffcc)),f.sub(hi,lo)),fp(0x41eaaa64)));

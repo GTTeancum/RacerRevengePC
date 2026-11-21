@@ -6,6 +6,7 @@
 #include "native_display_capacity50du.h"
 #include <exception>
 #include "../../platform/linux/native/original_ui_controller_navigation50la.h"
+#include "../../platform/linux/native/original_ui_main_exit_game50xg.h" // PC-NATIVE ADDITION (EXIT GAME)
 // Native original Main session. Included by50DU after its host diagnostics and
 // SessionExit50DU declaration. This lifetime owns no vehicle, world, race audio,
 // shared particle manager, or cold gameplay renderer. Course publishes only a
@@ -243,7 +244,19 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // to Main, this frontend's route stays idle (no second race is started).
   const bool resultsExitReturned=rr::platform::testResultsInput50PD().returnedToMain;
   if(resultsExitReturned)std::cerr<<"test_results_exit frontend_after_results route=idle first_screen="<<unsigned(firstScreen)<<'\n';
-  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen);
+  // Unattended test only (PC-NATIVE ADDITION, EXIT GAME): RR_TEST_MAIN_EXIT=fresh selects
+  // EXIT GAME on the first frontend's Main (no route is driven there); =return does it in a
+  // frontend opened after a race, first pressing Back on Rider/Course/Hall/Options until
+  // Main. Every step is an ordinary menu input through originalMain.input, as a player would.
+  const char* mainExitSetting=captureRun.unattended()?std::getenv("RR_TEST_MAIN_EXIT"):nullptr;
+  const bool mainExitFresh=mainExitSetting&&std::string(mainExitSetting)=="fresh";
+  const bool mainExitReturn=mainExitSetting&&std::string(mainExitSetting)=="return";
+  const bool mainExitTest=(mainExitFresh&&sessionIndex==0)||(mainExitReturn&&sessionIndex>0);
+  if(mainExitSetting)std::cerr<<"test_main_exit mode="<<mainExitSetting<<" session="<<sessionIndex
+      <<" armed="<<(mainExitTest?1:0)<<" first_screen="<<unsigned(firstScreen)<<'\n';
+  std::uint64_t mainExitLastActionFrame=0;std::uint32_t mainExitActions=0;
+  bool mainExitOpenSent=false,mainExitConfirmSent=false,mainExitUnavailableLogged=false;
+  original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen&&!mainExitTest);
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;
@@ -403,6 +416,13 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   const auto garageFirstFramePending=[&]()noexcept{return raceReturnGarage&&originalMain.frameCount==0;};
   for(;;){
    const auto frontendIterationStart=std::chrono::steady_clock::now();
+   // PC-NATIVE ADDITION (EXIT GAME): a confirmed Main EXIT GAME takes the same clean
+   // close as the window Close button below (requestQuit, then closeWindow after the loop).
+   if(rr::platform::takeOriginalUiMainExitGameRequest50XG()){
+    std::cerr<<"pc_native_exit_game frontend_close route_screen="<<unsigned(originalMain.coordinator.route().screen)
+        <<" session="<<sessionIndex<<" race_return="<<(raceReturnScreen||sessionIndex>0?1:0)<<'\n';
+    originalMain.requestQuit();reportUiState("exit_game");break;
+   }
    if(closeAfterGarageFirstFrame&&!garageFirstFramePending()){
     std::cerr<<"frontend_close_after_garage_first_frame\n";originalMain.requestQuit();break;}
    if(captureRun.deadlineExpired()&&!closeAfterGarageFirstFrame){
@@ -599,6 +619,32 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         renderer.initialized(),
         originalMain.sourceFrameGeneration,originalMain.submittedPublication);
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));captureRoute.validateDispatch(originalMain.coordinator.snapshot());}
+   }
+   // Unattended EXIT GAME test (see RR_TEST_MAIN_EXIT above): one menu input at most every
+   // 20 native frames, only on a settled screen, never while another unattended route runs.
+   if(mainExitTest&&!captureRoute.enabled()&&!tournamentRoute.enabled()&&!tournamentReturnRoute.enabled()&&
+      !hallRoute.enabled()&&originalMain.frameCount>=mainExitLastActionFrame+20){
+    const auto snapshot=originalMain.coordinator.snapshot();
+    const bool settled=original_ui_capture_navigation50LA::Route::settled(snapshot)||
+        original_ui_capture_navigation50LA::HallRoute::settled(snapshot);
+    const auto exitStatus=rr::platform::originalUiMainExitGameStatus50XG();
+    int action=-1;const char* step=nullptr;
+    if(settled&&snapshot.route.screen!=4){
+     const auto screen=snapshot.route.screen;
+     if(mainExitReturn&&(screen==5||screen==6||screen==11||screen==12)){action=6;step="back";}
+    }else if(settled&&!exitStatus.rowAvailable){
+     if(!mainExitUnavailableLogged){std::cerr<<"test_main_exit row_unavailable\n";mainExitUnavailableLogged=true;}
+    }else if(settled&&exitStatus.dialogOpen){
+     if(exitStatus.dialogAwaitingInput&&!mainExitConfirmSent){action=4;step="dialog_confirm";mainExitConfirmSent=true;}
+    }else if(settled&&exitStatus.rowSelected){
+     if(!mainExitOpenSent){action=4;step="row_confirm";mainExitOpenSent=true;}
+    }else if(settled&&mainExitActions<16){action=2;step="previous";} // walks up and wraps into EXIT GAME
+    if(action>=0){
+     ++mainExitActions;mainExitLastActionFrame=originalMain.frameCount;
+     const auto status=originalMain.input(static_cast<std::uint8_t>(action));
+     std::cerr<<"test_main_exit step="<<step<<" event="<<action<<" screen="<<unsigned(snapshot.route.screen)
+         <<" status="<<static_cast<unsigned>(status)<<'\n';
+    }
    }
    const auto elapsedNanoseconds=originalMain.acceptedElapsed(monotonicNow50DU());
    platform::OriginalUiMainSessionUpdate50KG update;

@@ -122,6 +122,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/dlc_files50dl.cpp"
   "${RR_ROOT}/src/assets/dlc_registry50dl.cpp"
   "${RR_ROOT}/src/game/dlc_rider_entries50dl.cpp"
+  "${RR_ROOT}/src/game/dlc_career50dl.cpp"
   "${RR_ROOT}/src/game/dlc_course_entries50dl.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_addon_models50dl.cpp"
   "${RR_ROOT}/src/assets/dlc_progress50dl.cpp"

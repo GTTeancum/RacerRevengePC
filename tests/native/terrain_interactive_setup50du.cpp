@@ -1393,7 +1393,9 @@ SessionExit50DU Context::run() {
  // rig is already built (B-P04: no POD01 default).
  rr::assets::PodFlameOwners50W coldFlame{};
  if(racerRigs[0]&&racerVisuals[0])
-  coldFlame=native_racer50HW::buildColdFlames(*racerRigs[0],racerVisuals[0]->drawAssets,x.bindings);
+  // Name the pod in a refusal, as the per-slot roster visit does.
+  coldRacerStage50DU(racerRigs[0]->podId,"flame construction",[&](){
+   coldFlame=native_racer50HW::buildColdFlames(*racerRigs[0],racerVisuals[0]->drawAssets,x.bindings);});
 
 
  BaseTailState50X baseTail=coldBaseTailState50X(0x3f800000u,0x3f800000u);BaseTailGlobals50X baseGlobals{};BaseTailWorkspace50X baseWorkspace{};BasePoseHistoryState50Y poseHistory{};poseHistory.nextFD4=19;

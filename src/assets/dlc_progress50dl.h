@@ -33,7 +33,8 @@
 
 namespace rr::assets::dlc50DL {
 
-inline constexpr const char* progressSchema="rrpc-dlc-progress/2";   // written
+inline constexpr const char* progressSchema="rrpc-dlc-progress/3";   // written
+inline constexpr const char* progressSchemaV2="rrpc-dlc-progress/2"; // still read (careers without ai/name/boundary, no unlocks)
 inline constexpr const char* progressSchemaV1="rrpc-dlc-progress/1"; // still read (no careers)
 inline constexpr const char* progressFileName="dlc-progress-v1.json";
 inline constexpr const char* progressBadFileName="dlc-progress-v1.bad.json";
@@ -122,16 +123,31 @@ struct ProgressSubmitOutcome {
     std::string reason;
 };
 
-// ---- Add-on pod tournament career (schema /2). PORT EXTENSION, NOT ORIGINAL.
+// ---- Add-on pod tournament career (schema /2, /3). PORT EXTENSION, NOT ORIGINAL.
 // The stock career shape (17FFB0/1875C0: OriginalTournamentCareer50KG) for an
-// add-on pod: its own scalars and ONE pod row (an add-on career only races its
-// own pod). Never stored in the profile's 27 career tables or the stock save.
-// Bounds: abilities finite and >= 0, medals 0..8, progress 0..13; the u32 /
-// i16 lanes keep the stock storage widths.
+// add-on pod: its scalars, its OWN pod row (the original diagonal) and (/3) the
+// 27 stock pod rows of its AI opponents, the 219D name and the 102CC flag.
+// Never stored in the profile's 27 career tables or the stock save.
+// Bounds: abilities finite and >= 0, medals 0..8, progress 0..13, name at most
+// 20 printable ASCII characters, boundary 0/1; the u32 / i16 lanes keep the
+// stock storage widths. aiStored=false (a /2 entry, or a fresh career): the AI
+// rows are seeded by the career owner (dlc_career50dl) from the stock base0180.
 struct ProgressCareer {
     std::uint32_t earned2190=0,unspent2194=0,kills2198=0;
     std::uint8_t progress219C=0;
     game::OriginalTournamentPodCareer50KG pod{};
+    bool aiStored=false;
+    std::array<game::OriginalTournamentPodCareer50KG,27> ai{};   // /3
+    std::string name;                                             // /3, 219D
+    std::uint32_t boundary102CC=0;                                // /3
+};
+// ---- Stock unlocks granted by add-on careers (schema /3). PORT EXTENSION.
+// The original grants (20B480) write the stock unlock words 10FAC and the
+// gallery tier 11018 bits 5..6; a grant earned by an add-on career is stored
+// HERE and merged at read time (stock | granted, max tier). Pods 0..26.
+struct ProgressUnlocks {
+    std::array<bool,27> stockPods{};
+    std::uint8_t galleryTier=0;                                   // 0..3
 };
 bool validCareer(const ProgressCareer&) noexcept;
 // A fresh career: abilities from the pod's PHY [BaseAbilities]
@@ -181,6 +197,11 @@ public:
     // marks progress changed. Written at the next stock save moment.
     bool careerSnapshot(const std::string& podKey,ProgressCareer& out) const noexcept;
     bool commitCareer(const std::string& podKey,const ProgressCareer& career) noexcept;
+    // Stock unlocks granted by add-on careers (/3): read for the merge, and the
+    // bounds-checked grant (pod 0..26; tier 0..3, never lowered). Marks changed.
+    const ProgressUnlocks& addonCareerUnlocks() const noexcept {return state_.unlocks;}
+    bool grantStockPod(unsigned pod) noexcept;
+    bool grantGalleryTier(std::uint8_t tier) noexcept;
 
     // Applies 1ABFC0 (selector 0) and, when it returns 1, 1AC440 to the target
     // rows. Never touches the stock Hall. Marks progress changed on any effect.
@@ -206,6 +227,7 @@ public:
         std::map<std::string,Table> stockCourseAddonPod;    // upper-case stock code
         std::map<std::string,bool> pods;                    // pod item key -> unlocked
         std::map<std::string,ProgressCareer> careers;       // pod item key -> career (/2)
+        ProgressUnlocks unlocks;                            // /3
     };
     const State& state() const noexcept {return state_;}
     // Serialise / parse the whole file (bounds-checked, all or nothing).
