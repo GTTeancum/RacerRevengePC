@@ -14,7 +14,7 @@
 #include <array>
 #include <string>
 namespace rr::game { struct Type2ResourceView49X; }
-namespace rr::platform { class OriginalUiRiderProfileOwner50KG; }
+namespace rr::platform { class OriginalUiRiderProfileOwner50KG; struct OriginalUiMainApplication50KG; }
 namespace native_racer50HW { class Rig; }
 namespace native_racer_collision50HW { class Owner; struct EndpointPolicy; }
 namespace ra_cold_roster50LA { struct SharedOwners; struct RuntimeOwners; }
@@ -42,6 +42,10 @@ struct Context {
     std::size_t& mainPairCapacity;
     std::size_t& secondaryPairCapacity;
     interactive_frame50DU::BorrowedCall<bool(const rr::game::Type2ResourceView49X&)> matchesEndpointPolicy;
+    // The Application's one 308030 stream, its lazy seed/range owners and the
+    // 101A50 clock (free-play opponent draw 1AE620/1AEF70). Null outside a
+    // UI-launched race (direct development launch).
+    rr::platform::OriginalUiMainApplication50KG* applicationState=nullptr;
     void run() const;
 };
 }

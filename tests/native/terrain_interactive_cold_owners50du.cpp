@@ -210,7 +210,8 @@ void OwnersContext::run() {
         rig.modelCount==5?&rig.hierarchy[native_racer50HW::Rig::bottomLeft]:nullptr,
         nativeChariotModels[racer].get());
    });
-   if(originalAiOwnsSlot(racer)){
+   // Every AI refusal below names the pod (coldRacerStage50DU), stock or add-on.
+   if(originalAiOwnsSlot(racer))coldRacerStage50DU(rig.podId,"AI cold owners (.ai, 16E2A0)",[&](){
     rr::assets::ResArchive48C source;rr::assets::DecodeError48C error;std::vector<std::uint8_t> profileText;
     const auto sourceBytes=runtime_startup50fl::readBytes(rig.resourceFile);
     std::string lowerPod=rig.podId;for(char&c:lowerPod)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -246,7 +247,7 @@ void OwnersContext::run() {
     s.fields.vehicle58=1u;s.fields.nativeAiOwnersBound50IV=true;s.fields.applicationByte58=0u;
     x.parameters.rates.x=4.f;
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
-   }
+   });
    coldRacerStage50DU(rig.podId,"handling root placement",[&](){
     native_racer50HW::placeColdHandlingRoots(x);
    });

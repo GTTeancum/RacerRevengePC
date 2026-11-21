@@ -9,6 +9,10 @@
 #include "../../../src/assets/original_ui_garage_watto_assets50kg.h"
 #include "../../../src/assets/original_ui_garage_scene_assets50kg.h"
 #include "../../../src/game/dlc_career50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
+#include "../../../src/game/dlc_addon_ui_archive50dl.h"
+#include <map>
+#include <type_traits>
 #include "../../../tests/native/original_ui_main_entry50kg.h"
 #include "../../../tests/native/original_race_display_lifetime50la.h"
 #include <bit>
@@ -44,6 +48,12 @@ template<class A,class B> bool sameCustodyShared(const std::shared_ptr<A>& a,
     const std::shared_ptr<B>& b)noexcept {
     return a&&b&&a.get()==b.get()&&!a.owner_before(b)&&!b.owner_before(a);
 }
+bool sameUiName(const std::string& a,const std::string& b)noexcept { // case- and separator-insensitive
+    if(a.size()!=b.size())return false;
+    for(std::size_t i=0;i<a.size();++i){char x=a[i],y=b[i];if(x=='/')x='\\';if(y=='/')y='\\';
+        if(x>='A'&&x<='Z')x=char(x-'A'+'a');if(y>='A'&&y<='Z')y=char(y-'A'+'a');if(x!=y)return false;}
+    return true;
+}
 bool custodyFailure(std::string& error,const char* text)noexcept {
     try{error=text;}catch(...){error.clear();}return false;
 }
@@ -53,7 +63,8 @@ bool custodyFailure(std::string& error,const char* text)noexcept {
 bool appendGarageBankSources(const std::shared_ptr<const rr::assets::OriginalUiArchive50KG>& archive,
     const std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA>& domain,
     rr::assets::OriginalStandardMaterialDiagnostic50LA& d,bool* domainAppendStarted=nullptr,
-    const std::vector<std::string>* residentTextures=nullptr)noexcept {
+    const std::vector<std::string>* residentTextures=nullptr,
+    const std::vector<std::string>* onlyPsms=nullptr)noexcept { // onlyPsms: DLC career package archive
     namespace a=rr::assets;using Provider=a::OriginalStandardArchiveProvider50LA;
     if(domainAppendStarted)*domainAppendStarted=false;
     d={};const auto provider=domain?domain->archiveProvider3E1A70():nullptr;
@@ -81,6 +92,7 @@ bool appendGarageBankSources(const std::shared_ptr<const rr::assets::OriginalUiA
             std::string extension=name.substr(name.size()-4);
             for(char& c:extension)if(c>='A'&&c<='Z')c=char(c-'A'+'a');
             if(extension!=".psm")continue;
+            if(onlyPsms){bool wanted=false;for(const auto& p:*onlyPsms)if(sameUiName(p,name))wanted=true;if(!wanted)continue;}
             Provider::MemberView view;
             if(provider->lookup132820(name,view)!=Provider::Lookup::present||!view.member||!view.data||
                view.size!=original.size||std::memcmp(view.data,original.data,view.size))return fail(0x132820);
@@ -2326,15 +2338,11 @@ void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
         }
         // PORT EXTENSION (DLC career, dlc_career50dl.h). The Garage model is the
         // selected career's UIGARAGE/<100C0>E.RES; for an add-on career 100C0 holds
-        // its anchor, so that model would be the ANCHOR's pod with the add-on's
-        // stats. Refused until the add-on ui.garage_model joins this bank path
-        // (scene assets, selected bank 1D1D68, IPUM append 12CEA0, model bank
-        // binding: dlc-career-design.txt L3). The Tournament screen stays up.
-        if(const auto* addon=rr::game::dlc50DL::activeAddonCareer(selected.career.career100C0)){
-            std::fprintf(stderr,"dlc_career garage key=%s status=refused reason=\"add-on garage model not yet in the Garage bank path\" anchor_model=never\n",
-                addon->key.c_str());
-            d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;
-        }
+        // its anchor, so the selected bank is the add-on's OWN package archive and
+        // the selected model its ui.garage_model (scene assets loadAddon), kept in
+        // its own retained slot (never the anchor's). Anything that does not load
+        // refuses the Garage for that add-on only; the anchor model is never used.
+        const auto* addonCareer=rr::game::dlc50DL::activeAddonCareer(selected.career.career100C0);
         if(garageCustodyOwner_||garageCustodyAttempted_){
             // A real failed or completed source prefix cannot be adopted or
             // reset by another menu request. Report its genuine retained PC.
@@ -2343,7 +2351,12 @@ void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
                 d.pendingSourcePC=garageCustodyOwner_->entryFailureSourcePC_;
             return;
         }
-        auto& retained=frontend.garageCareerResources_[selected.career.career100C0];
+        // DLC career: one retained slot per add-on pod (host memory, bounded by the
+        // admitted pod count), never garageCareerResources_[anchor].
+        static std::map<unsigned,std::decay_t<decltype(frontend.garageCareerResources_[0])>> addonSlots;
+        if(addonCareer&&!addonSlots.count(addonCareer->number)&&addonSlots.size()>=rr::assets::dlc50DL::addonPodCount()){
+            d.status=S::profile;d.pendingSourcePC=0x1D1CD0;return;}
+        auto& retained=addonCareer?addonSlots[addonCareer->number]:frontend.garageCareerResources_[selected.career.career100C0];
         frontend.garageDestinationAssetsAttempted_=retained.attempted;
         frontend.garageDestinationAssets_=retained.assets;
         frontend.garageDestinationFailure_=retained.failure;
@@ -2371,7 +2384,28 @@ void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
             d.status=S::archive;d.pendingSourcePC=0x1D1950;d.archive=Id::garage;
             if(!frontend.garageDestinationArchive_)
                 frontend.garageDestinationArchive_=readArchive(assetRoot,Id::garage);
+            if(addonCareer){
+                // DLC career: the package archive and its garage model (same 1FB0F0 body).
+                rr::game::dlc50DL::AddonCareerArt50DL art;std::string why;
+                if(!rr::game::dlc50DL::loadAddonCareerArt50DL(addonCareer->number,art,why)||art.garagePsg.empty()){
+                    std::fprintf(stderr,"dlc_model_source screen=garage key=%s source=package status=refused reason=\"%s\" anchor_model=never\n",
+                        addonCareer->key.c_str(),why.empty()?"package lists no garage model":why.c_str());
+                    d.status=S::archive;frontend.garageDestinationFailure_=d;return;}
+                d.archive=Id::addonUi;frontend.garageDestinationPod19_=art.archive;
+                d.status=S::sceneAssets;d.pendingSourcePC=0x2710F0;
+                auto assets=std::make_shared<SceneAssets>();
+                const bool ok=assets->loadAddon(frontend.garageDestinationArchive_,frontend.garageDestinationPod19_,art.garagePsg,
+                    static_cast<int>(selected.career.career100C0),d.scene);
+                std::fprintf(stderr,"dlc_model_source screen=garage key=%s source=package member=%s status=%s anchor_model=never\n",
+                    addonCareer->key.c_str(),art.garagePsg.c_str(),ok?"loaded":"refused");
+                if(!ok){if(d.scene.sourcePC)d.pendingSourcePC=d.scene.sourcePC;frontend.garageDestinationFailure_=d;return;}
+                frontend.garageDestinationAssets_=std::move(assets);
+            }else{
             d.archive=rr::assets::originalUiGaragePodArchive50KG(selected.career.career100C0)->id;
+            // DLC log (only with add-on pods admitted): which archive the selected pod model comes from.
+            if(rr::assets::dlc50DL::addonPodCount())
+                std::fprintf(stderr,"dlc_model_source screen=garage career=%u source=stock_archive archive_id=%u\n",
+                    selected.career.career100C0,unsigned(d.archive));
             frontend.garageDestinationPod19_=readArchive(assetRoot,d.archive);
             d.status=S::sceneAssets;d.pendingSourcePC=0x2710F0;
             auto assets=std::make_shared<SceneAssets>();
@@ -2380,6 +2414,7 @@ void Application::prepareGarageCareerResources1D1950(Frontend& frontend,
                 frontend.garageDestinationFailure_=d;return;
             }
             frontend.garageDestinationAssets_=std::move(assets);
+            } // stock career
         }
         if(!frontend.garageDestinationAssets_->loaded()||
            frontend.garageDestinationAssets_->selectedCareer()!=static_cast<int>(selected.career.career100C0)||
@@ -2728,12 +2763,19 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
         std::shared_ptr<const rr::assets::OriginalUiIpumTextureCache50KG> sourceImages;
         if(!frontend.coordinator.prepareGarageSourceImages12CEA0(custody,selectedArchive,sourceImages,diagnostic))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected source-image preparation failed; bank retained");
-        if(!resolver->bindGarageStaticIpumCache24E880(sourceImages,selectedArchive,bank)){
+        if(!selectedArchive->addon()&& // DLC career: no static IPUM sources in a package archive
+           !resolver->bindGarageStaticIpumCache24E880(sourceImages,selectedArchive,bank)){
             diagnostic.texture=bank;return retainedFailure(Status::texture,bank.sourcePC?bank.sourcePC:0x24E880,
                 "Garage selected exact static IPUM source binding failed; bank retained");
         }
+        // DLC career: from a package archive only the selected model's own PSMs
+        // join (the archive also carries Rider-page materials of other pages).
+        std::vector<std::string> addonPsms;
+        if(selectedArchive->addon())if(const auto* pod=custody.sceneAssets_->selectedPod())
+            if(const auto* scene=pod->model?pod->model->scene():nullptr)
+                for(const auto& name:scene->materials)addonPsms.push_back("ui\\textures\\"+name+".psm");
         if(!appendGarageBankSources(selectedArchive,standardMaterialDomainOwner_,diagnostic,nullptr,
-               residentPodTextures?&residentPodTextureNames:nullptr))
+               residentPodTextures?&residentPodTextureNames:nullptr,selectedArchive->addon()?&addonPsms:nullptr))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected immutable source corpus failed; bank retained");
         if(!custody.prepareManagerSelected1D1CD0(diagnostic))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected model constructor failed after actual transfer entry; prefix retained");

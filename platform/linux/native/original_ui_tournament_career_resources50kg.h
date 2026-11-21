@@ -78,6 +78,11 @@ public:
     const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot* career() const noexcept;
     const assets::OriginalUiTournamentPageData50KG* page() const noexcept;
     const assets::OriginalUiRiderPodAssets50KG* pod() const noexcept;
+    // PORT EXTENSION (DLC career): addonCareer() = the selected career is an
+    // add-on pod's (pod() is then the anchor's, never drawn); addonPod() = its
+    // own model laid out by the same UITourn widget, null when it did not load.
+    bool addonCareer() const noexcept;
+    std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> addonPod() const noexcept;
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images() const noexcept;
     // Exact material/policy/sampler for each of the24 image-bank entries.
     const std::array<OriginalUiTournamentCareerMaterial50KG,24>* materials() const noexcept;

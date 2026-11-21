@@ -966,6 +966,13 @@ bool OriginalUiRiderProfileOwner50KG::commitHallRender(OriginalUiRiderProfileSta
        expected.mode34!=storage_->common->mode34||
        expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
     //1E3F40..1E3F4C clears only profile7E4 bit0 after genuine page render.
+    // The generation counts real profile changes only: once bit0 is clear, the
+    // same store on every later Hall frame changes nothing. Bumping it per frame
+    // made the destination prepared at the Hall Cross (Course6 from a Free Play
+    // record, 1E41C4) see a "changed" profile at its 1DA4A0 entry check after the
+    // Hall's closing frames and refuse the activation (cr-25). Same rule for every
+    // course, pod and Hall entry mode.
+    if(!storage_->bit0_7E4)return true;
     storage_->bit0_7E4=false;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::initialized() const noexcept {return bool(storage_);}

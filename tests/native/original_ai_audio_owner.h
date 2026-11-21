@@ -153,18 +153,21 @@ public:
         namespace d=pod_materials50ed_fixture::detail;namespace a=rr::assets;
         if(attempted_||!session){error="AI audio requires fresh native ownership";return false;}
         attempted_=true;
+        std::string_view currentPod; // every refusal below names the pod it was preparing
         try {
             mode_=mixer.originalSoundMode50KG();
             d::need(mode_&&mode_->ready(),"AI audio requires the actual original sound-mode owner");
             d::need(materialD44_.prepare(session,actualPacked1125C),"actual roster PodRaceAudioManager D44 pool rejected");
             firstAiSlot_=materialD44_.humanCount();racerCount_=materialD44_.racerCount();
             std::vector<a::AudioRequest50HC> requests;
-            for(std::size_t i=firstAiSlot_;i<racerCount_;++i){mappings_[i]=opponent_audio50HX::detail::readMapping(sources[i]);
+            for(std::size_t i=firstAiSlot_;i<racerCount_;++i){currentPod=sources[i].podId;
+                mappings_[i]=opponent_audio50HX::detail::readMapping(sources[i]);
                 for(const auto* name:{&mappings_[i].engineName,&mappings_[i].binderName}){
                     bool exists=false;for(const auto& request:requests)if(request.name==*name)exists=true;
                     if(!exists)requests.push_back({*name,false,false,false});
                 }
             }
+            currentPod={};
             if(!a::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
             auto clip=[](const a::AudioClip50HC* asset,rr::platform::AudioClip50HD& out){
                 if(!asset)return false;
@@ -175,6 +178,7 @@ public:
                 return p.channels==1&&rr::platform::AudioMixer50HD::validClip(out);
             };
             for(std::size_t i=firstAiSlot_;i<racerCount_;++i){auto& r=racers_[i];r.owner=this;r.slot=i;
+                currentPod=sources[i].podId;
                 const auto* identity=original_player_identity50IK::find(sources[i].podId);
                 d::need(identity,"AI audio racer identity unavailable");
                 // Explicit stable native object IDs, never PS2 addresses.
@@ -224,7 +228,10 @@ public:
                 d::need(r.materialD44,"actual AI vehicle D44 pool-row binding rejected");
             }
             prepared_=true;error.clear();return true;
-        }catch(const std::exception& e){error=e.what();return false;}
+        }catch(const std::exception& e){
+            try{error=e.what();if(!currentPod.empty()){error+=" (pod ";error+=currentPod;error+=')';}}catch(...){}
+            return false;
+        }
         catch(...){error="AI source audio preparation failed";return false;}
     }
     bool prepareHumanResetOwner(rr::game::OriginalHumanEngineResetOwner50LB& owner) noexcept {
@@ -259,12 +266,15 @@ public:
             error="AI D48 cold ownership lifecycle rejected";return false;
         }
         speechAttempted_=true;
+        std::uint32_t currentPod60=0; // every refusal below names the pod it was preparing
         try {
             std::array<selected_player_audio50IJ::Catalog,8> catalogs{};
             std::vector<a::AudioRequest50HC> requests;
             for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){
-                selected_player_audio50IJ::Authoring own;
-                if(!selected_player_audio50IJ::read(discRoot,racers_[slot].engine.identity.pod60,own,error))return false;
+                selected_player_audio50IJ::Authoring own;currentPod60=racers_[slot].engine.identity.pod60;
+                if(!selected_player_audio50IJ::read(discRoot,currentPod60,own,error)){
+                    try{error+=" (pod60 "+std::to_string(currentPod60)+")";}catch(...){}return false;
+                }
                 racers_[slot].speechCounts=own.speech;
                 for(std::size_t cue=0;cue<gameplay_audio50HE::cueCount;++cue){
                     const auto bank=gameplay_audio50HE::catalog[cue].bank;
@@ -285,8 +295,10 @@ public:
                     if(!exists)requests.push_back(request);
                 }
             }
+            currentPod60=0;
             if(!a::loadAudioBank50HC(audioRoot,requests,speechBank_,error))return false;
             for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){
+                currentPod60=racers_[slot].engine.identity.pod60;
                 const auto first=p::originalSpeechFirstVoice50HD+slot*p::originalSpeechVoicesPerRacer50HD;
                 std::array<std::size_t,gameplay_audio50HE::cueCount> voices{};
                 std::size_t count=0;
@@ -302,7 +314,10 @@ public:
                     &catalogs[slot],&voices))return false;
             }
             speechPrepared_=true;error.clear();return true;
-        }catch(const std::exception& e){error=e.what();return false;}
+        }catch(const std::exception& e){
+            try{error=e.what();if(currentPod60)error+=" (pod60 "+std::to_string(currentPod60)+")";}catch(...){}
+            return false;
+        }
         catch(...){error="AI D48 original speech preparation failed";return false;}
     }
     // Native cold owner order is the actual active bank rows. In mixed Course,

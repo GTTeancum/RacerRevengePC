@@ -11,6 +11,7 @@
 #include "../../../src/game/original_ui_rider_addon_models50dl.h"
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <bit>
 #include <cfenv>
 #include <algorithm>
@@ -1297,19 +1298,32 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
             return finish(Status::unavailableDestination,0x1EA694);
         }
         s->addonConfirmRider=stock;
-        // DLC career (dlc_career50dl.h). HOLD (coordinator, 2026-11-21): the
-        // Tournament screen still loads the ANCHOR's pod model (1EEC40
-        // loadTournament by 100C0), and no anchor model may show with add-on
-        // data, so the add-on Tournament Confirm is refused until the add-on
-        // pod model path reaches that screen. When it does, this refusal is
-        // replaced by the latch, before the Tournament destination is prepared:
-        //   if(!game::dlc50DL::latchTournamentCareer(stock,s->addonPod()->number))
-        //       return finish(Status::profile,0x1EA58C);
-        // Free Play, Time Trial and VS Confirms of add-on pods are unaffected.
-        if(s->cold.prospectiveMode==2){
-            std::fprintf(stderr,"dlc_rider_confirm key=%s status=refused reason=\"add-on tournament career waits for the add-on pod model on the Tournament screen\"\n",
+        // DLC career (dlc_career50dl.h): latch the add-on career for its anchor
+        // BEFORE the Tournament destination is prepared, so every career
+        // snapshot that destination takes already reads the add-on career. The
+        // Tournament screen then draws the add-on's own pod model in the
+        // anchor's place, or nothing (never the anchor's model).
+        // HOLD (coordinator, 2026-11-21, build cr-25): the original race-end route
+        // 1AB5BC sends every tournament race without a Hall/Win/Unlock stop to the
+        // Garage (13/1, 0x1AB818), and the race-return Garage entry faults the
+        // frontend when 1D1950 refuses an add-on career (Garage model step G2-G6
+        // not done). So the add-on Tournament Confirm stays refused until the
+        // Garage loads the add-on's own model; the latch below is then restored.
+        // TEST ONLY (eyecheck R5): RR_TEST_ADDON_TOURNAMENT=1 lets the add-on
+        // Tournament Confirm through the latch, honoured only on an unattended
+        // capture run (RR_UNATTENDED_CAPTURE=1, the same gate the runner's other
+        // RR_TEST_ switches use). Players always get the refusal above.
+        static const bool testAddonTournament=[]{
+            const auto on=[](const char* name){const char* v=std::getenv(name);return v&&v[0]=='1'&&!v[1];};
+            return on("RR_UNATTENDED_CAPTURE")&&on("RR_TEST_ADDON_TOURNAMENT");}();
+        if(s->cold.prospectiveMode==2&&!testAddonTournament){
+            std::fprintf(stderr,"dlc_rider_confirm key=%s status=refused reason=\"add-on tournament career waits for the add-on Garage model (race end goes to the Garage)\"\n",
                 s->addonPod()->key.c_str());
             return finish(Status::unavailableDestination,0x1EA58C);
+        }
+        if(s->cold.prospectiveMode==2){
+            std::fprintf(stderr,"dlc_rider_confirm key=%s status=latching mode=tournament test_override=1\n",s->addonPod()->key.c_str());
+            if(!game::dlc50DL::latchTournamentCareer(stock,s->addonPod()->number))return finish(Status::profile,0x1EA58C);
         }
     }else if(in.originalInput==4&&s->cold.prospectiveMode==2)game::dlc50DL::clearTournamentCareer(); // stock tournament Confirm
     const auto selected=in.originalInput==4?s->confirmRider():s->state.rider4C4;

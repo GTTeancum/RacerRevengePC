@@ -165,7 +165,11 @@ bool OriginalUiRiderModelMaterials50KG::loadAddonModel(std::shared_ptr<const voi
     d={};if(storage_)return fail(d,E::alreadyLoaded);
     if(!model||!addonUi||!addonUi->addon()||!scene||
        scene->materials.empty()||scene->materials.size()>256||!stockRider||!stockRider->loaded()||
-       stockRider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+       // The stock page archive that owns the shared original names (cable,
+       // pod_wndw, ...): UIRIDER on the Rider page, UITOURN on the Tournament
+       // page (DLC career). Any other archive is refused.
+       (stockRider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)&&
+        stockRider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament))||
        !app||!app->loaded()||app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart)||
        !podTextures||!podTextures->loaded()||
        podTextures->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures))return fail(d,E::input);

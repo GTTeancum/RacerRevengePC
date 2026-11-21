@@ -255,7 +255,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   if(mainExitSetting)std::cerr<<"test_main_exit mode="<<mainExitSetting<<" session="<<sessionIndex
       <<" armed="<<(mainExitTest?1:0)<<" first_screen="<<unsigned(firstScreen)<<'\n';
   std::uint64_t mainExitLastActionFrame=0;std::uint32_t mainExitActions=0;
-  bool mainExitOpenSent=false,mainExitConfirmSent=false,mainExitUnavailableLogged=false;
+  bool mainExitOpenSent=false,mainExitConfirmSent=false,mainExitUnavailableLogged=false,mainExitNoStepLogged=false;
   original_ui_capture_navigation50LA::Route captureRoute(captureRun.navigate()&&!captureRun.navigateTournamentTa()&&!captureRun.navigateHallTa()&&!resultsExitReturned&&!raceReturnScreen&&!mainExitTest);
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
@@ -625,22 +625,45 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    if(mainExitTest&&!captureRoute.enabled()&&!tournamentRoute.enabled()&&!tournamentReturnRoute.enabled()&&
       !hallRoute.enabled()&&originalMain.frameCount>=mainExitLastActionFrame+20){
     const auto snapshot=originalMain.coordinator.snapshot();
+    const auto& t=snapshot.transition;
+    const bool idle=snapshot.prepared&&snapshot.active&&!snapshot.faulted&&!snapshot.quitRequested&&snapshot.frameSubmitted&&
+        !snapshot.deferredQueue&&t.bound&&!t.initialRestartPending&&!t.applicationRequestQueued&&
+        t.lifecycle==rr::game::OriginalUiTransitionLifecycle50KG::idle&&t.phase==rr::game::OriginalUiTransitionPhase50KG::none&&
+        snapshot.route.page==1&&snapshot.route.screen==t.current.screen&&snapshot.route.page==t.current.page;
+    // Win7 / Unlock10 have no shared settled predicate; same open-page rule as the others.
+    const bool screenSettled=idle&&(snapshot.winBound||snapshot.unlockBound)&&snapshot.screenPageShown&&
+        snapshot.screenInputShown&&snapshot.screenFramePublished&&snapshot.screenAperture.bound&&
+        snapshot.screenAperture.inputEnabled268&&snapshot.screenAperture.state==rr::game::OriginalUiApertureState50KG::open;
     const bool settled=original_ui_capture_navigation50LA::Route::settled(snapshot)||
-        original_ui_capture_navigation50LA::HallRoute::settled(snapshot);
+        original_ui_capture_navigation50LA::HallRoute::settled(snapshot)||
+        ((snapshot.route.screen==7||snapshot.route.screen==10)&&screenSettled);
     const auto exitStatus=rr::platform::originalUiMainExitGameStatus50XG();
     int action=-1;const char* step=nullptr;
     if(settled&&snapshot.route.screen!=4){
+     // What the ORIGINAL screen itself accepts on the way back to Main:
+     //  Rider5 / Course6 / Options12: Back (6).
+     //  Hall11: its prompt says which. mode5 (Options Hall, 42C bit1): Back -> Options.
+     //    A race-return Hall (mode0/2, 42C bit0, 1E48E0) has NO Back (1E3F70 takes 6 only
+     //    in mode5); Cross (4) continues: Free Play -> Course6 (1E41C4), tournament ->
+     //    Win7/Unlock10/Garage13 (1E3FC0 table).
+     //  Win7 (2089D0) and Unlock10 (20B48C): Cross (4) only -> Unlock10/Garage13/Course6.
      const auto screen=snapshot.route.screen;
-     if(mainExitReturn&&(screen==5||screen==6||screen==11||screen==12)){action=6;step="back";}
+     if(mainExitReturn&&(screen==5||screen==6||screen==12)){action=6;step="back";}
+     else if(mainExitReturn&&screen==11&&(snapshot.hall.promptMask42C&1u)){action=4;step="hall_confirm";}
+     else if(mainExitReturn&&screen==11&&(snapshot.hall.promptMask42C&2u)){action=6;step="back";}
+     else if(mainExitReturn&&(screen==7||screen==10)){action=4;step="confirm";}
+     else if(!mainExitNoStepLogged){
+      // Garage13 / Tournament9 are not walked by this driver (tournament returns).
+      std::cerr<<"test_main_exit no_step screen="<<unsigned(screen)<<'\n';mainExitNoStepLogged=true;}
     }else if(settled&&!exitStatus.rowAvailable){
      if(!mainExitUnavailableLogged){std::cerr<<"test_main_exit row_unavailable\n";mainExitUnavailableLogged=true;}
     }else if(settled&&exitStatus.dialogOpen){
      if(exitStatus.dialogAwaitingInput&&!mainExitConfirmSent){action=4;step="dialog_confirm";mainExitConfirmSent=true;}
     }else if(settled&&exitStatus.rowSelected){
      if(!mainExitOpenSent){action=4;step="row_confirm";mainExitOpenSent=true;}
-    }else if(settled&&mainExitActions<16){action=2;step="previous";} // walks up and wraps into EXIT GAME
+    }else if(settled&&mainExitActions<16){action=2;step="previous";++mainExitActions;} // walks up and wraps into EXIT GAME
     if(action>=0){
-     ++mainExitActions;mainExitLastActionFrame=originalMain.frameCount;
+     mainExitLastActionFrame=originalMain.frameCount;
      const auto status=originalMain.input(static_cast<std::uint8_t>(action));
      std::cerr<<"test_main_exit step="<<step<<" event="<<action<<" screen="<<unsigned(snapshot.route.screen)
          <<" status="<<static_cast<unsigned>(status)<<'\n';

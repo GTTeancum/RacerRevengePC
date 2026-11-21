@@ -64,7 +64,11 @@ bool OriginalUiGarageDrawContribution50KG::prepareDrainModelPolicies24B130(D& d)
         std::vector<std::shared_ptr<const assets::OriginalUiGarageModelMaterials50KG>> policies;
         models.reserve(resources.population_.size());policies.reserve(resources.population_.size());
         assets::OriginalUiImageBankInput50KG input;
-        input.archives={drainAppStart_,session->sceneAssets_->archive(),session->sceneAssets_->selectedArchive()};
+        // DLC career: a package selected archive joins as an add-on archive of the bank.
+        if(session->sceneAssets_->selectedArchive()&&session->sceneAssets_->selectedArchive()->addon()){
+            input.archives={drainAppStart_,session->sceneAssets_->archive()};
+            input.addonArchives={session->sceneAssets_->selectedArchive()};
+        }else input.archives={drainAppStart_,session->sceneAssets_->archive(),session->sceneAssets_->selectedArchive()};
         if(session->residentPodTextures_)input.archives.push_back(session->residentPodTextures_);
         input.ipumCache=drainIpum_.get();input.owners.reserve(resources.population_.size());
         const auto* selected=session->sceneAssets_->selectedPod();

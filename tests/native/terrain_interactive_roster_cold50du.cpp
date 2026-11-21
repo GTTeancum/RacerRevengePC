@@ -13,6 +13,10 @@
 #include "../../src/game/original_opponent_selection50kg.h"
 #include "../../src/game/dlc_rider_entries50dl.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
+#include "../../platform/linux/native/original_ui_main_session50kg.h"
+#include "../../src/game/original_unlock_checks50pd.h"
+#include "../../src/game/lap_host_clock50id.h"
+#include "../../src/assets/dlc_registry50dl.h"
 #include "original_ui_main_entry50kg.h"
 #include "ra_cold_roster_operation50la.h"
 #include "ra_cold_roster_resources50la.h"
@@ -23,6 +27,8 @@
 #include "runtime_asset_paths50lb.h"
 #include "runtime_allocation_counter50fl.h"
 #include <algorithm>
+#include <cstdio>
+#include <span>
 #include <exception>
 #include <filesystem>
 #include <stdexcept>
@@ -110,7 +116,72 @@ void Context::run() const {
   fieldOk=common_roster50CR::buildTournamentField188470(klass,playerRacer60,field,fieldDiagnostic);
  }else if(raceRacerCount==1u){
   fieldOk=common_roster50CR::buildTimeTrialField(playerRacer60,field,fieldDiagnostic); // 1AD520 solo
+ }else if(sourceUiHumanCourse){
+  // Free Play / practice: the original 1AE620 non-tournament branch
+  // (original_opponent_selection50KG::freePlay1AE620): opponent 0 is the course
+  // rival unless the human rides it, every other opponent is drawn by 1AEF70
+  // from the Application's one 308030 stream with the original eligibility
+  // (no duplicates, never 5/6/13, the 1/19 and 14/18 pairs, the unlockable
+  // riders only when a human rides one and that rider is unlocked in 10FAC).
+  // app+340 is the "NoRandomAI" command-line switch (17CFF4..17D008), never
+  // set on retail: the random branch is the retail one.
+  // DLC rule R4 (PORT EXTENSION): on an add-on course (track data: registry
+  // row) every admitted add-on pod whose package allows AI joins the candidate
+  // list after the 26 stock racers, in registry number order; on a stock
+  // course the list is exactly the original's, so draw and stream match no DLC.
+  // PORT STAND-IN (flagged, ordering only): the original draws opponent k+1
+  // after opponent k's pod load (1AE370 -> 16E450 -> 210770 -> 19BB70 ember
+  // emitter, which itself takes 308030 draws); the port draws the whole field
+  // before loadAll, and the ember draws come later in the wreck-effect stage.
+  // Same rules and stream, a different position in the stream.
+  require50DU(applicationState&&applicationState->clock101A50&&courseProfile,
+      "free-play opponent draw 1AE620 needs the Application RNG owner, its 101A50 clock and the profile");
+  rr::game::OriginalUnlockFacts50PD facts{};
+  require50DU(courseProfile->unlockFacts187E30(facts),
+      "free-play opponent draw 1AE620 needs the profile's unlock words 10FAC and course rival 11280");
+  namespace reg=rr::assets::dlc50DL;
+  const std::array<original::RacerId,1> humans{static_cast<original::RacerId>(playerRacer60)};
+  std::array<original::RacerId,reg::RegistryLimits::pods> addonCandidates{};
+  std::size_t addonCount=0;
+  if(addonCourse){
+   for(unsigned n=reg::RegistryLimits::firstNumber;n<=reg::RegistryLimits::lastRacer;++n){
+    if(!reg::addonPod(n)||!rr::game::dlc50DL::addonRiderMayBeAi(n,true))continue;
+    require50DU(addonCount<addonCandidates.size(),"add-on opponent candidates exceed the registry pod limit");
+    addonCandidates[addonCount++]=static_cast<original::RacerId>(n);
+   }
+  }
+  original::FreePlayInputs1AE620 drawInputs{};
+  drawInputs.humans=std::span<const original::RacerId>(humans.data(),humans.size());
+  drawInputs.opponents=raceRacerCount-1u;
+  drawInputs.rival11280=facts.rival11280;
+  drawInputs.unlock10FAC=facts.unlock10FAC;
+  drawInputs.addonCandidates=std::span<const original::RacerId>(addonCandidates.data(),addonCount);
+  original::FreePlayResult1AE620 drawn{};
+  const bool drew=original::freePlay1AE620(drawInputs,applicationState->sharedNoise308030,
+      applicationState->sharedRandomSelectors,*applicationState->clock101A50,drawn);
+  {
+   std::string pods;
+   for(std::uint32_t i=0;i<drawn.count&&i<drawn.opponents.size();++i){
+    if(i)pods+=',';
+    pods+=std::to_string(drawn.opponents[i]);
+   }
+   const auto code=track.identity.code.view();
+   std::fprintf(stderr,"opponent_draw pc=1AE620 course=%.*s addon_course=%d candidates=%u drawn=%s rival=%d rival_taken=%d draws=%u seeded=%d status=%s fail_pc=%X\n",
+       static_cast<int>(code.size()),code.data(),addonCourse?1:0,drawn.candidates,pods.empty()?"none":pods.c_str(),
+       facts.rival11280,drawn.rivalTaken?1:0,drawn.draws,drawn.seeded?1:0,drew?"ok":"refused",drawn.failPC);
+  }
+  require50DU(drew,"free-play opponent draw 1AE620/1AEF70 refused");
+  std::array<std::uint32_t,common_roster50CR::maxSlots> ids{};
+  require50DU(raceRacerCount<=ids.size()&&drawn.count+1u==raceRacerCount,"free-play field size differs from the 1AE620 draw");
+  ids[0]=playerRacer60;
+  for(std::uint32_t i=0;i<drawn.count;++i)ids[i+1]=static_cast<std::uint32_t>(drawn.opponents[i]);
+  fieldOk=common_roster50CR::buildCourseField(ids.data(),raceRacerCount,1u,addonCourse,
+      practice?common_roster50CR::FieldKind::practice:common_roster50CR::FieldKind::freePlay,field,fieldDiagnostic);
  }else{
+  // PORT STAND-IN (flagged, development direct launch only: no Application
+  // profile or RNG owner): the retained eight host entries, selected racer in
+  // slot 0 (original_course_roster50kg_fixture.h). Every UI-launched race
+  // takes the 1AE620 branch above.
   std::array<std::uint32_t,selection::entries.size()> entries{};
   require50DU(original_course_roster50KG::courseFieldEntries(playerRacer60,entries),
       "selected racer has no pod row (A5 table or registry)");

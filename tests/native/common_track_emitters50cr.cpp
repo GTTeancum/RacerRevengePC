@@ -690,7 +690,13 @@ bool Owner::prepare(const ct::Track& track,const Inputs& inputs,ct::Diagnostic& 
             for(std::size_t i=0;i<idx;++i){auto* p=s.placements.at(i);if(!initialize(s,*p,i,true,d))return false;}
         }
         trackDataNamed(track,"particles.emitters",track.identity.tobMember,s.rows.size());
-        trackDataNamed(track,"particles.attachments",track.identity.tobMember,s.placements.size());
+        // Receipt meaning (stock_course_receipts50cr.h: GB 67/55, MC 8/2): particles.attachments =
+        // ATTACHED emitter instances (AttachToSoultree rows matched to world instances),
+        // particles.placements = distinct attached world models. Unattached rows placed by
+        // Position (MC 8..39) are emitter instances too and all run, as in 27C7B0 and the
+        // retired MC chain; they are counted in placements= on the common_track_emitters line.
+        trackDataNamed(track,"particles.attachments",track.identity.tobMember,attached);
+        trackDataNamed(track,"particles.placements",track.identity.tobMember,s.graphCount);
         trackDataNamed(track,"particles.definitions",track.identity.tobMember,s.definitions.size());
         std::cerr<<"common_track_emitters course="<<code<<" rows="<<s.rows.size()<<" definitions="<<s.definitions.size()
                  <<" placements="<<s.placements.size()<<" attached="<<attached<<" graphs="<<s.graphCount

@@ -1736,6 +1736,13 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank12E5E0(
     const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,D& d) noexcept {
     return issueGarageBank(provider,archive,lease,false,d);
 }
+namespace {
+// PORT EXTENSION (DLC career): the Garage selected bank is a career pod archive
+// (catalog) or an add-on pod's own package archive (identity addonUi).
+bool garageSelectedBankArchive50DL(const OriginalUiArchive50KG* a,OriginalUiArchiveId50KG id) noexcept {
+    return originalUiGaragePodCareer50KG(id)>=0||(id==OriginalUiArchiveId50KG::addonUi&&a&&a->addon());
+}
+}
 bool OriginalStandardTextureResolver50LA::issueGarageSelectedBank1D1D68(
     const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
     const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,D& d) noexcept {
@@ -1750,7 +1757,7 @@ bool OriginalStandardTextureResolver50LA::issueGarageBank(
     if(lease.resolver_||!storage_||!provider||storage_->provider!=provider||!provider->sealed_||
        !provider->retainedSourcesAccessible()||!archive||!archive->loaded()||!archive->identity()||
        (loadingFonts?selected19E||archive->identity()->id!=OriginalUiArchiveId50KG::fonts:
-        selected19E?originalUiGaragePodCareer50KG(archive->identity()->id)<0:
+        selected19E?!garageSelectedBankArchive50DL(archive.get(),archive->identity()->id):
         archive->identity()->id!=OriginalUiArchiveId50KG::garage))
         return fail(d,E::phase,0x12E5E0);
     std::size_t bank=static_cast<std::size_t>(-1);
@@ -1783,7 +1790,7 @@ bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
     if(!bank.active||bank.generation!=lease.generation_||bank.admittedUi.lock()!=lease.archive_||
        !lease.archive_||!bank.ui||!bank.ui->identity()||
        (lease.loadingFonts_?lease.selected19E_||bank.ui->identity()->id!=OriginalUiArchiveId50KG::fonts:
-        lease.selected19E_?originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0:
+        lease.selected19E_?!garageSelectedBankArchive50DL(bank.ui.get(),bank.ui->identity()->id):
             bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage))return fail(d,E::phase,0x12E6D0);
     return validateGarageBankRows12EAA0(lease.mount_,lease.generation_,d);
 }
@@ -2139,7 +2146,7 @@ void OriginalStandardTextureResolver50LA::reclaimRetiredPsgBacking26E5C8(
         const auto& bank=*storage_->provider->mounts_[file.bank];
         if(!bank.active||bank.generation!=file.bankGeneration||!bank.ui||!bank.ui->identity()||
            (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
-            originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0))return;
+            !garageSelectedBankArchive50DL(bank.ui.get(),bank.ui->identity()->id)))return;
     }
     const auto owner=file.payloadGeometry.lock();
     const auto* references=geometry.references00();
@@ -2554,7 +2561,7 @@ bool OriginalStandardTextureResolver50LA::reclaimNeverBorrowedSelectedPstAfterBa
        receipt.mount>=receipt.provider->mounts_.size())return fail(d,E::phase,0x12EB60);
     const auto& bank=*receipt.provider->mounts_[receipt.mount];
     if(bank.active||bank.generation!=receipt.generation||!bank.admittedUi.expired()||
-       !bank.ui||!bank.ui->identity()||originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0)
+       !bank.ui||!bank.ui->identity()||!garageSelectedBankArchive50DL(bank.ui.get(),bank.ui->identity()->id))
         return fail(d,E::phase,0x12EB60);
     std::size_t residentBytes=0,releaseBytes=0;
     for(std::size_t index=0;index<storage_->files.size();++index){
@@ -2631,7 +2638,7 @@ bool OriginalStandardTextureResolver50LA::preflightRetiredGaragePstBacking(
     if(bank.active||bank.generation!=file.bankGeneration||!bank.admittedUi.expired()||
        !bank.ui||!bank.ui->identity()||
        (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
-        originalUiGaragePodCareer50KG(bank.ui->identity()->id)<0)||file.bankOrdinal>=bank.rows.size())
+        !garageSelectedBankArchive50DL(bank.ui.get(),bank.ui->identity()->id))||file.bankOrdinal>=bank.rows.size())
         return fail(d,E::phase,0x12EB60);
     if(file.cacheIdentity||!file.cached.expired()||file.animation||file.geometryIdentity||
        !file.geometry.expired()||!file.payloadGeometry.expired()||file.collisionIdentity||

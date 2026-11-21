@@ -1934,6 +1934,9 @@ bool OriginalUiFrontend50KG::prepareGarageSourceImages12CEA0(
         session.managerArchiveOnlyScope170_;
     if(!selected&&!garage)return reject(assets::OriginalStandardMaterialStatus50LA::phase,
         0x12CEA0,"actual selected/base source bank predecessor required");
+    // PORT EXTENSION (DLC career): a package archive (identity addonUi) has no
+    // authenticated static IPUM sources; its PSTs are decoded by the resolver.
+    if(selected&&archive->addon()){out=s->cold.riderIpumCache;return true;}
     assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
     if(!s->cold.riderIpumCache->appendGarageArchive12CEA0(archive,cacheDiagnostic)){
         d.slot=cacheDiagnostic.mip;

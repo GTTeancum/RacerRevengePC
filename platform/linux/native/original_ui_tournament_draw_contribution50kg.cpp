@@ -4,6 +4,7 @@
 #include "../../../src/assets/original_ui_material_binding50kg.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <optional>
@@ -45,6 +46,10 @@ struct Binding {
     RegistrationKind kind=RegistrationKind::existingStatic;
     MaterialRow row{};
     std::shared_ptr<LiveMaterial> live;
+    // PORT EXTENSION (DLC career): a pass of the add-on pod's own model. Not an
+    // APPSTART Mat_Stbl.txt row: a static page row with a port-owned rank after
+    // the stock ranks (schedule), never matched against the table by name.
+    bool addon=false;
 };
 struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;};
 struct Registration {
@@ -121,7 +126,8 @@ struct OriginalUiTournamentDrawContribution50KG::Storage {
     const game::OriginalUiApertureOwner50KG* aperture=nullptr;
     game::OriginalUiApertureSnapshot50KG apertureAtBegin{};
     bool exitExpected=false,exitProjected=false;
-    std::uint32_t widgetOwner=0,careerOwner=0,modelOwner=0,binderOwner=0;
+    std::uint32_t widgetOwner=0,careerOwner=0,modelOwner=0,binderOwner=0,addonOwner=0;
+    bool addonModelLogged=false; // DLC career: one dlc_tournament_model line per screen
     game::OriginalUiTextureAnimation50KG markerAnimation{};
     std::uint32_t markerControllerStamp=0xffffffffu;bool markerAnimatesWhilePaused=false;
     bool markerMutatedInFrame=false,markerTerminal=false;
@@ -264,8 +270,9 @@ bool OriginalUiTournamentDrawContribution50KG::prepareBank(D& d) noexcept {
    inputs.owners.insert(inputs.owners.end(),input->owners.begin(),input->owners.end());
    if(input->ipumCache){if(inputs.ipumCache&&inputs.ipumCache!=input->ipumCache)return false;inputs.ipumCache=input->ipumCache;}return true;};
   if(!addInput(s.resources->bankInput(),s.widgetOwner)||!addInput(s.career->bankInput(),s.careerOwner)||
-     !addInput(s.backend->bankInput(),s.modelOwner)||s.backend->bankInput()->owners.size()!=2)return fail(d,E::bank);
-  s.binderOwner=s.modelOwner+1;
+     !addInput(s.backend->bankInput(),s.modelOwner)||
+     s.backend->bankInput()->owners.size()!=(s.backend->addonReady()?3u:2u))return fail(d,E::bank);
+  s.binderOwner=s.modelOwner+1;s.addonOwner=s.modelOwner+2; // addonOwner: DLC career add-on model images only
   auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();if(!bank->load(inputs,d.bank))return fail(d,E::bank);
   s.bank=bank;struct Rollback{Storage& s;bool done=false;~Rollback(){if(!done)s.bank.reset();}} rollback{s};
   std::vector<Binding> bindings;
@@ -287,6 +294,17 @@ bool OriginalUiTournamentDrawContribution50KG::prepareBank(D& d) noexcept {
   const auto binder=s.backend->binderAssets();if(!binder||!binder->images()||!binder->images()->textures()||!binder->pass())return fail(d,E::resource);
   for(std::uint32_t i=0;i<binder->images()->textures()->textureCount();++i)
    if(!s.add("ui/textures/binder",*binder->pass(),*binder->images(),i,bank->mapping(s.binderOwner,i),bindings,d,RegistrationKind::ledgerDynamic))return false;
+  // DLC career: the add-on model's own passes as static page rows (flagged).
+  if(const auto addon=s.backend->addonMaterials()){const auto addonPod=s.backend->addonPodAssets();
+   const auto* addonScene=addonPod?addonPod->scene():nullptr;
+   if(!addonScene||addon->materialCount()!=addonScene->materials.size())return fail(d,E::model);
+   for(std::uint32_t m=0;m<addon->materialCount();++m)for(std::uint32_t p=0;p<addon->passCount(m);++p){
+    const auto* pass=addon->pass(m,p);
+    if(!pass||!s.add("ui/textures/"+addonScene->materials[m],pass->source,*addon->images(),pass->imageIndex,
+       pass->imageIndex==unresolved?nullptr:bank->mapping(s.addonOwner,pass->imageIndex),bindings,d))return fail(d,E::material);
+    bindings.back().addon=true;
+   }
+  }
   std::vector<Registration> history;std::vector<std::uint32_t> representatives;
   if(!s.schedule(bindings,{},history,representatives,d))return false;
   std::vector<MaterialTextureSampler50EB> samplers(bank->images()->textures()->textureCount());std::vector<bool> set(samplers.size(),false);
@@ -355,6 +373,9 @@ bool OriginalUiTournamentDrawContribution50KG::model(std::uint16_t id,D& d) noex
  auto& s=*storage_;if(id!=s.backend->widgetId()||!s.backend->attached()||!s.backend->shown())return fail(d,E::model);
  game::OriginalUiTournamentPodPacket50KG selected;
  if(!s.cameraFrame||!s.backend->prepareSelected(*s.camera,*s.cameraFrame,selected,d.pod))return fail(d,E::model);
+ // DLC career: the anchor pod's geometry and binders are never drawn; the
+ // add-on model draws in their place, or nothing.
+ if(s.backend->addonCareer())return addonModel(selected,d);
  if(selected.emitsGeometry){const auto& packet=selected.model;const auto materials=s.backend->materials();
   if(!packet.scene||!materials||packet.scene->lods.size()!=1)return fail(d,E::geometry);
   const auto& surfaces=packet.scene->lods[0].surfaces;
@@ -388,6 +409,50 @@ bool OriginalUiTournamentDrawContribution50KG::model(std::uint16_t id,D& d) noex
   s.vertices.insert(s.vertices.end(),p.vertices.begin(),p.vertices.end());s.w.insert(s.w.end(),p.rasterW.begin(),p.rasterW.end());s.fog.insert(s.fog.end(),p.fogFactors.begin(),p.fogFactors.end());
   s.packets.push_back({first,2,binding,static_cast<std::uint32_t>(s.packets.size())});
  }
+ return true;
+}
+bool OriginalUiTournamentDrawContribution50KG::addonModel(const game::OriginalUiTournamentPodPacket50KG& selected,D& d) noexcept {
+ // PORT EXTENSION, NOT ORIGINAL (DLC career): the add-on pod model projected
+ // exactly as the stock pod (same selection, camera/light context and lit /
+ // specular surface projection; its own palette and fog). Any refusal
+ // withdraws what it emitted this frame and draws nothing (never the anchor).
+ auto& s=*storage_;
+ const auto vertices0=s.vertices.size(),w0=s.w.size(),fog0=s.fog.size(),packets0=s.packets.size();
+ std::uint32_t emitted=0;const char* refused=nullptr;
+ const auto materials=s.backend->addonMaterials();const auto& packet=selected.addonModel;
+ if(!s.backend->addonReady()||!materials)refused=s.backend->addonRefused();
+ else if(!selected.addonEmits||!packet.scene)refused=selected.selection.selected()?"add-on packet not prepared":nullptr;
+ else if(packet.scene->lods.size()!=1)refused="add-on model shape";
+ else{const auto& surfaces=packet.scene->lods[0].surfaces;
+  for(std::uint32_t surface=0;surface<surfaces.size()&&!refused;++surface){const auto m=surfaces[surface].material_index;
+   if(m>=materials->materialCount()||surfaces[surface].indices.size()%3){refused="add-on surface material";break;}
+   const auto count=surfaces[surface].indices.size()/3;if(!count)continue;
+   if(count>originalUiMaximumSourceQuads50KM){refused="add-on surface size";break;}
+   s.scratchVertices.resize(count*4);s.scratchW.resize(count*4);s.scratchFog.resize(count*4);
+   for(std::uint32_t p=0;p<materials->passCount(m);++p){const auto* material=materials->pass(m,p);
+    if(!material){refused="add-on material pass";break;}
+    const auto* map=material->imageIndex==unresolved?nullptr:s.bank->mapping(s.addonOwner,material->imageIndex);
+    if(material->imageIndex!=unresolved&&!map){refused="add-on image not in the bank";break;}
+    const auto binding=s.find(&material->source,map?map->combinedIndex:unresolved);
+    if(binding==unresolved){refused="add-on material not registered";break;}
+    game::OriginalUiLitSurfaceOutput50KM projected{s.scratchVertices.data(),s.scratchW.data(),s.scratchFog.data(),static_cast<std::uint32_t>(count),0,0};
+    const auto status=same(material->source.microprogram,"SpecularMapCompressed")?
+      game::projectOriginalUiSpecularMapCompressedSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,projected,s.workspace):
+      game::projectOriginalUiLitSceneSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,packet.fog.computeRadialFog1B2,projected,s.workspace);
+    if(status!=game::OriginalUiLitGeometryStatus50KM::complete||projected.materialIndex!=m){refused="add-on surface projection";break;}
+    if(!s.capacity(projected.slotCount))return fail(d,E::capacity); // the page's own bound, as for a stock pod
+    if(!projected.slotCount)continue;
+    const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);const auto n=std::size_t(projected.slotCount)*4;
+    s.vertices.insert(s.vertices.end(),s.scratchVertices.begin(),s.scratchVertices.begin()+n);s.w.insert(s.w.end(),s.scratchW.begin(),s.scratchW.begin()+n);
+    s.fog.insert(s.fog.end(),s.scratchFog.begin(),s.scratchFog.begin()+n);s.packets.push_back({first,projected.slotCount,binding,static_cast<std::uint32_t>(s.packets.size())});
+    ++emitted;
+   }
+  }
+ }
+ if(refused){s.vertices.resize(vertices0);s.w.resize(w0);s.fog.resize(fog0);s.packets.resize(packets0);emitted=0;}
+ if(!s.addonModelLogged&&(refused||emitted)){s.addonModelLogged=true;
+  std::fprintf(stderr,"dlc_tournament_model source=package packets=%u status=%s%s%s%s anchor_model=never\n",emitted,
+      refused?"empty":"drawn",refused?" reason=\"":"",refused?refused:"",refused?"\"":"");}
  return true;
 }
 bool OriginalUiTournamentDrawContribution50KG::widgets(bool top,bool shown,D& d) noexcept {
@@ -753,6 +818,7 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
         if(cursor==table.size)break;
         const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
         for(std::size_t i=0;i<input.size();++i){const auto& name=input[i].registeredName;
+            if(input[i].addon)continue; // DLC career add-on model pass: port-owned rank below
             if(name.size()!=cursor-start)continue;std::size_t j=0;
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(table.data[start+j]));++j){}
             if(j!=name.size())continue;
@@ -786,6 +852,14 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
             ranks[i]=ordinal+k;
         }
     }
+    // DLC career add-on model passes: one port-owned rank per registered name,
+    // after the stock ranks and the two career-art ranks.
+    {std::vector<std::string> names;
+     for(std::size_t i=0;i<input.size();++i){if(!input[i].addon)continue;
+        if(input[i].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule,0x298C80);
+        std::size_t k=0;for(;k<names.size();++k)if(names[k]==input[i].registeredName)break;
+        if(k==names.size())names.push_back(input[i].registeredName);
+        ranks[i]=ordinal+2u+static_cast<std::uint32_t>(k);}}
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
         if(input[i].kind==RegistrationKind::ledgerDynamic&&

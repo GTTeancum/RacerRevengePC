@@ -13,8 +13,11 @@
 #include "../../src/assets/material_texture_assets50ea.h"
 #include "../../platform/linux/native/material_texture_gl50eb.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -99,6 +102,10 @@ struct State {
     rr::platform::MaterialTextureGl50EB bank;
     bool cold = false, frothImage = false;
     std::uint64_t frames = 0, drawnFrames = 0, hiddenFrames = 0, failedFrames = 0;
+    // Build timing since the last native_water_surface line (measurement only).
+    double buildMsSum = 0.0, buildMsWorst = 0.0; std::uint64_t buildFrames = 0, buildFramesLogged = 0;
+    std::vector<rr::assets::Vertex48B> verifyVertices;      // RR_WATER_VERIFY only
+    std::vector<WaterSurfacePoint50WS> verifyScratch;
     std::string log;
 };
 inline State& state() noexcept { static State owner; return owner; }
@@ -264,8 +271,26 @@ inline void buildFrame(const native_water_runtime50JC::Owner& runtime, const Cam
         f.baseHeight = *provider->baseHeight3C;
         f.frothPhase35C = runtime.frothPhase35C();
         f.sample = &sample; f.sampleContext = &context; f.missDepthScale = missScale;
-        if (buildWaterSurface50WS(f, s.vertices, s.scratch, s.counters) &&
-            s.counters.vertices == s.counters.strips * 2u * waterStripVertices50WS) {
+        // cr-16 measurement: CPU time of the build per drawn frame (logged below).
+        const auto buildStart = std::chrono::steady_clock::now();
+        const bool built = buildWaterSurface50WS(f, s.vertices, s.scratch, s.counters);
+        const double buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - buildStart).count();
+        s.buildMsSum += buildMs; s.buildMsWorst = std::max(s.buildMsWorst, buildMs); ++s.buildFrames;
+        // RR_WATER_VERIFY=1 (muted A/B runs only): every 625th build is repeated on
+        // the calling thread alone and compared byte for byte with the parallel one.
+        static const bool verify = [] { const char* e = std::getenv("RR_WATER_VERIFY"); return e && e[0] == '1' && !e[1]; }();
+        if (verify && built && s.buildFrames % 625u == 1u) {
+            WaterSurfaceCounters50WS serialCounters{};
+            const bool serialBuilt = buildWaterSurface50WS(f, s.verifyVertices, s.verifyScratch, serialCounters, false);
+            const bool same = serialBuilt && s.verifyVertices.size() == s.vertices.size() &&
+                (s.vertices.empty() || std::memcmp(s.verifyVertices.data(), s.vertices.data(),
+                    s.vertices.size() * sizeof(rr::assets::Vertex48B)) == 0) &&
+                std::memcmp(&serialCounters, &s.counters, sizeof serialCounters) == 0;
+            std::fprintf(stderr, "native_water_verify frame=%llu parts=%u vertices=%u result=%s\n",
+                static_cast<unsigned long long>(s.buildFrames), unsigned(WaterSurfaceWorkers50WS::shared().parts()),
+                unsigned(s.vertices.size()), same ? "match" : "differs");
+        }
+        if (built && s.counters.vertices == s.counters.strips * 2u * waterStripVertices50WS) {
             frame.waterVertices = s.vertices.data();
             frame.waterStrips = s.counters.strips;
             frame.waterAlphaReference = static_cast<std::uint32_t>(std::clamp(s.authoring.alphaReference, 0, 255));
@@ -278,11 +303,15 @@ inline void buildFrame(const native_water_runtime50JC::Owner& runtime, const Cam
         std::fprintf(stderr,
             "native_water_surface frames=%llu drawn=%llu hidden=%llu failed=%llu zone=%u sees=%u strips=%u vertices=%u "
             "ray_misses=%u sample_failures=%u degenerate_normals=%u height=%.3f..%.3f env_alpha=%u..%u "
-            "froth_vertices=%u froth_alpha_max=%u froth_source=original_none\n",
+            "froth_vertices=%u froth_alpha_max=%u froth_source=original_none build_ms_avg/worst=%.3f/%.3f build_frames=%llu parts=%u\n",
             static_cast<unsigned long long>(s.frames), static_cast<unsigned long long>(s.drawnFrames),
             static_cast<unsigned long long>(s.hiddenFrames), static_cast<unsigned long long>(s.failedFrames),
             cameraZone48, sees ? 1u : 0u, c.strips, c.vertices, c.rayMisses, c.sampleFailures, c.degenerateNormals,
-            c.heightMin, c.heightMax, c.envAlphaMin, c.envAlphaMax, c.frothVertices, c.frothAlphaMax);
+            c.heightMin, c.heightMax, c.envAlphaMin, c.envAlphaMax, c.frothVertices, c.frothAlphaMax,
+            s.buildFrames > s.buildFramesLogged ? s.buildMsSum / double(s.buildFrames - s.buildFramesLogged) : 0.0,
+            s.buildMsWorst, static_cast<unsigned long long>(s.buildFrames - s.buildFramesLogged),
+            unsigned(WaterSurfaceWorkers50WS::shared().parts()));
+        s.buildMsSum = 0.0; s.buildMsWorst = 0.0; s.buildFramesLogged = s.buildFrames;
     }
 }
 inline bool closeGpu(rr::platform::MaterialTextureGlDiagnostic50EB& diagnostic) noexcept {

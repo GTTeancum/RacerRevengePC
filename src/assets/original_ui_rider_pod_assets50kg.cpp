@@ -127,6 +127,26 @@ bool OriginalUiRiderPodAssets50KG::loadAddon(std::shared_ptr<const OriginalUiArc
         d={};return true;
     } catch (...) {storage_.reset();return fail(d,E::allocation,0x1D3590);}
 }
+bool OriginalUiRiderPodAssets50KG::loadTournamentAddon(std::shared_ptr<const OriginalUiArchive50KG> tournament,
+    std::uint32_t career,std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& modelName,
+    OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header.
+    d={};if (storage_) return fail(d,E::alreadyLoaded,0x1D3590);
+    if (!addonUi||!addonUi->addon()||modelName.empty()) return fail(d,E::archive,0x1D3590);
+    if (!loadTournament(std::move(tournament),career,d)) return false; // the anchor career's authored widget
+    try {
+        auto& s=*storage_;
+        const auto model=addonUi->find(modelName);
+        if (!model.identity||!model.data) {storage_.reset();return fail(d,E::member,0x1D35C4);}
+        s.layoutArchive=std::move(s.archive);s.archive=std::move(addonUi);s.model=model;s.addon=true;
+        s.hierarchy={};s.scene={};
+        if (!decodeModel(d)) {storage_.reset();return false;}
+        d={};return true;
+    } catch (...) {storage_.reset();return fail(d,E::allocation,0x1D3590);}
+}
+std::shared_ptr<const OriginalUiArchive50KG> OriginalUiRiderPodAssets50KG::layoutArchive() const noexcept {
+    return storage_?storage_->layoutArchive:nullptr;
+}
 bool OriginalUiRiderPodAssets50KG::addon() const noexcept {return storage_&&storage_->addon;}
 bool OriginalUiRiderPodAssets50KG::loaded() const noexcept {return !!storage_;}
 std::uint16_t OriginalUiRiderPodAssets50KG::widgetId() const noexcept {return storage_?storage_->widget:0;}

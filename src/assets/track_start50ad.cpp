@@ -3,21 +3,25 @@
 namespace rr::assets {
 bool parseTrackNumber50AD(const char* text, std::size_t bytes, float& output,
                              std::uint64_t* binary64Bits) noexcept {
-    if (!text || !bytes || bytes > 13) return false;
+    // PORT STAND-IN (flagged guard): the original float reader (310440/310498) takes any
+    // length. The exact long division below holds n below 2^63 with headroom, so at most
+    // 17 significant digits and 6 fractional digits are admitted (was 11 / 13 bytes, which
+    // refused any %f value of 100000 or more, e.g. DistanceToFinish=138617.156250).
+    if (!text || !bytes || bytes > 20) return false;
     std::size_t at=0, digits=0, fractional=0;
     const bool negative=text[0]=='-';
     if (negative || text[0]=='+') ++at;
     const std::size_t first=at;
     std::uint64_t n=0, d=1;
     while (at<bytes && text[at]>='0' && text[at]<='9') {
-        if (++digits>11) return false;
+        if (++digits>17) return false;
         n=n*10+static_cast<unsigned>(text[at++]-'0');
     }
     if (at==first) return false;
     if (at<bytes && text[at]=='.') {
         ++at; const std::size_t start=at;
         while (at<bytes && text[at]>='0' && text[at]<='9') {
-            if (++digits>11 || ++fractional>6) return false;
+            if (++digits>17 || ++fractional>6) return false;
             n=n*10+static_cast<unsigned>(text[at++]-'0'); d*=10;
         }
         if (at==start) return false;
@@ -26,7 +30,8 @@ bool parseTrackNumber50AD(const char* text, std::size_t bytes, float& output,
     std::uint64_t binary64=0;
     std::uint32_t binary32=0;
     if (n) {
-        // n and d are exact nonnegative integers <=99999999999 and1000000.
+        // n and d are exact nonnegative integers <=99999999999999999 and1000000
+        // (d*2 and remainder*2 stay below 2^58: no overflow).
         // Normalize a/b into[1,2), then generate53 bits by long division.
         // Remainder compares implement nearest-even without host arithmetic.
         int exponent=0;

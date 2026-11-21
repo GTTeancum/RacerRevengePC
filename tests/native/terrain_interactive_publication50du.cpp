@@ -1081,13 +1081,33 @@ void Context::run() {
   constexpr std::uint32_t courseWorldVertexCeiling=32u*1024u*1024u,courseWorldIndexCeiling=16u*1024u*1024u,
       courseWorldNormalCeiling=16u*1024u*1024u;
   renderRequest.track.maximumNormalBytes=courseWorldNormalCeiling;
-  if(trackSession->originalStaticCandidates){
+  // The authored projection (ProjectedPrelit) and the environment-map UVs share the renderer's
+  // one float2 stream. Which one a track supplies is read from its data: projection UVs only
+  // when a static-world span draws a projected pass (GA/GB/GC/TB author them), environment UVs
+  // only when a pass is EnvironmentMapCompressed (RC's crystals). Both at once is not
+  // representable by that stream and is refused here with its reason (no stock course does).
+  // Replaces the retired `!isRcTrack` branch. The environment budgets are sized from the
+  // producer and the mesh (they were left 0 when R8 retired maximumRcProjection/StagingBytes,
+  // so every environment-mapped track was refused at "environment-map UV producer
+  // association/projection budget").
+  std::size_t projectedSpans=0;
+  if(const auto* spans=staticWorld->spans())for(const auto& span:*spans)projectedSpans+=span.projectionPass!=0;
+  if(renderRequest.track.environmentUv){
+   require50DU(!projectedSpans,"track authors both projected (ProjectedPrelit) and environment-mapped passes: one shared UV stream");
+   const auto* mesh=staticWorld->mesh();
+   require50DU(mesh&&!mesh->vertices.empty(),"environment-map UVs need the static world mesh");
+   renderRequest.track.maximumEnvironmentUvBytes=mesh->vertices.size()*sizeof(std::array<float,2>);
+   renderRequest.track.maximumEnvironmentStagingBytes=renderRequest.track.environmentUv->uvCount()*sizeof(std::array<float,2>);
+   std::cerr<<"track_uv_stream course="<<track.code()<<" stream=environment uvs="<<renderRequest.track.environmentUv->uvCount()
+       <<" ranges="<<renderRequest.track.environmentUv->rangeCount()<<" mesh_vertices="<<mesh->vertices.size()<<'\n';
+  }else if(trackSession->originalStaticCandidates&&projectedSpans){
    const auto* projectionUvs=staticWorld->projectionUvs();
    require50DU(projectionUvs,"original projected UV publication missing");
    renderRequest.track.sourceProjectionUvs=projectionUvs->data();
    renderRequest.track.sourceProjectionCount=projectionUvs->size();
    renderRequest.track.maximumProjectionBytes=projectionUvs->size()*sizeof(rr::assets::TrackProjectedUv);
-  }
+   std::cerr<<"track_uv_stream course="<<track.code()<<" stream=projection projected_spans="<<projectedSpans<<'\n';
+  }else std::cerr<<"track_uv_stream course="<<track.code()<<" stream=none\n";
   // Bounded host rendering optimization; an explicit debugging opt-out keeps
   // the same scene and physics available for comparisons.
   const char* disableCulling=std::getenv("RR_DISABLE_TRACK_CULLING");

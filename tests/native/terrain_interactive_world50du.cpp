@@ -486,6 +486,7 @@ SessionExit50DU Context::run() {
   .mainPairCapacity=mainPairCapacity,
   .secondaryPairCapacity=secondaryPairCapacity,
   .matchesEndpointPolicy=interactive_frame50DU::BorrowedCall<bool(const rr::game::Type2ResourceView49X&)>(matchesEndpointPolicy),
+  .applicationState=originalUiStarted?originalMainApplication.state.get():nullptr,
  }.run();
  {
   std::array<std::uint32_t,common_roster50CR::maxSlots> pods{};

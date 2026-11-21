@@ -74,6 +74,8 @@ private:
  void finishSourceSubmission(std::uint64_t,bool,bool) const noexcept override;
  bool widgets(bool,bool,OriginalUiTournamentContributionDiagnostic50KG&) noexcept;
  bool model(std::uint16_t,OriginalUiTournamentContributionDiagnostic50KG&) noexcept;
+ // PORT EXTENSION (DLC career): the add-on model in place of the anchor pod (never the anchor).
+ bool addonModel(const game::OriginalUiTournamentPodPacket50KG&,OriginalUiTournamentContributionDiagnostic50KG&) noexcept;
  bool append(const game::OriginalUiOverlayQuad50KG&,const assets::OriginalUiMaterialPass50KG*,std::uint32_t,float,
      OriginalUiTournamentContributionDiagnostic50KG&) noexcept;
  bool appendText(const game::OriginalUiTextLayout50KG&,const std::array<std::uint8_t,4>&,

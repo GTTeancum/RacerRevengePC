@@ -50,6 +50,16 @@ public:
     bool loadAddon(std::shared_ptr<const OriginalUiArchive50KG> stockRider,std::uint16_t layoutWidget,
         std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& modelName,
         OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC career): an add-on pod's menu model
+    // laid out by the Tournament page's own User_Rotate widget of the selected
+    // (anchor) career (the 1EEC40 table3AFEA0 widget 39..61 loadTournament
+    // uses), the model `modelName` from the add-on's own archive. archive() is
+    // the add-on archive; layoutArchive() the UITourn archive.
+    bool loadTournamentAddon(std::shared_ptr<const OriginalUiArchive50KG> tournament,std::uint32_t career,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& modelName,
+        OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    // The stock archive the layout was read from (add-on pods only; else null).
+    std::shared_ptr<const OriginalUiArchive50KG> layoutArchive() const noexcept;
     bool addon() const noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;

@@ -90,9 +90,20 @@ bool Application::updateNativeResultsAfterRace50LA(const original_camera_session
     };
     if(!(outer.descendants24&2u)||!eligible(*root)||!(root->descendants24&2u))
         return skipped("Actual outer/root update traversal is masked or disabled");
-    // This join extends the existing native Race callback route, not an
+    // Time Trial Pause QUIT with a record (1BDAB4, every course): 1BDAC0 cleared Pause+200
+    // and its activity, 1BDB30 activated Results104 and 1BDB4C set page 3, but App11C stays
+    // set and the race stays under the Pause's 142040 (flags29 bit2, no 1BE830). The root
+    // 141ED0 traversal then skips the paused race (141EFC..141F34) and still reaches its
+    // active Results104 sibling, so 1C8AE0 updates page 3 over the paused race with no race
+    // end entered. Recognised from that state itself (launch 11258 == 3, App11C set,
+    // Pause+200 == 0, no end dispatch), not a flag. cr25: without this the update was
+    // skipped here every frame ("Native Race update domain disabled") and page 3 froze.
+    const bool pauseRecordPage1BDAB4=!race->endDispatchReturned_&&!race->endDispatchPublication_&&
+        returnedCamera.actual_.launchKind11258==3u&&animationPaused()&&
+        race->pause100_&&!race->pause100_->active200_;
+    // Otherwise this join extends the existing native Race callback route, not an
     // alternate dispatcher that executes UI siblings while Race is disabled.
-    if(!eligible(race->entity_))
+    if(!pauseRecordPage1BDAB4&&!eligible(race->entity_))
         return skipped("Native Race update domain disabled; existing route unchanged");
     const auto* pause=&race->pause100_->entity_->component;
     if(eligible(*pause))
@@ -108,14 +119,7 @@ bool Application::updateNativeResultsAfterRace50LA(const original_camera_session
     // frame, as the original Results run over the replay.
     const bool commonReplay=race->endDispatchReturned_&&
         native_common_results50PD::state().replayActive;
-    // Time Trial Pause QUIT with a record (1BDAB4, every course): 1BDAC0 cleared Pause+200
-    // and its activity, 1BDB30 activated Results104 and 1BDB4C set page 3, but App11C stays
-    // set (no 1BE830). 1A7B40 then runs only 141ED0 over the race's children (1A7B94..1A7BAC),
-    // so Results 1C8AE0 updates over the paused race with no race end entered. Recognised
-    // from that state itself (launch 11258 == 3, App11C set, Pause+200 == 0), not a flag.
-    const bool pauseRecordPage1BDAB4=!race->endDispatchReturned_&&!race->endDispatchPublication_&&
-        returnedCamera.actual_.launchKind11258==3u&&animationPaused()&&
-        race->pause100_&&!race->pause100_->active200_;
+    // (pauseRecordPage1BDAB4: see above.)
     if(!commonReplay&&!pauseRecordPage1BDAB4&&(race->endEntryStep_!=Race::EndEntryStep::subtype||race->endEntryProfile_||
        race->endDispatchPublication_||race->endDispatchReturned_))
         return stop(S::incomplete,0,"Canonical Race end continuation has not returned; native Camera publication is not its receipt");

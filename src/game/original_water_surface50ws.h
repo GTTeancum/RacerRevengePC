@@ -13,10 +13,19 @@
 #include "original_water_readback_layout50la.h"
 #include <algorithm>
 #include <array>
+#include <cfenv>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <mutex>
+#include <thread>
 #include <vector>
+#if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
+#include <xmmintrin.h>
+#define RR_WATER_SURFACE_MXCSR50WS 1
+#endif
 
 namespace rr::game {
 
@@ -204,6 +213,92 @@ struct WaterSurfacePoint50WS {
     float p[3]{};
     std::uint8_t frothA = 0, frothB = 0;
     bool miss = false;
+    // The point's 4-neighbour normal, computed once per frame for every emitted
+    // point (rows 0..rows-1, columns 0..columns-1); the emit reads it for both
+    // passes and both strips that share the point.
+    bool degenerate = false;
+    float n[3]{0.f, 1.f, 0.f};
+};
+
+// Host worker threads for the per-point water work (measurement-neutral host
+// execution, no game memory). The calling thread runs part 0, worker k runs part
+// k+1. Each part is a fixed contiguous range (deterministic partition), writes
+// only its own disjoint slots and its own counters; the caller merges counters in
+// part order. Workers take the caller's floating-point state (MXCSR: rounding,
+// flush/denormal modes; fenv rounding) for every job, so every operation rounds
+// as on the calling thread: the output is bit-identical to the one-thread build.
+// RR_WATER_WORKERS=0..3 caps the worker count (0 = one-thread build).
+class WaterSurfaceWorkers50WS final {
+public:
+    static constexpr std::size_t maximumWorkers = 3, maximumParts = maximumWorkers + 1u;
+    using Job = void (*)(void* context, std::size_t part, std::size_t parts) noexcept;
+    static WaterSurfaceWorkers50WS& shared() noexcept { static WaterSurfaceWorkers50WS pool; return pool; }
+    std::size_t parts() const noexcept { return workerCount_ + 1u; }
+    // Runs job(context, part, parts()) for every part, returns after all finished.
+    void run(Job job, void* context) noexcept {
+        if (!workerCount_) { job(context, 0, 1); return; }
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            job_ = job; context_ = context; pending_ = workerCount_;
+#ifdef RR_WATER_SURFACE_MXCSR50WS
+            mxcsr_ = _mm_getcsr();
+#endif
+            rounding_ = std::fegetround();
+            ++generation_;
+        }
+        wake_.notify_all();
+        job(context, 0, parts());
+        std::unique_lock<std::mutex> lock(mutex_);
+        done_.wait(lock, [this] { return pending_ == 0; });
+        job_ = nullptr; context_ = nullptr;
+    }
+    WaterSurfaceWorkers50WS(const WaterSurfaceWorkers50WS&) = delete;
+    WaterSurfaceWorkers50WS& operator=(const WaterSurfaceWorkers50WS&) = delete;
+    ~WaterSurfaceWorkers50WS() {
+        { std::lock_guard<std::mutex> lock(mutex_); stop_ = true; }
+        wake_.notify_all();
+        for (std::size_t i = 0; i < workerCount_; ++i) if (threads_[i].joinable()) threads_[i].join();
+    }
+private:
+    WaterSurfaceWorkers50WS() noexcept {
+        const unsigned hardware = std::thread::hardware_concurrency();
+        std::size_t wanted = hardware > 1u ? std::min<std::size_t>(maximumWorkers, hardware - 1u) : 0u;
+        if (const char* e = std::getenv("RR_WATER_WORKERS"); e && e[0] >= '0' && e[0] <= '9' && !e[1])
+            wanted = std::min<std::size_t>(wanted, std::size_t(e[0] - '0'));
+        try {
+            for (std::size_t i = 0; i < wanted; ++i) { threads_[i] = std::thread(&WaterSurfaceWorkers50WS::loop, this, i); ++workerCount_; }
+        } catch (...) {} // fewer workers (or none): the same partition rule over parts()
+    }
+    void loop(std::size_t index) noexcept {
+        std::uint64_t seen = 0;
+        for (;;) {
+            Job job = nullptr; void* context = nullptr; std::size_t parts = 1;
+            unsigned mxcsr = 0; int rounding = FE_TONEAREST;
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                wake_.wait(lock, [&] { return stop_ || generation_ != seen; });
+                if (stop_) return;
+                seen = generation_; job = job_; context = context_; parts = workerCount_ + 1u;
+                mxcsr = mxcsr_; rounding = rounding_;
+            }
+#ifdef RR_WATER_SURFACE_MXCSR50WS
+            _mm_setcsr(mxcsr);
+#else
+            (void)mxcsr;
+#endif
+            std::fesetround(rounding);
+            if (job) job(context, index + 1u, parts);
+            { std::lock_guard<std::mutex> lock(mutex_); if (pending_ && --pending_ == 0) done_.notify_one(); }
+        }
+    }
+    std::array<std::thread, maximumWorkers> threads_{};
+    std::size_t workerCount_ = 0, pending_ = 0;
+    std::mutex mutex_;
+    std::condition_variable wake_, done_;
+    std::uint64_t generation_ = 0;
+    Job job_ = nullptr; void* context_ = nullptr;
+    unsigned mxcsr_ = 0; int rounding_ = FE_TONEAREST;
+    bool stop_ = false;
 };
 
 namespace water_surface_detail50ws {
@@ -224,6 +319,162 @@ inline std::uint8_t byteOf(float v) noexcept { // ftoi0 then GS byte
 }
 } // namespace water_surface_detail50ws
 
+namespace water_surface_detail50ws {
+// Fixed contiguous partition of [0, total) into `parts` ranges (deterministic).
+inline void partRange(std::size_t total, std::size_t part, std::size_t parts, std::size_t& begin, std::size_t& end) noexcept {
+    begin = parts ? total * part / parts : 0u; end = parts ? total * (part + 1u) / parts : 0u;
+}
+struct SamplePart {   // phase 1 counters of one part
+    std::uint32_t rayMisses = 0, sampleFailures = 0;
+    bool any = false; float heightMin = 0.f, heightMax = 0.f;
+};
+struct EmitPart {     // phase 3 counters of one part
+    std::uint32_t degenerateNormals = 0, frothVertices = 0;
+    std::uint32_t envAlphaMin = 255, envAlphaMax = 0, frothAlphaMax = 0;
+    bool nonFinite = false, outOfRange = false;
+};
+struct Build {
+    const WaterSurfaceFrame50WS* f = nullptr;
+    WaterSurfacePoint50WS* points = nullptr; std::size_t pointCount = 0;
+    assets::Vertex48B* out = nullptr; std::size_t outCount = 0;
+    std::uint32_t pr = 0, pc = 0, rows = 0, columns = 0, bands = 0;
+    V3 C{}, D{}, A{}, B{};
+    float rowStep = 0.f, kFar = 0.f, base = 0.f, range = 0.f, h = 0.f, h1 = 0.f;
+    std::array<SamplePart, WaterSurfaceWorkers50WS::maximumParts> sample{};
+    std::array<EmitPart, WaterSurfaceWorkers50WS::maximumParts> emit{};
+    std::array<bool, WaterSurfaceWorkers50WS::maximumParts> partOutOfRange{};
+    // Bounds-checked slot of grid point (r, c), r in -1..rows, c in -1..columns.
+    WaterSurfacePoint50WS* at(std::int32_t r, std::int32_t c) const noexcept {
+        if (r < -1 || c < -1 || r > std::int32_t(rows) || c > std::int32_t(columns)) return nullptr;
+        const std::size_t i = std::size_t(r + 1) * pc + std::size_t(c + 1);
+        return i < pointCount ? points + i : nullptr;
+    }
+};
+// Phase 1: every grid point's ray/plane hit and height sample (the original's
+// per-point maths, unchanged). Part p owns point rows [begin, end) of the pr rows.
+inline void samplePart(void* context, std::size_t part, std::size_t parts) noexcept {
+    auto& b = *static_cast<Build*>(context);
+    if (part >= b.sample.size()) return;
+    const auto& f = *b.f; auto& k0 = b.sample[part]; k0 = {};
+    std::size_t begin = 0, end = 0; partRange(b.pr, part, parts, begin, end);
+    for (std::size_t ri = begin; ri < end; ++ri) {
+        const std::int32_t r = std::int32_t(ri) - 1;
+        for (std::int32_t c = -1; c <= std::int32_t(b.columns); ++c) {
+            auto* slot = b.at(r, c);
+            if (!slot) { b.partOutOfRange[part] = true; return; }
+            auto& pt = *slot;
+            const V3 Q = add(add(b.D, mul(b.A, float(r) * b.rowStep)), mul(b.B, float(c) / 16.f));
+            const float dy = Q.y - b.C.y;
+            // Ray / plane y = WaterBaseHeight (2B5710 plane 443C00/443C10,
+            // drawn by 2B3DC0, depth read back as d; VU: P0 = C + (Q-C) k).
+            float k = dy != 0.f ? (f.baseHeight - b.C.y) / dy : -1.f;
+            pt.miss = !(k > 0.f) || k > b.kFar || !std::isfinite(k);
+            if (pt.miss) { k = b.kFar * f.missDepthScale; ++k0.rayMisses; }
+            const V3 P0 = add(b.C, mul(sub(Q, b.C), k));
+            WaterSurfaceSample50WS s{};
+            if (!f.sample(f.sampleContext, P0.x, P0.z, s) || !std::isfinite(s.height)) {
+                ++k0.sampleFailures; s = {};
+            }
+            pt.p[0] = P0.x; pt.p[1] = P0.y + s.height; pt.p[2] = P0.z;
+            pt.frothA = s.frothA; pt.frothB = s.frothB;
+            if (!k0.any) { k0.heightMin = k0.heightMax = s.height; k0.any = true; }
+            k0.heightMin = std::min(k0.heightMin, s.height);
+            k0.heightMax = std::max(k0.heightMax, s.height);
+        }
+    }
+}
+// Phase 2: the 4-neighbour normal of every emitted point, once (it was
+// recomputed for each pass and each strip sharing the point; same expression).
+// Part p owns emitted rows [begin, end) of rows 0..rows-1; it reads neighbour
+// positions written in phase 1 and writes only its own points' n/degenerate.
+inline void normalPart(void* context, std::size_t part, std::size_t parts) noexcept {
+    auto& b = *static_cast<Build*>(context);
+    if (part >= b.partOutOfRange.size()) return;
+    std::size_t begin = 0, end = 0; partRange(b.rows, part, parts, begin, end);
+    for (std::size_t ri = begin; ri < end; ++ri) {
+        const std::int32_t r = std::int32_t(ri);
+        for (std::int32_t c = 0; c < std::int32_t(b.columns); ++c) {
+            auto* self = b.at(r, c);
+            const auto* e = b.at(r, c + 1); const auto* w = b.at(r, c - 1);
+            const auto* u = b.at(r - 1, c); const auto* d = b.at(r + 1, c);
+            if (!self || !e || !w || !u || !d) { b.partOutOfRange[part] = true; return; }
+            const auto pv = [](const WaterSurfacePoint50WS& q) noexcept { return V3{q.p[0], q.p[1], q.p[2]}; };
+            bool degenerate = false;
+            const V3 N = normalized(cross(sub(pv(*e), pv(*w)), sub(pv(*u), pv(*d))), degenerate);
+            self->degenerate = degenerate; self->n[0] = N.x; self->n[1] = N.y; self->n[2] = N.z;
+        }
+    }
+}
+// One emitted vertex (the original emit body; the normal comes from phase 2).
+inline assets::Vertex48B emitVertex(const Build& b, const WaterSurfacePoint50WS& pt,
+    const WaterSurfacePoint50WS& fr, bool froth, EmitPart& k) noexcept {
+    const auto& w = *b.f->authoring;
+    const V3 P{pt.p[0], pt.p[1], pt.p[2]};
+    const V3 N{pt.n[0], pt.n[1], pt.n[2]};
+    if (pt.degenerate) ++k.degenerateNormals;
+    assets::Vertex48B v{};
+    v.position[0] = P.x; v.position[1] = P.y; v.position[2] = P.z;
+    if (!froth) {
+        bool dv = false;
+        const V3 V = normalized(sub(P, b.C), dv);
+        const float nv = dot(N, V);
+        const V3 Rf = sub(V, mul(N, 2.f * nv));
+        const float inv = 1.f / (std::fabs(Rf.y) + 1.f);
+        v.uv[0] = Rf.x * inv * .5f + .5f;
+        v.uv[1] = Rf.z * inv * .5f + .5f;
+        for (unsigned i = 0; i < 3; ++i) v.color[i] = std::uint8_t(std::clamp(w.env[i], 0, 255));
+        v.color[3] = byteOf((1.f - std::fabs(nv)) * b.range + b.base);
+        k.envAlphaMin = std::min<std::uint32_t>(k.envAlphaMin, v.color[3]);
+        k.envAlphaMax = std::max<std::uint32_t>(k.envAlphaMax, v.color[3]);
+    } else {
+        // trunc(origin*TCS) is an integer UV shift on a repeating texture,
+        // so it is omitted (provider+0x3D0/+0x3D8 kept the PS2 floats small).
+        v.uv[0] = P.x * w.texCoordScale - .1f * N.x;
+        v.uv[1] = P.z * w.texCoordScale - .1f * N.z;
+        for (unsigned i = 0; i < 3; ++i) v.color[i] = std::uint8_t(std::clamp(w.froth[i], 0, 255));
+        // Froth bytes come from one row later and one column left of the
+        // vertex: the VU reads the current call's row at index j-1 (L5xx,
+        // PLAN 3 table). Original behaviour, kept on purpose.
+        v.color[3] = byteOf(std::min((float(fr.frothA) * b.h1 + float(fr.frothB) * b.h) * .25f, 64.f));
+        if (v.color[3]) ++k.frothVertices;
+        k.frothAlphaMax = std::max<std::uint32_t>(k.frothAlphaMax, v.color[3]);
+    }
+    if (!std::isfinite(v.position[0] + v.position[1] + v.position[2] + v.uv[0] + v.uv[1])) k.nonFinite = true;
+    return v;
+}
+// Phase 3: strips in kick order (band-major, rows top to bottom). Strip s owns
+// output slots [s*68, s*68+68): pass A 34 then pass B 34, zig-zag (r, r+1) per
+// column, exactly the order the one-thread build pushed them. Part p owns strips
+// [begin, end); every write is checked against the output size first.
+inline void emitPart(void* context, std::size_t part, std::size_t parts) noexcept {
+    auto& b = *static_cast<Build*>(context);
+    if (part >= b.emit.size()) return;
+    auto& k = b.emit[part]; k = {};
+    const std::size_t stripRows = b.rows - 1u, strips = std::size_t(b.bands) * stripRows;
+    constexpr std::size_t perStrip = 2u * waterStripVertices50WS;
+    std::size_t begin = 0, end = 0; partRange(strips, part, parts, begin, end);
+    for (std::size_t s = begin; s < end; ++s) {
+        const std::uint32_t band = std::uint32_t(s / stripRows), r = std::uint32_t(s % stripRows);
+        const std::size_t base = s * perStrip;
+        if (base + perStrip > b.outCount) { k.outOfRange = true; return; }
+        for (unsigned pass = 0; pass < 2; ++pass)
+            for (std::uint32_t j = 0; j < 17u; ++j) {
+                const std::int32_t c = std::int32_t(16u * band + j);
+                const auto* top = b.at(std::int32_t(r), c); const auto* bottom = b.at(std::int32_t(r + 1u), c);
+                const auto* topFroth = b.at(std::int32_t(r + 1u), c - 1); const auto* bottomFroth = b.at(std::int32_t(r + 2u), c - 1);
+                if (!top || !bottom || (pass == 1 && (!topFroth || !bottomFroth))) { k.outOfRange = true; return; }
+                const std::size_t slot = base + pass * waterStripVertices50WS + 2u * j;
+                b.out[slot] = emitVertex(b, *top, pass == 1 ? *topFroth : *top, pass == 1, k);
+                b.out[slot + 1u] = emitVertex(b, *bottom, pass == 1 ? *bottomFroth : *bottom, pass == 1, k);
+            }
+    }
+}
+inline void runPhase(bool parallel, WaterSurfaceWorkers50WS::Job job, Build& b) noexcept {
+    if (parallel) WaterSurfaceWorkers50WS::shared().run(job, &b);
+    else job(&b, 0, 1);
+}
+} // namespace water_surface_detail50ws
+
 // Builds every strip in the original kick order: band-major, rows top to
 // bottom; per strip pass A (reflection) then pass B (froth); per pass 34
 // vertices zig-zag (row r, row r+1) for 17 columns. Vertex48B: world
@@ -231,13 +482,17 @@ inline std::uint8_t byteOf(float v) noexcept { // ftoi0 then GS byte
 // RGBA bytes on the PS2 scale (128 = 1.0). Fog is the renderer's world fog.
 // scratch is caller storage reused every frame (no per-frame allocation once
 // sized). Returns false on non-finite input or an unbound grid.
+// parallel: the per-point work runs on WaterSurfaceWorkers50WS (bit-identical to
+// parallel=false, see the class). f.sample must be re-entrant and read-only (the
+// one water sampler only reads the completed water runtime).
 inline bool buildWaterSurface50WS(const WaterSurfaceFrame50WS& f, std::vector<assets::Vertex48B>& out,
-    std::vector<WaterSurfacePoint50WS>& scratch, WaterSurfaceCounters50WS& counters) noexcept {
+    std::vector<WaterSurfacePoint50WS>& scratch, WaterSurfaceCounters50WS& counters, bool parallel = true) noexcept {
     using namespace water_surface_detail50ws;
     counters = {};
     out.clear();
     const auto& g = f.grid;
     if (!g.bound || g.rows < 2 || !g.bands || !f.authoring || !f.authoring->bound || !f.sample) return false;
+    if (g.columns != 16u * g.bands + 1u) return false; // emitted columns 0..16*bands must be grid columns
     const auto& w = *f.authoring;
     const auto& cam = f.camera;
     const V3 C{cam.position[0], cam.position[1], cam.position[2]};
@@ -253,95 +508,46 @@ inline bool buildWaterSurface50WS(const WaterSurfaceFrame50WS& f, std::vector<as
     const float t = std::tan(0.5f * cam.fovDegrees * 0.017453292f);
     const float hx = cam.nearPlane * t, hy = hx * cam.aspect1F8;
     const V3 Pn = add(C, mul(F, cam.nearPlane));
-    const V3 D = sub(add(Pn, mul(U, hy)), mul(R, hx));                       // +0x3B0
-    const V3 A = mul(U, hy);                                                  // +0x3A0
+    Build b{};
+    b.f = &f; b.C = C;
+    b.D = sub(add(Pn, mul(U, hy)), mul(R, hx));                              // +0x3B0
+    b.A = mul(U, hy);                                                         // +0x3A0
     const float widen = float(17u * g.bands + 2u) / float(17u * g.bands);   // +0x498
-    const V3 B = mul(R, 2.f * hx / float(g.bands) * widen);                  // +0x390
-    const float rowStep = -2.f / float(g.rows);                              // 443EC0
-    const float kFar = cam.farPlane / cam.nearPlane;                          // d = 0 (cleared Z)
+    b.B = mul(R, 2.f * hx / float(g.bands) * widen);                         // +0x390
+    b.rowStep = -2.f / float(g.rows);                                        // 443EC0
+    b.kFar = cam.farPlane / cam.nearPlane;                                    // d = 0 (cleared Z)
     // Points for rows -1..rows and columns -1..columns (normal and froth neighbours).
-    const std::uint32_t pr = g.rows + 2u, pc = g.columns + 2u;
-    try { scratch.resize(std::size_t(pr) * pc); out.reserve(waterSurfaceVertexCapacity50WS(g)); }
-    catch (...) { return false; }
-    auto at = [&](std::int32_t r, std::int32_t c) noexcept -> WaterSurfacePoint50WS& {
-        return scratch[std::size_t(r + 1) * pc + std::size_t(c + 1)];
-    };
-    bool firstHeight = true;
-    for (std::int32_t r = -1; r <= std::int32_t(g.rows); ++r)
-        for (std::int32_t c = -1; c <= std::int32_t(g.columns); ++c) {
-            auto& pt = at(r, c);
-            const V3 Q = add(add(D, mul(A, float(r) * rowStep)), mul(B, float(c) / 16.f));
-            const float dy = Q.y - C.y;
-            // Ray / plane y = WaterBaseHeight (2B5710 plane 443C00/443C10,
-            // drawn by 2B3DC0, depth read back as d; VU: P0 = C + (Q-C) k).
-            float k = dy != 0.f ? (f.baseHeight - C.y) / dy : -1.f;
-            pt.miss = !(k > 0.f) || k > kFar || !std::isfinite(k);
-            if (pt.miss) { k = kFar * f.missDepthScale; ++counters.rayMisses; }
-            const V3 P0 = add(C, mul(sub(Q, C), k));
-            WaterSurfaceSample50WS s{};
-            if (!f.sample(f.sampleContext, P0.x, P0.z, s) || !std::isfinite(s.height)) {
-                ++counters.sampleFailures; s = {};
-            }
-            pt.p[0] = P0.x; pt.p[1] = P0.y + s.height; pt.p[2] = P0.z;
-            pt.frothA = s.frothA; pt.frothB = s.frothB;
-            if (firstHeight) { counters.heightMin = counters.heightMax = s.height; firstHeight = false; }
-            counters.heightMin = std::min(counters.heightMin, s.height);
-            counters.heightMax = std::max(counters.heightMax, s.height);
-        }
-    const float base = w.baseOpacity, range = w.maxOpacity - w.baseOpacity;
-    const float h = f.frothPhase35C, h1 = 1.f - h;
-    auto emit = [&](std::int32_t r, std::int32_t c, bool froth) noexcept {
-        const auto& pt = at(r, c);
-        const V3 P{pt.p[0], pt.p[1], pt.p[2]};
-        auto pv = [&](std::int32_t rr, std::int32_t cc) noexcept {
-            const auto& q = at(rr, cc); return V3{q.p[0], q.p[1], q.p[2]};
-        };
-        bool degenerate = false;
-        const V3 N = normalized(cross(sub(pv(r, c + 1), pv(r, c - 1)), sub(pv(r - 1, c), pv(r + 1, c))), degenerate);
-        if (degenerate) ++counters.degenerateNormals;
-        assets::Vertex48B v{};
-        v.position[0] = P.x; v.position[1] = P.y; v.position[2] = P.z;
-        if (!froth) {
-            bool dv = false;
-            const V3 V = normalized(sub(P, C), dv);
-            const float nv = dot(N, V);
-            const V3 Rf = sub(V, mul(N, 2.f * nv));
-            const float inv = 1.f / (std::fabs(Rf.y) + 1.f);
-            v.uv[0] = Rf.x * inv * .5f + .5f;
-            v.uv[1] = Rf.z * inv * .5f + .5f;
-            for (unsigned i = 0; i < 3; ++i) v.color[i] = std::uint8_t(std::clamp(w.env[i], 0, 255));
-            v.color[3] = byteOf((1.f - std::fabs(nv)) * range + base);
-            counters.envAlphaMin = std::min<std::uint32_t>(counters.envAlphaMin, v.color[3]);
-            counters.envAlphaMax = std::max<std::uint32_t>(counters.envAlphaMax, v.color[3]);
-        } else {
-            // trunc(origin*TCS) is an integer UV shift on a repeating texture,
-            // so it is omitted (provider+0x3D0/+0x3D8 kept the PS2 floats small).
-            v.uv[0] = P.x * w.texCoordScale - .1f * N.x;
-            v.uv[1] = P.z * w.texCoordScale - .1f * N.z;
-            for (unsigned i = 0; i < 3; ++i) v.color[i] = std::uint8_t(std::clamp(w.froth[i], 0, 255));
-            // Froth bytes come from one row later and one column left of the
-            // vertex: the VU reads the current call's row at index j-1 (L5xx,
-            // PLAN 3 table). Original behaviour, kept on purpose.
-            const auto& fr = at(r + 1, c - 1);
-            v.color[3] = byteOf(std::min((float(fr.frothA) * h1 + float(fr.frothB) * h) * .25f, 64.f));
-            if (v.color[3]) ++counters.frothVertices;
-            counters.frothAlphaMax = std::max<std::uint32_t>(counters.frothAlphaMax, v.color[3]);
-        }
-        out.push_back(v);
-    };
-    for (std::uint32_t band = 0; band < g.bands; ++band)
-        for (std::uint32_t r = 0; r + 1u < g.rows; ++r)
-            for (unsigned pass = 0; pass < 2; ++pass) {
-                for (std::uint32_t j = 0; j < 17u; ++j) {
-                    const std::int32_t c = std::int32_t(16u * band + j);
-                    emit(std::int32_t(r), c, pass == 1);
-                    emit(std::int32_t(r + 1u), c, pass == 1);
-                }
-                if (pass == 0) ++counters.strips;
-            }
+    b.pr = g.rows + 2u; b.pc = g.columns + 2u; b.rows = g.rows; b.columns = g.columns; b.bands = g.bands;
+    const std::size_t capacity = waterSurfaceVertexCapacity50WS(g);
+    try { scratch.resize(std::size_t(b.pr) * b.pc); out.resize(capacity); }
+    catch (...) { out.clear(); return false; }
+    b.points = scratch.data(); b.pointCount = scratch.size();
+    b.out = out.data(); b.outCount = out.size();
+    b.base = w.baseOpacity; b.range = w.maxOpacity - w.baseOpacity;
+    b.h = f.frothPhase35C; b.h1 = 1.f - b.h;
+    runPhase(parallel, &samplePart, b);
+    runPhase(parallel, &normalPart, b);
+    runPhase(parallel, &emitPart, b);
+    // Merge the part counters in part order (sums; min/max as the one-thread
+    // build's running min/max over the same points in the same order).
+    bool firstHeight = true, failed = false;
+    for (const bool o : b.partOutOfRange) failed = failed || o;
+    for (const auto& k : b.sample) {
+        counters.rayMisses += k.rayMisses; counters.sampleFailures += k.sampleFailures;
+        if (!k.any) continue;
+        if (firstHeight) { counters.heightMin = k.heightMin; counters.heightMax = k.heightMax; firstHeight = false; }
+        counters.heightMin = std::min(counters.heightMin, k.heightMin);
+        counters.heightMax = std::max(counters.heightMax, k.heightMax);
+    }
+    for (const auto& k : b.emit) {
+        counters.degenerateNormals += k.degenerateNormals; counters.frothVertices += k.frothVertices;
+        counters.envAlphaMin = std::min(counters.envAlphaMin, k.envAlphaMin);
+        counters.envAlphaMax = std::max(counters.envAlphaMax, k.envAlphaMax);
+        counters.frothAlphaMax = std::max(counters.frothAlphaMax, k.frothAlphaMax);
+        failed = failed || k.outOfRange || k.nonFinite;
+    }
+    counters.strips = g.bands * (g.rows - 1u);
     counters.vertices = std::uint32_t(out.size());
-    for (const auto& v : out)
-        if (!std::isfinite(v.position[0] + v.position[1] + v.position[2] + v.uv[0] + v.uv[1])) return false;
-    return true;
+    return !failed;
 }
 } // namespace rr::game

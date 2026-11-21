@@ -19,6 +19,14 @@ struct OriginalUiTournamentPodInput50KG {
     // Actual CURRENT Tournament static row inventory, not predecessor rows.
     // The session retires the complete predecessor before attachSelected.
     std::vector<OriginalUiRiderMaterialRow50KG> currentStaticRows;
+    // PORT EXTENSION, NOT ORIGINAL (DLC career, dlc_career50dl.h). addonCareer:
+    // the selected career is an add-on pod's; `pod` is then the ANCHOR career's
+    // stock pod, kept for the original attach/visibility/camera chain but never
+    // drawn. addonPod: the add-on's own model laid out by the same UITourn widget
+    // (loadTournamentAddon), null when it did not load (the model area is then
+    // empty). Both unset for a stock career: everything runs exactly as before.
+    bool addonCareer=false;
+    std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> addonPod;
 };
 enum class OriginalUiTournamentPodError50KG:std::uint8_t {
     none,input,alreadyBound,material,binder,lifetime,membership,model,phase,completion,camera,allocation
@@ -36,6 +44,10 @@ struct OriginalUiTournamentPodPacket50KG {
     OriginalUiRiderModelSelection50KG selection{};
     OriginalUiRiderModelPacket50KG model{};
     bool emitsGeometry=false;
+    // DLC career: the add-on model's packet (same selection, camera context and
+    // flags; its own palette and fog). addonEmits=false: nothing to draw.
+    OriginalUiRiderModelPacket50KG addonModel{};
+    bool addonEmits=false;
 };
 struct OriginalUiTournamentBinderPacket50KG {
     OriginalUiRiderBinderFrame50KG image{};
@@ -67,6 +79,14 @@ public:
     bool teardownComplete()const noexcept;
     std::uint16_t widgetId()const noexcept;
     bool binderPresent(std::size_t pair)const noexcept;
+    // DLC career (PORT EXTENSION): addonCareer() = the anchor pod is never drawn;
+    // addonReady() = the add-on model loaded (graph, materials, images);
+    // addonRefused() = why not (static text, "" when ready).
+    bool addonCareer()const noexcept;
+    bool addonReady()const noexcept;
+    const char* addonRefused()const noexcept;
+    std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG> addonMaterials()const noexcept;
+    std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> addonPodAssets()const noexcept;
 private:
     friend class rr::platform::OriginalUiTournamentSession50KG;
     friend class rr::platform::OriginalUiTournamentDrawContribution50KG;

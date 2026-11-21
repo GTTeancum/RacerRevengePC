@@ -81,6 +81,14 @@ public:
     bool load(std::shared_ptr<const OriginalUiArchive50KG> garage,
         std::shared_ptr<const OriginalUiArchive50KG> garagePod19,
         OriginalUiGarageSceneAssetDiagnostic50KG&) noexcept;
+    // PORT EXTENSION, NOT ORIGINAL (DLC career): the same 30 statics and 10
+    // actors from UIGARAGE, the selected model (1 node) `garageModel` from the
+    // add-on pod's own archive (identity addonUi) at the same 1D1D94 placement;
+    // selectedCareer() answers `anchorCareer` (the 100C0 value the career keeps).
+    bool loadAddon(std::shared_ptr<const OriginalUiArchive50KG> garage,
+        std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& garageModel,
+        int anchorCareer,OriginalUiGarageSceneAssetDiagnostic50KG&) noexcept;
+    bool addon() const noexcept;
     bool loaded() const noexcept;
     int selectedCareer() const noexcept;
     const OriginalUiGarageStaticModel50KG* staticModel(std::size_t) const noexcept;
@@ -91,6 +99,8 @@ public:
     std::shared_ptr<const OriginalUiArchive50KG> archive() const noexcept;
     std::shared_ptr<const OriginalUiArchive50KG> selectedArchive() const noexcept;
 private:
+    bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG> garage,std::shared_ptr<const OriginalUiArchive50KG> pod19,
+        const std::string* addonModel,int addonCareer,OriginalUiGarageSceneAssetDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

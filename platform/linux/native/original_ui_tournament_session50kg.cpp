@@ -231,6 +231,7 @@ S OriginalUiTournamentSession50KG::bind(const OriginalUiTournamentSessionCold50K
   s->camera=std::make_shared<game::OriginalUiTournamentCameraOwner50KG>();if(!s->camera->bind(cold.tournamentArchive,d.camera))return result(d,S::camera);
   s->pod=std::make_shared<game::OriginalUiTournamentPodOwner50KG>();game::OriginalUiTournamentPodInput50KG podInput;
   podInput.pod=std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>(cold.resources,cold.resources->pod());podInput.appStart=cold.appStart;podInput.podTextures=cold.podTextures;podInput.runtime=cold.materialRuntime;podInput.ipumCache=cold.ipumCache.get();
+  podInput.addonCareer=cold.resources->addonCareer();podInput.addonPod=cold.resources->addonPod(); // DLC career
   if(!OriginalUiTournamentDrawContribution50KG::staticRows(*cold.widgets,*cold.resources,podInput.currentStaticRows,d.draw)||!s->pod->prepareCold(podInput,d.model))return result(d,S::model);
   game::OriginalUiApertureCallbacks50KG callbacks{s.get(),&Storage::available,&Storage::hook,&Storage::overlay};
   if(s->aperture.bindTournament(cold.tournamentArchive,callbacks,d.aperture)!=AS::ok)return result(d,S::aperture);

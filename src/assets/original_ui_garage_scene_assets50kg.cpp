@@ -11,6 +11,7 @@ struct OriginalUiGarageSceneAssets50KG::Storage {
     std::array<OriginalUiGarageStaticModel50KG,originalUiGarageStaticModelCount50KG> statics;
     std::array<OriginalUiGarageActorAsset50KG,originalUiGarageActorCount50KG> actors;
     OriginalUiGarageSelectedPodAsset50KG selected;
+    int addonCareer=-1; // DLC career: the anchor 100C0; -1 = stock (career from the catalog identity)
 };
 namespace {
 using D=OriginalUiGarageSceneAssetDiagnostic50KG;
@@ -59,6 +60,16 @@ static_assert(std::size(actorStems)==originalUiGarageActorCount50KG);
 }
 OriginalUiGarageSceneAssets50KG::OriginalUiGarageSceneAssets50KG() noexcept=default;
 OriginalUiGarageSceneAssets50KG::~OriginalUiGarageSceneAssets50KG()=default;
+bool OriginalUiGarageSceneAssets50KG::loadAddon(std::shared_ptr<const OriginalUiArchive50KG> garage,
+    std::shared_ptr<const OriginalUiArchive50KG> addonUi,const std::string& garageModel,int anchorCareer,D& d) noexcept {
+    // PORT EXTENSION, NOT ORIGINAL: see the header. The statics and actors are
+    // built by the one stock body (loadImpl); only the selected model's source differs.
+    d={};if(storage_)return fail(d,E::alreadyLoaded,0x1FB0F0);
+    if(!addonUi||!addonUi->loaded()||!addonUi->addon()||garageModel.empty()||anchorCareer<1||anchorCareer>26)
+        return fail(d,E::archive,0x1FB0F0);
+    return loadImpl(std::move(garage),std::move(addonUi),&garageModel,anchorCareer,d);
+}
+bool OriginalUiGarageSceneAssets50KG::addon()const noexcept{return storage_&&storage_->addonCareer>=0;}
 bool OriginalUiGarageSceneAssets50KG::load(std::shared_ptr<const OriginalUiArchive50KG> garage,
     std::shared_ptr<const OriginalUiArchive50KG> pod19,D& d) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded,0x1FB0F0);
@@ -66,6 +77,11 @@ bool OriginalUiGarageSceneAssets50KG::load(std::shared_ptr<const OriginalUiArchi
        (!pod19||!pod19->loaded()||!pod19->identity()||
         originalUiGaragePodCareer50KG(pod19->identity()->id)<0||
         !archiveIs(pod19,pod19->identity()->id)))return fail(d,E::archive,0x1FB0F0);
+    return loadImpl(std::move(garage),std::move(pod19),nullptr,-1,d);
+}
+bool OriginalUiGarageSceneAssets50KG::loadImpl(std::shared_ptr<const OriginalUiArchive50KG> garage,
+    std::shared_ptr<const OriginalUiArchive50KG> pod19,const std::string* addonModel,int addonCareer,D& d) noexcept {
+    if(!archiveIs(garage,OriginalUiArchiveId50KG::garage))return fail(d,E::archive,0x1FB0F0);
     try {
         auto n=std::make_unique<Storage>();n->garage=std::move(garage);n->pod19=std::move(pod19);
         if(!readOriginalUiDat50KG(*n->garage,"UI/UIGarage/garage.scn",n->scene,d.text,OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)||
@@ -135,9 +151,11 @@ bool OriginalUiGarageSceneAssets50KG::load(std::shared_ptr<const OriginalUiArchi
                 // MCF FrameCount/FPS (which is double duration here).
             }
         }
-        const int career=originalUiGaragePodCareer50KG(n->pod19->identity()->id);
-        const std::string selectedPath="UI/Geometry/"+std::string(career<10?"0":"")+
+        const int career=addonModel?addonCareer:originalUiGaragePodCareer50KG(n->pod19->identity()->id);
+        // DLC career: the add-on's own garage model member (ui.garage_model).
+        const std::string selectedPath=addonModel?*addonModel:"UI/Geometry/"+std::string(career<10?"0":"")+
             std::to_string(career)+"e.psg";
+        n->addonCareer=addonModel?addonCareer:-1;
         d.ordinal=0;n->selected.model=model(n->pod19,selectedPath.c_str(),1,d);
         if(!n->selected.model)return false;
         //1D1D94..1D1DCC immediate source words, NOT PSG bind translation.
@@ -158,6 +176,7 @@ std::shared_ptr<const OriginalUiArchive50KG> OriginalUiGarageSceneAssets50KG::se
 
 namespace rr::assets {
 int OriginalUiGarageSceneAssets50KG::selectedCareer()const noexcept {
+    if(storage_&&storage_->addonCareer>=0)return storage_->addonCareer; // DLC career: the anchor 100C0
     const auto archive=selectedArchive();
     return archive&&archive->identity()?originalUiGaragePodCareer50KG(archive->identity()->id):-1;
 }

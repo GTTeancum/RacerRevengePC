@@ -12,6 +12,11 @@
 #include "../../../src/game/original_ui_texture_animation50kg.h"
 #include <cmath>
 #include "../../../src/game/original_ui_text_position50kg.h"
+#include "../../../src/game/dlc_career50dl.h"
+#include "../../../src/game/dlc_addon_ui_archive50dl.h"
+#include "../../../src/assets/dlc_registry50dl.h"
+#include "../../../src/assets/original_ui_addon_material50dl.h"
+#include <cstdio>
 
 namespace rr::platform {
 namespace {
@@ -182,6 +187,11 @@ struct OriginalUiTournamentCareerResources50KG::Storage {
     bool nonNativeMarkerUsed=false;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile;
     std::shared_ptr<const assets::OriginalUiArchive50KG> tournament,fonts,appStart,backgrounds;
+    // PORT EXTENSION (DLC career): the add-on pod's own menu archive when the
+    // selected career is an add-on's (its portrait and background); else null.
+    std::shared_ptr<const assets::OriginalUiArchive50KG> addonArt;
+    bool addonCareer=false;
+    std::shared_ptr<assets::OriginalUiRiderPodAssets50KG> addonPod; // null = the model area stays empty
     assets::OriginalUiMaterialTemplates50KG templates;
     std::array<OriginalUiTournamentCareerMaterial50KG,24> materials;
     assets::OriginalUiImageBankInput50KG bankInput;
@@ -237,6 +247,11 @@ bool OriginalUiTournamentCareerResources50KG::load(
         if(progress>13)return fail(d,Error::unsupportedProgress,0x1EF88C);
         if(!s->page.load(s->tournament,d.page))return fail(d,Error::page,0x1EDAB8);
         if(!s->pod.loadTournament(s->tournament,selected,d.pod))return fail(d,Error::pod,0x1EEC40);
+        // DLC log (only with add-on pods admitted): which archive the pod model came from.
+        if(rr::assets::dlc50DL::addonPodCount()){const auto m=s->pod.modelSource();
+            std::fprintf(stderr,"dlc_model_source screen=tournament career=%u source=stock_archive archive=UITOURN member=%s%s\n",
+                selected,m.identity&&m.identity->name?m.identity->name:"-",
+                game::dlc50DL::activeAddonCareer(selected)?" role=anchor_layout_only drawn=never":"");}
         std::vector<assets::OriginalUiImageSource50KG> sources;
         const auto add=[&](const assets::OriginalUiArchive50KG& archive,const std::string& path,
             const std::string& celPath)->bool {
@@ -262,8 +277,44 @@ bool OriginalUiTournamentCareerResources50KG::load(
         std::string portrait="00_flrg",background="00_bkg";
         portrait[0]=background[0]=char('0'+selected/10);
         portrait[1]=background[1]=char('0'+selected%10);
-        if(!add(*s->tournament,"ui/textures/"+portrait+".pst","")||
-            !add(*s->backgrounds,"ui/textures/"+background+".pst",""))
+        // PORT EXTENSION (DLC career, dlc_career50dl.h). The original rule names
+        // the SELECTED career's %02d_flrg / %02d_bkg; for an add-on career (100C0
+        // holds its anchor) those are the package's own portrait and background
+        // (ui.portraits / ui.background), read from its own archive. The anchor's
+        // art is never used: a missing member refuses the screen.
+        game::dlc50DL::AddonCareerArt50DL art;std::string portraitPath;
+        if(const auto* addon=game::dlc50DL::activeAddonCareer(selected)){
+            std::string why,backgroundPath;
+            if(!game::dlc50DL::loadAddonCareerArt50DL(addon->number,art,why)||art.portraitPst.empty()||
+               art.backgroundPst.empty()||art.backgroundPsm.empty()){
+                std::fprintf(stderr,"dlc_career tournament_art key=%s status=refused reason=\"%s\"\n",addon->key.c_str(),
+                    why.empty()?"package lists no portrait/background":why.c_str());
+                return fail(d,Error::image,0x1F17AC);
+            }
+            game::dlc50DL::addonMemberStem50DL(art.portraitPst,portraitPath,portrait);
+            game::dlc50DL::addonMemberStem50DL(art.backgroundPst,backgroundPath,background);
+            s->addonArt=art.archive;s->addonCareer=true;
+            // The add-on's own pod model (ui.rider_model) in the anchor career's
+            // UITourn widget layout. A failure leaves the model area empty
+            // (logged); the anchor's pod is never drawn for this career.
+            if(const auto* pod=rr::assets::dlc50DL::addonPod(addon->number)){
+                auto model=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();assets::OriginalUiRiderPodDiagnostic50KG pd;
+                const bool ok=model->loadTournamentAddon(s->tournament,selected,art.archive,pod->ui.riderModel,pd);
+                if(ok)s->addonPod=std::move(model);
+                std::fprintf(stderr,"dlc_model_source screen=tournament career=%u source=package key=%s member=%s status=%s\n",
+                    selected,addon->key.c_str(),pod->ui.riderModel.c_str(),ok?"loaded":"refused");
+            }
+        }
+        const auto addAddon=[&](const std::string& name)->bool {
+            // Port-owned image identity (namespace 0x5447, never a catalog row);
+            // the bank finds the member in its addonArchives.
+            const auto member=s->addonArt->find(name);
+            if(!member.identity||!member.data)return false;
+            sources.push_back({0x5447000000000000ull|(std::uint64_t(sources.size()+1)<<32),member,0,member.size,{}});return true;
+        };
+        if(s->addonArt?(!addAddon(art.portraitPst)||!addAddon(art.backgroundPst)):
+           (!add(*s->tournament,"ui/textures/"+portrait+".pst","")||
+            !add(*s->backgrounds,"ui/textures/"+background+".pst","")))
             return fail(d,Error::image,0x1F17AC);
         const auto marker=s->tournament->find("ui/textures/medstar.atm");
         assets::OriginalUiAtm50KG markerAtm;assets::DecodeError48C markerError;
@@ -293,6 +344,16 @@ bool OriginalUiTournamentCareerResources50KG::load(
                     return fail(d,Error::material,d.material.sourcePC);
             }else if(i==12){
                 if(!assets::readOriginalUiTournamentNotchFallbackMaterial50KG(*s->tournament,s->templates,
+                    assets::OriginalUiTemplate50KG::screenMt,runtime,binding.source,d.material))
+                    return fail(d,Error::material,d.material.sourcePC);
+            }else if(i==13&&s->addonArt){
+                // DLC career: the same ScreenTexture missing-PSM fallback on the package portrait.
+                if(!assets::readOriginalUiAddonPortraitFallbackMaterial50DL(*s->addonArt,portraitPath,s->templates,
+                    assets::OriginalUiTemplate50KG::screenMt,runtime,binding.source,d.material))
+                    return fail(d,Error::material,d.material.sourcePC);
+            }else if(i==14&&s->addonArt){
+                // DLC career: the package's own %02d_bkg-rule PSM (ui.background).
+                if(!assets::readOriginalUiMaterial50KG(*s->addonArt,art.backgroundPsm,s->templates,
                     assets::OriginalUiTemplate50KG::screenMt,runtime,binding.source,d.material))
                     return fail(d,Error::material,d.material.sourcePC);
             }else if(i==13){
@@ -469,6 +530,7 @@ bool OriginalUiTournamentCareerResources50KG::load(
         }
         if(!sameStamp(s->profile->stamp(),s->career.stamp))return fail(d,Error::profile,0x1EEC40);
         s->bankInput.archives={s->appStart,s->tournament,s->fonts,s->backgrounds};
+        if(s->addonArt)s->bankInput.addonArchives={s->addonArt}; // DLC career art (bank add-on namespace)
         s->bankInput.owners={s->images};
         storage_=std::move(s);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x1EEC40);}
@@ -624,6 +686,9 @@ bool OriginalUiTournamentCareerResources50KG::current()const noexcept {
 const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot* OriginalUiTournamentCareerResources50KG::career()const noexcept{return storage_?&storage_->career:nullptr;}
 const assets::OriginalUiTournamentPageData50KG* OriginalUiTournamentCareerResources50KG::page()const noexcept{return storage_?&storage_->page:nullptr;}
 const assets::OriginalUiRiderPodAssets50KG* OriginalUiTournamentCareerResources50KG::pod()const noexcept{return storage_?&storage_->pod:nullptr;}
+bool OriginalUiTournamentCareerResources50KG::addonCareer()const noexcept{return storage_&&storage_->addonCareer;}
+std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> OriginalUiTournamentCareerResources50KG::addonPod()const noexcept{
+    return storage_?storage_->addonPod:nullptr;}
 std::shared_ptr<const assets::OriginalUiScreenAssets50KG> OriginalUiTournamentCareerResources50KG::images()const noexcept{return storage_?storage_->images:nullptr;}
 const std::array<OriginalUiTournamentNumber50KG,3>* OriginalUiTournamentCareerResources50KG::numbers()const noexcept{return storage_?&storage_->numbers:nullptr;}
 const std::array<OriginalUiTournamentMedal50KG,13>* OriginalUiTournamentCareerResources50KG::medals()const noexcept{return storage_?&storage_->medals:nullptr;}

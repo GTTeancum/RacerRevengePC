@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <cstdio>
 #include <utility>
 namespace rr::game {
 namespace {
@@ -38,6 +39,11 @@ struct OriginalUiTournamentPodOwner50KG::Storage {
     bool (*consume)(void*,bool)noexcept=nullptr;
     std::uint64_t registryGeneration=1,submitted=0,retired=0,retiredFrontier=0,cameraSerial=0,updateSequence=0;
     bool attached=false,shown=false,everAttached=false,frame=false,poisoned=false,tornDown=false;
+    // DLC career (PORT EXTENSION): the add-on pod's own graph and materials.
+    // Owns no material-lifetime row (static page rows, as on the Rider page).
+    std::shared_ptr<assets::OriginalUiRiderModelMaterials50KG> addonMaterials;
+    OriginalUiRiderPodScene50KG addonScene;
+    bool addonReady=false;const char* addonRefused="";
 };
 OriginalUiTournamentPodOwner50KG::OriginalUiTournamentPodOwner50KG()noexcept=default;
 OriginalUiTournamentPodOwner50KG::~OriginalUiTournamentPodOwner50KG(){
@@ -118,6 +124,30 @@ bool OriginalUiTournamentPodOwner50KG::prepareCold(const OriginalUiTournamentPod
         if(!s->materials->images())return fail(d,E::material,0x26E640);
         s->bankInput.owners.push_back(s->materials->images());
         s->bankInput.owners.emplace_back(s->binderAssets,s->binderAssets->images());
+        // DLC career: the add-on model's materials (shared original names from
+        // this UITourn archive) and its own graph. Any failure leaves the model
+        // area empty for this add-on career only; the stock chain above is
+        // unchanged and the anchor pod is never drawn.
+        if(input.addonCareer){
+            const auto refuse=[&](const char* why){s->addonReady=false;s->addonRefused=why;s->addonMaterials.reset();};
+            if(!input.addonPod||!input.addonPod->loaded()||!input.addonPod->addon())refuse("add-on model did not load");
+            else{
+                auto materials=std::make_shared<assets::OriginalUiRiderModelMaterials50KG>();
+                assets::OriginalUiRiderModelMaterialDiagnostic50KG md;OriginalUiRiderModelDiagnostic50KG sd;
+                if(!materials->loadAddonPod(input.addonPod,archive,input.appStart,input.podTextures,input.runtime,input.ipumCache,md))
+                    refuse("add-on model materials refused");
+                else if(!materials->images())refuse("add-on model has no images");
+                else if(!s->addonScene.loadAddon(input.addonPod,sd))refuse("add-on model graph refused");
+                else if(s->bankInput.addonArchives.size()>=assets::OriginalUiImageBankAddonLimits50DL::archives)refuse("add-on archive limit");
+                else{
+                    s->addonMaterials=std::move(materials);s->addonReady=true;s->addonRefused="";
+                    s->bankInput.owners.push_back(s->addonMaterials->images());   // owner index 2
+                    s->bankInput.addonArchives.push_back(input.addonPod->archive());
+                }
+            }
+            std::fprintf(stderr,"dlc_model_source screen=tournament stage=cold source=package status=%s%s%s%s\n",
+                s->addonReady?"ready":"refused",s->addonReady?"":" reason=\"",s->addonReady?"":s->addonRefused,s->addonReady?"":"\"");
+        }
         s->instances.reserve(s->coldRows.size());storage_=std::move(s);return true;
     }catch(...){return fail(d,E::allocation,0x1D3590);}
 }
@@ -137,6 +167,13 @@ bool OriginalUiTournamentPodOwner50KG::teardownComplete()const noexcept {
 }
 std::uint16_t OriginalUiTournamentPodOwner50KG::widgetId()const noexcept{return storage_?storage_->input.pod->widgetId():0;}
 bool OriginalUiTournamentPodOwner50KG::binderPresent(std::size_t pair)const noexcept{return attached()&&pair<2&&bool(storage_->binders[pair]);}
+bool OriginalUiTournamentPodOwner50KG::addonCareer()const noexcept{return storage_&&storage_->input.addonCareer;}
+bool OriginalUiTournamentPodOwner50KG::addonReady()const noexcept{return addonCareer()&&storage_->addonReady;}
+const char* OriginalUiTournamentPodOwner50KG::addonRefused()const noexcept{return storage_?storage_->addonRefused:"";}
+std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG> OriginalUiTournamentPodOwner50KG::addonMaterials()const noexcept{
+    return addonReady()?storage_->addonMaterials:nullptr;}
+std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> OriginalUiTournamentPodOwner50KG::addonPodAssets()const noexcept{
+    return addonReady()?storage_->input.addonPod:nullptr;}
 bool OriginalUiTournamentPodOwner50KG::canonicalMaterialRow(const std::string& name,OriginalUiRiderMaterialRow50KG& out)const noexcept {
     if(!storage_)return false;OriginalUiRiderMaterialLifetimeDiagnostic50KG d;
     return OriginalUiRiderMaterialRow50KG::prepare(*storage_->input.appStart,name,out,d);
@@ -180,6 +217,7 @@ bool OriginalUiTournamentPodOwner50KG::attachSelected(D& d)noexcept {
         // returns do1D34E0 generic SELECT,1D34E8 unpause and1D34F4 show run.
         if(!synchronizeMaterials(d))return false;
         s.pod.selected();
+        if(s.addonReady)s.addonScene.selected(); // DLC career: the add-on graph follows the same SELECT
         if(!setShown(true))return reject(E::membership,0x1D34F4);
         return true;
     }catch(...){return reject(E::allocation,0x1D3590);}
@@ -199,6 +237,10 @@ bool OriginalUiTournamentPodOwner50KG::advance(float inheritedDelta,std::uint64_
        storage_->updateSequence==std::numeric_limits<std::uint64_t>::max()||
        sequence!=storage_->updateSequence+1)return fail(d,E::phase,0x1D38B0);
     if(!storage_->pod.advance(inheritedDelta,d.model)){storage_->poisoned=true;return fail(d,E::model,0x1D38B0);}
+    // DLC career: the add-on graph turns by the same User_Rotate rule and delta.
+    // A failure empties the model area (never the anchor), not the page.
+    if(storage_->addonReady){OriginalUiRiderModelDiagnostic50KG ad;
+        if(!storage_->addonScene.advance(inheritedDelta,ad)){storage_->addonReady=false;storage_->addonRefused="add-on graph advance refused";}}
     storage_->updateSequence=sequence;return true;
 }
 bool OriginalUiTournamentPodOwner50KG::beginFrame()noexcept {
@@ -224,7 +266,19 @@ bool OriginalUiTournamentPodOwner50KG::prepareSelected(const OriginalUiTournamen
         frame.renderContext().fogStart,next.model.fog))return fail(d,E::model,0x26F070);
     if(!s.visibility.recordPacketFog(next.selection,next.model.fog.computeRadialFog1B2))return fail(d,E::membership,0x24136C);
     next.model.scene=s.input.pod->scene();next.model.sourceModelFlags191=next.selection.sourceModelFlags191;
-    next.emitsGeometry=true;output=std::move(next);return true;
+    next.emitsGeometry=true;
+    // DLC career: the add-on model under the same selection and camera context,
+    // with its own palette and fog bounds. Refusal = nothing drawn this frame.
+    if(s.addonReady){OriginalUiRiderModelDiagnostic50KG ad;
+        next.addonModel.context=next.model.context;
+        if(s.addonScene.projectPalette(next.selection.sourceModelFlags191,next.addonModel.palette,ad)&&
+           prepareOriginalUiRiderModelFog50KG(*s.input.addonPod->hierarchy(),s.addonScene.graph(),frame.cameraAfterFog().position,
+               frame.renderContext().fogStart,next.addonModel.fog)){
+            next.addonModel.scene=s.input.addonPod->scene();next.addonModel.sourceModelFlags191=next.selection.sourceModelFlags191;
+            next.addonEmits=true;
+        }
+    }
+    output=std::move(next);return true;
 }
 bool OriginalUiTournamentPodOwner50KG::projectBinder(std::size_t pair,const OriginalUiTournamentCameraOwner50KG& camera,
     const OriginalUiTournamentCameraFrame50KG& frame,std::uint32_t milliseconds,bool animate,

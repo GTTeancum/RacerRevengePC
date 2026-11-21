@@ -1,5 +1,6 @@
 #include "original_ai_engine_emitter.h"
 #include "scalar_minmax48o.h"
+#include "../assets/dlc_registry50dl.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -15,7 +16,14 @@ bool scalar(float value) noexcept {std::uint32_t u;std::memcpy(&u,&value,4);
 // not a row count: the 23 retail racers use ids 1..26 without 5, 6 and 13
 // (POD24/25/26 race in the third tournament tier). Same set as the original
 // catalog in original_player_identity50ik_fixture.h.
-bool racerId(std::uint32_t id) noexcept {return id>=1&&id<=26&&id!=5&&id!=6&&id!=13;}
+// PORT EXTENSION, NOT ORIGINAL: an admitted add-on racer number (registry row
+// 32..99) is a pod60 like any other here; the emitter is the same for every
+// pod (the original constructor only refuses pod 0 / >= 100 at 210824).
+bool racerId(std::uint32_t id) noexcept {
+    if(id>=1&&id<=26&&id!=5&&id!=6&&id!=13)return true;
+    namespace reg=rr::assets::dlc50DL;
+    return reg::addonNumberRange(id)&&reg::addonPod(id)!=nullptr;
+}
 bool identity(const OriginalAiEmitterIdentity& i) noexcept {
     return i.session&&i.racer&&i.mainBody&&i.emitterD40&&i.managerOrdinal<8&&racerId(i.pod60);
 }

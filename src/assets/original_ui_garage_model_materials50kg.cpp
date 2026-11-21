@@ -14,6 +14,11 @@ bool basename(const std::string& n)noexcept{
     for(unsigned char c:n)if(c<32||c>=127||c=='/'||c=='\\'||c==':')return false;
     return true;
 }
+// PORT EXTENSION (DLC career): a selected-model owner that is an add-on pod's own
+// package archive (identity addonUi, never a catalog row).
+bool addonSelected50DL(const std::shared_ptr<const OriginalUiArchive50KG>& a)noexcept{
+    return a&&a->loaded()&&a->addon()&&a->identity()&&a->identity()->id==OriginalUiArchiveId50KG::addonUi;
+}
 bool authentic(const std::shared_ptr<const OriginalUiArchive50KG>& a,OriginalUiArchiveId50KG id)noexcept{
     return a&&a->loaded()&&a->identity()==originalUiArchiveIdentity50KG(id);
 }
@@ -68,8 +73,8 @@ bool OriginalUiGarageModelMaterials50KG::load(std::shared_ptr<const void> pin,co
     if(residentPodTextures&&(kind!=K::selected19E||!authentic(residentPodTextures,OriginalUiArchiveId50KG::podTextures)))
         return fail(d,E::input);
     if(!pin||!scene||!identity||scene->materials.empty()||scene->materials.size()>256||kind==K::absent||
-       (kind==K::selected19E?(!archive||!archive->identity()||
-        originalUiGaragePodCareer50KG(archive->identity()->id)<0||!authentic(archive,archive->identity()->id)):
+       (kind==K::selected19E?(!archive||!archive->identity()||(!addonSelected50DL(archive)&&
+        (originalUiGaragePodCareer50KG(archive->identity()->id)<0||!authentic(archive,archive->identity()->id)))):
         !authentic(archive,OriginalUiArchiveId50KG::garage))||
        !authentic(app,OriginalUiArchiveId50KG::appStart))return fail(d,E::input);
     try {
@@ -151,8 +156,10 @@ bool prepareOriginalUiGaragePrelitMaterial50KG(const OriginalUiGarageModelMateri
         const auto archiveId=selected&&archive&&archive->identity()?archive->identity()->id:OriginalUiArchiveId50KG::garage;
         if(!owner.loaded() || !owner.modelIdentity() ||
            (!selected && owner.kind()!=OriginalUiGarageMaterialKind50KG::staticModel) ||
-           !archive || !archive->loaded() || (selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
-           archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
+           !archive || !archive->loaded() ||
+           (selected&&addonSelected50DL(archive)?false: // DLC career: package archive as selected owner
+            ((selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
+             archive->identity()!=originalUiArchiveIdentity50KG(archiveId))) ||
            !row || !images || !images->loaded())
             return fail(d,Error::profile,"actual Garage static/selected material and image owner",0x26EA0Cu);
         const auto& pass=row->source;d.pass=pass.pass;
@@ -210,8 +217,10 @@ bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials
         if(!owner.loaded() || !owner.modelIdentity() ||
            (!selected && owner.kind()!=OriginalUiGarageMaterialKind50KG::staticModel &&
             owner.kind()!=OriginalUiGarageMaterialKind50KG::actor && owner.kind()!=OriginalUiGarageMaterialKind50KG::watto) ||
-           !archive || !archive->loaded() || (selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
-           archive->identity()!=originalUiArchiveIdentity50KG(archiveId) ||
+           !archive || !archive->loaded() ||
+           (selected&&addonSelected50DL(archive)?false: // DLC career: package archive as selected owner
+            ((selected&&originalUiGaragePodCareer50KG(archiveId)<0) ||
+             archive->identity()!=originalUiArchiveIdentity50KG(archiveId))) ||
            !row || !images || !images->loaded())
             return fail(d,Error::profile,"actual Garage model material and image owner",0x26EA0Cu);
         const auto& pass=row->source;d.pass=pass.pass;

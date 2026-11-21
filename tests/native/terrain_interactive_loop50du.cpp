@@ -180,6 +180,10 @@ struct RenderCost50CR {
     std::uint64_t frames=0,waterFrames=0,particleFrames=0;
     // Gameplay display completion (swapAndCapture) and its completeGameplayDisplay part.
     double completionMs=0.0,completeDisplayMs=0.0,completionWorstMs=0.0;
+    double prepMs=0.0; // render stamp -> renderer.submit (CPU frame preparation, builds included)
+    // world_service split per simulation step: world animations (timed lights, track
+    // animations, ATM, trigger exits), water runtime advance, particles + track emitters.
+    double worldAnimationMs=0.0,worldWaterMs=0.0,worldParticleMs=0.0;std::uint64_t worldSteps=0;
     std::uint64_t completions=0,captureFrames=0;
     static double ms(FrameHitch50DU::Clock::time_point a,FrameHitch50DU::Clock::time_point b) noexcept {
         return b<a?0.0:std::chrono::duration<double,std::milli>(b-a).count();
@@ -673,7 +677,10 @@ void Context::run() {
     static std::uint64_t confirmStartNs50PD=0;static unsigned confirmTaps50PD=0;
     auto& testResults50PD=rr::platform::testResultsInput50PD();
     testResults50PD.focus=false;
-    if(resultsConfirm50PD>0.f&&captureRun.unattended()&&native_common_results50PD::state().replayActive){
+    // Also on the Time Trial records page 3 that Pause QUIT (1BDAB4) opens over the paused
+    // race: the original waits for the player's confirm there too (test only).
+    if(resultsConfirm50PD>0.f&&captureRun.unattended()&&
+       (native_common_results50PD::state().replayActive||pauseRecordPage1BDAB4)){
      // Applied by the host at its next poll, before the Results observe it.
      testResults50PD.focus=true;
      const auto nowNs=monotonicNow50DU();
@@ -941,7 +948,7 @@ void Context::run() {
    rr::game::OriginalResults104Diagnostic50LA resultsInputDiagnostic;
    const bool resultsInputOkay=(originalUiActive||nativeModalOwnsInput)?true:
        originalMainApplication.pressConsumedResults1C8C30(host,resultsInputDiagnostic);
-   if(native_common_results50PD::state().replayActive&&nativeModalOwnsInput){
+   if((native_common_results50PD::state().replayActive||pauseRecordPage1BDAB4)&&nativeModalOwnsInput){
     static unsigned reportedModal=0xffffffffu;
     const unsigned modal=unsigned(sessionMenu.open())|
         unsigned(humanResultsReady)<<2|unsigned(sourcePauseParentAttached)<<3|
@@ -952,7 +959,7 @@ void Context::run() {
          <<" menu_command="<<((modal>>5)&1u)<<'\n';}
    }
    const bool resultsInputClaimed=host.retireResultsEdges50LA(hostInput);
-   if(native_common_results50PD::state().replayActive&&(resultsInputDiagnostic.operation||!resultsInputOkay)){
+   if((native_common_results50PD::state().replayActive||pauseRecordPage1BDAB4)&&(resultsInputDiagnostic.operation||!resultsInputOkay)){
     static const char* reportedInput=nullptr;
     if(resultsInputDiagnostic.operation!=reportedInput){reportedInput=resultsInputDiagnostic.operation;
      std::cerr<<"race_replay results_input okay="<<resultsInputOkay<<" claimed="<<resultsInputClaimed<<" pc="<<std::hex
@@ -2248,9 +2255,19 @@ void Context::run() {
              {SimulationScope timing(phaseTiming.enabled,simulationTotals[7]);
              require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::afterAllRacerPrefixes,.016f).status==
                  sourceCamera::Status::sceneChildComplete,"original scene missed racer-prefix cut");
+             // cr-16 measurement: the world_service split (scene child / world
+             // animations, water runtime, particle manager + track emitters).
+             const auto worldStart=FrameHitch50DU::Clock::now();
              advanceWorldAnimations();
+             const auto worldAnimated=FrameHitch50DU::Clock::now();
              advanceWater();
+             const auto worldWatered=FrameHitch50DU::Clock::now();
              advanceTrackParticles();advanceTrackEmitters();
+             const auto worldParticles=FrameHitch50DU::Clock::now();
+             renderCost50CR.worldAnimationMs+=RenderCost50CR::ms(worldStart,worldAnimated);
+             renderCost50CR.worldWaterMs+=RenderCost50CR::ms(worldAnimated,worldWatered);
+             renderCost50CR.worldParticleMs+=RenderCost50CR::ms(worldWatered,worldParticles);
+             ++renderCost50CR.worldSteps;
              }
              {SimulationScope timing(phaseTiming.enabled,simulationTotals[8]);
              advanceOriginalAiManager(.016f,&schedule);}
@@ -3754,6 +3771,10 @@ void Context::run() {
     // Common rewrite (I4): one submit for every course; the renderer draws the
     // track's one particle window from its request (track.roles.particles, R8).
     {const auto submitStart=FrameHitch50DU::Clock::now();
+     // Render-frame preparation on the CPU: from the render stamp (after the last
+     // simulation step) to the submit (player/opponent batches, cables, Binder,
+     // flames, shadows, HUD, water/particle builds). Measurement only.
+     renderCost50CR.prepMs+=RenderCost50CR::ms(frameHitch50DU.render,submitStart);
      submitted=renderer.submit(next,renderFrame,rendererDiagnostic);
      const double submitMs=RenderCost50CR::ms(submitStart,FrameHitch50DU::Clock::now());
      renderCost50CR.submitMs+=submitMs;++renderCost50CR.frames;
@@ -4230,13 +4251,17 @@ void Context::run() {
          <<a[2]/n<<'/'<<a[5]/n<<'/'<<a[7]/n<<'/'<<a[8]/n<<'/'<<a[9]/n<<'/'<<a[10]/n<<'/'<<a[11]/n<<'/'<<a[12]/n
          <<'/'<<(a[0]+a[1]+a[4]+a[6])/n<<'\n';}
     {const auto& c=renderCost50CR;const double f=c.frames?double(c.frames):1.0;
-     std::cerr<<"render_cost_ms frames="<<c.frames<<" submit_avg/worst="<<c.submitMs/f<<'/'<<c.submitWorstMs
+     std::cerr<<"render_cost_ms frames="<<c.frames<<" prep_avg="<<c.prepMs/f<<" submit_avg/worst="<<c.submitMs/f<<'/'<<c.submitWorstMs
          <<" water_build_avg="<<c.waterBuildMs/f<<" water_frames="<<c.waterFrames
          <<" particle_build_avg="<<c.particleBuildMs/f<<" particle_frames="<<c.particleFrames
          <<" last_particle_draws/quads="<<rendererDiagnostic.particleDraws<<'/'<<rendererDiagnostic.particleQuads
          <<" completion_avg/worst="<<(c.completions?c.completionMs/double(c.completions):0.0)<<'/'<<c.completionWorstMs
          <<" complete_display_avg="<<(c.completions?c.completeDisplayMs/double(c.completions):0.0)
-         <<" completions="<<c.completions<<" capture_frames="<<c.captureFrames<<'\n';}
+         <<" completions="<<c.completions<<" capture_frames="<<c.captureFrames
+         <<" world_steps="<<c.worldSteps<<" world_animation/water/particles_avg="
+         <<(c.worldSteps?c.worldAnimationMs/double(c.worldSteps):0.0)<<'/'
+         <<(c.worldSteps?c.worldWaterMs/double(c.worldSteps):0.0)<<'/'
+         <<(c.worldSteps?c.worldParticleMs/double(c.worldSteps):0.0)<<'\n';}
     renderCost50CR.reset();
     stepSplit50GG.resetWindow();
     raceFrames50AU.buckets={};raceFrames50AU.intervalWorstMs=0.0;
