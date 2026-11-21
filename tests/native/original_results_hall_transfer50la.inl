@@ -234,16 +234,24 @@ bool Application::commitRaceAcknowledgementTransfer50PD(rr::game::OriginalRaceCo
         return false;
     }catch(...){return reject("exception");}
 }
+// One receiver for every 17DE10(App,6,screen,1) race departure. The 1CA6F0 Results
+// Hall (Time Trial record, incl. Pause QUIT -> 1ABFC0 records page) and the 1AB5BC
+// acknowledgement rows write the same request lanes (flags 6, screen, page 1), and
+// 17DB80/ld_ui writes no mode, so both enter the same race-return first screen
+// (here Hall11 with P+34 unchanged), with the same shared-dialog/dispatcher boot.
+// The former separate 1CA6F0 receiver (prepareNativeResultsHall: Hall entered in
+// Options mode5, no 1B7BD0 boot) is no longer selected (cr-26: its frontend reached
+// the Root audio prefix with the previous lifetime's closed dispatcher).
 bool Application::nativeRaceReturnRoute50PD(std::uint32_t& screen,std::uint32_t& page)const noexcept {
     screen=0;page=0;
     const auto p=resultsHallTransfer50LA_;
-    if(!p||!p->acknowledgement1AB5BC||!nativeResultsHallReceiverCurrent50LA())return false;
+    if(!p||!nativeResultsHallReceiverCurrent50LA())return false;
     screen=p->screen34;page=p->page38;return true;
 }
 bool Application::acceptNativeRaceReturnReceiver50PD()const noexcept {
     if(garageAudioOwnerThread_!=std::this_thread::get_id())return false;
     const auto p=resultsHallTransfer50LA_;
-    if(!p||!p->acknowledgement1AB5BC||p->phase!=NativeResultsHallTransfer50LA::Phase::receiver||
+    if(!p||p->phase!=NativeResultsHallTransfer50LA::Phase::receiver||
        p->profile!=riderProfile||p->common!=profile||p->video!=videoOwner_||sourceRace28COwner_||
        p->request.reference00||p->enrolled||!riderProfile||
        riderProfile->stamp().mode34!=p->stamp.mode34)return false;

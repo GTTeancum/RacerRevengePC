@@ -92,6 +92,8 @@ struct FrameHitch50DU {
 FrameHitch50DU frameHitch50DU;
 float testRouteX50DU=0.f; // Last HUD gate direction; unattended steering test only.
 float testPositionX50DU=0.f,testPositionZ50DU=0.f; // Last player position; unattended unstick test only.
+float testPositionY50DU=0.f; // Its height: zero-g sections climb with little XZ travel (unstick test only).
+bool testRouteBehind50DU=false; // The steering target is behind the view (unattended steering test only).
 double hitchMs50DU(FrameHitch50DU::Clock::time_point a, FrameHitch50DU::Clock::time_point b) {
     if (a == FrameHitch50DU::Clock::time_point{} || b == FrameHitch50DU::Clock::time_point{} || b < a) return -1.0;
     return std::chrono::duration<double, std::milli>(b - a).count();
@@ -751,16 +753,32 @@ void Context::run() {
      // RR_TEST_UNSTICK=1: when wedged (moved under 40 units in 3 s) the bot
      // taps the player's manual reset key (T, 150 ms), as a player would.
      static const bool unstick50DU=[]{const char* v=std::getenv("RR_TEST_UNSTICK");return v&&std::string(v)=="1";}();
-     static std::uint64_t stuckCheckNs50DU=0,resetUntilNs50DU=0;static float stuckX50DU=0,stuckZ50DU=0;
+     static std::uint64_t stuckCheckNs50DU=0,resetUntilNs50DU=0,resetGraceNs50DU=0;
+     static float stuckX50DU=0,stuckY50DU=0,stuckZ50DU=0;
      if(unstick50DU){
       constexpr std::size_t resetT=23;
       const auto nowNs=monotonicNow50DU();
-      if(!stuckCheckNs50DU){stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckZ50DU=testPositionZ50DU;}
+      if(!stuckCheckNs50DU){stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckY50DU=testPositionY50DU;stuckZ50DU=testPositionZ50DU;}
       if(nowNs>=stuckCheckNs50DU+3000000000ull){
-       const float dx=testPositionX50DU-stuckX50DU,dz=testPositionZ50DU-stuckZ50DU;
-       if(dx*dx+dz*dz<40.f*40.f){resetUntilNs50DU=nowNs+150000000ull;
-        std::cerr<<"test_unstick reset x="<<testPositionX50DU<<" z="<<testPositionZ50DU<<'\n';}
-       stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckZ50DU=testPositionZ50DU;
+       // 3D travel: a zero-g climb (Vengeance) moves mostly in Y and read as wedged in XZ,
+       // giving 73 needless resets in cr26 NV. After a reset the game's own manual reset
+       // (T, 1A17A4: back on the spline, facing forward) gets 6 s to drive off before the
+       // next check, so a reset is never stacked on a pod still settling from the last one.
+       const float dx=testPositionX50DU-stuckX50DU,dy=testPositionY50DU-stuckY50DU,dz=testPositionZ50DU-stuckZ50DU;
+       if(nowNs>=resetGraceNs50DU&&dx*dx+dy*dy+dz*dz<40.f*40.f){resetUntilNs50DU=nowNs+150000000ull;
+        resetGraceNs50DU=nowNs+6000000000ull;
+        std::cerr<<"test_unstick reset x="<<testPositionX50DU<<" y="<<testPositionY50DU<<" z="<<testPositionZ50DU
+            <<" behind="<<testRouteBehind50DU<<'\n';}
+       stuckCheckNs50DU=nowNs;stuckX50DU=testPositionX50DU;stuckY50DU=testPositionY50DU;stuckZ50DU=testPositionZ50DU;
+      }
+      // Lost: the target has stayed behind the view for 5 s (circling at a branch or a
+      // missed gate, the MB wrong-way loop). Tap the same manual reset a player would use.
+      static std::uint64_t behindSinceNs50DU=0;
+      if(!testRouteBehind50DU)behindSinceNs50DU=0;
+      else if(!behindSinceNs50DU)behindSinceNs50DU=nowNs;
+      else if(nowNs>=behindSinceNs50DU+5000000000ull&&nowNs>=resetGraceNs50DU){
+       resetUntilNs50DU=nowNs+150000000ull;resetGraceNs50DU=nowNs+6000000000ull;behindSinceNs50DU=0;
+       std::cerr<<"test_unstick reset reason=target_behind x="<<testPositionX50DU<<" z="<<testPositionZ50DU<<'\n';
       }
       const bool tap=nowNs<resetUntilNs50DU;
       if(tap&&!hostInput.keys.down[resetT])hostInput.keys.pressed[resetT]=1;
@@ -3179,9 +3197,48 @@ void Context::run() {
      const double length=std::sqrt(right*right+ahead*ahead);
      if(std::isfinite(length)&&length>0.0001){
       hud.routeValid=true;hud.routeX=static_cast<float>(right/length);
-      testRouteX50DU=hud.routeX; // Unattended steering test only.
-      testPositionX50DU=static_cast<float>(position.v[0]);testPositionZ50DU=static_cast<float>(position.v[2]);
       hud.routeY=static_cast<float>(ahead/length);
+      testPositionX50DU=static_cast<float>(position.v[0]);testPositionZ50DU=static_cast<float>(position.v[2]);
+      testPositionY50DU=static_cast<float>(position.v[1]);
+      // Unattended steering test only (the HUD arrow above is unchanged). Read-only: it
+      // chooses which key a player would hold; it writes no racer, navigation or physics.
+      //  * Look-ahead: once the pod is within half the way to the next gate's successor,
+      //    aim at that successor (UndertrackNode50ET::next, every authored branch; the one
+      //    best in line with the current view is taken), so a gate passed beside it no longer
+      //    pulls the pod round.
+      //  * Gate behind (ahead <= 0): full lock toward its side. The plain bearing is near 0
+      //    for a gate straight behind, which left the bot driving away for ever (cr20/cr25 MB:
+      //    44 wrong-way clears).
+      {
+       double tx=double(nextGate.position[0]),tz=double(nextGate.position[2]);
+       if(nextGate.nextCount&&nextGate.nextCount<=std::size(nextGate.next)){
+        double bestDot=-2.0;std::uint32_t best=selectedMapCount();
+        for(std::uint32_t n=0;n<nextGate.nextCount;++n){
+         const auto index=nextGate.next[n];
+         if(index>=selectedMapCount())continue;
+         const auto& after=selectedMapNode(index);
+         const double ax=double(after.position[0])-position.v[0],az=double(after.position[2])-position.v[2];
+         const double al=std::sqrt(ax*ax+az*az);
+         if(!std::isfinite(al)||al<=0.0001)continue;
+         const double d=(double(viewForwardX)*ax+double(viewForwardZ)*az)/al;
+         if(d>bestDot){bestDot=d;best=index;}
+        }
+        if(best<selectedMapCount()){
+         const auto& after=selectedMapNode(best);
+         const double sx=double(after.position[0])-tx,sz=double(after.position[2])-tz;
+         const double span=std::sqrt(sx*sx+sz*sz);
+         if(std::isfinite(span)&&std::sqrt(dx*dx+dz*dz)<0.5*span){tx=after.position[0];tz=after.position[2];}
+        }
+       }
+       const double ex=tx-position.v[0],ez=tz-position.v[2];
+       const double steerRight=-double(viewForwardZ)*ex+double(viewForwardX)*ez;
+       const double steerAhead=double(viewForwardX)*ex+double(viewForwardZ)*ez;
+       const double steerLength=std::sqrt(steerRight*steerRight+steerAhead*steerAhead);
+       if(std::isfinite(steerLength)&&steerLength>0.0001){
+        testRouteX50DU=steerAhead>0.0?static_cast<float>(steerRight/steerLength):(steerRight>=0.0?1.f:-1.f);
+        testRouteBehind50DU=steerAhead<=0.0;
+       }
+      }
      }
     }
     // Original viewport clear consumes the authenticated track Fog.ColorRGB.
