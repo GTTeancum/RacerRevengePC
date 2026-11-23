@@ -1,0 +1,118 @@
+Builder queue (sole builder, main tree). Order fixed by the coordinator.
+
+1. Stage A (per-racer identities, every course): built as 130b, 13-course round running
+   (regress-130b.txt). Commit when the round passes.
+2. GB step split: apply D:\Programming\GitHub\RacerRevengePC\work\scratch\gb-gc-fps\gb-step-split.patch
+   (one .cpp, terrain_interactive_loop50du.cpp) into the next build; one profiled GB race
+   (command in D:\Programming\GitHub\RacerRevengePC\work\scratch\gb-gc-fps\NOTES.md, use the new build);
+   report which part of the step is heavy (moving scenery / readiness checks / pod collision). No fix.
+   Stand-ins to flag: GB moving-scenery block and readiness checks (per-course).
+3. Milestone (b): storage-b NOTES.md Stages B and C.
+4. Milestones (c)-(e) per PLAN.md.
+5. Renderer batch 4 (pod-shadow patches 3+4): regenerate the set from the revised HUD draft
+   D:\Programming\GitHub\RacerRevengePC\work\scratch\draft-hud\ AND include
+   D:\Programming\GitHub\RacerRevengePC\work\scratch\render-common\A+B-series.patch
+   (A: common destination-alpha blend, retires the RC-only crystal path, fast path default,
+   RR_EXACT_DEST_ALPHA_BLEND=1 for comparison; user accepted one-colour-level shine rounding.
+   B: zone visibility on every course, must use the widescreen draft's widened camera).
+   Checked 2026-11-13 against b27c955: applies cleanly. Notes for that build:
+   - it adds a NEW source src\game\track_zone_visibility50zv.cpp: relink-next needs
+     new.cpp=template.cpp for it;
+   - it also edits tests\native\terrain_interactive_loop50du.cpp, the same file as the GB
+     step-split patch (item 2): re-check it applies after item 2 lands;
+   - it edits vehicle_window_gl50ds.h (renderer header, ~45 min rebuild): one batch only.
+
+## Added 2026-11-13 (coordinator): water drawing into renderer batch 4
+User saw MC (The Grand Reefs) looking bare/unfinished. Cause #1: the port never draws the GC/MC sea (only simulates its height).
+Patches 0001-0007 in D:\Programming\GitHub\RacerRevengePC\work\scratch\audit-render\water\patches\ (0003 is a renderer header) go into renderer batch 4.
+Verify on GC and MC by looking at frames (see mc-look notes): D:\Programming\GitHub\RacerRevengePC\work\scratch\mc-look\NOTES.md.
+Second cause (all courses except RA): the port lights the world with its own fixed white sun instead of each course's authored lights — audit-render S0 lighting plan; schedule after water.
+
+## Added 2026-11-13 (coordinator): Results prompts diagnostic
+Frame review: every Results screen is missing the button prompts inside the original's black bottom bar (the bar itself is original).
+Fold D:\Programming\GitHub\RacerRevengePC\work\scratch\visual-faults\A1-results-packet-receipt.patch (logging only, one .cpp) into your next build. Report what one Results screen's draw list shows. See D:\Programming\GitHub\RacerRevengePC\work\scratch\visual-faults\NOTES.md section A.
+
+## Added 2026-11-13 (coordinator): light pools / beams intensity into renderer batch 4
+User: GB yellow lamp pools and ceiling beams far too strong. Cause: surfaces stored without colours get white (=2x brightness, 4x opacity on PS2 scale). Fix: D:\Programming\GitHub\RacerRevengePC\work\scratch\light-intensity\L1-source-color-absent.patch (two renderer headers; rides in batch 4; one-word shader merge if lighting draft 04 also goes in). Affects GB, SC, SA, TC, MC, RC. Animated-model follow-up in that NOTES.md.
+
+## Added 2026-11-14 (coordinator): track-data gaps (from arcade session, user-approved)
+Notes: D:\Programming\GitHub\RacerRevengePC\work\scratch\track-data-gaps\NOTES.md. No renderer headers.
+- Fog per zone: existing draft-fog\fog-cr1-all.patch (camera batch C) is exact; no addendum. Zone light stays with lighting draft W4.
+- Scrolling textures: track-data-gaps\uv\uv-all.patch (6 files; retires six per-course scroll owners; equivalence test passes). Conflicts with render-common A+B near terrain_interactive_publication50du.cpp 1612/1631: regenerate whichever lands second.
+- Material cap: track-data-gaps\matcap\track-texture-budget-A.patch (1 file). Optional B (54 files) later.
+- Track animations: reader drafted (anim\01-track-animation-reader.patch); full common path in W3 after the shared world (TA's sail barges currently play nothing).
+- Also: render-common A+B no longer applies after light-intensity L1 — regenerate one on the other inside batch 4.
+- Secondary check for uv-all (after stock-course verification): the arcade converted track with one scrolling material is refused at load with "require_failed Unjoined original SC pass/program/texture subset" on today's port. Track file D:\Programming\GitHub\RacerRevengePC\work\scratch\racer-n64\export\n2r-uvscroll\sc\install\TRACKS\SC.RES; evidence D:\Programming\GitHub\RacerRevengePC\work\scratch\racer-arcade\silo\tree\evidence\silo-smr-faith5-look. The common scroll path must admit any material the original admits (scroll needs the vertex-animation setting; the original's scroll shader lights with course lights, not baked colours). The SC-pinned loader's fixed subset check is a per-course stand-in.
+
+## Added 2026-11-14 (coordinator): ice surfaces (user-approved enhancement, via arcade session)
+User: "Yes, add ice". Optional, switchable enhancement (like destruction momentum), NOT original behaviour: original Revenge loads surface friction/drag/traction keys but never uses them. Keyed on track surface data, never course name; inert on all stock courses; same rule for player and AI unless the N64 spec says otherwise. Waiting on the arcade session's N64 ice spec + surface keys. Lands after the pod-vs-pod response (common pod physics work), before the camera steps. Off by default.
+- Ice spec received: D:\Programming\GitHub\RacerRevengePC\work\scratch\racer-n64\notes\n64-ice-physics.md. Key on SurfaceTraction only (friction/slow snow excluded). Needs a common terrain-zone reader (pod ground collision piece -> zone -> traction); today only RA test code reads terrain zones. Default ON/OFF: awaiting the user's answer (not agreed yet). Secondary test data: D:\Programming\GitHub\RacerRevengePC\work\scratch\racer-arcade\silo\assets-bwr.
+- 2026-11-14: user ("canonical is what matters") -> include slow snow too: SurfaceFriction via the same reader, near-ground only (<15), eased 0.5/s; Swst 0.1 same. Default still pending the user.
+- 2026-11-14 user ("N64's 1.7 s"): ice uses the N64 absolute slide time (sideways slide halves in ~1.7 s at 0.2), not the ratio mapping.
+- 2026-11-14 user ("Tell the other chat it's canonical as well"): ice/slow-snow default ON (switchable off). Stock must stay bit-identical.
+- 2026-11-14 user: a converted N64 track will have no-gravity areas; same rule (canonical N64, data-keyed, default on, inert on stock). Awaiting the arcade session spec.
+- 2026-11-14: zero-g (N64 Oovo IV tracks; TerrainZoneN ZeroGravity 0/1/2) + boost strip (TerrainZoneN SurfaceSpeedBonus) under the same canonical-N64 rule; design in work\scratch\zero-g\ (in progress). Lands with ice/snow after pod-vs-pod.
+- 2026-11-14 user: zero-g lean (N64 C-left/C-right tilt) on the shoulder buttons (free pair in Revenge racing; only active in zero-g).
+
+## Added 2026-11-15 (coordinator): rigid chariot mount (user request via arcade session)
+Port extension, data-keyed, default off: [Pod Animation] ChariotRigidMount = 1 in a pod's .phy. Patch: D:\Programming\GitHub\RacerRevengePC\work\scratch\rigid-mount\chariot-rigid-mount.patch (new header + 2 source files; uncompiled). Verify: RR_TEST_FORCE_RIGID_MOUNT on stock pods (chariot_pose hold reads zero), stock bit-identical without the key, then converted slot 11 from a scratch copy. Check limp/wreck/reset and the Results replay.
+- 2026-11-15 user: zero-g lean = right stick left/right, default control preset only, zero-g only; other presets later; keyboard undecided.
+- 2026-11-15 user: zero-g lean keyboard = A/D.
+
+## Added 2026-11-15 (coordinator): converted Vengeance (N64 zero-g) findings
+Test set: work\scratch\racer-arcade\silo\assets-ven; package racer-arcade\dlc-out\n64-vengeance-sc. Player zero-g works.
+1. AI never exits zero-g (stall mid-air before the exit) - diagnosis in work\scratch\zero-g-ai\ (in progress).
+2. N64 energy column destroys a pod ~20 ft off the line -> data-driven "destroy pod" trigger action (canonical N64).
+3. Moving obstacles with collision (spinning fan) -> common track-animation path (W3 / track-data-gaps anim).
+4. Breakable asteroids (hide on contact, debris, damage) -> data-driven trigger action.
+
+## Added 2026-11-15 (coordinator): N64 hazards (column, asteroids, door, fan)
+Design: work\scratch\n64-hazards\NOTES.md; patches 01 (new header) and 02 (trigger reader: original error text for unknown actions, separates never-original vs not-yet-built original actions, raises the 22-trigger limit). Landing order: header -> merged trigger owner (common-race W3) -> common animation player + 4 additions -> hook-up round (~6 files) -> N64 respawn after column wreck (canonical N64 rule on converted tracks; port code, flagged) -> decode N64 floor table for the column gate -> converter change -> full round. Inert on stock.
+- 2026-11-16: N64 floor table decoded (n64-hazards-spec.md s7). Converter will write the N64 table into track data; port reads it when present (fallback: current sampling). Column then never fires for pods in the hall, faithfully. Second Vengeance door leaf kept (always-on loop).
+- 2026-11-16: confirmed N64 floor table format: tracks\<code>.nft (spec n64-hazards-spec.md s8). Port reader goes with the hazard hook-up round; absent -> fallback sampling.
+
+## Added 2026-11-16 (coordinator): three more N64 add-on courses and their gaps (canonical-N64, data-driven, inert on stock)
+Packages: work\scratch\racer-arcade\dlc-addons\n64-scrappers-run (nr), n64-bumpys-breakers (nu), n64-baroo-coast (nc). Specs: work\scratch\racer-n64\notes\n64-magnet-physics.md, n2r-scr.md, n2r-bub.md, n2r-bar.md.
+1. MagnetGravity terrain-zone value (wall riding up to ~87 deg, never ceilings, steering halved).
+2. Starting grid from track data (optional; fallback fixed 3-across/40 ft). Baroo Coast's narrow start puts pods within 3 ft of walls.
+3. Trigger-driven moving collision (sliding doors).
+4. Hide/break trigger action with lap and damage conditions (extends BreakObject).
+5. Animated scenery models, texture flipbooks in add-on materials, drifting-particle weather.
+6. Cut cameras following across zones.
+Order: after the DLC core (add-on pods, menu art, tournament/Garage, add-on courses, common race-load route). Item 2 is small and worth doing with add-on courses.
+
+== From Custom content session, 2026-11-20 (after the common rewrite lands) ==
+- Slot-19 Rider IPU stand-in: OriginalUiIpumTextureCache50KG::loadOriginal
+  (D:\Programming\GitHub\RacerRevengePC\src\assets\original_ui_ipum_texture_cache50kg.cpp:556) demands a byte-identical 19c_1.pst
+  with no PST kind check. loadAdditionalOriginal already applies the general rule (kind != 2 means no IPU, take the ordinary PST path).
+  prepareOriginalUiRider19IpumMaterial50KM also keeps the fixed 5-mip "19 contract". Fix: one general rule for every rider page.
+  Blocks any DLC pod using ui.layout_slot 19 ("original Rider IPUM native decode/admission rejected error=4").
+- DLC checker: explain the flame-table refusal clearly. Stock engines list the flame material once per LOD even where the
+  last LOD draws no flame (POD12: 4 flame12l entries, 3 surfaces). The flame owner requires 4 entries
+  (pod_flame50w.cpp:70). Today the refusal only says "Roster source-selected per-model flame owners rejected".
+- GB sky lightning flashes: GB's sky file holds 7 cubes, a base cube (48 tiles) plus 6 partial lightning-flash overlay
+  cubes (42 tiles). The port has never drawn the overlays. Port the original flash-overlay draw in the shared sky path,
+  driven by data (any sky file with overlay cubes), with no GB code.
+- Intro pod frames: the original runs live pod frames during every intro, fresh and restart alike. The port runs one quiet setup
+  update before the countdown. This is flagged PORT STAND-IN in the common rewrite (commit 19fec60). Port the live intro pod
+  frames on the common path after the rewrite lands.
+
+== Custom content, 2026-11-20: eight N64 DLC course packages ready ==
+Packages are in D:\Programming\GitHub\RacerRevengePC\work\scratch\racer-arcade\dlc-addons: spice-mine-run, beedos-wild-ride, vengeance,
+scrappers-run, bumpys-breakers, baroo-coast, dug-derby, malastare-100 (new). Modes: single/time_trial/vs. All pass the DLC checker.
+Scale is now 1 N64 unit = 2.5 ft (user decision; notes at racer-n64\notes\n64-scale.md). Not yet seen in game.
+After the common rewrite lands, install them and eyecheck all eight on the common route.
+- Fog far distance: the port caps it at 4,000 ft, but N64 fog at 2.5 scale is 5,000-6,250 ft. First check whether 4,000 is the original's limit or a
+  port cap. If it is a port cap, size it from data; if it is the original's, carry the N64 value through track data (N64 canonical, inert on stock).
+- Airborne gravity: on Malastare 100's 570-ft jump every racer drops into the pit, because Revenge pulls airborne pods down harder than N64.
+  Treat it as N64-canonical airborne gravity through track data, inert on stock (same rule as ice and zero-g).
+- Falling pillar and methane bursts: not played yet. Add them to the N64 hazards work (racer-n64\notes\n64-hazards-spec.md).
+
+== Coordinator, 2026-11-21: N64 pod-behaviour items DROPPED (user-confirmed via Custom content) ==
+Reverse-gravity doubling, nose-down drop reduction and far-AI line following will not be reproduced. N64 tracks are guests: tracks stay N64-true, pods stay Revenge-true; adaptation is on the track side (2.5 scale, [Environment] AirborneGravity 96).
+
+== Coordinator, 2026-11-21: N64 hazard follow-ups (from Custom content, packages rebuilt with hazards on) ==
+- Port: animation player needs a drawn mesh; Spice Mine Run has 3 invisible moving collision pieces that stay static. Support collision-only animated pieces.
+- Port: Bumpy's Breakers doors are an unsupported hazard type (stay fixed). Add the type.
+- Port: fan start phase key (N64 starts the fan at load).
+- Converter-flagged choices to revisit: shake strength 1.0 (N64 0.05 amplitude target undecoded), RespawnDelay 2.5 s omits the pre-death explode moment, near-camera 1,000-unit cutoff inferred, methane is one cloud (N64 three puffs with spread/spin).

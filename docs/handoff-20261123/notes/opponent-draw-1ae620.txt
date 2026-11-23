@@ -1,0 +1,111 @@
+Free-play opponent draw 1AE620 / 1AEF70: port, and add-on AI on add-on courses (R4)
+==================================================================================
+2026-11-21. Worktree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main (branch common-rewrite,
+base 15a25ba, uncommitted). Not built, not run, not committed. Syntax-checked with clang++ -fsyntax-only:
+original_opponent_selection50kg.cpp and terrain_interactive_world50du.cpp clean;
+terrain_interactive_roster_cold50du.cpp reports only the existing unrelated clang-only error in
+ra_cold_roster_operation50la.h:95 (deduced return type), nothing in the new code.
+Disassembly (static, read-only) from D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\stock-install\SLUS_202.68
+with D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\opp-draw\slusdis.py (EE MMI moves / lq / sq decoded);
+listings D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\opp-draw\1ae620.txt and 1aef70.txt.
+
+1. What the original does
+-------------------------
+1AE620(manager s6, ...), called from 1AD520 after the humans are built:
+  1AE64C..1AE6A0  class = 187B10(course order)+1 -> 1 (<5), 2 (<9), 3.
+  1AE6A4..1AE6C4  188470(profile, list, class, first human's pod60 [mgr+44][0]+60) -> list (pure, no RNG).
+  loop s0 = 0 .. mgr+38 (opponents):
+    1AE6D0..1AE6F8  if app+340 != 0 or profile+34 == 2 (tournament): pod = list[s0] (already ported).
+                    app+340 is the command-line switch "NoRandomAI" (17CFF4 strcmp with 3A87B8, 17D008
+                    stores 1); never set on retail.
+    1AE700..1AE778  s0 == 0: R = signed byte P+11280+12*(P[1125F]&15) (the course rival). If no human
+                    (1AF330 over mgr+34) has pod60 == R, pod = R. Otherwise fall through to the draw.
+    1AE780..1AE790  pod = 1AEF70(manager, s0 + humans34).
+    1AE798..1AE7B8  1AE370(..., ordinal s0, pod): builds the AI racer (16E450 -> pod load) and stores it at
+                    racers[humans34 + s0] (1AE5D0..1AE5E4), so later draws see it.
+1AEF70(manager, placed) = GetRandomNumber-style retry loop:
+  1AEF9C..1AEFE4  lazy seed: guard gp-80A8 / cache 3D6B30; if the cache is 0: 3D6B30 = 101A50(), 308020(it).
+                  Checked on every attempt (a zero timestamp reseeds).
+  1AEFE8..1AF024  s1 = (int)(26.0f * (2^-31 * (float)308030())) + 1   -> 1..26
+  1AF028..1AF094  range assertion "assumption violated in GetRandomNumber" (guard gp-80AC / 3D6B38).
+  1AF0A0..1AF294  for each placed racer t (racers[0..placed-1], humans first): reject (new draw) if
+                    s1 == pod(t)                       (already in the field)
+                    s1 is 5, 6 or 13                   (never an AI)
+                    s1 1 with pod 19, 19 with 1, 14 with 18, 18 with 14   (the two Anakins, the two Sebulbas)
+                    s1 is 1, 14, 21, 25 or 26 (the unlockable riders) and either no human rides one of
+                    those five, or P+10FAC+4*s1 == 0 (not unlocked).
+  1AF2A8          return s1. One 308030 draw per attempt.
+The RNG is the shared 308030 stream (LCG *41C64E6D+3039, low 31 bits returned), the same stream and the
+same lazy-seed / range owners the Rider voice choice (1EA694..1EA734) and others use.
+Note: 1AE370 -> 16E450 -> 210770 -> 19BB70 (pod ember emitter) also takes 308030 draws (19BE48..19BED4)
+while each AI pod loads, i.e. between consecutive opponent draws.
+
+2. The change
+-------------
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_opponent_selection50kg.h:27-47
+  FreePlayInputs1AE620 / FreePlayResult1AE620 / freePlay1AE620 (header has 3 includers besides its own
+  .cpp, all .cpp: common_roster50cr.cpp, terrain_interactive_continuation50du.cpp,
+  terrain_interactive_roster_cold50du.cpp; forward declarations only, no new includes).
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_opponent_selection50kg.cpp:52-188
+  accept1AEF70 (line 62): the per-placed-racer rejection rules above, exactly as the 1AF0DC loop.
+  freePlay1AE620 (line 82): rival for opponent 0, then 1AEF70 draws; lazy seed through the Application's
+  SharedRandomOwner50ID + 101A50 clock, draw through drawOriginalSharedRng50IU; the float step
+  evaluated as the exact integer rational (24-bit CVT.S.W truncation, same floor as the EE toward-zero
+  product, the method of the Rider voice choice); range check kept fail-closed. Bounds: humans <= 2,
+  humans + opponents <= 8, candidate list 26 + at most 68 add-on numbers, each add-on number > 26.
+  Native guard (NOT original, flagged in code): 2^20 attempts per opponent, then refuse (the original
+  retries forever; with 26 candidates and <= 7 placed racers an accept always exists).
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_roster_cold50du.cpp:119-180
+  Free Play / practice with 2..8 racers in a UI-launched race now builds its field from freePlay1AE620:
+  human = the selected racer, opponents = racers-1, rival and unlock words from the profile
+  (unlockFacts187E30: 10FAC with the DLC read-time grant merge; rival 11280 of 1125F, or the add-on
+  course row's stock rival, -1 = none), RNG = Application sharedNoise308030 / sharedRandomSelectors /
+  clock101A50. Logs the opponent_draw line (line 169), then buildCourseField as before (rowForRacer and
+  loadAll keep the add-on AI check as the second check).
+  Lines 181-188: the old courseFieldEntries list stays only for the direct development launch (no
+  Application profile or RNG owner): PORT STAND-IN, flagged. Every UI-launched race takes the 1AE620 path.
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_roster_cold50du.h:17,45-48
+  Context gains applicationState (OriginalUiMainApplication50KG*, default null). 2 includers
+  (terrain_interactive_roster_cold50du.cpp, terrain_interactive_world50du.cpp).
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_world50du.cpp:489
+  passes originalMainApplication.state when the UI started the race.
+
+DLC rule R4 (PORT EXTENSION): only when the race's track is a registry row (track.source() == registry:
+data, no course name), every admitted add-on number 32..99 with addonRiderMayBeAi(n, true)
+(package aiOnAddonCourses) is appended after the 26 stock candidates in number order, and the same draw
+picks over N = 26 + A: index = floor(N * u). The stock rules key on stock racer numbers only, so an
+add-on candidate is rejected only as a duplicate. On a stock course the list is exactly 1..26: same
+draw, same number of 308030 transitions, same field as with no DLC installed. Tournament/career untouched
+(188470 branch unchanged). Add-on AI pods load their own files through the same roster pod load.
+
+Flags
+ - PORT STAND-IN (ordering only): the original draws opponent k+1 after opponent k's pod load, whose ember
+   emitter (19BB70) takes 308030 draws; the port draws the whole field before loadAll and the ember draws
+   happen later in the wreck-effect stage. Same rules, same stream, different position in it (the seed is
+   a timer value, so no retail field is reproducible draw-for-draw anyway).
+ - PORT STAND-IN: direct development launch keeps the old eight-entry list (above).
+ - PORT EXTENSION: an add-on course with rival "none" (-1): opponent 0 is drawn (the original rival byte
+   is always a real racer).
+ - The 188470 call made unconditionally by 1AE620 is skipped outside the tournament: it is pure (no RNG,
+   no writes), so skipping it changes nothing.
+ - 2-player VS is not covered here (this roster builds one human); freePlay1AE620 already takes 1..2 humans.
+ - Stale comment, not edited (header): tests\native\original_course_roster50kg_fixture.h:5-9 still says
+   1AE620 is not ported.
+ - Not done: a host check against recorded original fields (needs a build); planned P4 runs.
+
+3. What a log will show
+-----------------------
+Format: opponent_draw pc=1AE620 course=<code> addon_course=0|1 candidates=N drawn=<pods> rival=R
+        rival_taken=0|1 draws=D seeded=0|1 status=ok|refused fail_pc=<pc>
+Stock course, 8 racers, Anakin (POD19) on TA (rival 19 = the human, so opponent 0 is drawn too), e.g.:
+  opponent_draw pc=1AE620 course=TA addon_course=0 candidates=26 drawn=8,22,3,17,11,4,20 rival=19 rival_taken=0 draws=11 seeded=0 status=ok fail_pc=0
+Stock course, Gasgano (7) on MC (rival 8): first drawn entry is always the rival:
+  opponent_draw pc=1AE620 course=MC addon_course=0 candidates=26 drawn=8,16,2,23,10,12,24 rival=8 rival_taken=1 draws=8 seeded=0 status=ok fail_pc=0
+  Never on a stock course: 5, 6, 13, 1 or 19 together, 14 or 18 together, an add-on number, or one of
+  1/14/21/25/26 unless the human rides one of them and it is unlocked. candidates is always 26 with or
+  without DLC installed. seeded=1 only if no earlier consumer (e.g. the Rider voice) seeded the stream.
+Add-on course (say NV, rival stock:12) with two AI-allowed add-on pods 32 and 33 installed:
+  opponent_draw pc=1AE620 course=NV addon_course=1 candidates=28 drawn=12,33,9,15,24,2,7 rival=12 rival_taken=1 draws=9 seeded=0 status=ok fail_pc=0
+  candidates = 26 + the add-on pods whose package allows AI; each add-on pod appears at most once; the
+  field then logs its common_roster rows with source=registry for those slots.
+(The pod numbers above are illustrative; they come from the timer-seeded stream.)

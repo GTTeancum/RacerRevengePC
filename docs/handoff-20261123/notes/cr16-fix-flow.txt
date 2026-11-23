@@ -1,0 +1,153 @@
+cr16 fix-flow: teardown archive release, PositionStats after Pause RESTART, Results input after replay
+Base: worktree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main (common-rewrite, e05f0f9).
+Only .cpp files edited. Not built, not run, not committed.
+
+======================================================================
+FAULT 1a  Teardown never releases the course archive (every run)
+======================================================================
+Evidence: cr15-01-TA line ~1395, cr15s-MC ~5470, cr15b-04-SA 1312, cr15b-10-SC 1279,
+cr15b-15-RA (after a failed load) - all show
+  common_teardown_holders role=collisions holders=1 preflight=1
+  role=triggers 1, role=trigger_source 1, role=animation 3 (MC also water_resources 1)
+  common_teardown role=archive released=0
+
+Root cause: Track::release's preflight
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\common_track_load50cr.cpp,
+Track::release, the "Preflight" block) allows exactly 1 holder per role (2 for collisions
+with the storage alias / particles with emitters). But every one of the "extra" holders is an
+object INSIDE the same Track that the in-order release below drops by itself:
+ - collisions +1: the navigation store's 1ACF70 world lease (NavigationStorage::worldLease,
+   common_track50cr.h:358; Lease aliases the collision Owner, track_collision_world50cr.h:73-81).
+   Release resets it first (navigation block), but the preflight runs before that.
+ - triggers +1, trigger_source +1: the trigger action owner (roles.triggerActions, the same
+   object the collision world keeps as actions_) holds group_ and source_
+   (course_trigger_actions50ct.h:142-143, set in prepareSource :280). Dropped by its close()
+   (:433), which the collision world's retire() runs (track_collision_world50cr.h:180).
+ - animation +3: actions destinations_.animations (course_trigger_actions50ct.h:132/280),
+   the collision world's animations_ (track_collision_world50cr.h:109/304) and its lane's
+   runtime_ (track_animation_world50an.h:21/40). All three go at the collision world's retire().
+   (Session's own copy is already gone: "session_holder_released=1 use_count_before=5" = Track
+   + session + these 3.)
+ - MC water_resources +1: the water runtime's resources_ (native_water_runtime50jc_fixture.h:222);
+   water is released before water_resources.
+So the preflight refused every teardown, on every course, including after a failed load (RA).
+
+Change (common_track_load50cr.cpp, Track::release preflight): each internal holder is now
+credited only when proven by identity, never by a count guess:
+ - water: roles.water->resources().get()==roles.waterResources.get()
+ - collisions: navigation worldLease shares the collision world's control block (owner_before)
+ - triggers / trigger_source / animation: the action owner's nativeGroup()/sourceOwner()/
+   animationOwner() equal the role (only while the action owner is open and held by at most
+   the Track and the collision world, use_count<=2)
+ - animation: collision world's animationLane() non-null (=> animations_ held) and
+   lane->runtime()==role.
+A real external holder still blocks exactly as before. Added
+#include "native_water_runtime50jc_fixture.h" (header-only, already included by 5 TUs).
+After a failed load the credits fall to 0 automatically for owners never built.
+Log: new line `common_teardown_internal water_resources=.. collisions=.. triggers=..
+trigger_source=.. animation=..` before the checks.
+Fixed when: no `common_teardown_holders ... preflight=1` lines, then
+`course_archive_release released=1` and no `consumed_close_rejected`.
+Not proven: whether some role is ALSO held externally; the next log will name it (holders=N).
+Note: the other release-order steps (collision close() with use_count==1, actions close, lane
+reset) were not changed; if collisions still refuses at release time it will log
+`common_teardown role=collisions released=0`.
+
+======================================================================
+FAULT 1b  native_terminate from ~Owner of original_consumed_stage50DU during unwinding
+======================================================================
+Root cause: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\race_application_cold50la.cpp
+`Owner::~Owner()noexcept {if(!close())std::terminate();}`. With 1a the close refused, so the
+destructor (run while an exception from interactive_continuation50DU::Context::run unwinds)
+terminated.
+Change: same file, Owner::~Owner. On a refused close it logs
+  consumed_stage_close_refused at=destructor race=.. track=.. retained=.. audio_error=..
+  material_pc=.. uncaught=..
+and moves race_ and track_ into never-freed host holders (new(std::nothrow) shared_ptr), so no
+destructor runs on a still-counted race (World::~World terminates while counted) or an
+unreleased Track. No guest memory touched. Terminates only if that host allocation fails.
+PORT STAND-IN (flagged in code): failure-path custody; the original has no refusable close.
+Fixed when: a failing run ends with the original failure (require_failed ...) plus the
+consumed_stage_close_refused line, SESSION END not exit=terminate from this destructor.
+Not proven: other destructors further up the unwind could still terminate; only this one was
+in the cr15 stacks.
+
+======================================================================
+FAULT 2  PositionStats display rejected right after Pause RESTART (TA, SA, SC)
+======================================================================
+Evidence: TA 1391, SA 1307, SC 1274: `original_position_stats_display_rejected
+source_pc=1646000` (= 0x191DB0, decimal print) one frame after race_restart_in_place ok=1.
+Root cause: 0x191DB0 is the generic reject of Application::capturePositionStatsNumbers50LA
+(original_position_stats_resources50la.h:547), reached when the view0 adapter capture fails;
+the adapter requires fields[index].placeCCC==rank[index].placeCCC
+(original_position_stats_adapter50la.h:98-99). The 1AEA70/216690 restart hook
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_publication50du.cpp,
+resetRacerTiming216690) stored CCC=0 only into rank[slot]; the port's two other mirrors of the
+same one racer word (fields[slot], observed[slot]; rank() writes all three together,
+native_ai_session50iv_fixture.h:85-87) kept the previous race's place. The first frame after
+the restart (host clock paused, no rank pass yet) therefore fails the fields==rank test.
+The 1A7DD0 end dispatch has the same test (original_race_end_dispatch50la.cpp:50).
+Change: resetRacerTiming216690 now stores the 216690 CCC=0 into all three mirrors
+(fields[slot].placeCCC, observed[slot].placeCCC, each bounds-checked by std::size).
+Common path: every course, every pod, every in-place restart.
+Log: the rejection line now also prints rank0_ccc, fields0_ccc, observed0_ccc,
+observed0_bound, fields0_bound
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_loop50du.cpp,
+PositionStats prepare in Context::run).
+Fixed when: after race_restart_in_place ok=1 the race continues (no
+original_position_stats_display_rejected). If it still rejects, the new fields show whether
+the place mirrors agree; if they do, the reject is another 191DB0 gate (not proven which).
+Confidence: likely, not proven - capturePositionStatsNumbers50LA has ~15 gates behind one pc.
+
+======================================================================
+FAULT 3  Results input stops after the Results replay (MA 1CA708, MC 1C8EF0)
+======================================================================
+Evidence: MA 2443, MC 3354: first Results confirm after `common_race_start ... caller=1ABAD8
+result=ok` stops at the 26D070 stop gate. MC retries every tap and fails every time, so it is a
+persistent refusal, not a timing window. Old main-path runs (c148-ga-single5, c147-*,
+d146p23-fp-MA) passed the same gate (1C8F5C / 1CA778).
+What I found but could NOT prove: the stop condition
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_results104_input50la.cpp,
+pressHostInput1C8C30, sites 1C8EF0 / 1CA608/1CA708 / 1C984C) is one || chain of 9 owner gates
+plus OriginalApplicationAural50KG::stopResultsNative26D070, which has 21 refusals that all
+report pc 26D070. Differences since main on this path: every race now has world74_, the
+1AC960 music fade cut now runs whenever race10C exists (original_race_end_dispatch50la.cpp,
+Cut::musicFade), and race_music50IE::Owner's restart fade was rewritten (race_music50ie_fixture.h
+requestRestartFadeTail234440; canStopResultsNative26D070 refuses while fadePending_ /
+Fading / SilentRetirement). A fade that never leaves Pending would explain a persistent
+refusal, but the log has no line that shows it, so no behaviour change was made.
+Change (diagnostics only):
+ - original_results104_input50la.cpp: at all three stop sites, a read-only line
+   `results_stop26D070_refused pc=.. gate=<first failing gate> aural_status=.. aural_pc=..
+   music10C=.. music_fade_pending=.. music_fade_phase=.. replay=..`
+   (gates: aural00_absent, race_audio_absent, end_hud_scope_absent, music/announcer/gameplay/
+   engines_absent, end_state_not_current, music10C_backend_not_current, stop26D070).
+ - D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_application_aural_reset50kg.cpp,
+   stopResultsNative26D070: each refusal logs `aural_stop26D070_refused step=N status=S`
+   (same Status/pc returned as before); step 17 also logs
+   `aural_stop26D070_unclaimed_active_voice slot=N`.
+   Steps in source order: 1 thread, 2 Aural owner, 3 race groups/intro, 4 music/feedback/
+   announcer canStop (music fade pending lands here), 5 ALL8 engines, 6 human gameplay/engines,
+   7 control-change capacity, 8 announcer slot, 9 claim music/feedback/announcer,
+   10 gameplay cue claim, 11 engine claim, 12 auxiliary claim, 13 lap claim, 14 countdown claim,
+   15 world claim, 16 intro/provider overlap, 17 unclaimed active voice, 18 Main frontend,
+   19 stream retirement / native source, 20 stream refs, 21 stream slot generation.
+Next run tells which owner refuses; the fix follows from that. UNRESOLVED.
+
+======================================================================
+Other observations
+======================================================================
+ - The 1ABAD8 replay restart line prints racers=0 (common_race_start ... caller=1ABAD8): the
+   end-dispatch path never fills RaceStart.racers. Cosmetic, not changed.
+ - cr15b-15-RA load failure itself ("renderer error 20 at track animation requires a bounded
+   published source frame bank") is outside these faults.
+
+Files changed
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\common_track_load50cr.cpp   (1a; track-load file, may overlap the load-data helper's area)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\race_application_cold50la.cpp   (1b)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_publication50du.cpp   (2)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_loop50du.cpp   (2, log only)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_results104_input50la.cpp   (3, log only)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_application_aural_reset50kg.cpp   (3, log only)
+Stand-ins added: one, ~Owner failure-path custody (race_application_cold50la.cpp), flagged.
+No per-course or per-pod code.

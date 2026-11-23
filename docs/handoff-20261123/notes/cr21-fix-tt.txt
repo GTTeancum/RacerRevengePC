@@ -1,0 +1,171 @@
+cr21 fix: Time Trial faults from cr20-03 (GC Time Trial, 1 lap, solo, seeded slow Hall rows)
+Evidence: D:\Programming\GitHub\RacerRevengePC\evidence\cr20-03-GC-time_trial-P17\RacerRevenge.log
+Base: commit 80156e3. Nothing was built, run or committed.
+
+======================================================================
+(a) Lap 1 completes but the Time Trial never finishes
+======================================================================
+FINDING: The original never ends a Time Trial on its lap count. The port behaves the same way,
+so I made NO code change. The expectation in PLAN 5.3 run 3 and 5.5 ("common_race_start
+reason=restart caller=1ABC0C" after the lap) cannot be met by the original's own rules.
+
+Evidence (D:\Programming\GitHub\RacerRevengePC\work\scratch\dis_all.txt):
+ - 1A7DA0..1A7DAC: the race update enters the end dispatch 1A7DD0 only when B4+58 bit0 is set.
+ - 1AFA44..1AFA64: B4+58 bit0 = the return value of 1B0A70.
+ - 1B0A70: when B4+58 bit5 is clear, it returns 1 only if every human row has +48 bit0 set
+   (row = racer+C90, so +48 is CD8 bit0, "finished"), a retired human included.
+ - CD8 bit0 is set only at 1B035C, inside 1B02F0. 1B02F0 returns at once when B4+58 bit5 is
+   clear (1B02F0..1B02FC). A search of all byte stores to +0xCD8 and to row+0x48 finds no
+   other writer of bit0.
+ - B4+58 bit5 is written only by 1AF960(B4, a1), with a1 = (App2DC+11258 == 1)
+   (1A7750..1A7758). So bit5 is clear in a Time Trial (11258 == 3).
+ - The lap tail 1A2B80 (port: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\lap_completion50gg.cpp:132-143)
+   runs, for 11258 == 3, the per-lap 217940 / 217420 player reset and skips the last-lap
+   22B760. 217940 (D40 virtual94, racer virtualA8 = 1A2B70 `jr ra`, +64/+68/+78) sets no
+   finish bit. The TT lap count in 1125C is used only by the 3-lap race-record lookup
+   (1A2CF0).
+ - The port matches: manager flags58 = 0x46 (bit5 clear), finish_count54 = 0, player_cd8 = 0.
+   The 1ABBC0 -> 1ABBE8 -> 1ABC0C branch of 1AB520 exists, but in a Time Trial nothing
+   reaches 1A7DD0, so it is not reached by a lap.
+What this means for the plan: a Time Trial runs lap after lap until Pause QUIT (row 10 ->
+1BDAB4, item b). PLAN 5.3 run 3 / 5.5 should drop "TT finish restart 1ABC0C". The best lap
+CB4 is still kept across restarts (216690 with 11258 == 3, Pause RESTART), and that can be
+proven with a Pause RESTART instead.
+Not proven: I read the disassembly only. The finish bit could have a writer this search
+missed (for example a word store covering CD8, or a store through another base). That is
+unlikely, because 1B0A70/1B02F0 tie "finished" to bit5 so directly.
+
+======================================================================
+(b) Pause QUIT row 10 with a record: page 3 never opens and the race keeps running
+======================================================================
+ROOT CAUSE:
+ - 1BDAB4 (D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\common_race_end50cr.cpp,
+   quitTimeTrialFromPause1BDAB4) runs correctly: Pause+200 = 0, activity off, 1A4B90(2),
+   199770, Results104 activate, 1CA8E0(Results,3,0). It leaves App11C set, as the original
+   does (no 1BE830).
+ - The race loop then sets pauseRecordPage1BDAB4
+   (D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_loop50du.cpp, ~1492).
+   That flag only re-routes the pad to Results 1C8C30 (~938). Nothing holds the world:
+   the loop freezes the world only while the Pause itself is open (countedOpen(), ~1605),
+   so the simulation ran again and the race clock counted to 624 s.
+ - Nothing ran Results 1C8AE0 or its capture/draw outside the race-end and replay paths. In
+   addition, Application::updateNativeResultsAfterRace50LA
+   (D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_results_update_schedule50la.cpp)
+   refused any Results update unless the race end had been entered or the replay was running
+   ("Canonical Race end continuation has not returned"). So page 3 was never updated, drawn
+   or confirmable.
+ - Original: with App11C set, 1A7B40 takes 1A7B94..1A7BAC: 141ED0 over the race's children
+   only, then return. No racer, manager or race-clock step runs, and the Results child
+   updates over the frozen race.
+CHANGES:
+ 1. terrain_interactive_loop50du.cpp, step loop, right after the race-root guard: while
+    pauseRecordPage1BDAB4 && App11C, each step:
+    - runs no racer, manager, lap or world step;
+    - publishes a camera frame from the frozen racers through Cut::replayPose (PORT STAND-IN,
+      flagged: the native Results update needs a current Camera publication; the original
+      141ED0 is not claimed to run the camera);
+    - runs Results 1C8AE0 (updateNativeResultsAfterRace50LA) and its capture
+      (finishRaceRootWithResults);
+    - keeps the race audio live through the same held route as the completed scene and the
+      Results replay (liveAudio/raceMusic unpaused, committedStep + advanceSourceAudioWorld),
+      so the page's feedback and its confirm's 26D070 stop have the mixer.
+    Logs: `pause_record_page frame=1BDAB4 camera_status=..` and `pause_record_page results
+    updated=.. captured=.. pc=.. operation=..`.
+ 2. original_results_update_schedule50la.cpp: the end-continuation gate also admits the
+    1BDAB4 state, recognised from the state itself, not from a new flag: no end dispatch
+    returned or published, launch 11258 == 3, App11C set, Pause+200 == 0. The Pause and
+    Results eligibility checks below it are unchanged (the Pause's activity is off).
+ The pad already reaches 1C8C30 (applicationPausedModal is false on the page). The confirm
+ 1CA340 -> 1CA574..1CA6F0 (name store, 1ABFC0(race,2), 26D070 / 1A4AB0 / 267BE0, Hall request
+ 1CA678, blocking fade, Hall 17DE10(6,11,1)) runs in original_results104_input50la.cpp, and
+ the loop's resultsDonePending / Hall receiver carries it on. That part is unchanged and
+ untested from this state.
+Common path: no course or pod terms. Vengeance run 17 (no record) takes 1BDB5C ->
+departRace50CR -> Course and does not touch this branch.
+FIXED WHEN: after `pause_quit row=10 site=1BDAB4 qualify_1ABFC0=1`, the race clock stops
+(the race phase lines hold the same seconds), `pause_record_page results updated=1
+captured=1` appears, the page-3 draw/packet lines appear, and then the 1CA574 confirm and the
+Hall request (`race_ack`/Hall lines).
+OPEN / NOT PROVEN:
+ - Whether the camera admits Cut::replayPose outside a replay. Only heldBeforeStart has a gate
+   (original_camera_session50kx.h:1184). A refusal shows as camera_status != published, and
+   then no Results update happens.
+ - Whether music should keep playing under the page. The Pause open paused the World group;
+   the port's host pause of the music is lifted here, as the replay path does.
+ - The unattended --pause-quit test may not press the page-3 confirm. If no
+   test_results_confirm taps appear after the page opens, the test driver needs a page-3
+   confirm step (test only).
+
+======================================================================
+(c) Teardown inside that race: consumed_close_rejected "race detached identity/flags/children"
+======================================================================
+ROOT CAUSE: the race's retirement gate
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_race_native_retirement50la.h:15-21)
+requires (race flags29 & 15) == 3. The Pause open's 142040(race,1)
+(original_race_pause_forward50la.h:86) sets flags29 bit2. After 1BDAB4 with a record, the
+race stays paused (the original keeps it so until its screen change destroys everything).
+So at the wall-budget teardown the gate refused twice, and the camera/display cleanup
+terminated. The same applies to any session that ends with the Pause open, on any course.
+The other cr20 runs (TA, RA tournament, SA, MA, GA, TB) closed cleanly, which also confirms
+the cr16 archive-release fix.
+CHANGE:
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_continuation50du.cpp,
+ closeWindow, just before consumedStage.close(): close the Pause's own effects in 1BE830's
+ order through the same owners: App11C = 0 (setExplicitAnimationPause(false)), 1ACF50
+ resume, then 142040(race,0). When nothing is paused these store the same values. Results
+ are logged, not fatal. Added #include "original_race_pause_forward50la.h" (header-only,
+ already included elsewhere).
+ PORT STAND-IN (flagged): teardown only; the original never meets this gate.
+ Log: `common_teardown_pause app11C_was=.. world_1ACF50_resume=.. race_142040_resume=..`.
+FIXED WHEN: no "race detached identity/flags/children"; course_archive_release released=1;
+SESSION END not exit=terminate.
+Not proven: whether another field of that gate also differs in this state. If it does, the
+gate line still names it.
+
+Files changed
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_loop50du.cpp (b)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_results_update_schedule50la.cpp (b)
+ D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_continuation50du.cpp (c)
+No header edits. No per-course or per-pod code. Two stand-ins added, both flagged: the
+replayPose camera frame under page 3, and the teardown Pause close.
+
+======================================================================
+cr25 follow-up (D:\Programming\GitHub\RacerRevengePC\evidence\cr25-03-GC-time_trial-P17\RacerRevenge.log 2678-2686)
+======================================================================
+Question (b), does the page keep updating? The loop branch did run every frame. The log has
+only one line because it is written only when the outcome changes. The outcome itself was
+wrong:
+  pause_record_page results updated=1 captured=1 pc=0 status=0 operation=Native Race update domain disabled; existing route unchanged
+That is a "skipped" result, not an update. Application::updateNativeResultsAfterRace50LA
+(D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_results_update_schedule50la.cpp)
+required the race entity to be updatable ((flags29 & 13) == 1). Under the record page the
+race is still under the Pause's 142040 (flags29 bit2 set; 1BDAB4 does not run 1BE830), so
+1C8AE0 never ran and page 3 stayed at its first frame.
+Original: the root 141ED0 traversal skips the paused race (141EFC..141F34 bit2 test) and
+still reaches its active Results104 sibling. The schedule's own comment calls Results a UI
+sibling, and the draw path (1A8698, captureNativeResultsAfterRoot50LA) already ignores bit2.
+FIX: the record-page state test (launch 11258 == 3, App11C set, Pause+200 == 0, no end
+dispatch) now comes before the race-eligibility test and bypasses it. In every other state
+that test is unchanged. Expect `pause_record_page results ... operation=` with no "Native Race
+update domain disabled" text, and page-3 draw/packet lines on later frames.
+
+Question (a), is input reaching the page? The pad is routed to 1C8C30 on the page
+(applicationPausedModal is false). But the unattended driver never pressed anything there:
+RR_TEST_RESULTS_CONFIRM taps were armed only while the Results replay runs, and the cr25 log
+has no test_results_confirm line after the QUIT. The original waits for the player's confirm
+on page 3.
+FIX (test only): terrain_interactive_loop50du.cpp, the RR_TEST_RESULTS_CONFIRM driver, also
+taps while pauseRecordPage1BDAB4 is set. The runner must set RR_TEST_RESULTS_CONFIRM for the
+Time Trial run, as it does for the Single Race runs (--results-exit main). Check that
+test_results_confirm taps appear after `pause_quit_record`.
+DIAGNOSTICS: the two Results-input log lines (`race_replay results_input modal_owner ...` and
+`race_replay results_input okay=.. pc=.. operation=..`) now also print on the record page, so
+any refusal of the confirm (1CA340 / 1CA574..1CA6F0 / Hall 1CA678) is named.
+NOT PROVEN:
+ - Whether Enter alone finishes the name page. In cr15 MA the first Enter reached the DONE
+   branch (1CA708), so DONE is the initial selection there; the GC page is expected to behave
+   the same.
+ - Whether the input path (pressResults1C8C30 -> its race 1A87A0 predecessor) accepts a race
+   under 142040. If it refuses, the new input log line names the gate.
+Files: original_results_update_schedule50la.cpp; terrain_interactive_loop50du.cpp (test
+driver and logs only). No headers.

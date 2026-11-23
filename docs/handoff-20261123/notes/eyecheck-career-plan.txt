@@ -1,0 +1,61 @@
+Eyecheck plan: DLC career art and models (Rider, Tournament, Garage, Win)
+=======================================================================
+2026-11-21. Still frames only, outside the muted logs-only tests (user rule: frame grabs allowed from live game
+windows outside tests). One game instance at a time; runs chained. Grabber (read-only PrintWindow):
+  D:\Programming\GitHub\RacerRevengePC\work\scratch\frames\fastgrab.ps1 -Match <run-name> -IntervalMs 500 -Seconds 90
+  (frames land in D:\Programming\GitHub\RacerRevengePC\work\scratch\frames\fast\<run>\; convert with ppm2png.py if PPM)
+DLC root: D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\roots\testers-cr21\DLC (RR_DLC_ROOT).
+Pods: add-on arcade-ark-roose/a2r-ark (first registry pod) and stock pod 16 (the anchor-free reference); for the
+anchor case use a profile whose last stock Confirm is rider 16, so the add-on's anchor is 16 and any anchor
+art would be visibly pod 16's.
+
+Runs (each a separate run name; the runner drives the menus; logs kept beside the frames):
+ R1 eyecheck-dlc-career-rider-addon   Tournament Rider page, carousel moved onto the add-on slot (P1).
+    Expect: add-on pod model and character, package name, career stats bars (fresh career = PHY base),
+    no stock rider 16 model, no NN_bkg of 16.  Log: dlc_rider_page key=arcade-ark-roose/a2r-ark ...
+ R2 eyecheck-dlc-career-tourn-addon   Confirm the add-on in Tournament -> Tournament screen.
+    Expect: the add-on pod model rotating where the stock pod sits (centre-left, above the stats panel),
+    the add-on portrait in the portrait frame, the add-on background tiles, the package name; money/earned/
+    kills = the side-save career; course line = next stock course (TA for a fresh career).
+    Must NOT show: pod 16's model, portrait 16_flrg, background 16_bkg.
+    Logs: dlc_career latch key=... status=latched*, dlc_model_source screen=tournament ... source=package
+    status=loaded, dlc_model_source screen=tournament stage=cold source=package status=ready,
+    dlc_tournament_model source=package packets=N status=drawn (N>0) anchor_model=never.
+ R3 eyecheck-dlc-career-tourn-stock   Same with stock pod 16 confirmed.
+    Expect: the stock Tournament screen exactly as before DLC (pod 16, 16_flrg, 16_bkg); logs show
+    dlc_model_source screen=tournament ... source=stock_archive (no role=anchor_layout_only), no
+    dlc_tournament_model line. Compare against a no-DLC run frame: identical.
+ R4 eyecheck-dlc-career-garage-stock  Stock pod 16 -> Garage.
+    Expect: Garage room, Watto, pod 16 on the stand. Log dlc_model_source screen=garage source=stock_archive.
+ R5 eyecheck-dlc-career-garage-addon  Add-on career -> Garage. Run with RR_UNATTENDED_CAPTURE=1 and
+    RR_TEST_ADDON_TOURNAMENT=1 (test-only: lets the add-on Tournament Confirm through; log
+    "dlc_rider_confirm key=... status=latching mode=tournament test_override=1"). Grab both the Garage entered
+    from the Tournament screen AND the race-return Garage after one TA race (the forced 1AB5BC route).
+    Without the switch (player builds) the Confirm stays refused.
+    Older expectation (before the round-7 Garage chain):
+    Expect: the Garage entry refused, the Tournament screen stays up (no Garage room, never pod 16 with
+    add-on stats). Log: dlc_career garage key=... status=refused ... anchor_model=never.
+    Expect now (round-7 Garage chain): the Garage room, Watto, the add-on's own pod on the stand, add-on stat
+    bars, the career's credits; logs dlc_model_source screen=garage key=... source=package member=... status=loaded
+    anchor_model=never. If the frame shows a refusal or the frontend faults on the race-return Garage, the
+    Confirm hold stays and the log names the refusing step.
+ R6 eyecheck-dlc-career-win-addon     Add-on career wins a circuit (test route: career at progress 3, win TA..
+    the 4th course with --hold-throttle --steer-invert --camera-cycle, or a prepared side save at progress 3).
+    Expect: Win page with the add-on's own background, place text from the add-on's medal, package colours.
+    Log: (none on success); dlc_career win_background ... status=none only for a pod without a background.
+ R7 eyecheck-dlc-career-win-stock     Stock pod 16 circuit win: the stock Win page, 16_bkg, unchanged.
+Free-play sanity: one Single Race with the add-on pod (Rider -> Course -> race -> Results) must look as in cr-23.
+
+Check list per frame: no stock pod model/portrait/background visible under an add-on name; stock frames
+identical to the no-DLC reference; text not clipped. Report one frame per screen per pod.
+
+Runner command lines (round cr-29 test hooks; logs-only runs, frames from fastgrab.ps1 -Match <run name>)
+Common prefix (one line):
+  python D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tools\capture\run_windows_takeover.py --build <build> --assets <assets> --sdl D:\Programming\GitHub\RacerRevengePC\toolchains\sdl2-msvc\extracted\SDL2-2.32.10\lib\x64\SDL2.dll --env RR_DLC_ROOT=D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\roots\testers-cr21\DLC --route main-tournament-course-ta
+ R2  <prefix> --output evidence\eyecheck-dlc-career-tourn-addon --addon-rider arcade-ark-roose/a2r-ark --hold-tournament 60 --seconds 120
+ R3  <prefix> --output evidence\eyecheck-dlc-career-tourn-stock --hold-tournament 60 --seconds 120
+ R4  <prefix> --output evidence\eyecheck-dlc-career-garage-stock --hold-garage 60 --seconds 150
+ R5a <prefix> --output evidence\eyecheck-dlc-career-garage-addon --addon-rider arcade-ark-roose/a2r-ark --hold-garage 60 --garage-from tournament --seconds 150
+ R5b <prefix> --output evidence\eyecheck-dlc-career-garage-addon-race --addon-rider arcade-ark-roose/a2r-ark --hold-garage 60 --garage-from race --hold-throttle --steer-invert --camera-cycle --seconds 600
+Note: a fresh profile's tournament Rider opens on Rider19, so the add-on's anchor in these runs is 19 (not 16);
+any anchor art would be Sebulba's pod 19.

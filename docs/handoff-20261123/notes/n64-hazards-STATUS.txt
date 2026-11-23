@@ -1,0 +1,158 @@
+N64 hazards on converted courses: status, this round, converter keys
+=====================================================================
+2026-11-21. Tree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main (main 8e1e440).
+Not built, not run, nothing committed or stashed. Rule: N64 tracks are guests - N64-true
+through data the converter writes, inert on stock (no stock TOB has an N64Volume row, an
+.acb/.nft member or StartHidden).
+
+1. LANDING ORDER (NOTES.md section 8) - WHAT IS ALREADY IN THE CODE
+--------------------------------------------------------------------
+ 1 hazard header .................. IN: src\game\n64_track_hazards50nh.h (reader, volumes, door machine)
+ 2 trigger reader N64 rows ........ IN: common reader course_trigger_sources50ct.h hands N64Volume rows to it
+ 3 animation runtime + N64 (a)-(d)  IN: tests\native\track_animation_runtime50an.h (rate/set-time,
+                                    hide with collision, StartHidden, transform override, alpha state)
+ 4 zero-g line table .............. IN: src\game\native_zero_gravity50zg.h
+ 5 hazard wiring .................. IN: world load, after-step (frame_physics), ExplodePod / break
+                                    damage hand-offs (frame_children), race loop (loop)
+ 6 ExplodePod respawn ............. IN (port extension, flagged)
+ 7 N64 floor table ................ IN: src\game\n64_floor_table50nh.h reads tracks\<code>.nft
+ MISSING before this round: the hazard runtime's animation port was never bound, so every
+ BreakObject / AnimationToggle only logged "n64_trigger target_unbound reason=animation_runtime"
+ (asteroids never broke visibly, the door never froze or toggled, no debris). Race restart did
+ not restore hazard-changed rows. Falling pillar (312) and methane (314) not started.
+
+2. DONE THIS ROUND (.cpp + one new 2-TU header)
+-----------------------------------------------
+- NEW tests\native\n64_track_animation_port50nh.h: the N64 animation port implemented on the ONE
+  common track-animation runtime's Control (fire/hide/show/setRate/setTime/transform+scale/alpha,
+  referenceName from the row's ReferenceName, time from the row's motion time). Raw pointer, never
+  a share (the Track's release counts holders). Remembers rows it hid with collision or
+  rate-overrode and restores them on race reset (N64 'Load'/'RSet' reload the track fresh).
+- terrain_interactive_world50du.cpp: bind after the hazard rows load (unbound when the course has
+  no [Animations]).
+- terrain_interactive_continuation50du.cpp: port race reset beside the hazard race reset at race
+  activation; unbind before the session drops its runtime reference at teardown.
+- terrain_interactive_publication50du.cpp: in-place restart (restartWorld, 1AC8E0) now also resets
+  the hazard rows and restores the port's rows, before 2702E0 re-poses every row (the hazard
+  runtime was only reset at cold activation before).
+Stock: no N64 rows -> the port is never called; bind/reset touch nothing. Bit-identical by data.
+
+3. ROUND 2 (approved; not built, not run) - AnimationPlay, debris fade, CameraShake
+-------------------------------------------------------------------------------------
+Headers edited (transitive TU includers), all under D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main:
+  platform\linux\native\vehicle_window_gl50ds.h ....... 161 (renderer; the big rebuild)
+  src\game\n64_track_hazards50nh.h .................... 39
+  tests\native\track_animation_runtime50an.h .......... 39
+  tests\native\course_trigger_sources50ct.h ........... 37
+  tests\native\course_trigger_actions50ct.h ........... 34
+  src\game\camera_shake_relay50cs.h (NEW) ............. 7
+  src\game\n64_track_hazards_runtime50nh.h ............ 6
+  tests\native\track_animation_window50an.h ........... 4
+  tests\native\n64_track_animation_port50nh.h ......... 2
+  plus .cpp edits: renderer draw, cold contacts, continuation, publication, world.
+- AnimationPlay (N64 312 falling pillar, 314 methane): reader + runtime handler. Show a
+  StartHidden row (methane FX), fire the row, signed Rate (stops at the end), once through the
+  row's OneTimeOnly, local-only through LocalOnly; optional Revenge CameraShake. Race reset
+  hides the shown FX again and clears the rate (port adapter). Test switch: play@N/anim.
+- Debris fade drawn: VehicleWindowDynamicWorldFrame50DS gains spanAlphas/spanAlphaCount (one
+  per dynamic-world span, validated before GL). A span below 1 draws in the transparent pass,
+  source-alpha blended, no depth write; 0 skips it. The animation window hands the row alphas
+  only when some row is faded (stock frames unchanged); the runtime keeps faded rows projected.
+- CameraShake: the original Revenge HAS it (CameraShakeTriggerAction, 1B5990 fields, enter
+  1B2780 -> 1ACEA0 -> 177720 broadcast to every race camera; the camera session already
+  consumed the shake timer). Ported on the common trigger path: ActionKind::CameraShake
+  (Magnitude, ShakeTime, Decaying, Delay with the original defaults 0/0/1/0) and a
+  cameraShake destination. PORT STAND-IN (flagged): the enter is recorded in
+  camera_shake_relay50cs.h and applied by the same frame's world step through the camera
+  session's applyAuthoredShakeEnter (the trigger query cannot reach the camera session).
+  Stock: no stock TOB authors CameraShake (it was a refused port gap), so stock is unchanged.
+
+4. WHAT THE CONVERTER MUST PROVIDE (exact keys, as the port reads them)
+-----------------------------------------------------------------------
+Common to every N64 row - TOB [Triggers] NumberOfTriggers counts them; one TriggerN block each:
+  N64Volume        Plane | Capsule                        (required; marks the row as N64)
+  Position         x,y,z centre, Revenge space            (required)
+  N64Direction     dx,0,dz horizontal, length 0.5..2      (required; normalised by the port)
+  N64HalfWidth     size_xy/2 ft, 0 < v <= 5000            (required)
+  N64HalfHeight    size_z/2 ft, 0 < v <= 5000             (required)
+  OneTimeOnly      T | F                                  (required)
+  NumberOfActions  1                                      (required; exactly one N64 action)
+  SurfaceObject    comma list of carrier static instance names (27A524 rule: to the first dot,
+                   <= 50 chars), max 16; absent = any surface
+  MinSpeed 150 / LocalOnly T / Laps 1,2,3   only when the N64 flags are set
+  Zone            1-based SCB zone holding the centre (required, 1..zone count; checked by the
+                   common reader). StartEnabled T (default T), Name (log only).
+  Max 32 N64 rows per track. A Revenge ActionType on an N64 row is refused.
+Floor under the line in flight: tracks\<code>.nft (already written by tools\n2r\n2r_floor.py for
+  ZeroGravity tracks; no change).
+
+Energy column (104) - TriggerNAction1:
+  ActionType ExplodePod; Side Random|Left|Right (default Random); Gate LocalOrNearCamera|Local|All
+  (default LocalOrNearCamera); NearCameraDistance (default 1000, 0..100000); AfterDestroy
+  Respawn|Retire (default Respawn); RespawnDelay s (default 3, 0..30; N64 value still open).
+  Row: Plane, OneTimeOnly F, SurfaceObject = the column instance.
+
+Breakable asteroids (102) - TriggerNAction1:
+  ActionType BreakObject; AnimationNumber N (1-based [Animations] row) or AnimationNameRef
+  (<= 39 chars, ReferenceName, last match wins); ThrustDeceleration 2.5; DamageTotal 0.15 (0..1);
+  DamageBoostScale 4 (0..16); DamageHits 3 (1..8); EffectAnimationNumber or EffectNameRef = the
+  debris row; EffectAhead 12; EffectAiScale 8 (0..64); EffectFade 2 (0..30); FileName (sound,
+  <= 259 chars), Pitch 0.25, PitchRandom 0.15, MinDistance 10, MaxDistance 500. Defaults are these
+  N64 values. Row: Plane, OneTimeOnly T, SurfaceObject = that trigger's carrier meshes.
+  Each asteroid: its own [Animations] row (KeyFramed, one-frame pose, SequenceActive1 F,
+  LoopSequence1 F, UseCollision T) and NOT in the static world. Debris row: SequenceActive1 F, LoopSequence1 F,
+  UseCollision F, StartHidden T.
+
+Door (101) - TriggerNAction1:
+  ActionType AnimationToggle; AnimationNumber or AnimationNameRef = the door row; ToggleGuard 3.0
+  (0..600); ToggleRate 20 (0..1000); FirstTrigger Freeze (only value). Row: Capsule, OneTimeOnly F.
+  Door row: 13.33-s closed->open motion, SequenceActive1 T, LoopSequence1 T, UseCollision T.
+
+Fan - no trigger: [Animations] row, 24-s motion keyed densely enough to match the N64 slerp,
+  SequenceActive1 T, LoopSequence1 T, UseCollision T; not in the static world.
+
+Falling pillar (312) - TriggerNAction1:
+  ActionType AnimationPlay; AnimationNumber or AnimationNameRef = the pillar row; Rate 0.6 (signed,
+  -1000..1000, not 0; default 1); Show F (default); camera shake through Revenge's own fields:
+  ShakeMagnitude (0..1000), ShakeTime s (0..60), ShakeDecaying 0|1 (default 1), ShakeDelay s
+  (0..60) - any of them present = shake issued. N64 'Shak' 4.0 is not decoded into these
+  fields: the converter chooses (suggest ShakeTime from the N64 value only once decoded).
+  Row: Capsule (the N64 record), OneTimeOnly T, LocalOnly T, SurfaceObject = carrier.
+  Pillar [Animations] row: its N64 fall motion keyed at N64 animation time (speed 1; Rate 0.6
+  makes the 2.6-s fall), SequenceActive1 F,
+  LoopSequence1 F, UseCollision T; not in the static world.
+
+Methane bursts (314) - TriggerNAction1:
+  ActionType AnimationPlay; AnimationNumber or AnimationNameRef = the FX row; Show T; Rate 1
+  (default). Row: Capsule, OneTimeOnly T, LocalOnly T, SurfaceObject = carrier.
+  FX [Animations] row: model 293 and its animation, placed at the marker node (Offset),
+  StartHidden T, SequenceActive1 F, LoopSequence1 F, UseCollision F.
+
+Revenge CameraShake (any course, original action) - TriggerNActionM:
+  ActionType CameraShake; Magnitude, ShakeTime, Decaying, Delay (all optional; 0, 0, 1, 0).
+  Usable on ordinary Revenge trigger rows (Radius/Box), not on N64Volume rows.
+
+Every animated object: report total vertices / indices / spans against the window budget
+(8192 / 32768 / 64) per track.
+
+5. OPEN / NOT BUILT
+-------------------
+- N64 'Shak' 4.0 (pillar) and the N64 shake units: not mapped onto Revenge's CameraShake fields.
+- Debris alpha: opaque materials fade from GS alpha 0x80 = opaque; textures with their own alpha
+  multiply in (not checked against the N64 frame).
+- CameraShake applied by the world step, not inside the trigger query (flagged stand-in).
+- RespawnDelay (N64 death camera), fan phase at race start (N64 plays from load), FORCE_GROUND
+  near-camera distance inference: not settled by the spec; unchanged from NOTES.md section 9.
+
+6. cr-29 LOAD FAILURE (05.14 "not a rigid node-palette model") - fixed in the port
+-------------------------------------------------------------------------------
+Every converted N64 animation PSG (door, fan, asteroids, pillar, methane) is a one-node PSG3
+that ends after its surfaces (no matrix-palette trailer); every stock animation PSG (TA TB TC SA
+MC GA GB GC) is multi-node with the identity palette. The port's animation source admitted only
+the palette form; the original model resource (240258) takes both forms. Fixed in
+tests\native\track_animation_source50an.h (39 TUs): a one-node model is admitted (all vertices
+on node 0). Converter: no change. [I: the original character draw of a one-node animation model
+was not traced separately.]
+course_triggers count=0: correct. "count" is the Revenge trigger rows only; the N64 rows are
+counted by the next line (course_triggers_n64 site=ND rows=7, NM rows=6, NV rows=25 in cr-29:
+admitted). The kinds list names both.

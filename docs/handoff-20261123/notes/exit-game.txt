@@ -1,0 +1,269 @@
+EXIT GAME on the Main menu  (PC-NATIVE ADDITION, not a port stand-in)
+=====================================================================
+Worktree: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main (branch common-rewrite)
+State: code written, NOT built, NOT run, NOT committed.
+
+What the player gets
+--------------------
+Main shows a sixth line "EXIT GAME" under the five original rows, in the same font, colour,
+fade and selection arrows as those rows. Up/Down move into and out of it (it sits in the wrap
+ring after the last row: ... OPTIONS -> GALLERY -> EXIT GAME -> TOURNAMENT ...), with the
+original move sounds. Enter/Space/pad A on it opens a yes/no dialog that looks and animates
+exactly like the game's own shared popup (dim, three orange strips, cross = Confirm, triangle =
+Cancel); Enter/Space/A confirms, Escape/pad Y cancels (original sounds 1 / 5). After Confirm
+the dialog closes with its normal animation and the game shuts down through the same path as
+the window Close button.
+
+Why it is not a real ui.dat row
+-------------------------------
+The original Main page (UIMAIN ui.dat page 1, Group 1) has exactly five controls; the port's
+widget manager rejects any other count (applyMainWidgetPhase: groups[1].controls.size()!=5),
+the 49-slot widget bank and navigation arrays are the original's own data, and Main's
+destinations are hard-wired by slot (1E5E00 dispatch, slots 1..5). Adding a sixth control would
+mean writing past proven bounds of original structures. So the row is a host-side addition
+that is drawn by Main's own collector with Main's own materials and text code:
+  - nothing is added to ui.dat, the widget bank, the navigation arrays, APP UI+47C or the
+    shared 470/47C dialog owners;
+  - the only touch on original state is the manager's own deselect/select command on an
+    existing Group 1 control (the same command the original movement issues), so the
+    original row stops looking selected while EXIT GAME is selected, and is reselected (or
+    the original move runs) when the player leaves EXIT GAME.
+
+The shared 47C dialog itself cannot be reused without header edits: its message text is
+chosen from four cold-prepared variants (original_ui_controller_popup_geometry50kg.h,
+textVariants_[4]) keyed by flags in original_ui_controller_popup50kg.h, and both headers sit
+under ~30+ includers (original_ui_main_session50kg.h has 31 direct includers). Closest faithful
+approach used instead: a HOST copy of the 47C state machine (the original
+OriginalUiControllerPopup50KG start/input/update/render functions, run on a private state,
+never on APP UI+47C), drawn with the 47C's own materials (dimpopup, overlay1popup,
+venus14popup, icon_x_popup, icon_tri_popup) at the 47C's own layout constants (2055B0/2064C0:
+message centred at 320,204; Confirm label 412,257 with cross at 380,247; Cancel label
+232,257 with triangle at 200,247; strip UVs and colours), packet depth 16777214, same packet
+order. The Confirm/Cancel labels are the original LOC 9 / LOC 10 strings (read from the 47C
+popup's prepared texts); only the message "EXIT GAME?" and the row text "EXIT GAME" are
+PC-native strings.
+
+Files changed
+-------------
+NEW  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_main_exit_game50xg.h
+     Small declarations-only header (3 includers, listed in it): arrow-owner functions,
+     status struct, one-shot exit request.
+     D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_main_session50kg.cpp
+     - Storage::ExitGame: all row/dialog state (host memory, part of the session's Storage).
+     - prepareExitGame() at bind: copies the slot-5 row descriptor (widget 9), lines =
+       "EXIT GAME", y = widget9.y + (widget9.y - widget8.y); prepares it with Main's own
+       OriginalUiTextGeometry50KG, row font/material/atlas. Refuses (row simply absent,
+       logged) if: rows not stacked downward, pitch > 64, glyph missing, the row would reach
+       the base prompt icons at y 378, any material/image missing.
+     - exitInput(): runs in input() after the original container/aperture gates, before
+       dispatchMain. Dialog open = modal (only Confirm4/Back6 on controller 0). Entering:
+       Next on the last enabled row or Previous on the first enabled row. Leaving: Next ->
+       first enabled row, Previous -> last enabled row (moveControl or reselect). Confirm
+       on the row opens the dialog (startController2 + hasCancel, sound 1). Not entered
+       while the real 47C popup is active or input is blocked. Sound refusal returns
+       unavailableDestination before any effect (no fault).
+     - update(): host dialog saves its delta (206420 equivalent).
+     - render(): row glyphs + (when selected) the slot-5 arrow rule around the row, right
+       after projectMainPage; dialog packets after the Main particles, before drain. Host
+       dialog state is published only after the frame drained. When a confirmed dialog has
+       finished closing: requested=1, one-shot request set.
+     - Page entry / previous page / opening / closing callbacks let go of the row (the
+       original openingAC reselects savedSlot6E0 itself).
+     D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_main_draw50kg.cpp
+     - projectMainPage skips the ORIGINAL selection arrows only while this collector is the
+       registered EXIT GAME owner (one host pointer, compared only).
+     D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_frontend_session50la.h  (1 includer)
+     - Top of the frontend loop: takeOriginalUiMainExitGameRequest50XG() -> requestQuit(),
+       reportUiState("exit_game"), break -> the same closeWindow() as window Close
+       (Garage retirement if owned, collector retirement, closeUi, closeAudio, renderer close,
+       display close) -> SessionExit50DU::Quit -> native_exit_code=0 -> SESSION END.
+     - Test hook RR_TEST_MAIN_EXIT=fresh|return (unattended only).
+     D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tools\capture\run_windows_takeover.py
+     - --main-exit fresh|return (sets RR_TEST_MAIN_EXIT, RR_TEST_IGNORE_FOCUS); "return"
+       requires --results-exit main. Pass/fail ("routeCompleted") comes from the log.
+
+Header edits: only the new header. No existing header changed. Rebuild cost: the two .cpp
+files plus terrain_interactive_drive50du.cpp (the one includer of
+original_frontend_session50la.h).
+
+After a race (race-return frontend)
+-----------------------------------
+A race-return frontend builds a fresh Main session when the player backs out to Main; the row
+is prepared again at that bind and the exit uses the same closeWindow(). The race-return close
+itself was fixed in 47fd2d7 (shared dialogs 470/47C retire from the never-attached state); the
+exit request is taken at the top of the loop, i.e. after a fully completed frame, the same point
+a window Close is honoured. The race-return Garage first-frame rule is unaffected (exit only
+comes from Main).
+
+Log lines that prove a clean exit
+---------------------------------
+  pc_native_exit_game row=ready x=<n> y=<n>          (or row=unavailable reason=<why>)
+  pc_native_exit_game select=row from_slot=<n>
+  pc_native_exit_game dialog=open
+  pc_native_exit_game dialog=confirm                  (dialog=cancel on Back)
+  pc_native_exit_game exit_requested=1
+  pc_native_exit_game frontend_close route_screen=4 session=<n> race_return=<0|1>
+  original_main_closed {... "cleanup_complete":true ...}   (stdout)
+  native_exit_code=0
+  ========== RacerRevenge SESSION END UTC ... ==========   (plain; no exit=terminate)
+and none of: frontend_close_refused, native_terminate, SESSION END exit=terminate.
+Unattended driver lines: test_main_exit mode=... armed=1, test_main_exit step=previous|back|
+row_confirm|dialog_confirm event=... status=...
+
+Runs to do (muted, logs-only; not done here)
+--------------------------------------------
+  run_windows_takeover.py ... --main-exit fresh
+  run_windows_takeover.py ... --results-exit main --main-exit return   (repeat with rotated
+      courses/pods per the common-path rule; the exit code itself is course/pod independent)
+execution.json "mainExit" lists the evidence; routeCompleted needs exit code 0, all lines above,
+the frontend close on screen 4 (session 0 for fresh, >0 for return), native_exit_code=0 exactly
+once, the last marker exactly "SESSION END", no refusal, no terminate.
+
+Not verified / open points
+--------------------------
+- Not compiled. Watch for: Session::Storage (nested class) calling the private
+  OriginalUiMainDraw50KG::appendOverlay through Session's friendship (standard C++ allows a
+  befriended class's nested class this access; MSVC does).
+- The row position is derived from the rows' own pitch; whether it overlaps the description
+  text (widgets 29..33) or looks right can only be judged on screen: needs one still frame
+  from a live window (frame grabber) or the user's eye. Logs alone cannot prove the look.
+- Row colour mirrors the Options row (widget 8): highlight colour when selected, its normal
+  colour otherwise, its live alpha (so it fades in/out with the page).
+- Glyph packets are one packet per glyph (appendOverlay) instead of one per line; drain
+  orders by material then submission, so the result is identical but uses ~35 more spans
+  (limit 2048).
+- --main-exit return backs out only from Rider/Course/Hall/Options; a race-return that lands
+  on Garage/Win/Unlock/Tournament would stall until the wall budget (fails visibly).
+
+=====================================================================
+cr-23 follow-up: Back from a race-return Course screen ended the game
+=====================================================================
+Evidence: D:\Programming\GitHub\RacerRevengePC\evidence\cr23-exit-return-TA\RacerRevenge.log
+  frontend_race_return first_screen=6, test_main_exit step=back event=6 screen=6, then
+  "original UI deferred activation rejected: status=13 source=2767940 (0x2A3C44) ...
+   rider=8 rider_pc=1803984 (0x1B86D0)" -> native_exit_code=1.
+
+Cause: the incoming Rider screen's requestedPage90 runs its constructor's 1B86D0 reorder of
+the shared dialogs 470/47C (reappendRiderEntry1E809C -> reappendNativeMenu1B86D0). That
+function required initialMainAttached_, i.e. that some earlier manager had already put
+470/47C under the dispatcher. On a race-return frontend only Main (1D7CF4, fresh boot) or the
+Garage (1FB648, reappend1B86D0) ever did that. A frontend that starts on Course6, Hall11,
+Win7 or Unlock10 boots 470/47C per frontend (port stand-in) and leaves them unattached, so
+the first later 1B86D0 (Rider from Course, Options from Hall, Main re-entry) was refused and
+the deferred activation of the previous screen failed. The original keeps 470/47C attached
+across the race, so its 1B86D0 just detaches and re-appends them.
+
+Fix (one rule, keyed on the actual topology, no screen/course/pod check):
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_shared_dialogs50kg.cpp
+  reappendNativeMenu1B86D0 now also admits the never-attached topology (not attached, no
+  reorder in progress, no completed reorder, no pending Main initial reset, neither entity
+  under the dispatcher). It performs the same two scope reappends (the scope's own 1B86D0
+  already handles a never-attached entity; the Garage first-attach path uses it today) and
+  sets initialMainAttached_, exactly as reappend1B86D0 does for a Garage-first frontend.
+  Every other gate is unchanged. Flagged PORT STAND-IN in the code (consequence of the
+  per-frontend 470/47C boot). No header change; rebuild is that one .cpp.
+  Covered by the same rule: Course6 -> Rider (1E809C) -> Main (1D7CF4 re-entry), Hall11 ->
+  Options (1B86D0) -> Main, and Win7/Unlock10 when their next screen is a menu manager
+  (Garage keeps its existing first-attach path).
+
+Not verified (no build/run). Re-run:
+  run_windows_takeover.py ... --results-exit main --main-exit return
+Expect after frontend_race_return first_screen=6: test_main_exit step=back (Course), a
+windows_menu_selection screen=5, step=back (Rider), screen=4, then the EXIT GAME lines,
+pc_native_exit_game frontend_close route_screen=4 session=2 race_return=1,
+native_exit_code=0 and a plain SESSION END. Also worth a Hall-first return (record run,
+--seed-slow-hall) to exercise Hall -> Options -> Main.
+
+=====================================================================
+cr-24 follow-up: race-return Hall (record) refused Back
+=====================================================================
+Evidence: D:\Programming\GitHub\RacerRevengePC\evidence\cr24-exit-hall-TA\RacerRevenge.log
+  race_ack route=hall ... pc=1ab884 mode34=0 record7E4=1, frontend_race_return first_screen=11,
+  then every "test_main_exit step=back event=6 screen=11 status=1" (noChange) until the wall budget.
+
+Finding: NOT a port fault; the test driver pressed the wrong key. The original Hall page
+callback 1E3F70 (src\game\original_ui_hall_controller50kg.cpp, OriginalUiHallOfFameController50KG::input):
+  - Back (6) acts only with prompt bit1 AND P+34 == 5 (the Options Hall): -> Options12 (1E4260).
+  - A race-return Hall (P+34 0 Free Play / 2 tournament) gets prompt bit0 at openedB0 (1E48E0,
+    the Cross icon) and takes Cross (4) through the 1E3FC0 table: Free Play -> Course6 (1E41C4);
+    tournament -> Win7 (1E4048/1E40EC), Unlock10 (1E418C), Garage13 (1E41AC), or the ending.
+  The coordinator already admits all of these (original_ui_frontend50kg.cpp, HallStatus::confirmProposed,
+  including the 6/1 Free Play case). A player is not stuck: Cross leaves the Hall, as on PS2.
+  Win7 (2089D0) and Unlock10 (20B48C) likewise act only on Cross (4).
+  (Stale comment noted, not changed: original_ui_hall_session50kg.h says the mode0 Hall
+  "is not represented"; the bind and coordinator do represent it now.)
+
+Driver change (tests\native\original_frontend_session50la.h, --main-exit return):
+  - Rider5 / Course6 / Options12: Back (6), unchanged.
+  - Hall11: reads the Hall's own prompt mask: bit0 -> Cross (4) "hall_confirm"; bit1 -> Back (6).
+  - Win7 / Unlock10: Cross (4) "confirm"; settled = idle transition + page shown + input
+    container shown + frame published + aperture open (snapshot winBound/unlockBound fields).
+  - Garage13 / Tournament9: no step; logs "test_main_exit no_step screen=N" once (tournament
+    returns are outside this test).
+  - The 16-press limit now counts only the Main "previous" presses.
+  Expected Free Play record walk: Hall11 Cross -> Course6 Back -> Rider5 Back -> Main4 ->
+  EXIT GAME -> native_exit_code=0, plain SESSION END.
+Not built or run. Only the test header changed (1 includer: terrain_interactive_drive50du.cpp).
+
+=====================================================================
+cr-25 follow-up: Hall Cross -> Course after a record killed the game
+=====================================================================
+Evidence: D:\Programming\GitHub\RacerRevengePC\evidence\cr25-exit-hall-TA\RacerRevenge.log
+  test_main_exit step=hall_confirm event=4 screen=11 status=4, then deferred activation
+  rejected status=13 source=2767960 (0x2A3C58, pageEntry74) course=8 course_pc=1942688
+  (0x1DA4A0) -> native_exit_code=1.
+
+Cause (not the shared dialogs this time): Course6's pageEntry74 origin check for a Hall
+predecessor (original_ui_course_session50kg.cpp, previousScreen==11) requires the rider
+profile stamp to equal the one taken when Course was cold-prepared at the Hall Cross. The
+Hall page render (1E3F40..4C, commitHallRender) clears profile 7E4 bit0 and the port bumped the
+profile generation on EVERY Hall frame, even when bit0 was already clear. The Hall keeps
+rendering through its closing doors after the Cross, so the generation moved and Course
+refused its own entry. Every race-return Hall -> next screen transition is exposed to this
+(Free Play Hall -> Course 1E41C4; tournament Hall -> Win/Unlock/Garage).
+
+Fix: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_rider_profile50kg.cpp
+  commitHallRender bumps the generation only when bit0 actually changes (the same
+  "changed-only" rule this owner already uses for 7E4 at 1AB578 and 1ACC4C). The store itself
+  is unchanged; it is a no-op once bit0 is clear. No course/pod/screen key. The first Hall
+  render (which clears a record's bit0) happens before the Cross can be pressed, so the
+  destination's cold stamp now stays current through the closing frames.
+  Unlock10 -> Course6 already tolerates its own +1 grant (previousScreen==10); Win7 has no
+  per-frame profile write. No header change; rebuild is that one .cpp.
+Not built or run. Expect: hall_confirm -> Course6 entry -> back -> Rider5 -> back -> Main4 ->
+EXIT GAME -> native_exit_code=0, plain SESSION END.
+
+=====================================================================
+cr-26 follow-up: Time Trial Pause QUIT -> records page -> Hall failed at frontend start
+=====================================================================
+Evidence: D:\Programming\GitHub\RacerRevengePC\evidence\cr26-03-GC-time_trial-P17\RacerRevenge.log
+  frontend_race_return first_screen=11, loading steps 1B73A0/1B7450/1B7CE8 only filled in
+  "late=1" (the shared-UI boot 1B7BD0 never ran), then
+  aural_dispatcher_rejected prerequisite=!scope->live().okay()
+  frontend_root_audio_rejected prerequisite=!nativeSourceAudioDispatcherCurrent(*aural)
+  -> "Native frontend audio prefix lost its actual Root, display, output or dispatcher owner".
+
+Cause: two receivers existed for the SAME original request 17DE10(App,6,11,1):
+  - 1AB5BC acknowledgement rows (Results confirm; acknowledgement1AB5BC=true) -> the
+    race-return first-screen receiver (prepareNativeRaceReturn: Hall11 with P+34 kept, Main
+    boot bank, shared dialogs/dispatcher booted 1B7BD0 before activation). Works (cr24..26).
+  - 1CA6F0 Results Hall (Time Trial record; reached now via Pause QUIT -> 1ABFC0 page,
+    cr-21) -> an older separate receiver (prepareNativeResultsHall: Hall entered in Options
+    mode5 and Frontend::activate explicitly skipped prepareSharedDialogsInitial). Its frontend
+    therefore never built a dispatcher; the Root's sharedUiScopeOwner_ was still the previous
+    lifetime's closed scope, and the first Root audio prefix (140CE0) refused it.
+  Not an ordering difference in the race's teardown: the race retired the same way; the
+  receiver chosen afterwards was different.
+
+Fix (one receiver for every race departure, keyed on the request, not on the route taken):
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\original_results_hall_transfer50la.inl
+  nativeRaceReturnRoute50PD / acceptNativeRaceReturnReceiver50PD no longer require
+  acknowledgement1AB5BC: a 1CA6F0 transfer reports its own route (11,1). Frontend::prepare then
+  selects prepareNativeRaceReturn for it (nativeResultsHallEntry_ stays false), so it gets the
+  same Hall11 mode0 entry (17DB80/ld_ui writes no mode), the same 1B7BD0 boot, the same Cross ->
+  Course6 exit and the cr-23/25 fixes. The old 1CA6F0 receiver (prepareNativeResultsHall /
+  acceptNativeResultsHallReceiver50LA, mode5) is now unreachable; left in place, flagged here
+  as a retired stand-in to delete in a cleanup round.
+  The .inl has one includer (original_results104_input50la.cpp); no header changed.
+Not built or run. Expect on the TT Pause QUIT record run: frontend_race_return first_screen=11
+with the 1B73A0/1B7450/1B7CE8 steps in order (no late=1), Hall opens, Cross -> Course6.

@@ -1,0 +1,781 @@
+STAND-INS kept or added by the common rewrite (one file per writer/fixer, concatenated)
+
+=================== stand-ins/fix-A.txt
+fix-A stand-ins (area A, race structure + race flow). Each is flagged "PORT STAND-IN" in the code.
+
+NEW
+1. tests\native\common_race_start50cr.cpp (restart, Step::cameraReset): the camera session owns the start
+   countdown and the 1A9750 camera leaves, so the one resetCamera(a1) hook performs both a1 branches of
+   1ACD44: a1 != 0 = 175430(race48) + 1A9750(race,1); a1 == 0 = 1ACD68 1AFD80(B4) countdown re-arm
+   (B4+34 seed, B4+58 bit2, 1AD330, 1A9750(race,0), 1AD3C0 for 11258 2/3). The race-internal VCR tail
+   (287B60 + 287C80(1.0) / race78+B0 bit1) follows it as in the original. See w0-requests\round3-A.txt.
+
+KEPT (existing, reworded or re-pointed)
+2. common_race_start50cr.cpp: 2DCC70 / 161F60 / 2702E0 run together through restartWorld at the 2DCC70
+   position (R9 #1).
+3. common_race_start50cr.cpp: no 10C music manager -> 1AC960 skipped, logged stand_in=1 (R9 #2).
+4. common_race_start50cr.cpp: the 2AED60(raceFC,500) fade is the race's 1A7BD0 fade after bit3 (R9 #3).
+5. common_race_start50cr.cpp: 1ACB74 267BE0 not called on a restart (Aural transport flush admitted only
+   after a Results 26D070 stop) (R9 #3).
+6. RESOLVED (cr-28 round, flow audit F15/F16): the Results Restart rows run on the common path.
+   src\game\original_results104_input50la.cpp: 1C8D94 (Profile34 == 2 falls to 1C98DC; else race1B0
+   bit4 cleared, caller 1C8DF0) and 1C972C (bit4 cleared, caller 1C9774) hand their 1AC8E0(race,0)
+   to the race loop (tests\native\terrain_interactive_loop50du.cpp), which runs the one in-place
+   restart (common_race_start reason=restart caller=1C8DF0|1C9774, same as Pause RESTART 1BD934),
+   then the row tail: 1A4AB0(race10C,0.5) on the tournament row, 1A4B90(race10C,2).
+   Remaining PORT STAND-INs (flagged in code): the 1C98DC tail of that event and later events of the
+   same poll are not run after the handover; a refused in-place restart (the original cannot refuse)
+   re-marks race1B0 bit4 so the Results replay keeps running.
+   F16: an uncommitted tournament result arming is dropped at the restart's 1AEA70
+   (tests\native\terrain_interactive_continuation50du.cpp, restartGridPlacement1AEA70) and re-arms at
+   the restarted race's own GO; a committed result stays committed.
+6b. DELETED (cr-28 round): the separate 1CA6F0 Results Hall entrance (Hall entered as Options mode5,
+   no shared-dialog boot), unused since cr-27 when the records-page Hall moved to the common
+   race-return entrance. Removed: OriginalUiFrontend50KG::prepareNativeResultsHall and its
+   nativeHallRoot/Preimage/Stamp storage and branches (platform\linux\native\original_ui_frontend50kg.cpp),
+   the frontend's nativeResultsHallEntry_ branches (tests\native\original_ui_main_entry50kg.cpp,
+   original_pause_main_transfer50la.inl) and Application::acceptNativeResultsHallReceiver50LA
+   (original_results_hall_transfer50la.inl). A retained Results transfer without a race-return route is
+   now refused at frontend preparation. Header remnants left for the next header round (declarations
+   only, nothing calls them): original_ui_frontend50kg.h:312 prepareNativeResultsHall,
+   original_ui_main_entry50kg.h:332 acceptNativeResultsHallReceiver50LA, :1656 nativeResultsHallEntry_.
+7. src\game\original_race_end_dispatch50la.cpp: Results-waiting replay 1ABAD8 keeps the native replay
+   owner's race78 posing (R9 #7); it now logs one common_race_start line with caller=1ABAD8.
+
+Not stand-ins but recorded gaps of 1AC8E0 (unchanged by this round, outside the ruled steps):
+ * bit4 set (replay restart): 1ACAC8 17BCE0 per human is not performed.
+ * 1ACBE8 race34 slots>0 vtable+18, 1ACC4C..1ACCD4 Profile 7E4/7E8 and 11258 +1260/+126C clears,
+   1AFC70(B4), race104 vtable+18, 2D30B0(race48+78), 17BCE0/178700 per human, 1ACE44.. race98=10.0,
+   1A6590(race10C), 2C4EF0, race1B1 bit1: not performed (no owner/hook in the frozen W0 interface).
+   The race's own fields in that range (race1B0 bit5 = 0, race1A8 = 0) ARE set.
+ * 1ACE04 194CC0(raceD0): the port's race has no D0 time-stats object (original beqz skip).
+
+NEW (2)
+8. src\game\original_race_end_entry50la.cpp OriginalRaceConstructor50LA::borrowEndRuntimeNative returns null on
+   every course until area C publishes the race's one OwnershipBridge on the common path (the RA aggregate that held
+   it is retired). Effect: the 1A7E40 per-racer cuts stop "owner unavailable", as on every non-RA course before.
+
+=================== stand-ins/fix-B.txt
+fix-B stand-ins (area B, camera). Flagged "PORT STAND-IN:" in code.
+
+1. tests\native\original_camera_session50kx.h Session::rebindRacerCameras1ACBA0(a1): the restart camera reset 1ACBA0
+   (per human 1750A0 grid re-placement 2A2880/179580/13DDB0/175224, camera34 vtable+18, and 175430 when a1 != 0) is
+   not ported. The member checks admission and the racer-identity part of 1750A0, then refuses with the first
+   unported pc (0x175174), so common_race_start logs resetCamera refused. Same for every course and pod.
+Kept from R2 (unchanged): src\assets\original_track_cut_identity50la.h runtime-row ceiling 64;
+   src\game\original_camera_start_authoring.cpp [321_anims] refusal; Start7C/TvBody unreached;
+   original_race_loading_camera50la.inl World+3EC mapping. (r2.txt items 1-4.)
+Ceilings changed (not new stand-ins): src\game\original_camera_visibility_join.h backing is now sized from the
+   lighting owner's flagged allocation ceilings (maximumZones 64 keys, maximumPortals+1 = 65 memberships) instead
+   of the SC envelope (30 / 35).
+
+=================== stand-ins/fix-C.txt
+[fix-C helper, items 1/2/3/7, tests\native\common_track_load50cr.cpp]
+- runHostDataCheck: the check-local standard material domain is prepared through its public standalone
+  route OriginalStandardMaterialDomain50LA::prepareFresh(material application over the authenticated
+  APPSTART) - which runs prepareFreshNativeService (12CBA0 fresh file capacity) - because
+  prepareFreshNativeService itself is reachable only from the Application. The race's Application uses
+  the 17CAB8/17CAD4/17CAE8 order. Host data check only, never a race.
+- runHostDataCheck: LoadInputs.racers=8 (full 1AD520 field) and generation=1; no race field exists in the
+  host check. Host data check only.
+
+[fix-C main, RA-chain retirement (item 4) and light manager (item 6)]
+- tests\native\original_pod_load50pl.cpp SceneTrackData50PL Node visibilityNode_/collisionNode_: host identities for
+  the incoming 4C0[0]/4C4[0] search-node arguments that 165EC8/165ED0 keep as identities only; the common track has
+  no SearchNode entity.
+- tests\native\original_pod_load50pl.cpp OwnershipBridge::podTrackRetainParticles: the World4A0 wreck borrow (1AA57C)
+  is refused (logged pod_load_track_particles_refused reason=borrower): OriginalTrackParticleCold50LA::
+  nativeWreckBorrower_ is writable only by its retired RA friends. Needs from area E (fix-C.txt).
+- tests\native\ra_cold_roster_operation50la.h Operation::bind: no common caller binds the bridge's roster operation
+  (the common roster constructs every slot; the bridge's 2129C0 tail is not wired into the cold load).
+  constructSlot (the RA warm slot constructor) is retired.
+- tests\native\ra_fresh_execution_arena50la.h: createConstructorArenaNative (RA aggregate composition) retired; no common
+  caller admits the fresh constructor arena.
+- tests\native\ra_fresh_roster_operation50la.inl completeConstructorModelResources: the RA static-world material-namespace
+  gate (aggregate constructorMaterialNamespaceCurrent) replaced by "the bridge's Track is bound and has its static
+  world" (the one material namespace, single_pass_world50LM).
+- tests\native\ra_native_handling_tail_owners50la.inl continueNativePlayerResources1AE104 input custody: the RA aggregate
+  roster-mount receipt (rosterMountComplete_/Domain_/Application_) dropped; the pod archives are mounted in the same
+  Application domain by the common roster.
+- platform\linux\native\original_ui_light_manager_owner50kg.cpp raZonesReleasePreflight: returns false (the RA source
+  zone scope RaZones148B60 is never issued on the common path; its RA members are retired).
+
+=================== stand-ins/fix-D.txt
+fix-D stand-ins (area D: navigation + lap + triggers)
+=====================================================
+
+ADDED (flagged "PORT STAND-IN" at the site)
+1. tests\native\course_trigger_actions50ct.h, class LostAiResetSink: 2255B0's PLAYER branch reached from a trigger
+   (a human racer's main690 entering a Reset LostAI trigger, 1B27C0 -> 2255B0) is not carried. The query issuer binds
+   no reset for a human query, so the sink's preflight refuses and the action owner logs the refusal. The AI branch is
+   carried (native_original_ai_recovery::resumeTrigger1B27C0). No stock course authors it: MB's UpShaft, the only
+   Reset LostAI trigger, ignores PLAYER (IgnoreTrigger PLAYER in tracks\mb.tob).
+
+RETIRED
+- R4 #2: tests\native\common_navigation50cr.cpp readNavigation2A1260 fresh default SourceLibmState49T. The 2A1D80 acos
+  now runs on the session's one libm (W0 R4 #1 signature; I2 passes s.animationShared.libm).
+- R5 #9: the four legacy per-course trigger groups native_trigger_group50{ga,gb,tb,tc}.h and native_trigger_capacity50tg.h
+  are deleted; the shared query kernels (vehicle_live_query50eq.cpp, indexed_type2_contact50cc.cpp,
+  static_type2_producer49x.*, native_wreck_group_contact50pd.h, track_runtime_storage50ig_fixture.h) carry only the one
+  MC-shaped group. The MB source-trigger query chain over the GA group (source_trigger_entry50mb.h,
+  source_indexed_type2_query50mb.*, mb_source_trigger50mb.h, source_trigger_reset50mb.h) is deleted; its 1B27C0 AI reset
+  is the third caller of the one AI 2255B0 owner (original_ai_physical_recovery.h).
+- track_runtime_storage50ig_fixture.h: the per-course trigger-row pins of the storage check (MC RandomTriggerPercent
+  per row 50/99/100 and callback count 1; TC row 10 = 3 callbacks; TB/GB row 15/17) are replaced by the one rule
+  (0..100 percent, 1..triggerActionCapacity50IN callbacks, as staged from the TOB by the action owner).
+- tests\native\race_mode1_host50id_fixture.h: five per-course constructors and the MC-only sourceNativeOnly_ refusal
+  -> one constructor over race_session50HM::CourseSession.
+- tests\native\original_ai_physical_recovery.h / original_human_physical_recovery.h/.cpp: the legacy
+  TrackNavigation50EU owner sets are deleted; one Owners each over the common NavigationView.
+- tests\native\checkpoint_recovery50fi_fixture.h, src\game\host_course_driver50gk.*: read the common NavigationView
+  instead of the fixed TrackNavigation50EU (the host aid's own CourseSpeedLimits50GK array keeps its
+  maxUndertrackNodes50ET bound; the route count is the file's).
+
+KEPT (unchanged, already flagged by their writers)
+- src\game\undertrack_reposition50et.h navigationNodeLimit50ET = 1024 (R4 #1: reader allocation guard).
+- course_trigger_sources50ct.h / course_trigger_actions50ct.h / track_atm50cr.h items 1-8 and 10 of stand-ins\r5.txt.
+
+=================== stand-ins/fix-E.txt
+fix-E stand-ins (area E, lights + media + ground effects). Each is flagged "PORT STAND-IN" in the code.
+R6/R7 stand-ins listed in stand-ins\r6.txt and r7.txt still apply except where marked RETIRED below.
+
+ADDED
+tests\native\common_track_emitters50cr.cpp (the one ground-effects owner, track_particle_emitters50CR::Owner)
+  - State::ownSparks: when Inputs::globals is null (LoadInputs has no particle-globals pointer this round) the owner
+    keeps its own TypeID 11 lazy speed scale (84D0/433980 = 20); the original word is one per process, shared with the
+    racers' pod sparks. w0-requests\round3-E.txt 1.
+  - advancePlacement: runs 161180/15A7A0 with paused=false (the Application pause 11C view is not in Inputs); the race
+    loop must not call advance while paused. w0-requests\round3-E.txt 2.
+  - prepare: the 27CFC8 second attachment pass over World+3C8 dynamic objects is not modelled; too few SoulTree
+    matches is refused (the original asserts at 27D6C4).
+  - prepare: registry quota 3 x 5000 x row size is an allocation guard, not an original value (shared with later
+    racer emitters).
+  - parseDefinition: NumberOfForcedSets > 0 refused (no native consumer).
+  - psgCap 4 MiB: allocation guard for reading a ChildObject PSG.
+tests\native\common_track_media50cr.cpp 05.06
+  - Inputs.globals=nullptr (see above).
+src\game\original_gc_particle_render50kg.cpp (the one track particle render owner, every course)
+  - pixel UVs normalised by the 128x1024 extent of the stock atlas texture (demoprt.tga, every stock course); a frame
+    outside it is refused. The texture's own extent is not carried to this owner yet.
+tests\native\track_environment_uv50cr.h (the one environment-map UV producer)
+  - single-node, zero-origin quantization frame only (quantization[4..6] == 0); a PSG hierarchy or nonzero
+    quantization origin is refused (every stock environment model authors this frame).
+tests\native\positional_sound_rows50sr.h (trigger Sound actions)
+  - a Positional=T trigger Sound action is refused at 05.12 (3D placement of the original not traced); no stock course
+    authors one (TC's two are global).
+  - a trigger Sound start with the 24-transport pool full is dropped (logged), not refused.
+src\game\original_gc_gameplay_lighting_candidate.cpp flares
+  - none new; a flare's LightFlareColorRGB must be authored (27792C "undef" default cannot be read: refused).
+
+KEPT (existing, now on every course)
+tests\native\gc_particle_materials50kg_fixture.h + src\assets\original_gc_particle_material50kg.cpp (unassigned):
+  the one particle material owner authenticates the exact stock demoprt.psm/.pst bytes (shared by every stock course);
+  an add-on course with its own particle atlas is refused there until the identity gate becomes a receipt.
+src\game\original_ra_static_selection50la.inl, original_ra_static_visibility50la.inl, original_ra_zone_projection50la.inl,
+  original_ra_zone_draw50la.inl, original_ra_native_static_draw50la.inl: RA-named members of the lighting owner with no
+  RA data pins left (the flare-identity and 270900 scene-role pins went with original_ra_scene_roles270900.inl); their
+  callers are the RA chain area C retires and the OwnershipBridge it keeps.
+
+RETIRED
+- R7 "05.06 no common 274370 emitter runtime: every course loses its trackside emitters": the one ground-effects owner
+  now exists (GB/MC/RC/RA/GC fires, fireworks, sparks, fog, smoke through TypeID data).
+- RA flare-zone pins (zones 1/7, 15 flares, LightFlareColorRGB 255,255,255, size 30, flare1) and RaFlareIdentity tail:
+  replaced by Owner::trackFlares() rows read from every course's LightN HasLightFlare data.
+- RC crystal producer pins (4 PSG members, 79 placements, 20596 UVs, 44 selections, ambient 7.5/5/10): replaced by the
+  data-driven environment UV producer.
+- GC particle render value pins (ambient 40,40,45,64; directional 85,85,80; fog colour 0xff97a0b1; 129 frames).
+- TC two-voice trigger Sound owner (tc_global_sound50tc.h, deleted): trigger Sound actions go to the one positional owner.
+- 161F60 restart removal not reachable: OriginalTrackParticleCold50LA::restartRemoval161F60 now forwards to the manager.
+
+=================== stand-ins/fix-F.txt
+fix-F (area F, renderer) stand-ins
+
+Added (flagged "PORT STAND-IN:" in the code):
+  1. platform\linux\native\vehicle_window_gl50ds_track_flare.inl (header comment): flare geometry. The original
+     flare is a 4-vertex StripOptFog strip made by 14AB30 (UVs 0,0 / 0,1 / 1,0 / 1,1) and turned by its entity
+     each frame; its exact per-frame vertex placement is not recovered. The common pass draws a camera-facing
+     square of half-extent LightFlareSize about the light, same strip UV order, on every course.
+  2. same file: the flare material's GS ALPHA is not re-selected in the renderer (the DefaultMT templates live in
+     the Application); the pass always draws the additive A=Cs,B=0,C=As,D=Cd form that every stock flare PSM
+     authors (scan_all.tsv: ABE=1 A0B2C0D1).
+  3. platform\linux\native\track_flare_gl_storage.inl: allocation guards (corrupt-file guards, logged on create in
+     track_flare_renderer): 1024 rows (the lights block ceiling), 64 distinct images, 16 MiB RGBA, 1024x1024 per image.
+  4. platform\linux\native\vehicle_window_gl50ds_draw.cpp (comment at drawTrackFlares): the flare pass runs right
+     after the transparent world; its exact render-list slot relative to the transparent world spans is not recovered.
+
+Retired:
+  - material_texture_gl50eb.h/.cpp: createRaStaticWorld / createRaStaticFire, raStaticWorld_ / raStaticFire_ and the
+    ra_static_fire_visual50la.h / ra_cold_aggregate50la.h includes (RA byte-material world and FireP0t publications).
+  - native_shadow_storage50ps.inl / vehicle_window_gl50ds_shadow50ps.cpp: shadowRaArray / shadowRaNormals (never created).
+  - course-named internal renderer names: coverage composition uniform coverageRaCompositionUniform / GLSL "raComposition"
+    -> coverageCompositionUniform / "coverageComposition"; track shader rcSourceColor / rcCenterDepth -> gsSourceColor /
+    gsCenterDepth (no behaviour change).
+  - RA-only local Light3 flares -> the one track flare pass above (every course whose lights author HasLightFlare).
+
+=================== stand-ins/fix-G.txt
+fix-G stand-ins (area G: pods + harness + manifests)
+
+Added: none.
+
+Retired:
+  - R11 stand-in 1 (tests\native\original_ui_main_entry50kg.cpp, constexpr test-profile block visibleRiderTest ..
+    mawhonicRylothTest): deleted together with the dead Application-startup branches it kept compiling. Startup now makes
+    the one riderProfile->initializeAtApplicationStartup call; the "Rider test profile provenance differs" require, the
+    TEST UNLOCK OVERRIDE / TEST PROFILE prints and the test-profile part of the "ORIGINAL MAIN:" line are gone.
+  - Test-profile owners: platform\linux\native\original_ui_rider_profile50kg.h/.cpp initialize*TestProfileAtApplicationStartup
+    (10 entries), the *TestProfile() accessors, the Storage test fields and their availability11018 / remembered /
+    rememberedCourse pokes and beta-save / Hall / import exclusions; the 8 bools in OriginalUiCourseWidgetProfile50KG
+    (src\game\original_ui_course_widget_controller50kg.h) and OriginalUiCourseRememberedProfile50KG
+    (src\game\original_ui_course_selection50kg.h) and their reads in original_ui_course_session50kg.cpp,
+    original_ui_tournament_career_resources50kg.cpp, original_ui_rider_session50kg.cpp (gasganoTestProfile).
+  - platform\linux\native\host_session_menu50if.h: the GA preview Pause/Controls pages and row counts, the GC
+    "experimental incomplete" page (gcIncompleteWorld, always false) and the TA-only Tracks row; the Tracks/Main rows
+    show the selection's own course code (hostTrackCode50IM).
+  - Pod receipts: common_pod_receipt file=UIACCEPT.INI moved from the rig (native_racer_rig50hw_cold.cpp) to the one
+    receipt writer common_roster50CR::Owner::logPodReceipts, which also logs file=ANN.INI (bytes + SHA-256 against the
+    stock identity). Works after build() alone (R11 host data check). Add-on pods: receipt=none.
+
+Kept from R10 (unchanged, still flagged in the code; see stand-ins\r10.txt): free-play opponents
+  (original_course_roster50kg_fixture.h), single-wrist refusal (native_racer_rig50hw_fixture.h), prepared-import
+  development input (terrain_interactive_roster_cold50du.cpp), TrackIntro/PodEngine key 3 baseline
+  (selected_player_audio50ij_fixture.h), Rider UI population riders 3/7/19/20 (original_ui_rider_dynamic_owner50kg.h,
+  original_ui_rider_backend50kg.cpp).
+
+=================== stand-ins/fix-H.txt
+[continuation helper] RETIRED: tests\native\terrain_interactive_continuation50du.cpp the unloaded legacy
+  trackMaterialOwner (track_materials50fa_fixture::Owner) and the local track_uv_animation50uv_fixture::Owner; the
+  publication context now takes *track.roles.uvAnimation. No stand-in added.
+[loop helper, W0 AREA H item 6]
+ADDED: tests\native\terrain_interactive_loop50du.cpp:1506 host menu "Restart Race" and :3934 the capture restart test
+  (takeNativeRestartRequest) call restartInPlace1AC8E0(callerRaceInput1A8958, a1=0). PORT STAND-IN: host entries
+  emulating the original race-input restart (1A87A0 jal 1A8958 -> 1AC8E0 a1=0); Pause row 1 keeps 1BD934 a1=1.
+RETIRED: stand-ins\i4.txt item 6 (the host session-menu Pause page drawing the original Pause for a race without a
+  counted Pause binding, rows 1/9/10, the host openHost/closeHost lifetime block and its test driver). PLAN 2.8: with
+  no counted binding Start (Escape / pause request / pad Start) logs pause_refused site=1A87A0 and is ignored that
+  poll (:1456).
+NOTE (not a stand-in): :321 advanceTrackEmitters - per-placement Completion from the renderer's
+  completedTrackSpanVisibility (span submitted bits of the last completed gameplay image, per area F); it maps
+  Attachment::worldIndex to VehicleWindowTrackSpan50DS::worldInstance (both = the SCB static world instance order).
+
+== publication helper (tests\native\terrain_interactive_publication50du.cpp) ==
+- :2040 resetRacerTiming216690: 216690's tail 216760..216780 (+74 = 0, +7C = 0, racer+240 vtable+20) not ported (no port
+  field carries those offsets). Original: 216690 whole body. The rest of 216690 (CC8/CD8/CCC/CB0..CD4/CB4/CC0) and its
+  217420 leaf (+7D0..+7DC, +D38/+D3C) are done.
+- :2068 placeOnGrid2A2880: computes the 2A2880 rank pose over the one map view (rank = AI ordinal / human ordinal + AI
+  count, as 1AEA70) and grounds it, then REFUSES: no live mid-race 2169C0 placement owner is reachable from the
+  publication scope (placeColdGrid refuses a moved body; query rows / rebase models are continuation locals).
+  Original: 1AEA70 per racer 2A2880 + 7F4/C84 = 0 + 2169C0. Every restart therefore refuses at grid2A2880 (logged).
+- :2183 a launch with no counted race (direct start) runs the fresh hooks lockStart1AED30 / showStartOverlay197040
+  directly (no race start owner to bind). Original: one 1A6AA0 path for every race.
+
+== area H fixer ==
+RETIRED: tests\native\terrain_interactive_setup50du.cpp:568 (I2) the empty material_audio50HI::Provider unique_ptr passed to
+  the continuation; the context now borrows track.roles.audio (W0 I2 #7).
+RETIRED: tests\native\track_session_assets50ig_fixture.h retainedTA development inputs (work/impactAuthoring49Y/ta.tun outside
+  the archive, originalStaticCandidates=false, tuningInArchive=false): TA now has the same original-disc row shape as every
+  course (tracks\ta.tun from TA.RES, the track's own static candidates). Visible effect: TA takes the common material choice
+  and vertex colour scale (255/128) like every other course.
+NOT A STAND-IN (port order, original data): world.cpp prepares the trigger action owner's source half (prepareSource) before
+  the collision world's prepareStorage, and cold_contacts.cpp binds its destinations (bindDestinations) and then the
+  collision world's bindQuery; the Particles destination is cold_contacts.cpp's adapter over
+  track_particle_emitters50CR::Owner::applyTriggerAction (sourcePc 15A500), the LostAI Reset destination the action owner's
+  LostAiResetSink (lent per original-AI main690 query in frame_physics.cpp).
+KEPT (unchanged, existing): tests\native\native_racer_grid50hn.inc else-branch host grid offsets when
+  !originalStaticCandidates && !canonicalTournamentGrid (data-keyed; with the TA row corrected no stock row takes it).
+OPEN, routed to W0 round 3 (w0-requests\round3-H.txt H3 #1): publication.cpp placeOnGrid2A2880 computes the 2A2880 pose and
+  refuses (no live 2169C0 placement reachable from the publication scope).
+[loop helper, round 2 after fix-E] advanceTrackEmitters: skipped while Application 11C pause is set; completions stale
+  before the first completed image and for attached instances with no static span, unavailable only when a
+  publication is lost after one existed; unattached placements skipped. 161F60 emitter restart
+  (roles.emitters->restart161F60) added to the loop's two 161F60 sites: Results replay restart 1AC978 (beginReplay) and
+  the 1A8158 replay loop 1A824C (restartWorld). The 2702E0 stand-in (27C330, Particles-action reset) is unchanged.
+
+=================== stand-ins/i1.txt
+I1 stand-ins (none stand in for original behaviour; these are compatibility shims kept for other writers' readers)
+-------------------------------------------------------------------------------------------------------
+* tests\native\original_course_race_targets50kx.h directHumanTrack(Track): RETIRING, now true for every
+  host selection; kept only for the R11 frontend / I3 publication readers until they drop the call.
+* tests\native\original_course_race_targets50kx.h ConsumedLaunch::matches(..., Track, ...): RETIRING thin
+  wrapper over matchesCourse (same rule, by course code); kept for original_race_constructor50la.h:760 (R1).
+* platform\linux\native\host_track_selection50im.h HostTrackAdmission50IM::gcIncompleteWorld (always false)
+  and the name gcMode2 (means RR_RACE_MODE=2 for every course): kept for host_session_menu50if.h
+  (unassigned) and the I3 publication receipt; rename/delete in a later round.
+* HostTrack50IM itself stays as the host menu/harness selection key (W0-HANDOFF 3.1); race code reads the
+  Track's code and source.
+
+=================== stand-ins/i2.txt
+I2 stand-ins (files under D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-i2\tests\native)
+=====================================================================================================
+Kept or added (each also carries a "PORT STAND-IN" comment in the code):
+* terrain_interactive_world50du.cpp:688  cold payload ledger (remainingPayloadBytes / reserveAdditionalPayload)
+  over the one shared track_runtime_storage50IG ceiling (32 MiB, one value for every course).  Original: none
+  (no such ledger); sizes come from the data. Retired with it: the MC 48 MiB budget and the GB/MC renderer
+  metadata charges.
+* terrain_interactive_setup50du.cpp:568  empty material_audio50HI::Provider unique_ptr passed to the continuation
+  (the real provider is track.roles.audio).  W0 request i2 #7.
+* terrain_interactive_setup50du.cpp:1087 (existing, unchanged) track-animation re-home of a wrapped looping row
+  on the ordinary membership update (11ADC0/11AD20).
+* terrain_interactive_setup50du.cpp:1325  219AF0..219C74 end-candidate producer is not built (it lived on RA's
+  OwnershipBridge); retireEndCandidateProducer returns true.  Original: 219AF0 for every race; needs a common owner.
+* terrain_interactive_cold_owners50du.cpp:140  writeRosterPodExclusionStandIn (pod694 exclusion) now for every slot
+  on every course.  Original: per-racer 694 exclusion lists 212984..21299C.
+* terrain_interactive_cold_owners50du.cpp:191 (existing) no chariot model owner, so no racer340 body for the 694 row.
+* terrain_interactive_cold_contacts50du.cpp:111  `.lostAiReset={}`: no common sink for the LostAI Reset pose reset
+  (1B5A60); MB's UpShaft Reset action is refused (logged) until an owner exists.
+
+Port order (not a behaviour stand-in; logged with PLAN step numbers):
+* terrain_interactive_world50du.cpp:420-547  step 08 runs in two halves around step 10 (splines before the
+  roster, the 1ACF70 zone index after the collision storage) and both before the camera session (06), because
+  the frozen camera factory needs a runtime-valid map view and the storage needs every racer's collision owner.
+
+Removed stand-ins:
+* world.cpp: the practice (11258 2) exclusion from the counted race (R9 runs the 1ABC1C end).
+* world.cpp: the Stage-B "RA keeps its borrowed legacy-layout route" storage split, the legacy ground, the
+  corpus static-candidate route, the course-keyed trigger/animation storage-route splits.
+* setup.cpp: RA-only Follow bridge branch, GC-only light cache-policy exception, POD01.RES flame owners.
+* cold_owners.cpp: RA-only identity exclusions; the eight lift binds (one bindHumanLift).
+
+=================== stand-ins/i3.txt
+I3 (runtime: terrain_interactive_continuation50du.cpp, terrain_interactive_publication50du.cpp, terrain_interactive_publication_declarations50du.h)
+
+== continuation50du.cpp ==
+I3 (continuation) stand-ins - D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-i3\tests\native\terrain_interactive_continuation50du.cpp
+- reserveEnvironment / reserveAdditionalPayload / accountParticleRegistry: the race payload ledger (formerly MC/GB only) is now a host allocation guard for every course (camera descriptor, environment, particle registry). Original: none (no such budget).
+- activateColdRace: one neutral host activation tick at the end of cold for every course (GB/MC used to defer it until after renderer/query admission). Original: none (host setup tick).
+- trackMaterialOwner: an unloaded track_materials50fa Owner kept only because the W0 publication context still carries it; the one material owner is roles.staticWorld (single-pass decoder). Original: 274160/14D370 through the static world.
+- trackSource = track_source_fixture::Track::course for every course: kept only because the W0 publication context carries the enum; it selects the data route; stock rows are receipts. Original: none (course code is file names only).
+- Cold prefix retires the Bank's native backing (racerBank.retireNativeBacking) on every course (the GB/MC aggregate rule) - kept host lifetime rule, not original.
+- Human speech forward retain is skipped for every human race on the assumption that the common roster's 1ADF80 load bound it (was RA-only). Original: 22A210/2C1000 inside the human pod load.
+
+== publication50du.cpp / publication_declarations50du.h ==
+I3 (publication helper) - stand-ins in tests\native\terrain_interactive_publication50du.cpp
+
+KEPT/ADDED
+- PORT STAND-IN: renderRequest.track.track falls back to a non-owning alias of the caller-owned Track (no control block)
+  when there is no counted race (direct start only). With a counted race it is consumedStage.track() (checked == &ctx.track).
+
+RETIRED (per-course stand-ins removed from this file)
+- 127 isXxTrack / commonRouteTrack / maOrCommonRouteTrack / xxOriginalDisc uses; 13 consumed stages -> consumedStage.
+- TB/RC same-source canonical mounts and the per-course "selected-track archive mount" (Archive::open, step 04).
+- Per-course particle owners: native_ta prepare / prepareTb / prepareRc, RC authoring/attachments/runtime/render,
+  GB/MC/RC particle Windows and their GPU atlases (roles.particles, one owner).
+- 12 per-course ATM owners and loads (GA/GC/MA-SA/MB/SC/TB/GB/MC/RC/TC) and their "stock ATM set only" stand-in -> roles.atm.
+- RC crystal bridge + environment-map verifySpan stand-in.
+- RA camera/track-load-at-population stand-in (raCameraTrackLoadAndPopulation, raSession) and RA's own copy of the HUD
+  final checks; RA static-world renderer path (raStaticWorld) and RA sky.
+- 12 camera factories -> createNativeCourseCameraSession50LA; MC/GB/TB/RC per-course camera assets -> one load.
+- Per-course readiness gates in the embedded Course destination -> one data-driven readiness rule.
+- AA1 on TB/RC only (course-gated stand-in) -> authored AA1 on every course.
+- RR_AUTHORED_WORLD_FOG forced on GB/MC (B-C03); kept only as the course-independent diagnostic switch (default on).
+- GC native-world readiness log/require block; GA-only ready log (B-C08); receipt fields loaded_track_incomplete /
+  results_visible course terms (B-C08).
+- ALL8 spectator music / Pause draw / bindRace and RA Results root only on RA (B-C06) -> every counted race.
+- HostRaceResults50IL instance (F04) and restartRequested (F01 rebuild) removed from publication.
+
+=================== stand-ins/i4.txt
+I4 stand-ins (kept or added), every one for all courses and pods:
+
+1. frame_physics: PrefixRejected main/secondary query -> recoverPortalBoundary (I2's host portal-boundary
+   fallback) on every course (was skipped on TC/GB/MC). PORT STAND-IN, flagged in the code.
+2. loop: a refused 1A7DD0 dispatch departs to the Course screen through step 18 (departRace50CR(course)).
+   Port failure handling per PLAN 2.7; not a stand-in for an original screen. Flagged in the code.
+3. loop: Scene::Reset 2702E0 lambda still omits 27C330 (Scene+0x3D4) and the Particles-action emitter
+   reset (existing PORT STAND-IN, kept, comment updated: its trigger half is now the one trigger group).
+4. loop: the 1AB5BC destination choice after the Results ack stays in the loop (existing code), see
+   writer-notes R9.
+5. loop: the ALL8 spectator end still uses its own native route (all8FinishAwaitingDisplay /
+   humanResultsReady overlay), not raceEnd.continue1A7DD0 with humans34 == 0. Kept; to retire with R9's
+   ALL8 binding (PLAN 2.7 last row).
+6. loop: the host session-menu Pause page (originalPauseShown) remains only for a race with no counted
+   Pause binding; rows 1/9/10 there run the same 1AC8E0 / step-18 entries as the counted owner.
+Retired by I4 (no longer present): the session rebuild restart (restartRequested, timeTrialRestartPending148,
+SessionExit Restart), the HostRaceResults50IL panel polling and its test driver, the host F5 restart and the
+host manual/damage/undertrack checkpoints (they read the legacy TrackNavigation50EU), the host Pause
+fallback on a refused counted Pause (now pause_refused, Start ignored), the per-course query leases and
+typed Bank bindings, the GB-only listener commit, the RA static fog observation, the per-course sky/clear
+colour/ATM/particle/water owners in the loop, the five-way AI/recovery/navigation/wrong-way dispatches.
+
+=================== stand-ins/r1.txt
+R1 stand-ins (kept, flagged "PORT STAND-IN" in code)
+* src\game\original_race_timing_manager50la.cpp OriginalRaceConstructor50LA::readResultsManagerFlags58:
+  a race without its counted 1AF7F0 B4 object reads the one native Setup manager's flags58 through the end
+  scope. Same rule on every course (the RA-vs-common split is gone). Retires when 1A7710 B4 is initialized
+  for every race (B-C06 row "B0/B4 native racer init", I3 + R10).
+No other stand-in added. Removed: the RA-only consumed prefix gate (ra_application_cold50la.cpp:70-88), the
+13 per-course stage headers, the 12 per-course world prefixes, the RA-only F8 layout/music listener gates.
+
+=================== stand-ins/r10.txt
+R10 stand-ins (kept or added; each is marked PORT STAND-IN in the code)
+
+KEPT, flagged:
+* D:\Programming\GitHub\RacerRevengePC\tests\native\original_course_roster50kg_fixture.h (head comment, courseFieldEntries):
+  free-play opponents. Original 1AE620 non-tournament branch picks them with its RNG (not ported). The
+  port seats the eight retained host entries with the selected racer in slot 0 (a racer among them
+  swaps with slot 0; any other racer, stock or add-on, takes entry 0). Same rule for every pod.
+* D:\Programming\GitHub\RacerRevengePC\tests\native\native_racer_rig50hw_fixture.h (install, single wrist):
+  a pod with exactly one wrist is refused (the original builds each hand record on its own, 28EB90).
+  Now logged: pod_rig_refused pod=<id> rule=single_wrist_28EB90. No pod key. (B-P01 leftover, kept as the plan says.)
+* D:\Programming\GitHub\RacerRevengePC\tests\native\terrain_interactive_roster_cold50du.cpp (run, !directOriginalInputs):
+  the prepared-import development input builds each Rig from its retained pod.json; stock rows only.
+  The former selectPreparedRider re-check of the eight-row JSON field is dropped (each Rig verifies its
+  own import members, loadAll verifies the RES).
+* D:\Programming\GitHub\RacerRevengePC\tests\native\selected_player_audio50ij_fixture.h:28-31: the TrackIntro
+  cues and PodEngine key 3 come from the shared retained baseline reader (readRetainedAudioRequests50HC,
+  "TA intro"). Course audio, not pod audio: belongs with R2's intro audio / R7's track audio. Not changed.
+* Rider UI population: src\game\original_ui_rider_dynamic_owner50kg.h:37-46 (default-unlocked rider list,
+  riders 3/7/19/20) and src\game\original_ui_rider_backend50kg.cpp:245,255,378 (riders 3/7/19/20 mandatory
+  pairs). Needs the profile unlock mask from platform\linux\native\original_ui_rider_session50kg.cpp
+  (unowned). See writer-notes\r10.txt.
+* Original-data tables kept as data (not stand-ins, listed for the grep gate): UIACCEPT first-event table
+  firstUiAcceptEvent[27] (1E7C74, native_racer_rig50hw_cold.cpp), announcer namedBanks[27] (stock racer
+  ids; add-on pods have no named bank), 188470 class tables and its racer-keyed replacements
+  (original_opponent_selection50kg.cpp, the original's own code), stockSpeechCounts receipts
+  (original_player_identity50ik_fixture.h).
+
+RETIRED by R10:
+* B-P01: UIACCEPT.INI SHA-256 refusal (native_racer_rig50hw_cold.cpp:84) -> common_pod_receipt pod=<racer>
+  file=UIACCEPT receipt=match|differs. Stale POD02 comments (original_racer_visual50hw_fixture.h).
+* B-P02: POD26 curses hole (native_player_speech_authoring50la.h:184-188, selected_player_audio50ij_fixture.h:68-79)
+  and POD17 scorch17DeclaredEvents hash pin (source_announcer_authoring50ie_fixture.h:60-73,136): one rule
+  for every pod (2C1170/292650): NumEvents from the file, EventN > NumEvents unselected, an absent EventN
+  is a hole. Announcer NumEvents vs identity.announcerEvents is a receipt (common_pod_receipt file=ANN.INI.NumEvents).
+* B-P04: playerUsesRosterRig branch (roster_cold :161); the add-on overlay over slot 0
+  (original_course_roster50kg_fixture.h:4,37) is now the one field rule above, with each row loading its
+  own files; selectPod19 deleted.
+* B-C18 (R10 part): native_racer_owners50hn.inc:163,170 isRaTrack/isMbTrack -> the storage's own layout.
+* DLC seam: roster_cold :153-157 "add-on never joins a stock AI field" -> dlc50DL::addonRiderMayBeAi
+  (rowForRacer and loadAll, against the race's actual track source).
+* B-P05 part: original_ui_rider_dynamic_owner50kg.cpp:77,86 fixed 23-rider control/rider tables -> read from
+  rider.dat; original_ui_lit_geometry50km.cpp:340-379 widget 56/57/34/35 byte-count+SHA pins -> one
+  coloured-surface rule from the scene's own data.
+
+=================== stand-ins/r11.txt
+R11 stand-ins
+=============
+1. tests\native\original_ui_main_entry50kg.cpp, test-profile section (after RR_ORIGINAL_RIDER_PREVIEWS):
+   PORT STAND-IN constexpr block (visibleRiderTest=0, mcSelectedRider=1, wanMbTest .. mawhonicRylothTest
+   = false). Keeps the dead Application startup branches (:500-580) compiling until their owners delete
+   them (writer-notes\r11.txt). Retire: delete the block once those branches are gone. The retired env
+   switches themselves are refused at startup, so nothing can reach the dead branches.
+
+Test-only harness aids (not game behaviour; listed for completeness, not stand-ins of original code):
+2. tools\capture\run_windows_takeover.py seed_free_play: the free-play route's seeded save gets course
+   availability 11018 = 13 and Main slot 6E0 = 1 - save data the game itself writes; the Course screen's
+   own rules decide what is offered. Replaces the per-course availability pokes of the retired profiles.
+3. RR_TEST_RETURN_HOLD_SECONDS (runner --return-hold): ends an unattended run N seconds after
+   frontend_race_return through the existing wall-budget exit (windows_framebuffer_capture50ld.h Run).
+4. RR_TEST_COURSE / RR_TEST_COURSE_LAPS (runner --course / --laps): original Course-screen inputs only
+   (Left/Right/Up/Down/Confirm), original_ui_capture_navigation50la.h Route.
+
+=================== stand-ins/r2.txt
+R2 stand-ins (PORT STAND-IN, flagged in code)
+
+1. src\assets\original_track_cut_identity50la.h originalTrackCutRuntimeRowCeiling50LA=64: allocation guard on the number of
+   distinct course codes holding a derived cut row (13 stock + add-ons). Not a size, not an admission rule.
+2. src\game\original_camera_start_authoring.cpp OriginalCourseStartActions::prepare: a TOB with a [321_anims] block is
+   refused (the native start has no 321_anims path). Data-keyed, kept from before; no stock or registry course has one.
+3. tests\native\original_camera_unused_children50la.inl Start7C / TvBody 1752A0: built only through the native-owned 174DF0
+   load operands (beginSameControllerLoad174DF0), which no route publishes today, on any course. Cinematographer70 and Tv78
+   are now built for every issued session; Start7C/TvBody remain unreached for every course alike.
+4. tests\native\original_race_loading_camera50la.inl loadingCameraSourceNullSuffixCurrent: the original 1A97B8 null-fog test
+   (World+3EC) is represented as "the World's Track has no fog role yet" (the 1A9EE0 load publishes it). Port mapping of the
+   field; the path is uncalled today.
+5. tests\native\ra_source_camera_ownership50la.h: the bridge keeps RA-world-typed members (ra_cold_sources50LA, RA static
+   draw/light API) pending R3's common track load; listed in writer-notes\r2.txt "PLAN SHAPE".
+
+=================== stand-ins/r3.txt
+R3 stand-ins (each also marked "PORT STAND-IN" in the code where it lives)
+==========================================================================
+1. tests\native\common_track_load50cr.cpp buildPhysicsIndex270CDC: the zone-world Storage is allocated at collision
+   prepareStorage (after the roster, step 10), not inside 1A9EE0, because the port's shared layout pre-sizes every
+   racer's query rows. 05.03 checks and logs the counts only.
+2. tests\native\common_track_load50cr.cpp Archive::open: the provider mount label is the archive's actual SHA-256 and
+   size (port authentication label; the original mounts by name).
+3. tests\native\common_track_load50cr.cpp identityForCourse: Identity::courseNumber is not filled for a stock row
+   (no load step reads it; the Course screen owns the order).
+4. tests\native\track_collision_world50cr.h collisionMasks {4,16,32,64}: the port's COL category masks, one constant
+   for every course (as every per-course ground passed).
+5. tests\native\track_collision_world50cr.h placeGrid: the port's cold grid-centre pose (grid_center50ac) from the
+   map spline's first node and the selected PHY lift, kept from the per-course grounds; the original places at
+   2A2880 from the race start (R9 owns that step).
+6. tests\native\track_static_model_params50cr.h rowCeiling 16384: allocation guard (stock max 1162), refused and
+   logged above it; not a gate.
+7. Registry inherit.particles / inherit.tuning reads (common_track_load50cr.cpp Archive::open, finishTail1AA400):
+   PORT EXTENSION (DLC rows), not original; stock rows never take that path.
+8. tests\native\common_track_load50cr.cpp readScene270900 + original_single_pass_world50lm.inl validateBorrowedWorld:
+   the strict shared SCB decoder first, then the tolerant reader (mc_world_semantics50mc.h) for an SCB that retains
+   duplicate unused labels. The tolerant read is the original 270900 behaviour (first label wins); the strict
+   decoder is the port's. Flagged because the tolerant reader still carries an MC file name.
+9. RA native chain (ra_cold_aggregate50la.h and its TUs) kept but unreachable and not compiling on the merged tree;
+   see writer-notes\r3.txt "RA NATIVE CHAIN". Not a stand-in for any live path; listed so it is not forgotten.
+10. Kept from before (unchanged): stock TA tuning comes from the session row's file path
+   (work/impactAuthoring49Y/ta.tun) when the archive holds no tracks\ta.tun - finishTail1AA400 reads whatever the
+   row names.
+
+=================== stand-ins/r4.txt
+R4 stand-ins (each carries a "PORT STAND-IN" comment at the site)
+
+1. src\game\undertrack_reposition50et.h  navigationNodeLimit50ET = 1024
+   Node-count guard of the 2A1260 reader for the common navigation store (the original sizes its node array from the
+   file's NumNodes). Allocation guard only: every navigation block is then sized from the spline's own count. Bounds the
+   per-read heap scratch and the per-call visit arrays of 1A0DA0 / 1ACF70 / 2A0F30. Stock maximum 293 (TC AI spline).
+
+2. tests\native\common_navigation50cr.cpp  readNavigation2A1260: fresh default SourceLibmState49T
+   The frozen signature has no libm owner, so the 2A1D80 acos runs on a fresh default source libm state (mode 1,
+   errno 0) instead of the session's serial owner. Retire through w0-requests\r4.txt item 1.
+
+Retired by R4 (were stand-ins or per-course code):
+  - five per-course navigation stores/views/leases (track_navigation_view50{mb,gb,mc,tb,tc}.h, MbCollisionWorldLease and
+    the GB/MC/TB/TC leases, rc_navigation_lease50rc.h) and the fixed 293/256 capacities (courseNavigationCapacity50MB,
+    courseNavigationPortalCapacity50MB): one store sized from the files.
+  - the per-course extent list `static_assert(N==256||N==265||...||N==173)` in undertrack_shared50mb.inl.
+  - the five lap views, five lap_drive slots + ternary, five race sessions, five-way wrong-way, five AI inputs, five
+    recovery owner sets, four grid overloads and the per-course navigation owners {gb,mb,mc,tb,tc}_navigation50xx.h,
+    rc_navigation50rc.h (with their stock receipt pins: counts are now receipts in stock_course_receipts50cr.h).
+
+=================== stand-ins/r5.txt
+R5 STAND-INS (each flagged "PORT STAND-IN" in the code)
+=========================================================
+Kept or added by R5 (triggers, ATM, animation):
+
+1. tests\native\course_trigger_sources50ct.h nativeNumber(): native trigger geometry (position,
+   radius, box, yaw/pitch/roll, PodSound position/distances) keeps the binary64->binary32
+   conversion the per-course chains used, so stock triggers stay bit-identical to recorded logs.
+   The reader's own decimal parse (parseTrackNumber50AD) also validates the text. Retire: one parse.
+2. course_trigger_sources50ct.h boxWorld(): native std trig/normalisation for the shape6 box basis
+   (2DBF98 degree factor kept), not 13BFE0/VU parity.
+3. course_trigger_sources50ct.h refusals of authored data the port does not execute (refused with a
+   plain reason, never ignored): Animation action TimeTillReset/AnimationNameRef/SpecificObject;
+   PodSound/Sound SpecificObject; trigger Parent/AttachToSoulTree; the original action types
+   ResetAnimation, HideAnimation, EnableTrigger, AnimTexmapTrigger, PhysicsObject, Scoring,
+   ShaderPass, Shortcut, CameraShake. No stock course authors any of them (the old per-course
+   readers refused the same set).
+4. Allocation guards (logged, not sizes): trigger rows <= blockRow(BlockId::triggers).ceiling (1024);
+   NumberOfActions per trigger <= triggerActionCapacity50IN (32, the contact layer's limit; stock max 5).
+5. tests\native\course_trigger_actions50ct.h: an authored action kind with no bound destination
+   (Destinations: animation runtime, PodSound / Sound / Particles sinks, LostAI Reset sink) refuses
+   prepare() with "course_trigger_actions refused trigger=N kind=K reason=no_destination". Stands in
+   for destinations not yet wired by their owners (R7 sound/particles, I2 pose reset, I3 gate voice).
+6. course_trigger_actions50ct.h: IgnoreTrigger "ANIMATIONS" (2DC630 +0xDC) is read but has no effect:
+   only racer colliders are members of the group, so animation subjects never touch a trigger.
+7. course_trigger_actions50ct.h: LostAI targets are bounds-checked against the live AI spline
+   node count before binding (the C80 value indexes that spline). Port safety check, not original.
+8. tests\native\track_atm50cr.h: playback is the admitted 29A020 forward-loop subset
+   (advanceAuthoredTextureAnimation); a pass authoring reverse loop, LoopOnEndToFrame != 0 or
+   non-looping, TextureAnimation other than "unique", or a layered (multi-pass) ATM placement is
+   refused with its reason. Ceilings (64 frames per ATM = the subset's bound; 4096 frames, 65536
+   rows, 8 MiB per ATM member, 256 MiB RGBA) are logged allocation guards.
+9. src\game\native_trigger_capacity50tg.h / native_trigger_group50{ga,gb,tb,tc}.h: the four legacy
+   per-course trigger groups and the two capacity names they size from are KEPT (not deleted as
+   PLAN 3.1/W0-HANDOFF R5 asks) because unassigned shared query kernels still carry their pointer
+   arms (see writer-notes\r5.txt "Plan points"). The common path never instantiates them.
+10. track_animation_runtime50an.h (unchanged, already flagged there): cross-motion blend 155820 not
+   reproduced; N64 extensions (A11).
+
+=================== stand-ins/r6.txt
+R6 stand-ins (lights, sky, fog). Each is flagged "PORT STAND-IN" in the code.
+
+src\game\original_gc_gameplay_lighting_candidate.h
+  maximumZones=64 / maximumPortals=64: allocation ceilings of the one visibility topology (sized from the SCB's
+    zone/portal counts; stock max SC 30/34). Not sizes, not gates; a larger world is refused.
+src\game\original_gc_gameplay_lighting_candidate.cpp (readLights2783D0)
+  Storage::maximumLights=1024 = common_track50CR blockRow(lights).ceiling: allocation guard of the local-light store
+    (reserved once from NumberOfLights).
+  AmbientColorFlash*: the original defaults of IdleTime/MinDuration/Duration/ColorRGB are not recovered; a flash that
+    authors MinIdleTime but omits one of them is refused (stock GB authors all five).
+  Flashers: FlashPattern/FlashPeriod/FlashFilter defaults not recovered; an emitting flasher omitting one is refused.
+  One Directional per track (the native selection has one sun slot); a second, non-emitting, finite or zoned sun is refused.
+  Native authored-zone light selection (two strongest locals by reciprocal attenuation) is the existing native policy,
+    not retail cache/registry parity (unchanged, now the one policy for GC and TA too).
+src\game\original_light_flash50cr.h
+  FlashPattern admitted only with exactly 32 entries.
+tests\native\original_track_sky50kx_fixture.h
+  zoneLimit=256 allocation ceiling of the zone rows.
+  NumberOfSkyCubes > 1 refused (274AE0 builds one SkyCube per cube; the image loader builds one).
+  No [Environment] block: treated as zero cubes.
+  No [Fog] block: viewport clear colour opaque black (original value not recovered).
+tests\native\sky_course_data50gw.inl (existing, kept): NumberOfSkyCubes>1 refused; further internal CUB cubes (GB's
+  flash cubes) read for extent only.
+
+Kept RA-pinned World-chain members hosted in the lighting TU (not R6-designed; see w0-requests\r6.txt item 3):
+  src\game\original_ra_scene_roles270900.inl (10 zones/portals, 185 lights, 180 locals, "ra.cub", Light2 "206,206,185",
+  flare zones 1/7, ambient 172..174 ...), original_ra_static_selection50la.inl, original_ra_zone_projection50la.inl,
+  original_ra_zone_draw50la.inl, original_ra_native_static_draw50la.inl, original_ra_static_visibility50la.inl;
+  RaFlareIdentity tail fixed at 15. The Scene::ra gates were removed (no scene enum exists any more); the RA data
+  pins still make these paths refuse on any other course's data until the World chain owner generalises them.
+
+=================== stand-ins/r7.txt
+R7 stand-ins (each flagged "PORT STAND-IN" / "PORT MAPPING" in code)
+
+kept or added
+- tests\native\material_alpha50gx_fixture.cpp policyFromFields: the GS fixed-alpha additive pass is drawn
+  for FIX=128 only ((Cs-0)*FIX/128+Cd = ONE,ONE); another FIX is refused. (Was: SC lava material pinned
+  by name+SHA; now any material authoring the form.)
+- tests\native\material_alpha50gx_fixture.cpp selectMaSa: the stock beam material (PSM key 0e8d10...,
+  placements author use_lighting=false) draws unlit, keyed on the material's own bytes on any course,
+  until the world owner reads placement use_lighting.
+- tests\native\material_alpha50gx_fixture.cpp: the TA crowd/arrowred zero-alpha cutout stand-in
+  (discardZeroAlpha keyed on PSM bytes) is RETIRED: the 2476A0 DefaultMT alpha test now applies on
+  every course. Visible change to check on TA crowd/arrow signs (5.4 frames).
+- tests\native\course_world_texture50st.h coldSourceByteCeiling50ST / textureBudgets50ST(): one texture
+  budget ceiling = the 50EA hard capacities (allocation guard, logged), replacing the per-course
+  32/64 MiB cold-source budgets.
+- tests\native\material_audio_provider50hi_fixture.h: host voice layout (PORT MAPPING) base 64..79 +
+  extra 192..219 for every course (was 118/128/192 by course); 8+8..44 row layout bound refused, logged.
+- tests\native\positional_sound_rows50sr.h: transport pool 128..151 (24) for every course (PORT MAPPING;
+  RC used 236x28); attached/2D/stereo/start-disabled and omitted-Position soul-tree sounds refused;
+  ambient lists retained, not scheduled (0x2793A0/0x278D70 untraced); attenuation at/after
+  farDistance clamps to 0 (GB form; MC/RC/TB skipped the control there; 291350 untraced).
+- src\assets\original_positional_sounds50sr.h: positionalSoundCeiling50SR=4096 allocation guard (equals the
+  W0 positional_sounds block row); lists are now sized from their authored counts (was a 199/4 stock
+  capacity).
+- tests\native\common_track_media50cr.cpp 05.06: the TOB emitter table is read and counted, but NO common
+  274370 emitter runtime exists (w0-requests\r7.txt item 3). Every course loses its trackside emitters
+  (GB/MC/RC/RA/GC) until that owner lands.
+- tests\native\common_track_media50cr.cpp waterApplication443BB0(): the water runtime's application
+  BSS is one host static (original: one global), shared across races.
+
+retired (were stand-ins)
+- 9 per-course material selectors (select, selectGc, selectGa, selectMb, selectTc, selectRc, selectSc,
+  selectTb, selectGb) and the TA 29-material table -> one selectMaSa.
+- material_audio50HI::Track enum, the 13-row trackProfiles table, prepare/prepareCommonRoute/prepareRc/
+  prepareTb/prepareGb/prepareMc -> one Provider::prepareTrack; readMb/Tc/Tb/McMaterialAudioCatalog50HI and
+  the CatalogShape receipts -> one readMaterialAudioCatalog50HI.
+- gb/mc/rc/tb_positional_sound50xx.h (4 owners, per-course Stock pins) -> positional_sound_rows50SR::Owner.
+- native_ta_particle_cold50la prepareRc/prepareTb/prepareGb (per-course archive SHA/size pins) and the
+  demoprt PRT/PSM identity checks -> one prepare(Track).
+- mc_water50mc.h, native_gc_water_session50KG::Owner (GC water + GC fog/fire lane) -> 05.10 one water.
+- track_materials50fa_fixture::Owner (legacy visual49G loader), track_normals50hk_fixture.h,
+  track_visual_profile_fixture.h (per-course profile table).
+- {gb,mc,rc,ra}_particle_* (25 files): per-course emitter lanes (see the gap above).
+
+=================== stand-ins/r8.txt
+R8 renderer stand-ins
+
+Added: none.
+
+Retired (course stand-ins removed from the renderer):
+  - RA dedicated byte-material world path (raStaticWorld, ra_static_world_gl_storage.inl, local flare inl)
+  - RA FireP0t four-span publication/completion (raStaticFire, completedRaStaticFire)
+  - RC crystal owner (rcCrystal) -> generic VehicleWindowEnvironmentUv50DS producer for any EnvironmentMapCompressed pass
+    (old comment "Stand-in: the retained RC owner is the only environment-map UV producer" removed)
+  - TB world binding (tbWorld, validateTbWorld)
+  - RC/GB/MC particle Windows and their per-course attempt/completion bookkeeping, GB/MC fog colour literals
+    (31/28/55, 100/73/81) -> one particle bank/draw
+  - GC particle pins (demoprt PSM/PST identity, 128x1024 atlas, GCDEMOPR identity)
+  - RA sky literals in the sky source check (192 vertices / 288 indices / 48 spans)
+  - RR_RA_PIXEL_PROVENANCE -> RR_PIXEL_PROVENANCE (course-independent, default off)
+  - scLavaTwoPass / nativeGcSelectedLights names (course-named values of common policies)
+
+Kept (course-independent, pre-existing, unchanged):
+  - vehicle_window_gl50ds_draw.cpp ~1735 "STAND-IN order": pod extra-pass slot drain order
+  - vehicle_window_gl50ds_draw.cpp ~1780 "STAND-IN: saturates instead of an exact bridge" (pod extra pass alpha)
+  - vehicle_window_gl50ds_shadow50ps.cpp ~171 shadow receiver radius from drawn geometry instead of model +198/+130
+
+=================== stand-ins/r9.txt
+R9 stand-ins (each flagged "PORT STAND-IN" in the code)
+
+Retired: F01 Pause RESTART rebuild (restart=port_rebuild), F02 Time Trial finish rebuild (0x1abc0c
+stop), F03 Time Trial Pause QUIT always no-record, F04 HostRaceResults50IL (file deleted), the
+"Start after the finish left to host menus" part of F05, the RA ALL8 identity (track 7/order 4/pod 9),
+the RA world74_ routes in the end dispatch, Results input and 1AC440 camera borrow.
+
+Kept / added:
+1. tests\native\common_race_start50cr.cpp: 1AC8E0's three World74 leaves (2DCC70, 161F60, 2702E0)
+   run together through native_common_results50PD::state().restartWorld at the 2DCC70 position
+   (existing hook; the original runs 161F60/2702E0 after 103210/1A4AB0).
+2. tests\native\common_race_start50cr.cpp: race without its 10C music manager skips 1AC960 (logged
+   race_start_step pc=1AC960 music10C=absent stand_in=1).
+3. tests\native\common_race_start50cr.cpp: the 2AED60(raceFC,500) fade-in of 1AC8E0 is the race's
+   1A7BD0 fade after bit3, not a separate call; 1ACB74 267BE0 not called on a restart.
+4. tests\native\common_race_end50cr.cpp (departRace50CR): 2AED60 500 ms fade of rows 9/10 not run;
+   the frontend receiver's fade-in covers it (logged race_depart step=2AED60 ... stand_in=1).
+5. tests\native\common_race_end50cr.cpp (departRace50CR): 1ACF50 resume refusal on close logged,
+   not fatal (as the 149p open, which may not have paused the world's 4D8 group).
+6. tests\native\common_race_end50cr.cpp (Practice): the 1ABCBC..1ABCFC VCR channel loop is the
+   replay owner's beginReplay.
+7. src\game\original_race_end_dispatch50la.cpp: Results-waiting replay 1ABAD8 keeps the native
+   race78 replay posing instead of the common 1AC8E0 racer resets (existing, reworded).
+8. src\game\original_race_end_dispatch50la.cpp: music 1AC960 skipped without 10C (existing).
+9. PLAN 2.7 failure handling: a refused end dispatch logs common_race_end route=refused and
+   departs to the Course screen (port failure handling, not an original screen).
+Existing 149p ones still in tests\native\original_pause_callback_scheduler50la.inl: 1ACF50 open
+tolerance (:291) and 1AF770 pad-vibration stop by the loop (:296).
+
+=================== stand-ins/restart.txt
+restart helper (in-place 1AC8E0 restart: grid placement + camera reset). Flagged "PORT STAND-IN:" in code.
+Every course and pod takes the same path; nothing below names a course or a pod.
+
+RETIRED
+- tests\native\terrain_interactive_publication50du.cpp placeOnGrid2A2880 (fix-H.txt, round3-H.txt H3 #1): the pose is
+  no longer refused. Publication builds the 2169C0 placement (BC0 = 2A2880 position, Y + racer 7EC lift, W 1.0;
+  BD0 = 2A2880 heading) and calls the continuation's restartGridPlacementCall, which runs the racer's own recovery
+  owners (the same 216A30 stages as 2255B0) in the Ready (between frames) domain:
+  human 1A24F0 prefix + 1A0240 + 216A30, AI 216A30. C30/C34 = first 4C0/4C4 rows. 216A30 grounds the pose
+  itself (reset probe); the host groundGridPose call is gone from the restart.
+- tests\native\original_camera_session50kx.h rebindRacerCameras1ACBA0 (fix-B.txt item 1): the 1750A0 restart part
+  now runs (restart skips 2A2880/179580 because follow+108 preset storage exists; 13DDB0 fov 90 / CE0;
+  1148D0 + 175224 camera scene re-attach at the racer 7F0 zone), plus 1AFC70(B4) (port fields) and for a1 == 0
+  the 1AFD80 countdown re-arm (+ host rows mirror, goPublished_ cleared) and 1AD3C0 start music for 11258 2/3.
+- common_race_start50cr.cpp gap "1AFC70(B4) not performed" (fix-A.txt): now performed inside the resetCamera hook
+  on the port's fields (flags58 bits 0..4, time30, countdown34).
+
+NEW / REMAINING
+1. original_camera_session50kx.h rebindRacerCameras1ACBA0: a1 != 0 (Pause RESTART, 1BD934 a1=1) refuses before any
+   store with pc 175430: 175430(race48) (mode44 4, cut cursor 0, 1756D0 when cuts exist, 62/63 flags, 7C restart,
+   199770) and 1A9750(race,1) need an intro-restart entry into this Session's start state machine. So that no racer
+   is moved or start-locked by a restart that cannot finish, publication.cpp placeOnGrid2A2880 asks
+   Session::restartCameraEntryPorted1ACBA0 first and refuses at grid2A2880 (log refused_pc=175430), the same stop
+   point as before this round. Pause RESTART therefore still logs common_race_start ... result=refused.
+   Time Trial finish and Practice (a1=0) pass both steps.
+2. same member: 1A9750(race,0) not re-run (the fresh viewport / fog / controller layout is kept; same view count).
+3. same member: 2D2090 TV camera +24 = 0 has no port field (body and constants unchanged).
+4. same member: 1AFC70 per-racer 3C[i] virtual74, 40[i]/44[i] = 0, +4C/+50/+54 (no port field in LapTimingManager50ID).
+5. tests\native\original_ai_physical_recovery.h fullReset216A30Tail (216A30 a1 != 0, 21737C..2173F4): 228110 wreck
+   deactivate, 217940 (D40 virtual94, racer virtualA8(0), +64/+68 = 0, +78 = CF8) and the D34 row (-1,0,0,0,0) are
+   not performed (no owner reachable from the continuation's racer visit). Ported: 2179B0, C80..C8C, 844, B9D bit0.
+   Effect: a racer destroyed or limping when the restart starts keeps its wreck/state owners.
+6. tests\native\original_human_physical_recovery.h restart1AEA70: 1A24F0's a1 != 0 block 1A2578..1A258C
+   (racer350+100 = racer10A4, 1098 = 5.0, FF8 = 0) has no Player port field.
+7. tests\native\terrain_interactive_continuation50du.cpp restartGridPlacement1AEA70: 1AEBD0 B0+3C[slot] = 0 (no port
+   field) and, with race1B0 bit4, 1AEC00..1AEC24 D40 virtual80/virtual8C. Human racer 7F4 = 0 has no Player port
+   field (the AI's is navigation.lastZone7F4, cleared).
+8. tests\native\terrain_interactive_publication50du.cpp placeOnGrid2A2880: 1AEC40..1AECE0 (11258 == 3, manager+40
+   record racer: 2A2880 rank 0 + 2169C0 + virtual78(1)) - the record racer is not in the port's bank; the record
+   actor's restart stays the 1ACB18 hook.
+
+NOT STAND-INS (port order / naming, recorded)
+- src\game\undertrack_reset50ew.cpp PlayerControllerReady50LC and src\game\original_gc_gameplay_lighting_candidate.cpp
+  the "player input" lease now admit a Ready original AI with bound owners (the 1AEA70 virtual78 runs between frames
+  for every racer). Names kept to avoid a header round; rename to ReadyBetweenFrames with the next header batch.
+- The human restart uses the human State's one Ready-domain serial (originalManualResetSerial), the AI its own
+  State::restartSerial (one per restart).
+
+=================== cr-29 round: live intro pod frames
+RETIRED (narrowed): "pods get one quiet update before the countdown instead of live intro frames"
+(19fec60). tests\native\terrain_interactive_loop50du.cpp, held start-gate branch (camera
+startHeld: intro cuts and countdown, fresh race and every in-place 1AC8E0 restart): every step
+runs one complete native frame per racer (opponents, then slot 0 inside its Bank visit), before the
+step's scene/camera children (heldBeforeStart reads them Ready). Pods are held only by 1AED30's
+axis lock and the racers' own byte-58 (B4+58 bit1) gates, as in the original. Log at GO:
+intro_pod_frames race=<n> frames=<n> reason=fresh|restart.
+Proven from the original (SLUS_202.68, work\scratch\dis_all.txt):
+ - 1A7B40 calls 141ED0(race,dt) at 1A8304 on every race update with no start test (1A82E0..1A8304 is
+   a one-time static guard only), so every racer child updates on every intro-cut and countdown frame.
+ - The B4 timing manager 1AF9C0 runs 1AFF50 (per-racer timing, 1B0400 ranking, 1B02F0, 1B0920) and
+   1B0CB0/1B0A70 only when B4+58 bit1 is set and bit0 clear (1AFA0C..1AFA44): no ranking or timing
+   before GO. The port not stepping the rank pass before GO is therefore faithful (no longer a stand-in).
+ - The player's 1A0DA0 navigation is gated inside its own frame on byte 58 ((58 & 3) == 2); the port's
+   frame has the same gate.
+ - The pad is read every frame (1A1A20). RETIRED: slot 0's intro frame now gets this poll's live
+   packet, composed with controls not yet permitted (the racing step's countdown hold), not a neutral one.
+Remaining PORT STAND-INs (flagged in code):
+ - the port's racer-contact pass and host race session (host owners, stepped only by the racing step)
+   do not run before GO; which original owner performs racer contacts is not proven;
+ - the first frame before the first displayed image (cold publication / restart) stays the quiet
+   setup form (raceSetupFrame; tests\native\terrain_interactive_continuation50du.cpp setupTickRacers).
+   The original has no separate first frame; it is kept so the first image has pod graphics before
+   the loop's first step, and because at cold publication the race audio is not yet running.
+The cr18 wreck fix (destroyed frames close with the body phase markers at FrameReady,
+terrain_interactive_frame_physics50du.cpp advancePhysics) is unchanged and still applies: a restored
+racer enters both the restart setup tick and the live intro frames between frames.

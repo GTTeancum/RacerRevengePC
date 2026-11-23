@@ -1,0 +1,302 @@
+cr-16 helper: player-frame allocation (fault 1) and MC frame rate (fault 2)
+Worktree: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main (common-rewrite, from e05f0f9). Not built, not run, not committed.
+
+======================================================================
+FAULT 1: "successful player physics frame allocated C++ storage"
+======================================================================
+Evidence (shared event on all three failing runs)
+- GA  (cr15s-GA-single-P4 line ~1523): last event "TRIGGER WORLD ACTION: dispatches=29". GA triggers
+  (log line 200): kinds=Animation,LostAI x8,Animation+PodSound. Animation row 2 "opening" starts on trigger10
+  and had never started before (track_animation_state row=2 started=0 all race).
+- GC  (cr15b-03-GC-time_trial-P17 line 1799-1800): "TRIGGER WORLD ACTION: dispatches=4 opening_active=1",
+  then the failure. GC triggers: LostAI x8, Animation+PodSound.
+- GB  (cr15b-11-GB-single-P11 line 1206-1207): "TRIGGER WORLD ACTION: dispatches=3 opening_active=1",
+  then the failure. GB triggers: ... Animation+PodSound (trigger 16).
+- MC fires an Animation-only trigger (row 1 by_trigger=21) and finishes the race with no failure, and LostAI
+  dispatches never fail. The one thing every failing run shares is a PodSound action.
+
+Root cause
+- D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_cold_contacts50du.cpp
+  (PodSound sink apply) called voice->start(e.authored->filename).
+- D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\gc_gate_audio50in_fixture.h:114
+  start(file) calls normalized(file); line 31 normalized takes std::string BY VALUE and returns a new string.
+  "sfx/race/bigdoor.vag" (20 chars) is past the small-string buffer, so it is a heap allocation inside the race
+  frame. The trigger entry runs inside the racer's own collision query, i.e. inside the all-8 frame the guard
+  measures (terrain_interactive_loop50du.cpp, "successful player physics frame" check).
+
+Change (.cpp only)
+- terrain_interactive_cold_contacts50du.cpp: at cold (allocation allowed), compare every authored PodSound
+  action's Filename with the first one (case and slash insensitive, no allocation). When they all name the same
+  file (every stock course: GA, GB, GC, TB), the sink's apply calls voice->start(), which plays clip_ =
+  podSoundFiles[0] = that same file: identical sound, no copy. Rule is data-driven, same for every course.
+- PORT STAND-IN (flagged in the code): a trigger list naming two different PodSound files keeps start(file) and
+  its allocation, and logs "trigger PodSound several files: ... header fix pending". No stock course does this.
+
+Header fix NOT made (needs a header edit; write-up only)
+- gc_gate_audio50in_fixture.h (included by 4 .cpp: terrain_interactive_cold_contacts/continuation/publication/
+  setup50du.cpp): start(file) should compare names in place (same loop as my cold compare) instead of
+  normalized(). Then the stand-in above can go.
+- SAME BUG, NOT YET HIT: positional_sound_rows50sr.h:96-101 triggerClipFor() builds pcmName(filename)
+  (copy + ".vag") on every trigger Sound preflight AND apply. TC authors Animation+Sound+Sound on trigger 11
+  (trigger_sounds=2 in cr15s-TC-single-P8). TC's cr-15 run ended before any trigger fired, so it has not shown,
+  but TC will fail the same guard when the player reaches trigger 11. Fix: resolve the clip with an in-place
+  compare (strip ".vag", '\\' vs '/'), no string building. Header included by 4 .cpp (common_track_media50cr,
+  terrain_interactive_cold_contacts/continuation/setup50du.cpp). I could not do this from a .cpp: the clip
+  table is private.
+
+Sweep of other event points on the frame path (read, not run)
+- Trigger Animation fire (track_animation_runtime50an.h:427) and the later row motion: no allocation
+  (MC fired and played its animation all race without tripping the guard; GA/GC/GB failed on the trigger
+  frame itself, before the animation advanced).
+- Trigger LostAI: pointer store only.
+- Trigger Particles (track_particle_emitter_sink50cr.h -> applyTriggerAction): allocates only on refusal paths
+  (std::to_string in the error text), never on success.
+- course_trigger_actions50ct.h: error_ string assigned only on refuse/failure.
+- Track emitters advance (terrain_interactive_loop50du.cpp advanceTrackEmitters): the span map is rebuilt only
+  when the owner/spans change (first frame); steady frames do not allocate.
+- common_lap: already stack formatted (e05f0f9).
+Not swept exhaustively: the camera child, AI manager and every native leaf. If another event trips the guard
+after this fix, the line just before require_failed will name it.
+
+How a log shows it fixed
+- GA/GC/GB: the TRIGGER WORLD ACTION line with opening_active=1 (GA: dispatch on trigger 10) is followed by
+  normal race lines, no "require_failed successful player physics frame allocated C++ storage", and the
+  track_animation_state row for "opening" shows started=1 by_trigger=10 (GA) / 9 (GC) / 16 (GB).
+- No "trigger PodSound several files" line on any stock course.
+- TC stays at risk until the positional_sound_rows50sr.h fix is made.
+
+======================================================================
+FAULT 2: MC frame rate (44 FPS average, worst 5 s 22 FPS)
+======================================================================
+Evidence
+1. The slow windows are exactly the windows where the water is drawn. In cr15s-MC-single-P12 the
+   native_water_surface counter "drawn" rises from 21 (line 1487) to 4248 (line 3035) while FPS sits at
+   23-47; from line 3035 to 3523 drawn stays at 4248 (water hidden, sees=0) and FPS is back at 60-62; at line
+   3625 water draws again and FPS drops to 43 (this time with no simulation steps at all: steps=0).
+   Track draw counts do not explain it (2-80 draws in slow windows, same range as fast ones).
+2. Hitch split while water is drawn (frame_hitch lines from 1495): render_submit about 20 ms, "input_audio"
+   about 7 ms, simulation about 6.5 ms. Note: frameHitch50DU.physics is stamped at the LAST catch-up step
+   (loop.cpp ~2171), so "input_audio" includes the earlier catch-up step; a 33 ms frame is two ~6 ms sim steps
+   plus ~20 ms of render.
+3. The water itself is not new: the old MC runs drew the same 1020 strips / 2040 passes / 69360 vertices
+   (w145c-MC-GC-19 line 391-393, r145g5-MC-15 line 421-423). r145g5 was also slow (40-50 FPS) in its
+   water windows; w145c was at 62.
+4. What did change: simulation per step. w145c MC step average 1.6-2.0 ms (lines 1536-2157); cr15 MC
+   4.0-6.9 ms; cr15 GA 6.2 ms. That is on every course, not MC only. On GA the render is light so the
+   frame still fits 16.7 ms; on MC water render plus ~5 ms per step does not fit, so the loop runs two steps
+   per frame and slides into catch-up (the 3227 catch-up steps).
+So: MC is slow because its water render pass is the heaviest render of any course, and the common-path
+simulation step now costs about 2.5x what it did before the rewrite, which pushes MC over the frame budget.
+None of the suspects named in the brief is proven: the "near > far" change in d6338bc is the positional
+SOUND distances (positional_sound_rows50sr.h), not fog; the flare pass change is per-image depth write only.
+
+What I could NOT prove
+- Which render part costs the ~20 ms: the water CPU surface build (header-only code,
+  native_water_surface50ws.h / original_water_surface50ws.h, 69360 sampled vertices per frame), the 2040 water
+  draw calls with a texture bind each (vehicle_window_gl50ds_draw.cpp drawWater), or the particle pass (MC's 32
+  placed fires; particleRender.build runs only on water courses, loop.cpp ~3300).
+- Which step part grew from ~2 ms to ~5 ms: the window line prints only the worst step's split.
+So I made no behaviour change for fault 2. Measurement added instead (cheap, once per 5 s window):
+
+Change (.cpp only, measurement, no game or GL state)
+- tests\native\terrain_interactive_loop50du.cpp
+  * StepSplit50GG keeps the sum of every step's split; new line after window_submit_fps:
+    "step_avg_ms steps=N children/racer_physics/world_service/ai_manager/camera/contacts/field/presentation/fleet_other a/b/c/..."
+  * RenderCost50CR: steady_clock around native_water_surface50WS::buildFrame, particleRender.build and
+    renderer.submit; new line every window:
+    "render_cost_ms frames=N submit_avg/worst=x/y water_build_avg=x water_frames=N particle_build_avg=x particle_frames=N last_particle_draws/quads=a/b"
+- platform\linux\native\vehicle_window_gl50ds_draw.cpp (drawWater): CPU time of the water GL calls, appended to
+  the existing native_water_draw line as "gl_cpu_ms_avg/worst=x/y" (average over the last 625 water draws).
+  Adds #include <chrono>. Renderer .cpp only, no header.
+
+How the next MC log pinpoints it
+- Compare render_cost_ms in a window with water_frames about 300 against one with water_frames 0:
+  water_build_avg large -> the CPU surface build (header work, needs a header round);
+  submit_avg large and native_water_draw gl_cpu_ms_avg large -> the 2040-call water pass;
+  particle_build_avg or last_particle_draws large -> the particle pass.
+- step_avg_ms on MC and GA versus the old ~2 ms step shows which step part grew (likely children and
+  racer_physics; worst-step values went from 0.45/0.35 ms to about 2/2.5 ms).
+- Fixed means: MC race windows at 60+ FPS with water_frames high, and race_fps_summary avg_fps about 60.
+
+======================================================================
+cr-17 follow-up: SA race 2 slowdown after the in-place restart (cr17-04-SA-single-P02)
+======================================================================
+Finding: the slowdown is a stretch of SA, not the restart, as far as the logs show.
+- Race 1 lasted only about 20 s (1215 frames) before Pause RESTART, so it never reached the slow stretch.
+- Race 2 is at 51-62 FPS for its first 30 s (log lines 1475-1904), drops to 14-25 FPS from race time
+  about 34 s to 74 s (lines 2024-2626; camera zones 5..22, positions x 4200-6600, z 9000-13500), then is at
+  60-62 FPS again for the rest of the race (lines 2666-3131). A leak or a thing grown per restart would not
+  recover in the same race.
+- MA in the same build (cr17-05) restarts the same way and race 2 holds 62.4 FPS (min 5 s 61.1).
+- In the slow stretch the CPU side is normal: step average about 5 ms (step_avg_ms, same split as the fast
+  windows), renderer.submit about 3.5 ms (render_cost_ms submit_avg). The time goes to the completion/swap
+  phase: frame_hitch completion_swap_ms averages 37 ms over 170 hitch frames (up to 129 ms), against 2.7 ms
+  on RA. So the frame waits on the GPU or the display completion, not on simulation or GL submission.
+- Track draw counts are low there (2-57 draws), so it is not track geometry count. Not explained yet:
+  which GPU pass (shadow receivers over the track spans, transparent world, flares, FXAA, blur) or a
+  completion-side wait (history staging / capture inside swapAndCapture).
+- Pre-rewrite SA full races ran 62.3-62.5 FPS (c147-sa-r19, eyecheck-stock-hall-record-sa23), so this
+  stretch is a regression of the rewrite, but I could not prove which change.
+
+No fix made (cause not proven). Logging sharpened (tests\native\terrain_interactive_loop50du.cpp, .cpp only):
+- render_cost_ms now also prints completion_avg/worst (the whole swapAndCapture call),
+  complete_display_avg (renderer.completeGameplayDisplay inside it), completions and capture_frames
+  (frames with captureWindowImage set). If completion is large but complete_display is small, the capture
+  path is the cost; if complete_display is large, it is GPU completion/history/swap.
+To find the GPU pass, the renderer already has a diagnostic mode (no code change needed): run SA with
+RR_TRACE_PHASES=1 and RR_TRACE_GPU_STAGES=1. That finishes the GPU after each stage and prints
+"renderer_completed_stage name=sky/track_world/player_draw/opaque_opponents/cables/transparent_world/
+pod_glass/original_shadows/transparent_racers/binders_particles/coverage_resolve/hud_blur wall_us=..."
+per frame (vehicle_window_gl50ds_draw.cpp traceRendererStage). It slows the run and prints every frame,
+so use it for one targeted SA run only, never as an FPS measurement. Compare the stages between race time
+20-30 s and 40-60 s.
+
+MC water: no cr17 MC run exists yet (only cr17-01..06 in evidence), so nothing to report there. The
+render_cost_ms and native_water_draw gl_cpu_ms lines are in place for it.
+
+======================================================================
+cr-20 round: MC 49 FPS, SA/TC mid-race stretches, AA1 lead, MC particles.attachments receipt
+======================================================================
+1. The AA1 lead does not hold on the cr-20 logs.
+   Max per-5 s averages over every race window, cr20-* (render_cost_ms):
+     course  avg/min5 FPS (race1, race2)  submit_max  completion_max  water_build_max
+     TA      62.5/62.3, 62.5/61.9           2.6 ms       0.9 ms          0
+     GA      62.5/62.4, 61.2/54.1           2.5          0.1             0
+     SA      62.5/62.4, 62.4/61.4           3.3          0.2             0
+     TC      62.5/62.4, 62.1/56.5           3.0          0.3             0
+     MA      62.5/62.3, 62.5/62.2           2.7          0.1             0
+     MB      62.2/61.1, 62.4/57.4           3.0          0.2             0
+     SC      60.1/56.2, 58.9/37.4           5.4          0.3             0
+     MC      59.4/55.7, 46.5/29.7           4.0          1.6             10.1 ms
+   - The AA1 courses (TA, TC, MA, MB, MC, SA, SC) submit in 2.6-5.4 ms, the same range as GA/GB/TB;
+     their end-of-frame GPU wait is 0.1-0.3 ms. If AA1 cost GPU time, it would show in completion_avg
+     (the CPU waits on the GPU there); it does not. If it cost CPU, submit would rise; it does not.
+   - The SA and TC stretches seen in cr-17 (37-40 ms waits on the GPU/display) are gone in cr-20: SA
+     race 2 (6767 frames, the whole race) 62.4 avg / 61.4 min 5 s; TC race 2 (13517 frames) 62.1 / 56.5.
+     Something between cr-17 and cr-20 removed it. Not proven which; a candidate is 47fd2d7 (racer textures
+     at their real square size instead of 64x64). Nothing left to fix there on this evidence.
+   - SC race 2 min 37.4 and MB/TB dips are separate small items; not chased this round.
+
+2. MC: the cost is the CPU water surface build, plus the higher simulation step cost.
+   cr20-12-MC-single-P12: every slow window has water_frames > 140 and water_build_avg 8.0-10.1 ms per
+   frame (lines 2038-3018); every window with water_frames 0-2 is at 59-62 FPS. The water GL pass is cheap
+   (native_water_draw gl_cpu_ms_avg 0.13-0.18 ms for the 2040 draws), submit stays 2.3-3.2 ms, and the GPU
+   wait is about 0.1 ms. So it is not the 2040 draws, not AA1, not flares and not the GPU.
+   - What the build does: src\game\original_water_surface50ws.h:234 buildWaterSurface50WS samples
+     (rows+2) x (columns+2) = 258 x 67 = 17,286 grid points per frame. Each one calls
+     tests\native\native_water_surface50ws.h:56 sample() (wake buckets plus
+     src\game\water_height50jc.h:131 signatures(), every add/mul through the checked volatile Math). Then it
+     emits 69,360 vertices with a 4-neighbour normal each. The grid (MC 85/4) is the original's own size.
+   - The water code itself is not new: the same grid and strips ran before the rewrite (w145c). What
+     changed is the step: about 5 ms per simulation step now (step_avg_ms on MC: children 1.4-1.7,
+     racer_physics 1.5-2.0, world_service 0.7-0.9, camera 0.05-0.5, contacts 0.2) against about 2 ms in
+     w145c. 9 ms water + 5 ms step + 3 ms submit is over the 16.7 ms frame, so MC falls into catch-up
+     whenever the water is visible. GA/SA/TC have no water, so the same step cost still fits.
+   Fix: needs a header edit, so I did NOT make it (round-1 rule). Proposed, faithful and bit-identical:
+     original_water_surface50ws.h (included only through native_water_surface50ws.h, i.e. by
+     terrain_interactive_continuation50du.cpp, terrain_interactive_loop50du.cpp and
+     terrain_interactive_publication50du.cpp; it is NOT the 156-file renderer header).
+     (a) The 17,286-point loop (lines 270-290) is a pure function of the frame inputs: the sampler only
+         reads the water runtime, which does not change during the render. Split it by rows over a small
+         persistent worker pool (2-4 host threads made once at water cold load, joined at close). Each point
+         writes only its own scratch slot. Merge the counters (rayMisses, sampleFailures, height min/max) in
+         row order after the join. The output is identical bit for bit, and the build time is divided by the
+         worker count (expect about 9 ms -> 3 ms on 4 cores).
+     (b) Optional, also identical: the emit loop computes the same normal twice per grid point (pass A
+         and pass B) and three times at band seams. Compute N once per point into scratch before emitting.
+   How a log shows it fixed: on MC, render_cost_ms water_build_avg about 3 ms or less in windows with
+   water_frames about 300, and those windows at 60+ FPS; race_fps_summary MC avg about 60.
+   Separately: the ~2 ms -> ~5 ms step growth (children and racer_physics) affects every course; it is the
+   headroom MC lacks. Not investigated this round. A GPU-stage traced run would not help with it (it is CPU).
+
+3. MC particles.attachments value=40 receipt=differs(8): the reader logged the wrong count; the runtime is right.
+   - The receipts mean attached emitter instances and distinct attached world models
+     (stock_course_receipts50cr.h: GB attachments 67 / placements 55, MC 8 / 2). cr-20 logs: GB attached=67
+     graphs=55 (match), MC attached=8 graphs=2. The reader passed s.placements.size() (40), which also counts
+     MC's 32 unattached Fire rows placed by Position (rows 8..39). Those rows are real emitter instances: the
+     original 27C7B0 loads them and the retired MC chain ran all 40 too. So the old pin is right for what it
+     names, and the runtime is right to run all 40.
+   - Fix (tests\native\common_track_emitters50cr.cpp, log only): particles.attachments now reports the
+     attached instance count. A new particles.placements line reports the distinct attached world models
+     (graphCount). The total stays on the common_track_emitters line as placements=. Expected next log: MC
+     attachments value=8 receipt=match, placements value=2 receipt=match; GB 67/55 match; others
+     receipt=none.
+
+No GPU-stage traced run is needed for this round: MC's cost is CPU and is located.
+
+======================================================================
+cr-24 round (approved header change): water build split + normal once; step growth check
+======================================================================
+Water (src\game\original_water_surface50ws.h, tests\native\native_water_surface50ws.h; reached by 3 TUs:
+terrain_interactive_continuation/loop/publication50du.cpp)
+- WaterSurfaceWorkers50WS: 0-3 persistent host worker threads (hardware threads - 1, at most 3;
+  RR_WATER_WORKERS=0..3 caps it, 0 = one-thread build). Made on the first water build, joined at process exit.
+  The caller runs part 0. For every job the workers take the caller's MXCSR (rounding, flush/denormal modes)
+  and fenv rounding, so every operation rounds as on the game thread.
+- buildWaterSurface50WS(..., parallel=true) now runs three phases over a fixed contiguous partition:
+  1 sample: grid-point rows [-1..rows]; the per-point ray/plane and sample() maths unchanged.
+  2 normal: each emitted point's 4-neighbour normal, computed once and stored in the point. It was
+    recomputed per pass and per strip sharing the point; same expression, same inputs.
+  3 emit: strips in kick order. Strip s writes output slots [s*68, s*68+68) (pass A 34, pass B 34), the same
+    order the old push_back produced. out is resized to the cold-reserved capacity (no new allocation).
+  Every part writes only its own slots and its own counter row; every slot access goes through a bounds-checked
+  accessor (refused, not written, if out of range). Counters are merged in part order: sums, plus min/max.
+  The min/max equal the old running min/max over the same points. The degenerate-normal count still counts
+  per emitted vertex.
+- Requirement noted in the code: f.sample must be re-entrant and read-only. The one sampler
+  (native_water_surface50ws.h sample()) only reads the completed water runtime and uses a local Math.
+- Logs: native_water_surface (every 625 frames) gains "build_ms_avg/worst=x/y build_frames=N parts=P",
+  averaged over the builds since the previous line. render_cost_ms water_build_avg also still shows it.
+  RR_WATER_VERIFY=1 (muted A/B run only): every 625th build is repeated on the calling thread alone and
+  compared byte for byte (vertices and counters): "native_water_verify ... result=match|differs".
+- Expected: MC water_build_avg 8-10 ms (cr-20) -> about 2.5-3.5 ms with 4 parts; MC windows with water at
+  60+ FPS. Not built or run. To prove it, run MC once with RR_WATER_VERIFY=1 (expect result=match on every
+  line) and once without (FPS).
+
+Simulation step "2 ms -> 5 ms": not a rewrite regression on the like-for-like evidence.
+- The 2 ms baseline (w145c-MC-GC-19, average 2.01 ms over 218 windows) is not comparable. The pre-rewrite
+  single race on the same course and roster, r145g5-MC-15 (8 racers, 1 human), averaged 4.98 ms per step;
+  cr20-12-MC averages 4.85 ms. Other pre-rewrite single races: r145c-SA 5.58, r145b-MA 5.18 against cr20
+  SA 4.14 and MA 3.35. w145c-GA 2.75 against cr20 GA 6.04 is the only clear rise.
+- The steps were never 2 ms in ordinary 8-racer races; w145c differs in run setup, not in build. Not
+  resolved: what in w145c made it cheap. Its pod (POD19, 60 nodes) and test inputs differ.
+- One real addition: racer contacts now run. Pre-rewrite logs show racer_contacts passes=0 (they never ran);
+  cr-20 runs them (contacts about 0.2 ms per step, step_avg_ms). This is the original pod-pod pass, faithful,
+  kept.
+- GA (6.0 ms) and GB/GC single (7.2 ms) are the heaviest per step now. No pre-rewrite GB/GC single race with
+  steps was found to compare against. Not chased further this round. The step_avg_ms split
+  (children/racer_physics) is in place for a targeted look if wanted.
+
+======================================================================
+cr-25 round: MC still 42 FPS after the water split (cr25-MC-water)
+======================================================================
+Water change confirmed: build_ms_avg about 3.7-4.8 ms (was 8-10), 7/7 native_water_verify result=match.
+Per-frame accounting from the 5 s windows (frame = 5000 ms / frames; sim = steps/frames x step avg;
+other = frame - sim - submit - water - particle - completion), same round so machine load cancels:
+  MC slow windows: frame 24-50 ms = sim 9-27 + submit 2.7-4.6 + water 3.6-5.4 + other 7.5-12.8
+  MC water-free:   frame 16-23 ms, other 7.5-9.2
+  TA (cr25-exit-hall-TA): frame 16-20 ms, other 8.6-9.7; MB: other 7.5-10.1
+1. "other" is the same ~8-9 ms on every course: it is the CPU frame preparation between the render stamp
+   and renderer.submit (frame_hitch render_submit minus submit: MC 15.9, TA 16.6 ms in hitch frames).
+   It is not MC-specific, but it is the biggest fixed per-frame cost and the reason any extra cost tips a
+   course into catch-up.
+2. MC's own extras over TA, per simulation step (step_avg_ms averages):
+   world_service 0.95 ms against TA 0.10 / MB 0.14, and racer_physics 2.28 against 1.75 / 1.98. Per frame:
+   water build about 4 ms.
+3. Why MC collapses (frames down to 50 ms): the fixed frame cost (prep ~9 + submit ~3 + water ~4 = 16 ms)
+   is at the 16.7 ms budget before any simulation. Every step (6.5-7 ms on MC) then pushes the frame over,
+   so the loop runs 1.5-3 steps per frame (catch-up 3291 steps, dropped 979 ms), which makes the frame longer
+   again. Machine load in this round makes it worse, but MC's margin is negative even without it.
+Cause not narrowed to one function yet. Logging sharpened (tests\native\terrain_interactive_loop50du.cpp,
+.cpp only, measurement only):
+- render_cost_ms gains prep_avg (render stamp -> submit: player and opponent batches, cables, Binder,
+  flames, shadows, HUD, water and particle builds).
+- render_cost_ms gains world_steps and world_animation/water/particles_avg: the world_service split per
+  step (advanceWorldAnimations = timed lights, track animations, ATM, trigger exit service; advanceWater =
+  water runtime advance; advanceTrackParticles + advanceTrackEmitters).
+For the full split inside prep with no code change, the existing collector: run MC and TA once each with
+RR_TRACE_RENDER=1. Every 5 s it prints render_subphase lines (draw_bank, vehicle_projection, host_camera,
+source_cables, host_hud, driver_submit, census, opponent_preparation, opponent_draw_batch, opponent_lights,
+opponent_cables, opponent_binder, opponent_flame) and opponent_draw_stages (clock reads only, no GPU sync).
+Do NOT add RR_TRACE_GPU_STAGES (it finishes the GPU per stage). RR_TRACE_PHASES=1 would also add
+simulation_subphase lines, but it turns on per-frame renderer_stage lines (large log); optional.

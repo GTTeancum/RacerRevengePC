@@ -1,0 +1,332 @@
+DLC career: add-on pods as the player in every stock feature (tournament career, Garage, ...)
+=============================================================================================
+2026-11-21, round 2. Branch common-rewrite, worktree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main
+(base cd97a90, uncommitted). PORT EXTENSION, NOT ORIGINAL BEHAVIOUR. Game not built, not run, not committed.
+Governing: D:\Programming\GitHub\RacerRevengePC\CLAUDE.md (one common path; no per-pod code; stock save untouched).
+
+User rules (final, 2026-11-21):
+ R1 The career/tournament is untouched: stock courses and stock AI opponents only. No add-on course in the
+    tournament; no add-on pod as an AI opponent in the tournament.
+ R2 Add-on pods as the PLAYER get every stock player feature ("Pods should all be treated the same", "All the
+    same features"): same original rules (rewards, growth, unlocks, Garage), differing only in where the data
+    is stored: the DLC side save, never the stock save. Their career progress opens free-play courses the
+    same way stock progress does (read-time merge, the stock byte is never written).
+ R3 Add-on courses: Free Play, Time Trial and 2-player VS only.
+ R4 Single-play AI: on an ADD-ON course add-on pods may be AI opponents (port the free-play opponent draw
+    1AE620, add eligible add-on pods to its candidates on add-on courses only); on a STOCK course the AI field
+    stays stock only (existing exclusion, addonRiderMayBeAi).
+
+
+1. How the original holds the tournament and Garage state
+---------------------------------------------------------
+Profile P = App2DC (port: OriginalUiRiderProfileOwner50KG::Storage, the one career owner,
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_rider_profile50kg.cpp).
+  P+100C0   selected career = the selected racer 0..26 (port comparison100C0)
+  P+1125D   packed rider bits (rider in bits 3..7: a 5-bit field, cannot hold 32..99)
+  P+1920 + k*0x894, k = 0..26   one CAREER per racer (OriginalTournamentCareer50KG):
+      27 POD rows p*0x50: abilities 1920 (6 f32), medals 1938 (13 u8), remaining prizes 1946 (13 s16).
+      Row p == k is the player's own pod; the other 26 are the AI opponents' abilities, grown after each
+      advancing race (native 1AF4B0: 156 shared-RNG draws).
+      +0x870 earned 2190, +0x874 unspent 2194, +0x878 kills 2198, +0x87C progress 219C, +0x87D name 219D
+  P+0180 / P+0408   base / maximum ability tables per pod (constructor + PHY)
+  P+100C8           constructor prize halves; 100C4 course order; 100E8 PAR; 100CC kill %
+  P+11018           course availability (bits 0..4 open courses, bits 5..6 gallery tier)
+  P+102CC           circuit-boundary flag of the last result; P+7E8 rival-beaten word; P+10FAC unlock words
+Flows: Rider Confirm 1EA54C..5A8; Course mode-2 launch; field 188470 (class tables 3A8940/60/80); in-race AI
+abilities careers[100C0].pods[racer]; result 1875C0 + 187900/187A20 + 1AF4B0 + 187D80; unlocks 187E30; ack
+1AB5BC; Garage 1FEB90 (diagonal abilities + 2194, marks 100BC); Garage model UI/UIGARAGE/<100C0>E.RES;
+name entry 1CA528 mode 3; reset 1800E0; all 27 careers are part of the stock save.
+
+2. Where an add-on pod fits (no stock bound crossed)
+----------------------------------------------------
+- The add-on tournament Confirm runs the ORIGINAL Rider Confirm for its anchor stock rider (P1's last stock
+  Confirm, as in free play). 100C0 / 1125D / remembered words / stock save keep that anchor.
+- The add-on CAREER is host-side (D:\...\cr-main\src\game\dlc_career50dl.h/.cpp), latched by that Confirm,
+  and answers every "selected career" query while 100C0 == anchor in mode 2. Same shape as a stock career:
+  scalars, 27 stock pod rows (AI opponents), the add-on's OWN row (the original diagonal).
+- One reward body: 1875C0/187D80 is one internal core (original_tournament_result50kg.cpp) used by the stock
+  career (own aliases careers[C].pods[C]: every access is the original's) and by the add-on career. The
+  original rule "skip the player's own pod" in 1AF4B0 applies unchanged; the add-on pod is not among the 27
+  rows, so all 27 grow (162 draws).
+  Host check: D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\career-host-check\reward_equivalence.cpp
+  (build.cmd): 20000 random stock cases against the cd97a90 body, 0 mismatches (receipts, all 27 careers
+  bit-exact, availability, RNG); 4 add-on bound/shape checks pass.
+- Tournament race (R1): stock course; field = original 188470 with the add-on number as the human (the
+  original exclusion swaps nothing), 7 stock opponents; the human loads through the common roster.
+- Availability (R2): the profile's availability READS (Course, Hall, tournament snapshots, Hall planet
+  bound) take bits 0..4 = max(stock byte, add-on careers' availability). The add-on value is the 187D80 rule
+  in closed form: the rule raises availability by one whenever progress equals it, so for a career whose
+  availability starts at or above its progress the result is min(13, progress + 1); the largest over every
+  stored add-on career (dlc50DL::addonCareerAvailability). Bits 5..7 stay the stock byte's. The add-on result
+  runs 187D80 on the merged value (its output is not stored: the closed form re-derives it). The STOCK career
+  still runs 187D80 on the stock byte alone, so the stock save is exactly what it would be without DLC
+  (FLAG: in the original one shared byte; a stock career below an add-on's merged value can advance the
+  stock byte where the shared byte would not have; stock races themselves are identical).
+- Garage: base / maximum = the add-on PHY [BaseAbilities]/[MaxAbilities]; prices and limits are the original
+  1FEB90/1FE374 rules on those values; the stock card-dirty bit 100BC is not set.
+
+3. DLC side save (D:\...\cr-main\src\assets\dlc_progress50dl.h, schema rrpc-dlc-progress/3, round 3)
+-----------------------------------------------------------------------------------------------------
+Written: /3. Read: /3, /2 (careers without ai/name/boundary, no unlocks), /1 (no careers); older files are
+rewritten as /3 at the next save moment. All or nothing, bounds-checked:
+  careers{ "<pkg>/<pod>": earned, unspent, kills, progress 0..13, pod{abilities[6], medals[13] 0..8,
+           remaining_prizes[13] s16}, ai[27] (same row shape; absent = seeded from base0180 at the next
+           latch), name (<= 20 printable ASCII), boundary 0/1 }
+  unlocks{ stock_pods: [0..26 ...] granted by add-on careers, gallery_tier 0..3 }
+Read merges (profile owner): unlock word 10FAC = the stock word, or 1 when granted here; gallery tier
+(11018 bits 5..6) = max; availability bits 0..4 = max with the add-on careers' 187D80 value. Nothing here is
+ever copied into the stock save. The round-2 process-memory stand-in is retired.
+Host check D:\Programming\GitHub\RacerRevengePC\work\scratch\146p-race\check\career_check.cpp still expects /2
+to be written: update it to /3 (plus ai/name/boundary/unlocks round trips) before relying on it.
+
+4. Feature table: every stock player feature, add-on status
+------------------------------------------------------------
+works       = in main / this branch before this round
+this round  = code written this round (syntax-checked, not built or run)
+next round  = not done; reason given
+Feature                                   | Add-on pod status
+------------------------------------------|---------------------------------------------------------------
+Rider screen carousel, name, model, stats | works (free play, VS); this round: Tournament page (P1) with the
+                                          | career's own row, medals, progress
+Free Play race (stock + add-on courses)   | works
+Time Trial (solo field)                   | works
+2-player VS (both players add-on)         | works per 2026-11-16 rules (VS verification still open)
+Results / replay screens, Results name    | works (roster page draws AddonPod::name by racer number; the
+                                          | tournament Results use the same path)
+Hall of Fame records (merged display)     | works (side save, merged at display and qualification)
+Tournament: Rider Confirm into a career   | round 4: latched by the Rider session at the add-on Confirm, BEFORE
+                                          | the Tournament destination is prepared (round 2 latched at the
+                                          | profile commit, after the destination's career snapshot: the
+                                          | 1EA5E4 confirm-dependency check would have refused it); the profile
+                                          | commit only checks the latch matches the highlighted add-on
+Tournament screen name / colours          | this round (package name, ui.colors)
+Tournament screen portrait / background   | round 4: 1EEC40 takes the package's own portrait (ui.portraits,
+                                          | the add-on portrait fallback material) and background
+                                          | (ui.background PSM/PST) from its own archive
+                                          | (src\game\dlc_addon_ui_archive50dl.*), image namespace 0x5447,
+                                          | bank addonArchives; a missing member refuses the screen
+Tournament screen pod MODEL               | NOT DONE (round 4): still the anchor's pod (loadTournament by
+                                          | 100C0). The add-on Rider model is drawn by its own overlay path
+                                          | (original_ui_rider_addon_overlay50dl), not the backend material
+                                          | rows the Tournament pod owner uses (rows keyed by APPSTART
+                                          | material names an add-on pod does not have, footprint
+                                          | tournamentPod requiring a UITOURN member, materials requiring the
+                                          | stock Rider archive). Needed: a Tournament add-on overlay like the
+                                          | Rider's, laid out by the anchor career's UITourn widget 39..61.
+(round-3 note kept below for history)
+Tournament screen pod model / portrait /  | NOT DONE (round 3). 1EEC40 in
+background                                | original_ui_tournament_career_resources50kg.cpp loads the pod
+                                          | (loadTournament by 100C0 = the ANCHOR), portrait NN_flrg and
+                                          | background NN_bkg; its image sources are keyed by catalog member
+                                          | identity (archive id + member ordinal), which a package archive
+                                          | (loadAddon, no catalog identity) lacks. Needed: the pod through
+                                          | OriginalUiRiderPodAssets50KG::loadAddon (as the Rider overlay),
+                                          | package portrait/background as image sources with a port-owned
+                                          | identity (the Rider add-on scheme, original_ui_addon_material50dl),
+                                          | and the 24-binding material table taking them. Until then the
+                                          | screen shows the anchor's art: NOT shippable (verify only).
+Tournament race (stock course, stock AI)  | this round (race latch, 188470 field, anchor translation in the
+                                          | race check); R1 holds
+Tournament rewards, medals, AI growth     | this round (same body; 0 mismatches on stock)
+Tournament name entry (219D)              | done: side save /3 (round 3)
+Career reset (1800E0)                     | this round (Rider page prompt, popup, side save)
+Course availability from career progress  | this round (read-time merge, R2)
+Circuit ack / ending route (1AB5BC)       | this round (own final medal, own boundary flag)
+Win page (circuit ending)                 | round 3: place from the add-on career's own medals (2086CC rule,
+                                          | original_ui_win_page50pd.cpp); colours by the 208AF4 rule on the
+                                          | package ui.colors. Round 4: background = the 2077F0 rule on each
+                                          | add-on pod's ui.background (loaded with the Win resources, at
+                                          | most 64 pods, keyed by number); background(career) answers the
+                                          | add-on's for an add-on career, or none (page refused), never the
+                                          | anchor's. FLAG: a package background that fails to DECODE fails
+                                          | the whole Win resource load (stock Win too) while that package is
+                                          | installed; registry checks the member exists, not its pixels.
+Unlocks earned by career results (187E30) | round 3: the original checks on the add-on career (rival 187EE0;
+                                          | check 3 and the 1882D0 gallery read its own medals through
+                                          | OriginalUnlockFacts50PD::selectedAddonCareer, header
+                                          | original_unlock_checks50pd.h); their grants go to the side save
+                                          | (unlocks) and merge at read; stock-row checks keep stock grants
+Garage entry and upgrades (1FEB90)        | purchase commit, prices, credits, autosave written; Garage ENTRY
+                                          | still refused (logged, original_ui_garage_session50kg.cpp), so the
+                                          | anchor's model is never shown with add-on stats
+Garage model (ui.garage_model)            | NOT DONE (round 3). Every step admits only catalog UIGARAGE
+                                          | archives: scene assets 1FB0F0 (load requires a catalog pod19
+                                          | identity, reads "UI/Geometry/NNe.psg"; selectedCareer() derives
+                                          | the career from that identity), the garage session
+                                          | (garageCareerResources_ cached by 100C0; selected bank 1D1D68
+                                          | through the standard archive provider), the IPUM append 12CEA0
+                                          | (original_ui_frontend50kg.cpp:1929, "authenticated fixed Garage"
+                                          | archives) and the model bank binding. Plan: (1)
+                                          | OriginalUiGarageSceneAssets50KG::loadAddon(garage, package UI
+                                          | archive, garage_model psg member, anchor career) storing the
+                                          | career explicitly; (2) a separate cache slot per add-on career,
+                                          | never the anchor's; (3) provider + IPUM append admitting the
+                                          | package archive as the selected bank (registry-listed bytes,
+                                          | digest-checked, as the Rider add-on materials do); (4) model bank
+                                          | binding unchanged (it takes selectedArchive()).
+Watto (Garage widget 10)                  | follows Garage entry (same page, no pod data); blocked only by the
+                                          | Garage model item
+In-race AI abilities from the career      | this round (tournamentPodCareerSnapshot answers the AI rows)
+Own name everywhere                       | Rider, Results, Hall: works; Tournament screen: this round;
+                                          | loading-screen rival line reads stock racers only (correct)
+AI opponent use                           | stock courses and the tournament: never (R1/R4, rowForRacer /
+                                          | loadAll exclusion); add-on courses: next round (1AE620, section 5)
+
+5. Plan: port 1AE620's free-play opponent draw, then add-on candidates on add-on courses (R4)
+---------------------------------------------------------------------------------------------
+Today the free-play field is the stand-in courseFieldEntries (eight host entries, selected racer in slot 0,
+D:\...\cr-main\tests\native\original_course_roster50kg_fixture.h). The original chain is 1AA570/574 ->
+1AD520 -> 1AE620 -> 1AE370 (docs\original-ai-cold-owners50iu.md item 8): 1AE620 reads the first human at
+1AE6B8, then builds the opponents; its mode34==2 branch is the 188470 call already ported
+(src\game\original_opponent_selection50kg.h); its non-tournament branch draws opponents with the shared RNG
+308030.
+ P1 Recover 1AE620's non-tournament branch from SLUS_202.68 (disassembly only; no host guess): candidate set
+    (which racers: unlocked words 10FAC? hidden 730? all 26?), the draw (308030 transitions, count, rejection
+    of the human and duplicates), the entrant count (1125C bits 7..10) and the output order.
+ P2 Port it as rr::game::original_opponent_selection50KG::freePlay1AE620(candidates, human, entrants, rng)
+    in src\game\original_opponent_selection50kg.cpp (pure function, typed, bounds-checked) with a host check
+    against recorded original fields (same seed -> same opponents). Replace the stand-in courseFieldEntries
+    in terrain_interactive_roster_cold50du.cpp; stock fields then match the original with or without DLC.
+ P3 Add-on candidates, add-on courses only: the candidate list the original reads gains every admitted
+    add-on pod whose package allows AI (addonRiderMayBeAi(racer, addonCourse=true)), appended after the stock
+    candidates in registry number order, so the same draw picks over the larger list; on a stock course the
+    list is exactly the original's (the draw and RNG transitions are then bit-identical to no DLC). The only
+    branch is the track's data (registry course), never a course or pod name. rowForRacer/loadAll keep
+    their exclusion as the second check.
+ P4 Verify: stock courses with DLC installed equal the no-DLC field and RNG; add-on courses show add-on AI
+    pods (rotated packages), each loading its own files through the common roster.
+
+6. Files changed this round (all .cpp except the new dlc_career50dl.h, included by 7 .cpp files)
+------------------------------------------------------------------------------------
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\dlc_career50dl.h / .cpp (new)
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_tournament_result50kg.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_rider_profile50kg.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_rider_session50kg.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_tournament_session50kg.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\original_ui_garage_session50kg.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\dlc_rider_entries50dl.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_roster_cold50du.cpp
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\CMakeLists.txt,
+D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\windows\native\interactive50du.sources.json
+Syntax-checked with clang -fsyntax-only (clean; terrain_interactive_roster_cold50du.cpp stops at an unrelated
+existing clang-only error in ra_cold_roster_operation50la.h). Header comments in dlc_rider_entries50dl.h still
+say "free play only" for the race latch (left to avoid a rebuild; next header round).
+
+7. Verification before handover (muted, logs only)
+--------------------------------------------------
+V1 host check (done, 0 mismatches). V2 stock TA tournament race with a stock pod: progress-v1.bin byte-equal to
+a no-DLC run. V3 each add-on pod rotated: Rider Confirm (dlc_career latch), TA race (dlc_race_player
+mode=tournament), Results, dlc_career result line, progress-v1.bin byte-identical before/after,
+dlc-progress-v1.json career updated, free-play Course screen opens the merged course count; Garage entry
+logs the refusal. V4 career reset on an add-on slot.
+
+8. Model step (round 5): add-on pod model on the Tournament screen and in the Garage
+-----------------------------------------------------------------------------------
+Done (inert until wired; syntax-checked, not built):
+- OriginalUiRiderPodAssets50KG::loadTournamentAddon(UITOURN, anchor career, package archive, model): the
+  anchor career's UITourn widget 39..61 layout (the 1EEC40 table) with the package's own model;
+  layoutArchive() accessor (header src\assets\original_ui_rider_pod_assets50kg.h, reaches the model-scene
+  and material-lifetime headers: a header round).
+- OriginalUiRiderModelMaterials50KG add-on model loader accepts UITOURN (as well as UIRIDER) as the
+  stock owner of shared original names (cable, pod_wndw).
+- Log lines (only with add-on pods admitted): "dlc_model_source screen=tournament career=N
+  source=stock_archive archive=UITOURN member=..." at 1EEC40 and "dlc_model_source screen=garage career=N
+  source=stock_archive archive_id=..." at 1D1CD0.
+Still held: the add-on Tournament Confirm (Rider screen, logged) and the Garage entry for add-on careers
+(logged), so no anchor model is ever shown with add-on data.
+
+Remaining wiring, Tournament (one build round; files):
+ T1 original_ui_tournament_career_resources50kg.cpp 1EEC40: for an add-on career load the pod with
+    loadTournamentAddon(UITOURN, anchor, package archive from dlc_addon_ui_archive50dl, ui.rider_model) and
+    log source=package; a failure refuses that career's screen only.
+ T2 src\game\original_ui_tournament_pod_owner50kg.cpp prepareCold: pod->addon(): UITourn checks on
+    pod->layoutArchive() (widgets, binder, visibility); materials via loadAddonPod(pod, UITOURN, ...);
+    footprint: an add-on variant of OriginalUiRiderMaterialFootprint50KG::tournamentPod that accepts the
+    model member in the package archive (src\game\original_ui_rider_material_lifetime50kg.cpp); material
+    rows: the add-on pod's own names are not APPSTART rows, so the add-on materials do NOT join the
+    material ledger (as on the Rider screen: separate static bindings); bankInput gets the package archive
+    in addonArchives, never in archives.
+ T3 original_ui_tournament_draw_contribution50kg.cpp: Binding gains an `addon` flag; add-on model passes
+    are existingStatic bindings with port-owned ranks after 3235 (the same schedule rule as the career art,
+    generalised from names to the flag); model(): for an add-on pod project the add-on scene with the
+    Tournament camera/light context of the selected packet and the add-on's own palette and fog, and emit
+    nothing on any refusal (never the anchor's geometry).
+ T4 Rotation: the Tournament pod owner advances the add-on scene's User_Rotate graph exactly as the stock
+    pod's (same widget config, same clock), via OriginalUiRiderPodScene50KG::loadAddon.
+ T5 Re-enable: replace the Rider hold with the latch (the commented line beside it).
+ Still frame (Tournament screen, add-on career): the add-on's own pod model rotating where the stock pod
+ sits (above the stats panel, centre-left), the add-on portrait in the portrait frame, the add-on
+ background tiles, the package name in the name line; no stock pod anywhere on the page.
+ Logs: dlc_model_source screen=tournament source=package key=<pkg>/<pod> member=<rider_model>,
+ dlc_tournament_model packets=N (>0) per frame, never source=stock_archive with an add-on career.
+
+Remaining wiring, Garage (larger; after the Tournament round):
+ G1 OriginalUiGarageSceneAssets50KG::loadAddon(garage, package archive, ui.garage_model psg, anchor career):
+    same 30 statics / 10 actors from UIGARAGE, the selected model from the package (1 node), the career
+    stored explicitly (selectedCareer() no longer derived from a catalog identity for add-ons).
+ G2 original_ui_garage_session50kg.cpp 1F241C/1D1950: an add-on career gets its own retained resource slot
+    (never garageCareerResources_[anchor]); the selected bank is the package archive.
+ G3 original_ui_frontend50kg.cpp:1929 12CEA0 IPUM append and the standard archive provider/resolver
+    (1D1D68 selected bank): admit the package archive as the selected bank (registry-listed, digest-checked
+    bytes), nothing else.
+ G4 original_ui_garage_model_bank_binding50kg.cpp: the selected bank's images from addonArchives; the
+    add-on model's materials as separate static rows after the Mat_Stbl ranks (as on the Rider screen).
+ G5 Watto (widget 10) is unchanged data; it shows once G1-G4 let the Garage page open.
+ G6 Lift the Garage refusal in original_ui_garage_session50kg.cpp.
+ Still frame (Garage, add-on career): the Garage room with Watto, the add-on's own pod on the stand,
+ the six stat bars from the add-on PHY range and the career's credits; never the anchor's pod.
+ Logs: dlc_model_source screen=garage source=package key=... member=<garage_model>.
+
+9. Round 6: Tournament model wired; Garage G1 (written, not built)
+------------------------------------------------------------------
+Tournament (T1-T5 done):
+- 1EEC40 (original_ui_tournament_career_resources50kg.cpp): an add-on career loads the add-on pod model with
+  loadTournamentAddon (anchor career's UITourn widget, package ui.rider_model); the anchor pod still loads for
+  the original attach / visibility / camera chain and is logged role=anchor_layout_only drawn=never.
+- Pod owner (src\game\original_ui_tournament_pod_owner50kg.*): input addonCareer/addonPod; add-on materials
+  (loadAddonPod with UITOURN as the shared-name owner), add-on graph (OriginalUiRiderPodScene50KG::loadAddon,
+  same SELECT and User_Rotate advance), add-on images as bank owner 2 and the package in addonArchives; the
+  packet carries the add-on palette and fog under the stock selection/context. No material-lifetime rows.
+- Draw contribution: add-on passes are static page bindings (flag `addon`) with port-owned ranks after the
+  stock ranks and the two career-art ranks; model(): for an add-on career only addonModel() runs (no anchor
+  geometry, no anchor binders); any refusal withdraws its packets and leaves the area empty.
+  Log once per screen: dlc_tournament_model source=package packets=N status=drawn|empty anchor_model=never.
+- Rider: the add-on Tournament Confirm latches the career again (hold removed).
+- FLAG: add-on binders (engine cables) are not drawn yet (as on the Rider screen); the add-on graph has its own
+  binder nodes; a binder draw for add-on pods is a later step.
+Garage:
+- G1 done: OriginalUiGarageSceneAssets50KG::loadAddon (UIGARAGE statics/actors via the one stock body,
+  selected model from the package's ui.garage_model, selectedCareer() = anchor). Header edit
+  (src\assets\original_ui_garage_scene_assets50kg.h, 10 includers).
+- G2-G6 not written: the selected bank (1D1D68) goes through OriginalStandardArchiveProvider50LA
+  mountAuthenticatedUi, the resolver's lookup132820 and the IPUM append 12CEA0
+  (original_ui_frontend50kg.cpp:1929); each admits catalog archives by identity and enumerates members by
+  ordinal, which a package archive does not provide; plus garage visibility, UI lights, model construction,
+  garage model materials and the model bank binding check the selected model by catalog source. That is a
+  provider-level change (mount a package archive as a selected bank) and its own build round.
+  Garage entry stays refused for add-on careers (logged, anchor model never shown); Watto follows it.
+Eyecheck plan: D:\Programming\GitHub\RacerRevengePC\work\scratch\dlc\eyecheck-career-plan.txt
+
+10. Round 7: Garage selected bank from a package archive (written, not built; Confirm still refused)
+---------------------------------------------------------------------------------------------------
+Answer to "does the flow force the Garage": yes. 1AB5BC sends every tournament race without a Hall/Win/Unlock
+stop to the Garage (13/1, 0x1AB818), and the race-return Garage entry faults the frontend on a refusal; the add-on
+Tournament Confirm is held (logged) until the Garage path below is verified by a frame.
+Provider: original_standard_archive_provider50la.h needed NO change. A package archive loaded by loadAddon has a
+real identity (discPath dlc:/..., lowercase sha256 of its listed bytes, bytes, memberCount) and member(i)
+enumerates it, so mountAuthenticatedUi admits it as is; the IPUM cache header was not changed either.
+.cpp changes (no header):
+- original_ui_garage_session50kg.cpp 1D1950: an add-on career loads OriginalUiGarageSceneAssets50KG::loadAddon
+  (UIGARAGE + package ui.garage_model), retained in its own slot per add-on number (never the anchor's), logs
+  dlc_model_source screen=garage source=package member=... status=loaded|refused anchor_model=never; the static
+  IPUM binding 24E880 is skipped for a package archive; appendGarageBankSources takes only the selected model's
+  own PSMs from a package archive.
+- original_ui_frontend50kg.cpp 12CEA0: nothing to append for a package selected archive.
+- src\assets\original_standard_texture_resource50la.cpp: the selected-bank checks (issue 1D1D68, retire 12E5E0,
+  closed-bank reclaim) accept a career pod archive or a package archive (garageSelectedBankArchive50DL).
+- src\assets\original_ui_garage_model_materials50kg.cpp: the selected-model owner may be a package archive.
+- original_ui_garage_model_bank_binding50kg.cpp: a package selected archive joins the bank as addonArchives.
+Open (verify by frame before lifting the hold): the garage model materials' selected-model path was written for
+the stock 2475C0 no-PSM case; the add-on garage model has its own PSM (a2r_arke_1.psm) and the shared spcgarge.pst
+- the first eyecheck (R5) shows whether it draws or refuses; a refusal on the race-return path faults the
+frontend, which is why the Confirm stays refused for this build.

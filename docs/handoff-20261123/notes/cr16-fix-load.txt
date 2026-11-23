@@ -1,0 +1,378 @@
+cr16 load-fault batch (helper: load faults 1-6). Worktree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main, base e05f0f9.
+Not built, not run, not committed. No header edited. All paths below are in that worktree.
+
+Files changed by this helper (only these):
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\common_track_load50cr.cpp          (fault 1)
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_setup50du.cpp  (faults 2, 6)
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\common_track_media50cr.cpp         (fault 3)
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\platform\linux\native\vehicle_window_gl50ds_validation.cpp (fault 5)
+  D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\tests\native\terrain_interactive_continuation50du.cpp (fault 6, one guard at ~line 1424)
+Fault 4: no change (see below).
+
+======================================================================
+FAULT 1  RC pod 15: "Original MA/SA canonical racer material/texture closure rejected"
+----------------------------------------------------------------------
+Evidence: cr15s-RC-single-P15 line 588: racer_source_status=2 (Status::unsealed in
+original_racer_material_sources50la_fixture.h:13), racer_source_pc=1255456 = 0x132820,
+member textures\specmap5.tga, pass 0 map 1.
+
+Root cause: the name textures\specmap5.tga is registered twice with different bytes: every pod
+archive (12332 bytes, sha 574712ee...) and RC.RES (196652 bytes, sha 0c9838ec...). The provider's
+generic lookup (src\assets\original_standard_archive_provider50la.h:162-171) answers "unknown"
+for unequal duplicates. The only escape was the RC-only special case at :136-161, keyed on
+Mount::rcSpecmapEarlierMount; that field was set only by the retired rc_cold_sources50la.h
+(deleted in 08f1ee6; `git show 08f1ee6~1:tests/native/rc_cold_sources50la.h`, the POD17 block).
+Nothing in the tree sets it now, so on the common path every RC race fails here, whatever the
+pod. The course name in the message ("MA/SA") is just the single-pass owner's message text.
+
+The original rule, as that retired file records it: "Source12E2B0 ignores later equal-name
+registration": the FIRST registered member keeps the name. The pods are registered (pod load
+2129C0, log step 03) before the course archive (12CEA0, step 04).
+
+Change (common_track_load50cr.cpp, Archive::open, the one course-archive mount, every course):
+before mounting, each course member is looked up; when an earlier ACTIVE mount already serves
+that name with DIFFERENT bytes, the course mount does not register it (12E2B0). Equal-byte
+names stay (they coalesce anyway). The Track keeps every decoded member (entries are swapped
+back after the mount), so the course's own static world still reads RC's own specmap5, exactly
+as the old RC policy did (provider queries got the pod copy, the world its retained archive).
+Guard: if the earlier owner is another course archive (TRACKS/xx.RES still mounted by a race
+whose teardown did not release it), the member is kept and logged (stale_course_mount), so a
+leak still refuses loudly instead of serving another course's bytes.
+PORT STAND-IN (flagged in code): the rule belongs in the provider's lookup132820 (header).
+Retire it there in the next header round, and delete the dead RC special case at :136-161
+and Mount::rcSpecmap* (:349-351), which are a per-course stand-in.
+Not proven: that the retail registration order is pods before course archive for every
+mount the provider holds (the old file itself says the complete retail chronology was not
+claimed). The port's mount order is used.
+
+Log proof next run: on RC
+  common_track_registration course=RC member=textures\specmap5.tga bytes=196652 earlier_mount=N earlier_bytes=12332 rule=12E2B0_first_registration_kept
+  common_track_registration course=RC members=1121 registered=1120 ignored=1 undecided=0
+and no require_failed at ma_sa_original_racer_sources. Every other course should print
+ignored=0 unless it also shares a differing name with a pod/UI archive (each one is listed).
+If undecided>0, earlier mounts were already ambiguous for those names (as before).
+
+======================================================================
+FAULT 2  TC/TB/MB: "live1A0DA0 navigation error 9 source-stage 0x1a10d0 node 0"
+----------------------------------------------------------------------
+Error 9 = EffectBoundary from track_navigation_shared50mb.inl:165: the map scan crossed node 0
+(start line) and the lap-effect callback refused it. The callback is
+lap_drive50gj_fixture.h:215 crossing(): with bound_==false it uses the legacy
+applyPlayerLapCrossing50GF(track,...) (lap_progress50gf.cpp:110-115), whose extent is
+maxUndertrackNodes50ET (256). validTrack(track,256) fails for map splines over 256 points:
+TC 268, TB 270, MB 265 (log lines "navigation map/AI=268/293", "270/269", "265/292").
+lap_drive50GJ::Owner::bindTrack (the view path, extent = view capacity) exists but is never
+called: terrain_interactive_setup50du.cpp:878 only copied the markers (lapOwner.track=...).
+d6338bc did not create this; it removed the earlier 256-row AI-metadata refusal, so these
+courses now get far enough to reach the remaining 256 limit.
+
+Change (terrain_interactive_setup50du.cpp, ~line 878): the human lap owner is bound with
+lapOwner.bindTrack(mapView,laps.markers()) on every course (fresh owner each run; the existing
+teardown releaseTrack at continuation ~1521 releases it). Refusal is a require with its own
+message.
+Log proof: "common_lap_bind owner=human map_nodes=268 capacity=... markers=N bound=1" and no
+"navigation error 9" on TC/TB/MB/GB.
+Not checked in depth: other legacy 256 paths (undertrack_reposition50et.cpp:7-15,
+wrong_way_progress50go.cpp:163) are only used by the non-view overloads; the live callers I
+found (common_lap50cr.cpp, frame_children:300, human/AI recovery) use the view overloads.
+
+======================================================================
+FAULT 3  materials.second_passes receipt=differs (SC 1/4, TB 256/307, GB 249/273, RC 1/79)
+----------------------------------------------------------------------
+The common reader is not wrong; the two numbers count different things.
+ - In-game value (common_track_media50cr.cpp:173): selections with pass==2 = materials that
+   author a second pass. Proof: selections - materials = TB 613-357=256, GB 566-317=249,
+   SC 82-81=1, RC 44-43=1.
+ - The old pins (expectedSecondPasses) counted DRAW SPANS: rc_world50lm.inl:471 and
+   single_pass_world50lm_cold.cpp:200 do ++secondPasses once per placed surface span whose
+   selection is pass 2. Proof: surfaces receipt + pin = logged spans:
+   RC 1688+79=1767, TB 1069+307=1376, GB 1211+273=1484, SC 4091+4=4095, GC 1175+342=1517.
+Change (common_track_media50cr.cpp): materials.second_passes now logs the span count (spans
+with sourcePass==2, read from the static world's own spans, so the host check prints it too
+instead of 0); the per-material count is logged as materials.second_pass_selections (no
+receipt, race runs only).
+Log proof: receipt=match for materials.second_passes on SC/TB/GB/GC/RC (and TA/MC 0, GA 248).
+
+======================================================================
+FAULT 4  GB sky: 1 cube / 48 tiles vs old 7-cube table / 90 tiles
+----------------------------------------------------------------------
+No change; the common reader does not drop drawn sky data.
+The retired GB loader (git show e806dd0~1:tests/native/gb_sky_loader50gb.inl) decoded all 7
+internal cubes of gb.cub (90 tiles) but submitted ONLY cube 0 for drawing: spans are added
+only `if(cube==0)`, and it requires spans==48 ("Only the authentic complete base cube is
+submitted; lightning/ambient-flash chronology is not invented"). The common reader
+(sky_course_data50gw.inl:64-84) reads the same CUB table (1295B0/1289C0 framing, u32 1,
+count 7), checks the base cube and draws its 48 tiles, and logs
+"course_sky_data cub_internal_cubes=7 drawn=base". So the drawn sky is identical. The 42
+extra tiles the old loader decoded were never drawn. GB's [Environment] authors one sky cube
+(274AE0 builds one SkyCube per NumberOfSkyCubes); cubes 1..6 inside that CUB are the
+lightning/ambient-flash frames, and their timing is not recovered anywhere in the port.
+Unresolved (flagged, pre-existing): the GB flash cubes are not drawn; doing that needs the
+original flash chronology traced first, not a guess.
+
+======================================================================
+FAULT 5  RA (both modes): "renderer error 20 ... bounded published source frame bank ... component=5"
+----------------------------------------------------------------------
+Root cause: the renderer refused RA's 346 animation rows against a fixed 128-row guard
+(vehicle_window_gl50ds_validation.cpp:413, maxVehicleWindowTrackAnimations50DS=128 in
+vehicle_window_gl50ds.h:433). RA's crowd ATM is placed on 346 spans ("track_atm course=RA
+sources=1 frames=6 animations=346"); every other course places 26..76, so only RA hit it. That
+constant is read nowhere else: the renderer's animation table is heap-sized from the count
+(vehicle_window_gl50ds_storage.cpp:288) and the per-frame loops use the count.
+Change (validation .cpp only): the bound is now the track's own placed span count (each row owns
+a distinct span; duplicates were already refused), with its own message ("track animation rows
+exceed the track's placed spans"); the bank/borrow check keeps the old message. The header
+constant is untouched (now unused; remove it on the next header round).
+atm.sources value=1 receipt=2: the receipt is the retired ra_atm_authoring50la.h, which read
+textures\crowd.psm and textures\finishline.psm by NAME (git show 5925cf9~1:...). The static world
+has no finishline selection (RA materials=44, selections=44, so no 2-pass material is placed;
+finishline.psm has 2 passes, and single_pass_world50lm_cold.cpp:112 also refuses an ATM in a
+multi-pass material). So the common reader does not drop a placed source; the receipt counts a
+PSM the static world does not draw. Unresolved: where the original draws fholobeam (likely the
+finish-line hologram/dynamic model, not the static world); not traced, so its animation is not
+claimed. The receipt stays as a known differ.
+Log proof: RA reaches the race with "track_atm course=RA ... animations=346" and no
+renderer error 20. If the bank borrow is also wrong, the old message still appears; if the row
+count is the problem, the new message appears.
+
+======================================================================
+FAULT 6  NV add-on: "the track's positional sound rows (05.12) are not ready"
+----------------------------------------------------------------------
+Log: positional_sounds ... soultree_rows=0 ambient_rows=0 trigger_sounds=0 pcm=0; 05.12 ok.
+Root cause: positional_sound_rows50sr.h:207 returns success with ready()==false, authored()==false
+when nothing is authored (its documented contract, :126-128 and :232). The original's 279910 /
+2787B0 row loop simply runs zero times and builds no transport. But setup demanded ready()
+whenever the owner exists (terrain_interactive_setup50du.cpp ~767), and the per-frame service
+did the same (terrain_interactive_continuation50du.cpp ~1425).
+Change: both sites branch on the data (authored()): nothing authored = no Results-stop
+registration, no service, log line "positional_sounds site=common course=NV transport=none
+reason=no_authored_rows". When authored, ready() is still required as before. Trigger playback
+already treats an unready owner as no playback (positional_sound_rows50sr.h:112).
+Log proof: NV passes audio_materials with that line; stock courses unchanged (all author rows).
+Not proven: whether the original also skips the 26D070 Results world-stop registration when the
+list is empty (with no transport there is nothing for it to stop).
+
+======================================================================
+Stand-ins added or touched
+ - PORT STAND-IN (new): 12E2B0 first-registration rule applied at the course mount site in
+   common_track_load50cr.cpp instead of in the provider lookup (header). Retire into lookup132820.
+ - Flagged existing per-course stand-in (not touched, header): RC specmap5 special case in
+   original_standard_archive_provider50la.h:136-161 + Mount::rcSpecmap* (dead code now).
+ - Header constant maxVehicleWindowTrackAnimations50DS now unused (header, not edited).
+Two other helpers edit the same worktree; my edits are small, local insertions in shared files
+(setup, continuation, track_load).
+
+======================================================================
+FAULT 7 (cr-17)  MB single, "native selected-light beginDraw rejected ... racer=5 owner-status=identity(8) source=0x229e08"
+----------------------------------------------------------------------
+Not caused by the Pause restart or by MB's larger light set. The line just before the abort
+(cr17-09-MB-single-P09 line 2440) is
+  lostai_reset slot=5 trigger=3 ... ok=1 ... trigger LostAI 2255B0 returned in the same PostWorld collision query
+and the failing racer is that same slot 5. The only other run with a trigger LostAI reset,
+cr14-01-TA-single-P01 (slot 7), also ended right after it. So this happens on every course
+where a LostAI trigger fires, at the first draw after the reset.
+
+Cause (src\game\original_gc_gameplay_lighting_candidate.cpp):
+ - The outer frame runs every racer's children (graphics + updateAfterGraphics 228844, which
+   clears resetNeedsGraphics) BEFORE every racer's physics (terrain_interactive_loop50du.cpp
+   ~486-515). The trigger LostAI 2255B0 runs inside physics (the PostWorld query), so it
+   runs after this frame's graphics call.
+ - removeAiResetVisibility sets resetNeedsGraphics=true. finishAiResetVisibility republished
+   the racer only for the post-graphics Player lease (player_&&!input_), not for the trigger
+   lease. The same frame's draw then refused the racer in beginDraw
+   (`v.resetNeedsGraphics` -> identity, 229E08).
+Change: finishAiResetVisibility applies the same post-graphics publication to the trigger lease
+(lease.sourceTrigger_), with the same checks: graphics serial unchanged, every displayed
+model root rebuilt (no parent, flag bit 1, local==world). The restart lease and the 16EAA0
+lease are unchanged: their next graphics call comes before the draw.
+Logging: beginDraw identity refusals now print the reason
+  selected_light_refusal op=beginDraw racer=N reason=<slot_outside_field|frame_binding|racer_not_bound|
+    main_root|model_roots|reset_needs_graphics|no_graphics_yet|graphics_sequence|draw_generation_overflow>
+    owner_sequence=.. expected_sequence=.. reset_pending=.. attached=..
+Not proven: from the log alone I cannot show that resetNeedsGraphics was the failing term
+(the old diagnostic did not split them). It is the only term the trigger reset changes, and
+the frame order puts the draw between that reset and the next 228844. If the rebuilt-root
+check fails instead, the refusal now appears at finish as bounds 0x21723c, with a clear reason.
+Next test: an MB (or TA) race with a LostAI trigger shows the lostai_reset line, then the race
+continuing, with no selected_light_refusal line.
+File: D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main\src\game\original_gc_gameplay_lighting_candidate.cpp (.cpp only)
+
+======================================================================
+FAULT 1 REVISED (cr-17: RC pod 15 still refused)
+----------------------------------------------------------------------
+Re-trace of cr17-14-RC-single-P15 line 606 (the same check as before):
+  stage=ma_sa_original_racer_sources racer_source_status=2 racer_source_pc=1255456(0x132820)
+  racer_source_member=textures\specmap5.tga racer_source_map=1
+The empty source_member, canonical_row=-1 etc. are fields of LATER stages that were never reached.
+The failing check is original_racer_material_sources50la_fixture.h:49 (texture(): lookup132820
+returned Lookup::unknown, mapped to Status::unsealed). The provider answers unknown at
+original_standard_archive_provider50la.h:165-166 because two active mounts serve
+textures\specmap5.tga with different bytes (RC.RES 196652, the pod archive 12332).
+
+Why my cr-16 fix did nothing (line 167: registered=1121 ignored=0 undecided=0): my assumption
+about the order was wrong. The pods are NOT registered before the course archive. The course
+archive mounts at 12CEA0 (step 04). Each pod archive is mounted into the provider later, when
+its racer model owner binds (tests\native\native_racer_model_lifetime50la_fixture.cpp:636-639,
+setup::Archive::mount, during the roster load 1AA510/2129C0, step 10). So at the course mount
+there is nothing earlier to compare with, and the pod mounts later add the second copy.
+This also matches the original's order (archive 12CEA0 before roster 1AA510 in the step table,
+common_race_log50cr.h:84-108). Under 12E2B0 ("a later equal-name registration is ignored")
+the FIRST registration is RC.RES's, so the faithful answer is that racers on RC sample RC's
+specmap5, not the pod copy the old POD17 policy picked (that policy itself said it used
+port mount order, not retail chronology).
+
+Why this cannot be fixed in a .cpp:
+ - Filtering rows at a mount site (my cr-16 approach, at the course or at the pod mount)
+   breaks the provider's reentry rule: commit() (provider header :434-441) demands identical
+   rows when a same-named mount comes back. A pod mounted with specmap5 dropped on RC, then
+   mounted whole on TA, would be refused. The filter would depend on which course ran first.
+ - The rule has to live where the name is resolved: lookup132820 (header).
+ - Then the racer texture reader must accept RC's 256x256 TGA. Today it accepts exactly the
+   64x64 12332-byte specmap5 shape (src\assets\original_standard_texture_resource50la.cpp:
+   1538-1546; the general TGA shape check OriginalTgaConversion50LA::sourceShape exists, and
+   the RA branch above it already handles 256x256x24 with 5 levels).
+So per the instructions I stopped short of the header edit. The cr-16 course-mount filter is
+REMOVED from tests\native\common_track_load50cr.cpp: its premise was false, it did nothing in
+cr-17, and it would break reentry the first time an earlier mount did match. The plain mount
+is restored.
+
+Header change needed (for the next header round, written up, not made):
+ 1. original_standard_archive_provider50la.h lookup132820: for unequal duplicates, return the
+    member of the active mount REGISTERED FIRST, instead of unknown. Order by registration,
+    not slot index, because a reactivated tombstone keeps its old slot. Needs one new Mount
+    field, e.g. `std::uint64_t registered` set from ++revision_ in commit() on push and on
+    reactivation; pick the smallest. Ambiguity inside one mount stays unknown.
+    Delete the RC-only special case (:136-161) and Mount::rcSpecmap* (:349-351).
+ 2. Then (.cpp, same round): src\assets\original_standard_texture_resource50la.cpp:1538 replaces
+    the exact 12332-byte specmap5 subset with the general rule: sourceShape(bytes,w,w,24|32)
+    for a square power-of-two width, levels down to 16 (64->3, 128->4, 256->5, as the RA branch
+    and the current 64 case already do). Check every later consumer of that entry too
+    (racer visual specmap map-2 projection, original_racer_visual50hw_fixture.cpp ~707) for a
+    64x64 assumption.
+ Not proven: which specmap5 the retail game samples on RC pods. The order argument
+ (track archive before pods, first registration wins) is the port's reading of 12E2B0 and the
+ step table; it was not checked against a retail frame.
+
+Diagnostic (.cpp, tests\native\terrain_interactive_publication50du.cpp): the failure line now
+also prints racer_source_reason=<name>, e.g. lookup_unknown_ambiguous_or_unsealed, next to
+racer_source_member (which already names the failing member: textures\specmap5.tga).
+RC races keep failing at this check until the header round.
+
+======================================================================
+FAULT 1 HEADER ROUND (approved; not built)
+----------------------------------------------------------------------
+1. src\assets\original_standard_archive_provider50la.h
+   - lookup132820: an unequal duplicate name is served from the active mount REGISTERED FIRST
+     (12E2B0, every name/course/pod). Order is the new host-side Mount::registered serial, set
+     in commit() on a first mount and on every tombstone reactivation (a reactivated slot
+     registers again); never the slot index. Equal bytes coalesce as before. Two unequal rows
+     inside ONE mount still answer unknown. The serial overflow is refused before any mutation.
+   - Log once per name (bounded list of 256 names, host-side; a full list stops logging only):
+       archive_duplicate_name name=<member> kept_mount=<archive> ignored_mount=<archive> rule=12E2B0_first_registration
+   - Deleted the dead RC-only special case and Mount::rcSpecmap* fields.
+   Expected on RC: archive_duplicate_name name=textures\specmap5.tga kept_mount=TRACKS/RC.RES
+   ignored_mount=<pod RES>. The racers sample RC's 256x256 specmap5.
+2. src\assets\original_standard_texture_resource50la.cpp (~1538): the racer TGA reader takes the one
+   size rule: type 2, square power of two, 24/32 bits (OriginalTgaConversion50LA::sourceShape), levels
+   down to 16 (64->3, 128->4, 256->5), refused above the 5-level storage (Entry::levels,
+   levels_/colorBacking_ are all 5).
+   Later users with a 64x64 assumption, fixed: tests\native\original_racer_visual50hw_fixture.cpp:
+   both specular level gates (pod second pass ~1068, canonical second map ~1172) required
+   width==64 && words==4096. The projection copied a fixed 4096 pixels into a 64x64 image, and
+   the second-map bank budget was count*64x64 with max side 64. All of these now use the level's
+   own square size (helper visual_detail::squareSpecularLevel: 16..256, words==side*side) and
+   budgets summed from the projections actually built.
+   Left as is: the header comment at original_standard_texture_resource50la.h:628 still says
+   "specmap5 retains 64/32/16" (comment only).
+3. maxVehicleWindowTrackAnimations50DS: LEFT in platform\linux\native\vehicle_window_gl50ds.h.
+   That header has more direct includers (59 files) than the provider header (30), so editing it
+   would widen the rebuild. It is unused since fault 5 (comment in validation .cpp).
+Not proven: that retail RC pods sample the RC copy (order argument as in FAULT 1 REVISED); that no
+other consumer of a second-map TGA assumes 64 (searched 4096 / ==64 / 12332 / specmap; none left).
+
+======================================================================
+FAULT 8 (cr-25)  RC: "renderer error 2 at environment-map UV producer association/projection budget rejected"
+----------------------------------------------------------------------
+Not caused by the 256x256 specmap5. The refusal is platform\linux\native\vehicle_window_gl50ds_validation.cpp
+~179-195 (validateTrack, track.environmentUv branch). Two of its terms always failed for an
+environment-mapped track on the common path:
+ a) The budgets maximumEnvironmentUvBytes / maximumEnvironmentStagingBytes were never set by any
+    caller. R8 (eeaad60) retired maximumRcProjectionBytes/maximumRcStagingBytes, which the old
+    publication set for RC, and did not assign the new fields, so `gpu>0` > budget 0 refused.
+ b) `track.sourceProjectionUvs` must be null with an environment producer: the two share one
+    float2 stream. The old code skipped projection UVs with `!isRcTrack`; the common path
+    supplied them for every course with originalStaticCandidates.
+RC is the only stock course with an EnvironmentMapCompressed pass (crystal01.psm pass 2,
+work\scratch\render-common\scan_all.tsv), and it authors no ProjectedPrelit pass (0 rows in that scan;
+the projected courses are GA/GB/GC/TB, none with an environment pass). RC never reached the
+renderer on the common path before (it stopped at the racer specmap5 refusal), so this is the
+first time the branch ran.
+Change (tests\native\terrain_interactive_publication50du.cpp, .cpp only, every course by data):
+ - count the static-world spans with projectionPass!=0;
+ - environment producer present: require no projected spans (both at once is refused with its own
+   reason; the renderer has one stream), set maximumEnvironmentUvBytes = mesh vertices * 8 and
+   maximumEnvironmentStagingBytes = producer uvCount * 8 (exactly what validateTrack computes);
+ - else projection UVs only when a span draws a projected pass (renderer validation :324-326
+   already requires them exactly then; a course without projected spans no longer uploads an
+   unused stream);
+ - log: track_uv_stream course=XX stream=environment uvs=N ranges=N mesh_vertices=N |
+   stream=projection projected_spans=N | stream=none.
+RC by reasoning: the static world draws its crystal pass from RC's OWN retained specmap5 (the
+world reads its decoded archive, not the provider), with UVs from the environment producer
+(track_environment_uv50cr.h, the retired rc_crystal owner's math). The pods' map-2 projection now
+uses RC.RES's 256x256 specmap5 at its own size (header round). No projected passes on RC, so
+dropping the projection stream changes nothing drawn. Not proven: producer.validate(track)
+itself (never exercised before on this path); if it refuses, the same message appears.
+Next log on RC: "track_uv_stream course=RC stream=environment ..." and no renderer error 2.
+GA/GB/GC/TB: "stream=projection projected_spans=N"; others "stream=none".
+
+======================================================================
+FAULT 9 (cr-25)  NV add-on: "2A0F30/2A1260 AI metadata refused: tracks\mnv.spl" (pc 158A70, node 1)
+----------------------------------------------------------------------
+The package changed, and its data is valid; the fault is on the port side.
+testers-cr21 NV.RES (sha d294f6c3..., 1216260 bytes, Nov 21) vs addon-arcade-146 (7edb9671...):
+the regenerated course is about 2.5x larger (node 0 Position 26503,4143,17222 vs 11801,3877,8089;
+widths 222/446 vs 46/134). Node 1 DistanceToFinish is now 138617.156250 (was 55461.324219).
+60 nodes in mnv.spl and 60 in anv.spl have a DistanceToFinish of 100000 or more; no other field does.
+(Extracted copies: work\scratch\dlc\tmp-nv-cmp\{old,new}_{mnv,anv}.spl.)
+Cause: parseTrackNumber50AD (src\assets\track_start50ad.cpp:4) admitted at most 11 digits / 13 bytes,
+so any %f value of 100000 or more (6+6=12 digits) was refused. That is a port guard; the original
+float reader (310440/310498) has no such limit. Not caused by 6516ee6, 1AE620 or d6338bc.
+Change (.cpp only): admit up to 17 significant digits / 20 bytes (fractional digits still at most 6).
+The exact long division stays overflow-free (n < 1e17, d*2 and remainder*2 < 2^58). Values the
+old guard admitted parse to the same bits. Flagged in code as a PORT STAND-IN guard.
+For the converter: nothing to fix. Its values are ordinary.
+Next log: NV passes step 08 (common_load step=08 ... role=navigation result=ok).
+
+======================================================================
+FAULT 10 (cr-26)  NM add-on: back grid racers 4..7 credited lap 1 within ~1 s
+----------------------------------------------------------------------
+Data problem in the converted map splines; the port matches the original here. No port change.
+Original rule (as ported):
+ - Grid 2A2880 (tests\native\source_grid50ig_fixture.h): every rank is placed from map node 0, backwards
+   along the heading, row = rank/3: 0, 100 and 200 units behind node 0 (lateral 40/0/40, last row 20/20).
+ - Start state: C80=1, C88=1, C8C=0 (initializeTrackNavigationProgress50EU,
+   src\game\track_navigation50eu.cpp:12). Every racer starts "past node 0", aiming at node 1.
+ - AI lap (1700xx, src\game\ai_driving50iv.h ~430-450): sequential gate crossings from C88. When none hits,
+   the original scans ALL map gates and sets C88=next[n] for the one crossed. CC8 is incremented on a
+   sequential crossing of node 0 when CD8 bit0 (finished) is clear. There is no ProgressNode check
+   for the AI (the human also needs its FF8 markers, which is why only AI racers showed it).
+ So the original only works if the whole grid lies AFTER the gate of node 0's predecessor (the node
+ whose Next0 = 0). A racer behind that gate crosses it in the scan (C88 becomes 0), then crosses
+ node 0 sequentially, and gets lap 1 at once.
+Measured, distance from predecessor-of-zero to node 0 on the map spline (m<code>.spl):
+ stock: GA 363, GB 299, GC 278, MA 367, MB 406, MC 691, RA 631, RC 918, SA 209, SC 427,
+        TA 415, TB 265, TC 215. The minimum is 209, every one is above the 200 back row.
+ add-ons (testers-cr21): NM 65 (pred node 114), NV 62, NB 63, NC 67, NR 61, NS 76, NU 80, ND 90,
+        LC 121, EB 235.
+ NM: rows 1 and 2 (ranks 3..7, 100 and 200 behind node 0) are behind node 114's gate, so slots
+ 4..7 lap at once. The same fault will hit NV/NB/NC/NR/NS/NU/ND/LC (LC: only the 200 row). EB is fine.
+For the converter (every course it writes, map spline m<code>.spl; the AI spline is not involved):
+ - The node whose Next0 = 0 (predecessor of the start node) must lie more than 200 units behind node 0
+   measured along the track. Aim for 250 or more, as stock does (209..918), so the back row and its
+   20-40 unit lateral offsets sit between that node's gate and node 0's gate.
+ - Do it by dropping or merging the closing nodes before node 0, or by moving the last node back
+   along the path, without changing node 0's position or heading (the grid hangs off node 0).
+   Keep the loop closed, Next0/NumNextNodes/BranchID consistent, DistanceToFinish recomputed, and no
+   ProgressNode on a dropped node.
+ - Check with: distance(Position of the node with Next0=0, Position of node 0) > 200 for each map spline.

@@ -1,0 +1,91 @@
+Two-player VS: plan (2026-11-21, main 8e1e440; worktree D:\Programming\GitHub\RacerRevengePC\.claude\worktrees\cr-main)
+=====================================================================================================
+The original: Main menu slot 2 (needs pad 2) sets mode34=1 and two humans (1125C bits 5..6 = 2). Rider page 5/1 is
+P1 (6F4, 1125D bits 3..7, 100C0) and routes to page 5/2 (1EA630); page 5/2 is P2 (1125E bits 0..4, 6F8, 100C0
+only when its earned-minus-unspent beats the current one, 1EABC4..1EABEC) and routes to Course 6/1 (1EAD60).
+Course in mode 1 needs both pads, keeps 710/714/718, launches with opponents = entrants - 2 (1DED0C) and subtype 1.
+The race: two human rows first (1AE280 order), the opponent draw 1AE620 with both humans, a horizontal split screen
+(two cameras, two HUDs), P2 driven from pad 2; Results/Pause for two humans.
+
+What the port has
+- Route decisions for every mode-1 row: src\game\original_ui_route_decisions50kg.cpp:105-109, 195-235, 250-283.
+- Main menu VS entry and commitMain writing mode 1 + two humans (original_ui_frontend50kg.cpp:846-849); pad-2
+  presence and popup (window_host50dq.cpp:118, 199-234; original_ui_main_session50kg.cpp:650-689).
+- Profile reads for mode 1 (6F4/6F8 selection, readHumanPodSelection1ADFF4 humanIndex 1 at
+  original_ui_rider_profile50kg.cpp:2047-2051); commitBack for page 5/2.
+- 1AE620 port accepts two humans (src\game\original_opponent_selection50kg.cpp:82-87); the common roster accepts
+  any human prefix (tests\native\common_roster50cr.cpp:73-86).
+- DLC: per-player add-on Rider selection already exists (dlc_rider_entries50dl.h: players 0 and 1).
+
+What is missing (each refuses mode 1 / a second human today)
+ M1 Rider page 5/2 owner: rider session owns page 1 only (original_ui_rider_session50kg.cpp:1081) and always
+    dispatches playerIndex 0 (:1331); frontend has no {5,2} destination (original_ui_frontend50kg.cpp:1094) and the
+    rider commit needs sourcePage 1 -> targetPage 1 (:1026-1041).
+ M2 Profile commits: Rider Confirm for mode 1 (DONE this round, below); Course entry/move/back/launch for mode 1
+    (commitCourseEntry :1622, commitCourseMove :1661, commitCourseLaunch :1710, commitCourseBack :1759);
+    commitRacerManager1AD520 humans==1 (:1694).
+ M3 Course screen mode 1: original_ui_course_session50kg.cpp:47, 494, 577-584, 843; frontend :461, 877
+    (nativeSingleHumanCourseMode50KG, src\game\original_course_load_selection50kg.h:29-34), 921, 1750-1861.
+ M4 Race setup: terrain_interactive_session50du.cpp:364/366/396/503 (humans==1); roster_cold50du.cpp:137-188
+    (one-human 1AE620 input, buildCourseField(...,1u,...)); P2 pod from readHumanPodSelection1ADFF4(1) and the P2
+    add-on selection selectedAddonRider(1).
+ M5 Race runtime: camera session refuses humanCount>1 (tests\native\original_camera_session50kx.h:336, 1171, 1407,
+    1489); pod collision response humanCount_==1 (src\game\original_pod_collision_response_owner.h:105, 114);
+    one race view (terrain_interactive_loop50du.cpp:3878) and the renderer refuses views 1..3
+    (vehicle_window_gl50ds_draw.cpp:2532-2542); input from controllers[0] only (loop 664, 1505, 1563, 1740, 1769,
+    2304; setup 1876, 1883); one HUD (frame_children50du.cpp:295 has viewCount()).
+ M6 Race end for two humans: Results/Pause rows for both, records (two-human 1AC440 exists in the profile:
+    prepareTwoHumanRecordInsertion1AC440), race-return to Course 6/1 in mode 1.
+
+Confirmed DLC rules for VS
+- Either human may pick an add-on pod (both may pick the same one); each one's pod goes through the common roster.
+- Add-on courses are selectable in VS ("modes" includes "vs"; dlc_registry50dl.h:138 says it has no effect until
+  two-player races exist: it becomes live with M3).
+- Add-on AI only on add-on courses (addonRiderMayBeAi), stock courses keep the stock field.
+- Career untouched (VS never touches careers; the 100C0 write of page 5/2 is the original's comparison only, and an
+  add-on tournament career latch is cleared by it, as by any Rider Confirm).
+
+File set and order (each step its own build round)
+ S1 menus: rider session (page 5/2 owner, playerIndex from the page), frontend ({5,2} destination, 5/1->5/2 and
+    5/2->6/1 commits, course readiness for mode 1), course session (mode 1 rows), rider profile (course commits
+    for mode 1, the same functions generalised like the Rider Confirm this round).
+ S2 race setup: session/roster_cold (two human rows, 1AE620 with both humans, P2 pod and add-on selection),
+    profile commitRacerManager1AD520 for two humans, nativeSingleHumanCourseMode50KG -> mode-1 launch row.
+ S3 race runtime: two camera sessions, split viewport (renderer header), P2 input, two HUDs, collision response
+    for two humans. Largest; renderer header edit (see counts).
+ S4 race end: Results/Pause/records for two humans, return to 6/1.
+Header includer counts (direct / .cpp that pull it in), asked before any edit:
+  platform\linux\native\original_ui_rider_profile50kg.h            22 / ~120  (S1 if a new commit is declared;
+                                                                     avoided so far by generalising existing ones)
+  platform\linux\native\original_ui_frontend50kg.h                  5 / ~106  (S1 maybe)
+  src\game\original_course_load_selection50kg.h                     4 / ~108  (S2: mode-1 launch row)
+  tests\native\common_roster50cr.h                                 15 / ~19   (S2 maybe)
+  src\game\dlc_rider_entries50dl.h                                 10 / ~51   (S2: P2 race latch)
+  tests\native\original_camera_session50kx.h                       26 / ~49   (S3)
+  src\game\original_pod_collision_response_owner.h                  2 / ~9    (S3)
+  platform\linux\native\vehicle_window_gl50ds.h                    50 / ~161  (S3: split viewport; the big one)
+
+Done this round (.cpp only, syntax-checked, not built)
+- OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse also commits the original mode-1 rows: P1 Confirm
+  (6F4, 1125D, 100C0; route 5/2) and P2 Confirm on page 5/2 (1125E bits 0..4 with the planet bits kept, 100C0 by
+  the earned-minus-unspent comparison the dispatcher re-derives from the two careers, 6F8; route 6/1). Free Play
+  rows are unchanged (same writes, same exact-decision check). Inert until S1's frontend routes page 5/2.
+
+S1 detail (round 2 finding, not yet written)
+- The Rider screen's page 5/2 is a page change INSIDE the Rider session (route kind changePage, 5/1 -> 5/2 and Back
+  5/2 -> 5/1), the same mechanism the Options session already runs for 12/1 <-> 12/2..6
+  (original_ui_options_session50kg.cpp: ownsPage(page), currentPage() over t.current.page, requestPageExit
+  lifecycle, page-exit audio). The Rider session today hard-codes page 1 in about a dozen places
+  (original_ui_rider_session50kg.cpp:85, 544, 553, 1081, 1088, 1090, 1140, 1331, 1768 and the confirm/back
+  proposal checks) and the frontend accepts only 5/1 targets (original_ui_frontend50kg.cpp:1021-1041, 1094, 1177).
+  S1 therefore is: (1) Rider session ownsPage(1|2) with page-2 entry/exit as an in-session page change, P2 dispatch
+  with playerIndex = page-1 and controller 1, P2 add-on carousel (addonPlayer=1); (2) frontend: accept the
+  changePage proposal 5/1 -> 5/2 inside the active Rider manager (no new destination), 5/2 -> 6/1 as the existing
+  Rider -> Course route with mode 1 (course->canEnterMode(1)), Course Back 6/1 -> 5/2; (3) Course session mode-1
+  rows (710/714/718, both pads, entrants from the page); (4) profile course commits for mode 1.
+  This is a state-machine change of the Rider session's page lifecycle and needs a build + run loop (menu
+  frames) to get right; it was not written blind.
+- Current VS behaviour (safe): Main -> Rider 5/1 in mode 1 works, but the P1 Confirm is refused
+  (original_ui_rider_session50kg.cpp confirmReady admits mode 0 and 2 only), so no VS race can start; Back
+  returns to Main. No crash, no half-built race. The S2 race guard ("refuse a two-human race before load, log,
+  back to Course") goes in with S1, when a VS launch first becomes reachable.
