@@ -120,6 +120,29 @@ stand-ins; two Results-restart stand-ins.
 
 Performance: frame preparation costs about 8-9 ms per frame on every course (FPS fine, little headroom).
 
+## Requirement: regular file cleanup
+
+The user requires regular cleanup. The folder reached 90 GB; on 2026-11-23 it was cut to about 40 GB without losing
+any findings. Keep it from growing again: clean up after every test round and every build round, not at the end.
+
+What was removed on 2026-11-23, and the rules to keep following:
+- **Old build folders.** Builds are incremental: `build\<newest>\link.rsp` names every .obj it links, and those
+  objects live in older build folders. Before deleting a build folder, check it is not named in the newest build's
+  `link.rsp` (and keep `build\takeover-raload-141m`, where each link writes the map file). Delete every other old
+  build folder. After deleting, confirm every .obj in the newest `link.rsp` still exists.
+- **Raw dumps in evidence folders.** `.ppm` frame dumps, `.wav` recordings and the per-run copies of the game
+  `.exe`/`.dll` are regenerable and are not findings. Delete them once a run has been read; keep `RacerRevenge.log`,
+  `stderr.log`, `stdout.log`, `execution.json` and other small logs/json. Skip runs written in the last day.
+- **Helper worktrees** under `.claude\worktrees`: remove them with `git worktree remove` (no force) once their
+  branch is merged or no longer needed; the branch and its commits stay. Then `git worktree prune`.
+- **Still frames** (`work\scratch\frames\fast\`): keep only the frames you cite.
+- **Never delete** without checking: the newest build and anything its `link.rsp` uses, the DLC tester root
+  (`work\scratch\dlc\roots\testers-cr21`), the Custom content session's working files (`work\scratch\racer-arcade`,
+  `work\scratch\racer-n64`; ask that session instead), the ROM and the `Star Wars - Demolition (USA)` folder (user's
+  files, never committed), and anything modified in the last day.
+- Remaining large item at handoff: 14 GB of copied asset folders in `work\scratch\racer-arcade\silo\assets*`
+  (Custom content's; it was asked to prune them).
+
 ## Working with the user (their stated preferences)
 
 - Plain-language, brief reports for a non-programmer; FPS numbers; absolute paths in every message.
