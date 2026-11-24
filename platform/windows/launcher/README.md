@@ -9,4 +9,4 @@ Use the x64 .NET Framework C# compiler and the Windows port executable. The buil
 3. Run package_converter.py RUNTIME_DIR CONVERTER_ZIP with Python to assemble the converter archive.
 4. Run build.py --public with --converter CONVERTER_ZIP, --crt pointing at the x64 Microsoft.VC143.CRT directory, --game pointing at the Windows game executable, --stock pointing at the extracted USA PS2 tree with the four runtime DLLs, --dlc pointing at the directory containing demolition-pugwis, --arcade and --n64 pointing at the reference ROMs, --icon pointing at the launcher ICO, and --out pointing at a build output directory. Supply --race-frame with the native gameplay frame to include the launcher banner.
 
-Setup runs the converter with its own Python interpreter in a staging directory. A successful full import installs 16 DLC folders. The Pugwis template is separate from those 16 in both install modes.
+Setup runs the converter with its own Python interpreter in a staging directory. Stock setup installs Pugwis in DLC. A full import adds 16 more DLC folders. Both modes keep a separate editable Pugwis copy in Templates.

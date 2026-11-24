@@ -152,7 +152,7 @@ sealed class LauncherForm:Form {
         updateMode();
         var dest=PathRow("Install into a new folder",null,true,true);
         dest.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Racer Revenge PC");
-        Add(Caption("Includes the editable Pugwis pod in Templates."));
+        Add(Caption("Pugwis is ready to race in both modes. An editable copy is included in Templates."));
         var progress=new RaceProgress{Dock=DockStyle.Top,Height=12};
         var status=Caption("");Add(progress);Add(status);
         var install=ActionButton("Install",async(s,e)=>{

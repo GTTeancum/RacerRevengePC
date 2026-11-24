@@ -108,7 +108,7 @@ def main():
                         z.write(f, prefix + f.relative_to(a.dlc).as_posix())
             if groups != ({'demolition'} if a.public else {'arcade','n64','demolition'}):
                 raise ValueError('Missing optional packages or Pugwis template')
-            z.writestr('base/Templates/README.txt', 'Pugwis is an editable example pod. To race it, copy the demolition-pugwis folder into DLC beside RacerRevengePC.exe. Keep the original here as a template.\r\n')
+            z.writestr('base/Templates/README.txt', 'Pugwis is an editable example pod. Setup installs the playable copy in DLC/demolition-pugwis. This separate copy is available for editing.\r\n')
         compiler = Path(os.environ['SystemRoot']) / 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
         env = dict(os.environ, TEMP=temp, TMP=temp)
         exe = root / 'RacerRevengeLauncher.exe'

@@ -9,7 +9,7 @@ A native Windows PC port of *Star Wars: Racer Revenge*, reconstructed from the P
 3. Choose **stock** by leaving **Include Arcade + Nintendo 64 content** unchecked. For the **full installation**, check it and supply both your Racer Arcade chip-set ZIP (`swracer.zip`) and your USA Episode I Racer ROM (`.z64`, `.v64`, or `.n64`). The full installation adds two Arcade courses, six Arcade pilots, and eight N64 courses. Setup verifies both dumps and converts them locally with the bundled offline tools.
 4. Choose a **new** installation folder outside the extracted disc folder and click **Install**. ROM conversion can take several minutes. After setup, choose your video and control settings and click **Play**.
 
-**Pugwis** is included as an editable template. To race him, close the game, copy the entire `Templates/demolition-pugwis` folder to `DLC/demolition-pugwis` inside your installation, then start the game and select Pugwis on the rider screen.
+**Pugwis** is ready to select on the rider screen after either installation. Setup also keeps an editable copy in `Templates/demolition-pugwis`.
 
 You can launch **RacerRevengePC.exe** directly after setup. Open the installed launcher to change settings. Saved changes take effect the next time the game starts. To change which ROMs you import, run a freshly extracted launcher and choose a new destination.
 

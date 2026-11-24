@@ -130,6 +130,12 @@ static class Install {
                     string target=Safe(stage,e.FullName.Substring(slash+1));
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
                     using(var stream=e.Open())using(var output=File.Create(target))stream.CopyTo(output);
+                    const string templatePrefix="base/Templates/demolition-pugwis/";
+                    if(e.FullName.StartsWith(templatePrefix,StringComparison.Ordinal)){
+                        string active=Safe(stage,"DLC/demolition-pugwis/"+e.FullName.Substring(templatePrefix.Length));
+                        Directory.CreateDirectory(Path.GetDirectoryName(active));
+                        File.Copy(target,active);
+                    }
                 }
 #if PUBLIC_RELEASE
                 if(!String.IsNullOrEmpty(arcade)||!String.IsNullOrEmpty(n64)){
