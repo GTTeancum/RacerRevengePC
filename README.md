@@ -14,9 +14,19 @@ At **3440×1440**, the race camera shows more track to either side while keeping
 
 ## Windows development build
 
-These screenshots were captured on November 24, 2026, from development build **cr-179**. The launcher started the game, which went through the original rider and course menus into a race. The game captured native frames at **3840×2160**, **2560×1080**, and **3440×1440**. The original menus retain their proportions on ultrawide displays.
+The Mos Espa screenshots above were captured on November 24, 2026, from development build **cr-179**. The launcher started the game, which went through the original rider and course menus into a race. The game captured native frames at **3840×2160**, **2560×1080**, and **3440×1440**. The original menus retain their proportions on ultrawide displays.
 
 The personal development launcher accepts a USA PS2 disc image or extracted game folder. It can also install optional content when supplied with the supported Racer Arcade ROM set or USA *Episode I Racer* Nintendo 64 ROM. After installation, video settings and control presets apply on the next game launch. The game also runs directly from its executable.
+
+## Launcher controls and video
+
+![Launcher settings for input device, player presets, window size, widescreen and FXAA](docs/screenshots/launcher-settings.png)
+
+In development build **cr-181**, choose a player and a preset under **Controller bindings** to change which physical button, trigger, or stick axis performs a race action. For example, Player 1 can use the left trigger for throttle while Player 2 uses the right bumper. The original in-game prompts still show the PS2 layout. **Keyboard bindings** has separate layouts for Standard driving and Twin engine driving.
+
+| Keyboard bindings | Controller bindings |
+| --- | --- |
+| [![Standard keyboard layout waiting for a new throttle key](docs/screenshots/launcher-keyboard.png)](docs/screenshots/launcher-keyboard.png) | [![Controller editor with throttle assigned to the left trigger and steering to the right stick](docs/screenshots/launcher-controller.png)](docs/screenshots/launcher-controller.png) |
 
 ## Building from source
 
