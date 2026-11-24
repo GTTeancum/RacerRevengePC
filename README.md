@@ -1,42 +1,28 @@
 # Racer Revenge PC
 
-A native PC reimplementation of Star Wars: Racer Revenge, with shared code designed for a future original-Xbox port.
+A native Windows PC port of *Star Wars: Racer Revenge*, reconstructed from the PlayStation 2 game. The project uses the original game data for its courses, pods, menus, and audio. You need your own USA PS2 copy (SLUS-202.68).
 
-## Current handoff
+## The Mos Espa Open
 
-See [the performance handoff](docs/PERFORMANCE_HANDOFF.md) for current source status,
-last verified results, untested changes and takeover steps. The status narrative
-below is historical consolidation context and predates that handoff.
+![Mos Espa in 3440×1440 ultrawide, with rival pods on both sides of the starting straight](docs/screenshots/mos-espa-ultrawide.jpg)
 
-## Historical consolidation status
+At **3440×1440**, the race camera shows more track to either side while keeping the same vertical field of view. The lap display, minimap, and engine gauges follow the edges of the window.
 
-Native host CPU/GPU reimplementation is in progress. Linux is a temporary validation platform; portable gameplay and Windows releases are the priority. All driving validation requires original in-game AI for every racer, including the camera-followed player.
+| 16:9 gameplay at 3840×2160 | Course selection at 2560×1080 |
+| --- | --- |
+| [![A 4K race frame with the player's pod, opponents and race HUD](docs/screenshots/mos-espa-4k.jpg)](docs/screenshots/mos-espa-4k.jpg) | [![The original Mos Espa course-selection screen centered on an ultrawide display](docs/screenshots/course-select-ultrawide.jpg)](docs/screenshots/course-select-ultrawide.jpg) |
 
-The last completed focused check was the native Linux Rider19 menu opening, unavailable-direction/Confirm handling, and Back sequence on October 11, 2026 at 10:27 UTC. It passed on source commit `03df3c8`; later UI resource/lifetime/audio changes and this branch consolidation remain unbuilt and untested. Rider switching and the original menu-to-race flow are still closed. Historical GC gameplay remains partial at an unfinished original-AI recovery boundary; the newer opt-in Gate asset join has no fresh gameplay validation.
+## Windows development build
 
-Main consolidation preserves the optional [native audio timing observations](docs/native-audio-phase-observation.md). Those observations do not fix or validate simulation/audio drift. Build and capture identities must be rebound to the final merged source before any new validation.
+These screenshots were captured on November 24, 2026, from development build **cr-179**. The launcher started the game, which went through the original rider and course menus into a race. The game captured native frames at **3840×2160**, **2560×1080**, and **3440×1440**. The original menus retain their proportions on ultrawide displays.
 
-Historical [all-original-AI capture tooling](tools/capture/all_original_ai/README.md) is retained with its original runtime identity and incomplete-prefix limits. It has not been rebound or executed against consolidated main. Older capture helpers are retained for provenance and are not approved driving-test entry points.
+The personal development launcher accepts a USA PS2 disc image or extracted game folder. It can also install optional content when supplied with the supported Racer Arcade ROM set or USA *Episode I Racer* Nintendo 64 ROM. After installation, video settings and control presets apply on the next game launch. The game also runs directly from its executable.
 
-The [registered-pod query partial](docs/registered-pod-query50iz.md) is retained as an optional native owner path, uncompiled and untested. No original-AI state-5/reset activation is implied.
+## Building from source
 
-## Build and game data
+This repository contains source and build documentation. The tested development build is ahead of the public source snapshot. Supply original game data locally. The personal installer stays private.
 
-Supply your own original game data and generate local caches. Assets, executables, and memory dumps are excluded; some source-comparison fixtures also require local generation.
-
-Start with the [interactive build guide](docs/interactive-build50dv.md). Linux requires C++20, Python 3, zlib, SDL2, and desktop OpenGL. See [input requirements](docs/source-only-exclusions.md). A source-only [Windows x64 integrated build entry](platform/windows/native/README-interactive50du.md) now retains the same native UI/gameplay owners with SDL2/OpenGL window and audio adapters. It has not been compiled or run; it is not a validated release.
-
-## Controls and frontend modes
-
-- W / S: left-engine throttle / brake
-- Up / Down: right-engine throttle / brake; unequal input steers
-- Space: boost; Left Shift: powerslide; R: repair
-- A / D (or right stick left/right, default control layout): lean left / right while in zero gravity
-- Backspace: checkpoint return, or race restart; F5: restart
-- Escape: pause/resume; Up/Down or W/S: menu navigation; Enter or Space: select
-
-These driving and pause controls belong to the existing native host session. Its menus are not the original game UI. Automated driving checks use the original in-game AI for every racer, including the followed player.
-
-The original frontend is an explicit separate entry: `RR_ORIGINAL_MAIN_MENU=1`, `RR_ORIGINAL_UI_ROOT` pointing to the original game-files directory, and `RR_ORIGINAL_MAIN_AUDIO=muted` or `enabled`. Enabled audio also requires `RR_ORIGINAL_MAIN_AUDIO_ROOT` pointing to original AUDIO. Main/Options use Up/Down and Enter/Escape; Game Options uses Up/Down for groups, Left/Right for values, R for Defaults, Enter for Accept, and Escape for Cancel. Accept requires the genuine enabled frontend audio owner. These newer Options paths have not yet passed a runtime check.
-
-Vendored licenses remain intact.
+- [Windows x64 build guide](platform/windows/native/README-interactive50du.md)
+- [Native build guide and dependencies](docs/interactive-build50dv.md)
+- [Required local inputs and generated fixtures](docs/source-only-exclusions.md)
+- [Development handoff](docs/HANDOFF-20261123-codex.md)
