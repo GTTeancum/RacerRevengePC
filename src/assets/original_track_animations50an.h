@@ -82,6 +82,11 @@ struct TrackAnimation50AN {
     // PORT EXTENSION, NOT ORIGINAL (N64 data only): "StartHidden" in [AnimationN]. The original
     // executable has no such key; absent on every stock TOB, so stock rows stay visible.
     bool startHidden = false;
+    std::uint32_t parentAnimation = 0; // One-based earlier N64 animation row, zero for a top-level row.
+    bool transformOnly = false;
+    bool loadLoop = false; // Re-register N64 scenery at its authored initial time on race restart.
+    bool independentChannels = false; // N64 animated scenery repeats each channel at its own last key.
+    bool holdLastKey = false; // N64 non-looping motion retains its terminal time for a later reversal.
 };
 enum class TrackAnimationActionKind50AN : std::uint8_t { animation, resetAnimation, hideAnimation };
 struct TrackAnimationAction50AN {
@@ -277,6 +282,13 @@ inline bool readTrackAnimations50AN(const ParameterDocument48F& p, std::uint32_t
                 }
                 // PORT EXTENSION, NOT ORIGINAL: N64 StartHidden (inert on stock data).
                 a.startHidden = d::boolField(*b, "starthidden", false);
+                const auto parent = d::integerField(*b, "n64parentanimation", 0);
+                d::need(parent >= 0 && static_cast<std::uint32_t>(parent) < i, "Animated parent must precede its child");
+                a.parentAnimation = static_cast<std::uint32_t>(parent);
+                a.transformOnly = d::boolField(*b, "n64transformonly", false);
+                a.loadLoop = d::boolField(*b, "n64loadloop", false);
+                a.independentChannels = d::boolField(*b, "n64independentchannels", false);
+                a.holdLastKey = d::boolField(*b, "holdlastkey", false);
                 for (const auto& q : a.sequences) a.initialActive.push_back(q.active);
                 for (std::uint32_t s = 0; s < a.sequences.size(); ++s)
                     if (a.sequences[s].active) { a.initialSequence = s; break; }

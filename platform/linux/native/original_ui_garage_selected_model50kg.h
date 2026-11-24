@@ -76,7 +76,7 @@ class OriginalUiGarageSelectedModel50KG final {
         attempted_=true;grant_=std::move(grant);assets_=std::move(assets);
         // Manager+2B0 retains the actual partially constructed object too.
         //240740 receives a2=a3=0: no additional root and no local light block.
-        if(!resources.load(assets_->selectedPod()->model,R::RootMode::direct,false,model_,d))
+        if(!resources.load(assets_->selectedPod()->model,R::RootMode::direct,false,model_,d,true))
             return R::failureStage(d,"garage.selected.model.load");
         auto step=grant_->enrollConstructedModel(model_->scene_);
         if(!step.okay()){

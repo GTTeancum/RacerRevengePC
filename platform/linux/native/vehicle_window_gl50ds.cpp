@@ -753,6 +753,13 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if(d.originalRaceHudRejected&&s.raceHud)s.raceHud->frame=false;
     d.originalRaceStartOverlayRejected=!s.prepareRaceStartOverlayFrame(frame.originalRaceStartOverlay);
     if(d.originalRaceStartOverlayRejected&&s.raceStartOverlay)s.raceStartOverlay->frame=false;
+    s.splitPass=frame.splitPass;
+    if(frame.splitPass>2||(frame.splitPass&&(!frame.gameplayBlur||!frame.gameplayBlur->hasSecondView||!s.gameplaySceneTarget)))
+        return fail(d,VehicleWindowError50DS::frame,"split view requires two authored rectangles and a composition target");
+    if(frame.splitPass==2&&(!s.awaitingSecondView||s.splitCameraPublication!=frame.sourceBodyCameraPublication50LA||
+        s.splitWidth!=frame.width||s.splitHeight!=frame.height))
+        return fail(d,VehicleWindowError50DS::frame,"second split view has no matching first submission");
+    s.awaitingSecondView=false;
     s.frameGameplayBlurEnabled=frame.gameplayBlur!=nullptr;
     s.frameGameplayBlur=frame.gameplayBlur?*frame.gameplayBlur:GameplayBlurFrame50DS{};
     // Zone rows are copied (bounded) before any GL work; a count that is not
@@ -796,9 +803,12 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
                 fail(d, VehicleWindowError50DS::submission, "50CS/50CV submission rejected");
         } else {
             d.batchAccepted = true;
-            if(s.request.output==VehicleWindowOutput50DS::headless)
+            if(frame.splitPass==1){
+                s.awaitingSecondView=true;s.splitCameraPublication=frame.sourceBodyCameraPublication50LA;
+                s.splitWidth=frame.width;s.splitHeight=frame.height;s.splitFirstTarget=s.displayedTarget;
+            }else if(s.request.output==VehicleWindowOutput50DS::headless)
                 s.noteGameplayDisplayPending(s.displayedTarget,s.committedWidth,s.committedHeight);
-            if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
+            if (frame.splitPass!=1 && s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
                 auto copyStageStart=s.rendererStageNow();
                 accepted = s.copyToWindow();
                 s.traceRendererStage("copy_to_window",copyStageStart,false);

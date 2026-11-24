@@ -1,0 +1,92 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-vengeance",
+    "name": "Vengeance (Oovo IV, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.3",
+    "description": "Vengeance on Oovo IV, from Star Wars Episode I Racer (N64) model 145, as an add-on course (code nv, physics class B). AI class A (weak evidence); no rival (its source favourite has no Revenge pod). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NV": "VENGEANCE",
+        "PLANET_NV": "OOVO IV"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nv",
+        "code": "nv",
+        "archive": "TRACKS/NV.RES",
+        "name_key": "COURSE_NV",
+        "planet_name_key": "PLANET_NV",
+        "phy_class": "B",
+        "ai_class": "A",
+        "rival": "none",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NV.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NV.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nv",
+        "enhancements": [
+          "surface_rules",
+          "zero_g",
+          "n64_floor_table"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NV.RES",
+        "bytes": 1242960,
+        "sha256": "180dc2ec6913bf0b1ecc1d1f3eb187f65f46eeccede17cf5141d2662f30f0406",
+        "role": "course archive (members named tracks\\nv.* / anv.spl / mnv.spl / nvNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NV.PST",
+        "bytes": 66588,
+        "sha256": "cb405798434dbcfa3029ef5ff8a89e80bdefea6f00ee017d5dc7c1fd251e68ca",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NV.PST",
+        "bytes": 287772,
+        "sha256": "42d2bab3074680a5015e28b55f609b08da8626bcc3669ed8630e40f08c7cae2f",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      2350.0,
+      -40.0,
+      1470.0
+    ],
+    "target": [
+      16964.0,
+      5240.0,
+      16084.0
+    ]
+  }
+}

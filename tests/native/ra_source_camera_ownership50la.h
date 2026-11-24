@@ -1632,7 +1632,8 @@ class OwnershipBridge final {
         }
         const bool completed=freshLighting_->prepareRaZonePrefix114D00(lease,
             *session.actual_.applicationEntities,session.matrices_,session.spatial_.parent38,session.viewport_,
-            *session.actual_.applicationMaterials,session.racerEntities_,session.spatial_,dispatch,session.displayInputs_->rendererDispatch,
+            *session.actual_.applicationMaterials,session.racerEntities_,session.spatial_,
+            session.actual_.humanCount34==2u?&session.secondSpatial_:nullptr,dispatch,session.displayInputs_->rendererDispatch,
             session.displayInputs_->renderer,session.displayInputs_->diagnostic,detail);
         d.camera.sourcePC=detail.sourcePC;
         d.message="partial selection prefix only; inspect sourcePC for the remaining source boundary";

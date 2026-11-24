@@ -88,6 +88,7 @@ struct QueryLease {
  std::uint32_t* nodeC80=nullptr;           // the racer's C80 progress node (LostAI writes it)
  const g::Vector3_48C* listener=nullptr;   // accepted camera listeners (null before the first camera)
  std::uint32_t listenerCount=0;
+ std::uint32_t* pilotNodeC80=nullptr;
 };
 
 // Storage inputs only the race's cold caller (I2) has: query names, the shared roster
@@ -380,7 +381,7 @@ public:
   struct Fence {RacerBank& b;~Fence(){b.queryActive_=false;b.queryIssuer_=nullptr;}};
   bank.queryActive_=true;bank.queryIssuer_=this;Fence fence{bank};
   if(!actions_){try{return std::invoke(std::forward<Operation>(op),*storage);}catch(...){return false;}}
-  ta::ActionLease actual{lease.main690,lease.collider,lease.nodeC80,lease.listener,lease.listenerCount};
+  ta::ActionLease actual{lease.main690,lease.collider,lease.nodeC80,lease.listener,lease.listenerCount,lease.pilotNodeC80};
   ta::Owner::QueryBorrow scope(*actions_,actual);if(!scope)return false;
   bool accepted=false;
   try{accepted=std::invoke(std::forward<Operation>(op),*storage);}catch(...){accepted=false;}

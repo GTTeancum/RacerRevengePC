@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-boles-roor",
+    "name": "Boles Roor (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Boles Roor from Star Wars Racer Arcade, as an add-on pod (stem a2r_bol, 7 wreck pieces). Borrowed from stock pod 15 until own data exists: stats, pilot voice, camera presets, material set-ups, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_BOL": "BOLES ROOR"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-bol",
+        "stem": "a2r_bol",
+        "archive": "PODS/A2R_BOL/A2R_BOL.RES",
+        "camera": "PODS/A2R_BOL/A2R_BOL.CAM",
+        "name_key": "RIDER_A2R_BOL",
+        "ui": {
+          "archive": "UI/A2R_BOL_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_bol.psg",
+          "character": [
+            "ui\\anim\\a2r_bolc.psg",
+            "ui\\anim\\a2r_bolc.mcf",
+            "ui\\anim\\a2r_bolc.vut",
+            "ui\\anim\\a2r_bolc_ent.mot",
+            "ui\\anim\\a2r_bolc_idl1.mot",
+            "ui\\anim\\a2r_bolc_idl2.mot",
+            "ui\\anim\\a2r_bolc_idl3.mot",
+            "ui\\anim\\a2r_bolc_breathe.mot",
+            "ui\\anim\\a2r_bolc_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_bolc_1.pst",
+            "ui\\textures\\a2r_bolc_1.psm",
+            "ui\\textures\\a2r_bolc_2.pst",
+            "ui\\textures\\a2r_bolc_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_bol_1.pst",
+            "UI\\Textures\\a2r_bol_2.pst",
+            "UI\\Textures\\a2r_bol_3.pst",
+            "ui\\textures\\a2r_bol_1.psm",
+            "ui\\textures\\a2r_bol_2.psm",
+            "ui\\textures\\a2r_bol_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_bol_shdw.pst",
+            "ui\\textures\\a2r_bol_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_bol_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_bol_bkg.pst",
+            "ui\\textures\\a2r_bol_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_bol_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_bole.psg",
+            "ui\\textures\\a2r_bole_1.pst",
+            "ui\\textures\\a2r_bole_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "layout_slot": "15"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_BOL/A2R_BOL.RES",
+        "bytes": 200111,
+        "sha256": "2ef59218d54f9b9bf462adf33f4c6cf97a9a8977b8e8939a2bc5828c9037151e",
+        "role": "pod archive (members named by the stem: pods\\a2r_bol\\..., textures\\a2r_bol_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_BOL/A2R_BOL.CAM",
+        "bytes": 5781,
+        "sha256": "799d9589cec6ddb0ea39c28844af4fdcdff1dc0ea269e5332ad1e1680782ff5f",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_BOL_UI.RES",
+        "bytes": 183988,
+        "sha256": "08a6ba2efe1fdb314da8347601f8b88465a9afd9479c6f28065f0e1145143ced",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

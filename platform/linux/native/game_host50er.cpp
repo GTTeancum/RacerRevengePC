@@ -361,6 +361,7 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
         retainSharedDialogPoll50KG(input);
         {auto& test=testResultsInput50PD(); //Unattended test only; inert otherwise.
          if(test.focus){input.keys.focused=true;input.keys.activityLost=false;}
+         if(test.restart){input.keys.pressed[21]=1;input.keys.down[21]=1;test.restart=false;}
          if(test.enter){input.keys.pressed[40]=1;input.keys.down[40]=1;test.enter=false;}
          if(test.down){input.keys.pressed[81]=1;input.keys.down[81]=1;test.down=false;}
          if(test.capture){input.keys.pressed[69]=1;test.capture=false;}}

@@ -52,6 +52,8 @@ struct SelectedControlInput50KY;
 struct SelectedControllerReceipt50KY;
 }
 
+// Split screen: human 1 input stack (original_second_human_input50sv.h).
+struct SecondHumanInput50SV;
 namespace interactive_continuation50DU {
 namespace platform=rr::platform;
 namespace gcLighting=rr::game::original_gc_gameplay_lighting_candidate;
@@ -918,6 +920,8 @@ struct Context final {
     zoneQueueType& zoneQueue;
     using zoneScratchType = rr::game::ZoneRegistrationScratch50CJ;
     zoneScratchType& zoneScratch;
+    // Split screen: human 1's input stack, null for every one-human race.
+    SecondHumanInput50SV* secondHumanInput50SV=nullptr;
     SessionExit50DU run();
 };
 } // namespace interactive_continuation50DU

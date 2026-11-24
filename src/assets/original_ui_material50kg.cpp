@@ -2379,7 +2379,9 @@ bool prepareOriginalUiTournamentPodSpecularMaterial50KM(const OriginalUiMaterial
         // Original03c_3/08c_3 pass2 has the same authored FIX64/depth-writing
         // specular state as12c_4. Its single-mip diffuse passes stay generic.
         constexpr bool character=false; // Tournament User_Rotate has no character graph.
-        const auto* bodyName=tournamentUnlockedBodyName(pass);
+        const auto* stockBody=tournamentUnlockedBodyName(pass);
+        const auto addonLeaf=stockBody?std::string():addonPodMaterialLeaf(pass);
+        const char* bodyName=stockBody?stockBody:(addonLeaf.empty()?nullptr:addonLeaf.c_str());
         const bool original19=bodyName&&(same(bodyName,"19_1")||same(bodyName,"19_2"));
         const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\pod_wndw.psm");
         if ((!bodyName&&!window&&!character) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||

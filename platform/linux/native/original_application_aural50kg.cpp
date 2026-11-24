@@ -93,20 +93,21 @@ bool OriginalApplicationAural50KG::listenerCustodyCurrent(bool allowIncomplete)c
         source.initializerReturn||source.before48||source.after48||source.registrationReturn||source.listenerReturn))return false;
     for(std::size_t n=0;n<listeners4C_.size();++n){
         if(listeners4C_[n]!=nativeListenerOwners_[n].get())return false;
-        if(n&&listeners4C_[n])return false; //Only genuine one-view registration joined.
+        if(n&&listeners4C_[n]&&(nativeListenerPhase_==NativeListenerPhase::sourceReserved||n>=2))return false;
+        if(nativeListenerPhase_!=NativeListenerPhase::sourceReserved&&
+           (n<word48_)!=bool(listeners4C_[n]))return false;
+        if(n<word48_&&nativeListenerPhase_!=NativeListenerPhase::sourceReserved&&
+           !listeners4C_[n]->current(*this))return false;
     }
     switch(nativeListenerPhase_){
     case NativeListenerPhase::empty:
         return !nativeListenerIssuer_&&!word34_&&!word48_&&!listeners4C_[0];
     case NativeListenerPhase::ready:
-        return nativeListenerIssuer_&&word34_==1u&&word48_==1u&&
-            listeners4C_[0]&&listeners4C_[0]->current(*this);
+        return nativeListenerIssuer_&&word34_>=1u&&word34_<=2u&&word34_==word48_;
     case NativeListenerPhase::constructing:
-        return allowIncomplete&&nativeListenerIssuer_&&word34_<=1u&&!word48_&&
-            (!listeners4C_[0]||!listeners4C_[0]->hasBackend04()||listeners4C_[0]->current(*this));
     case NativeListenerPhase::failed:
-        //Failed102F10 destroys/nulls any wrapper but does not undo102EF0.
-        return allowIncomplete&&word34_<=1u&&!word48_&&!listeners4C_[0];
+        // 102EF0 reserves the index before its wrapper/backend allocation.
+        return allowIncomplete&&word34_<=2u&&word48_<=word34_&&word34_-word48_<=1u;
     case NativeListenerPhase::sourceReserved:
         //This phase remains separate from native ready even after genuine
         //source initialization/registration/listener return. Native disposal
@@ -156,12 +157,12 @@ bool OriginalApplicationAural50KG::listenerCustodyCurrent(bool allowIncomplete)c
 bool OriginalApplicationAural50KG::listenerCurrent(const ListenerManager& manager)const noexcept {
     return current()&&nativeListenerPhase_==NativeListenerPhase::ready&&nativeListenerIssuer_==&manager;
 }
-bool OriginalApplicationAural50KG::beginSingleRaceListener1A4620(
-    const ListenerManager& manager,Diagnostic& d)noexcept {
+bool OriginalApplicationAural50KG::beginRaceListeners1A4620(
+    const ListenerManager& manager,std::uint32_t count,Diagnostic& d)noexcept {
     d={};
-    //Private actual-manager caller proves source38==1 and same App/Race.
+    // The manager supplies the count loaded from race+1B0 at 1A3C14.
     //These are native ownership gates, not invented guest branch results.
-    if(!current()||nativeListenerPhase_!=NativeListenerPhase::empty||
+    if((count!=1&&count!=2)||!current()||nativeListenerPhase_!=NativeListenerPhase::empty||
        !issuer_->state||!nativeInitialized_||!backendCurrent()||!canActivateUiInitializer1B7340(d))
         return fail(d,Status::owner,0x1a4620);
     //141560 activation is BEFORE any listener reservation. Its real childless
@@ -172,65 +173,65 @@ bool OriginalApplicationAural50KG::beginSingleRaceListener1A4620(
     }
     nativeListenerIssuer_=&manager;nativeListenerPhase_=NativeListenerPhase::constructing;
     flags9CBit0_=true; //1A4678, preserve other bits in the existing projection.
-    ++word34_; //102EF0: reserve actual index0 BEFORE allocation/assertion stores.
-    //This native adapter uses a projected per-App guard, not the authentic
-    //shared process owner. Irreversibly poison BEFORE even reading that copy.
-    assets::OriginalConfigProcessGlobals50LA::invalidateListenerAssertionHistoryNative();
-    auto& app=*issuer_->state;
-    if(!app.listenerGuard80C4){
-        app.listenerAssertion3DF4C0=1u;app.listenerGuard80C4=1u; //102F48/4C.
+    for(std::uint32_t index=0;index<count;++index){
+        ++word34_; //102EF0: reserve the listener index BEFORE allocation/assertion stores.
+        //This native adapter uses a projected per-App guard, not the authentic
+        //shared process owner. Irreversibly poison BEFORE even reading that copy.
+        assets::OriginalConfigProcessGlobals50LA::invalidateListenerAssertionHistoryNative();
+        auto& app=*issuer_->state;
+        if(!app.listenerGuard80C4){
+            app.listenerAssertion3DF4C0=1u;app.listenerGuard80C4=1u; //102F48/4C.
+        }
+        //Each admitted index makes the represented133660(index<4) return0, with no
+        //assertion callback on either existing diagnostic-enable branch.
+        NativeListener290A90* wrapper=nullptr;
+        try{wrapper=new NativeListener290A90;}catch(...){wrapper=nullptr;}
+        nativeListenerOwners_[index].reset(wrapper);
+        listeners4C_[index]=wrapper; //102FC0 includes the genuine allocation-null result.
+        if(!wrapper){
+            listeners4C_[index]=nullptr; //103004 after genuine null290AA0 no-op.
+            nativeListenerPhase_=NativeListenerPhase::failed;return fail(d,Status::allocation,0x102fc8);
+        }
+        if(!app.listenerGuard8C58){
+            app.listenerAssertion4344B0=1u;app.listenerGuard8C58=1u; //290B48/4C.
+        }
+        //Actual same Aural is nonnull;133660 at290B6C has no callback here.
+        wrapper->bindAural290BAC(*this);
+        NativeListenerBackend2357A0* backend=nullptr;
+        //232D50 is actual interface28-bit0 gated. No device/RPC factory substitute.
+        if((**interfaceA0_).initialized28Bit0){
+            try{backend=new NativeListenerBackend2357A0;}catch(...){backend=nullptr;}
+        }
+        wrapper->installBackend290BBC(backend); //Publish even null, before return test.
+        if(!backend){
+            nativeListenerOwners_[index].reset(); //102FF4 ->290AA0 BEFORE null slot store.
+            listeners4C_[index]=nullptr;nativeListenerPhase_=NativeListenerPhase::failed;
+            return fail(d,Status::allocation,0x290bc4);
+        }
+        //Four exact PS2 backend leaves return1 without stores/callbacks/hardware.
+        (void)wrapper->initialize290CF0(0x40400000u);
+        (void)wrapper->initialize290D30(0x3f800000u);
+        (void)wrapper->initialize290CB0(0x3e9c0ebfu);
+        (void)wrapper->update290C70();
+        ++word48_; //10301C only after actual successful290B10.
     }
-    //Actual index0 makes the represented133660(index<4) return0, with no
-    //assertion callback on either existing diagnostic-enable branch.
-    NativeListener290A90* wrapper=nullptr;
-    try{wrapper=new NativeListener290A90;}catch(...){wrapper=nullptr;}
-    nativeListenerOwners_[0].reset(wrapper);
-    listeners4C_[0]=wrapper; //102FC0 includes the genuine allocation-null result.
-    if(!wrapper){
-        listeners4C_[0]=nullptr; //103004 after genuine null290AA0 no-op.
-        nativeListenerPhase_=NativeListenerPhase::failed;return fail(d,Status::allocation,0x102fc8);
-    }
-    if(!app.listenerGuard8C58){
-        app.listenerAssertion4344B0=1u;app.listenerGuard8C58=1u; //290B48/4C.
-    }
-    //Actual same Aural is nonnull;133660 at290B6C has no callback here.
-    wrapper->bindAural290BAC(*this);
-    NativeListenerBackend2357A0* backend=nullptr;
-    //232D50 is actual interface28-bit0 gated. No device/RPC factory substitute.
-    if((**interfaceA0_).initialized28Bit0){
-        try{backend=new NativeListenerBackend2357A0;}catch(...){backend=nullptr;}
-    }
-    wrapper->installBackend290BBC(backend); //Publish even null, before return test.
-    if(!backend){
-        nativeListenerOwners_[0].reset(); //102FF4 ->290AA0 BEFORE null slot store.
-        listeners4C_[0]=nullptr;nativeListenerPhase_=NativeListenerPhase::failed;
-        return fail(d,Status::allocation,0x290bc4);
-    }
-    //Four exact PS2 backend leaves return1 without stores/callbacks/hardware.
-    (void)wrapper->initialize290CF0(0x40400000u);
-    (void)wrapper->initialize290D30(0x3f800000u);
-    (void)wrapper->initialize290CB0(0x3e9c0ebfu);
-    (void)wrapper->update290C70();
-    ++word48_; //10301C only after actual successful290B10.
     nativeListenerPhase_=NativeListenerPhase::ready;
     d={Status::complete,0x1a46dc};return true;
 }
-bool OriginalApplicationAural50KG::removeSingleRaceListener103040(
+bool OriginalApplicationAural50KG::removeRaceListeners103040(
     const ListenerManager& manager,Diagnostic& d)noexcept {
     d={};
     if(!currentIncludingIncompleteListener()||nativeListenerPhase_==NativeListenerPhase::sourceReserved)
         return fail(d,Status::owner,0x103040); //Source cancellation is not this native adapter.
     if(!nativeListenerIssuer_){d={Status::complete,0x1a4618};return true;} //Never began/already withdrawn.
     if(nativeListenerIssuer_!=&manager)return fail(d,Status::owner,0x103040);
-    if(listeners4C_[0]){
-        if(nativeListenerPhase_!=NativeListenerPhase::ready||!listeners4C_[0]->current(*this))
-            return fail(d,Status::owner,0x103068);
-        nativeListenerOwners_[0].reset(); //290AA0 complete BEFORE source slot-null.
-        listeners4C_[0]=nullptr; //103070.
-        --word48_; //103080.
-        --word34_; //103090.
-        nativeListenerPhase_=NativeListenerPhase::empty;
+    const auto registered=word48_;
+    for(std::uint32_t index=0;index<registered;++index){
+        nativeListenerOwners_[index].reset();
+        listeners4C_[index]=nullptr;
+        --word48_;--word34_;
     }
+    if(!word34_)nativeListenerPhase_=NativeListenerPhase::empty;
     //Original enclosing1A45C0 ignores103040's null-slot false. It never repairs
     //reserved34 on a failed constructor. Withdraw native issuer, keep poison.
     nativeListenerIssuer_=nullptr;

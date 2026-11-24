@@ -235,22 +235,24 @@ public:
         catch(...){error="AI source audio preparation failed";return false;}
     }
     bool prepareHumanResetOwner(rr::game::OriginalHumanEngineResetOwner50LB& owner) noexcept {
-        if(!prepared_||activated_||firstAiSlot_!=1||humanResetOwner_)return false;
+        const auto slot=owner.identity().managerOrdinal;
+        if(!prepared_||activated_||slot>=firstAiSlot_||humanResetOwners_[slot])return false;
         auto* row=materialD44_.bindHumanRacer(owner);
         if(!row)return false;
-        humanResetOwner_=&owner;humanResetD44_=row;return true;
+        humanResetOwners_[slot]=&owner;racers_[slot].materialD44=row;return true;
     }
     bool humanPhysicalResetOwners(std::uint32_t actualPod60,
         const rr::game::VehicleFrameState49W& frame,
         rr::game::OriginalHumanEngineResetOwner50LB& owner,
         std::uint8_t*& flags22C,std::uint32_t*& field24C) noexcept {
         flags22C=nullptr;field24C=nullptr;
-        if(!prepared_||firstAiSlot_!=1||humanResetOwner_!=&owner||
+        const auto slot=owner.identity().managerOrdinal;
+        if(!prepared_||slot>=firstAiSlot_||humanResetOwners_[slot]!=&owner||
            !owner.bound()||owner.identity().pod60!=actualPod60||
            frame.fields.vehicle58!=0u)return false;
         // The human wrapper reaches reset from its actual packed-byte cut;
         // phase admission belongs to that wrapper, not the AI PostPlayer gate.
-        field24C=materialD44_.resetHumanField24C(humanResetD44_,owner);
+        field24C=materialD44_.resetHumanField24C(racers_[slot].materialD44,owner);
         if(!field24C)return false;
         flags22C=&owner.flags22C();return true;
     }
@@ -270,8 +272,8 @@ public:
         try {
             std::array<selected_player_audio50IJ::Catalog,8> catalogs{};
             std::vector<a::AudioRequest50HC> requests;
-            for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){
-                selected_player_audio50IJ::Authoring own;currentPod60=racers_[slot].engine.identity.pod60;
+            for(std::size_t slot=(firstAiSlot_?1u:0u);slot<racerCount_;++slot){
+                selected_player_audio50IJ::Authoring own;currentPod60=slot<firstAiSlot_?humanResetOwners_[slot]->identity().pod60:racers_[slot].engine.identity.pod60;
                 if(!selected_player_audio50IJ::read(discRoot,currentPod60,own,error)){
                     try{error+=" (pod60 "+std::to_string(currentPod60)+")";}catch(...){}return false;
                 }
@@ -297,8 +299,8 @@ public:
             }
             currentPod60=0;
             if(!a::loadAudioBank50HC(audioRoot,requests,speechBank_,error))return false;
-            for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){
-                currentPod60=racers_[slot].engine.identity.pod60;
+            for(std::size_t slot=(firstAiSlot_?1u:0u);slot<racerCount_;++slot){
+                currentPod60=slot<firstAiSlot_?humanResetOwners_[slot]->identity().pod60:racers_[slot].engine.identity.pod60;
                 const auto first=p::originalSpeechFirstVoice50HD+slot*p::originalSpeechVoicesPerRacer50HD;
                 std::array<std::size_t,gameplay_audio50HE::cueCount> voices{};
                 std::size_t count=0;
@@ -329,7 +331,7 @@ public:
         const rr::game::PodSpeechCounts50HG* actualHumanCounts=nullptr,
         rr::game::PodSpeechState50HG* actualHumanState=nullptr)noexcept {
         if(!speechPrepared_||speechInitialized_)return false;
-        if(firstAiSlot_==1u){
+        if(firstAiSlot_){
             if(!actualHumanCounts||!actualHumanState)return false;
             // The player's own 2C1170 (pod load, 2C1300) may already have drawn
             // this SAME D48's cursors at their source position; never redraw.
@@ -339,7 +341,7 @@ public:
             std::fprintf(stderr,"speech_cursor_init human=%s ai=%zu",drawn?"pod_load_2c1300":"all_eight",
                 racerCount_>firstAiSlot_?racerCount_-firstAiSlot_:0u);std::fputc(10,stderr);
         }else if(actualHumanCounts||actualHumanState)return false;
-        for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){auto& r=racers_[slot];
+        for(std::size_t slot=(firstAiSlot_?1u:0u);slot<racerCount_;++slot){auto& r=racers_[slot];
             if(rr::game::initializePodSpeech50HG(r.speechCounts,actualSharedRaw,r.speech)!=
                rr::game::PodSpeechStatus50HG::Complete)return false;
         }
@@ -348,9 +350,10 @@ public:
     bool speechOwner(std::size_t slot,std::uint32_t actualRacer60,
         const rr::game::PodSpeechCounts50HG*& counts,rr::game::PodSpeechState50HG*& state)noexcept {
         counts=nullptr;state=nullptr;
-        if(!speechPrepared_||!speechInitialized_||!ownsSlot(slot))return false;
+        if(!speechPrepared_||!speechInitialized_||slot>=racerCount_||(firstAiSlot_&&slot==0))return false;
         auto& r=racers_[slot];
-        if(r.engine.identity.managerOrdinal!=slot||r.engine.identity.pod60!=actualRacer60)return false;
+        const auto& identity=slot<firstAiSlot_?humanResetOwners_[slot]->identity():r.engine.identity;
+        if(identity.managerOrdinal!=slot||identity.pod60!=actualRacer60)return false;
         counts=&r.speechCounts;state=&r.speech;return true;
     }
     bool applySpeech(std::size_t slot,std::uint32_t actualRacer60,
@@ -375,8 +378,8 @@ public:
         if(!prepared_||materialAttempted_||activated_){error="AI D44 material cold lifecycle rejected";return false;}
         materialAttempted_=true;
         for(std::size_t slot=0;slot<racerCount_;++slot){
-            auto* row=slot<firstAiSlot_?humanResetD44_:racers_[slot].materialD44;
-            auto& channel=slot<firstAiSlot_?humanMaterials_:racers_[slot].materials;
+            auto* row=racers_[slot].materialD44;
+            auto& channel=racers_[slot].materials;
             if(!row||!native_original_ai_material::prepareArrays(
                 *row,channel,mixer,groups,catalog,bank,error))return false;
         }
@@ -389,11 +392,11 @@ public:
     bool selectNativeMaterialPitchPolicy()noexcept {
         if(!materialPrepared_||materialNativeBound_||activated_)return false;
         for(std::size_t slot=0;slot<racerCount_;++slot){
-            const auto* row=slot<firstAiSlot_?humanResetD44_:racers_[slot].materialD44;
+            const auto* row=racers_[slot].materialD44;
             if(!row||row->material().blocked||row->material().inDispatch)return false;
         }
         for(std::size_t slot=0;slot<racerCount_;++slot){
-            auto* row=slot<firstAiSlot_?humanResetD44_:racers_[slot].materialD44;
+            auto* row=racers_[slot].materialD44;
             row->material().pitchPolicy=rr::game::OriginalPodMaterialPitchPolicy::nativeDecodedRateUnity4096;
         }
         materialNativeBound_=true;return true;
@@ -438,8 +441,8 @@ public:
         std::memcpy(input.velocity.v,frame.bodies.main.components.root.body.velocity.v,12);
         std::memcpy(input.velocity.v+3,&frame.bodies.mainSphere.velocity70W,4);
         const auto result=slot<firstAiSlot_?
-            g::dispatchOriginalPodMaterialAudio179070(humanResetD44_->material(),
-                *humanResetOwner_,input,&listener_,1,mode_->fields(),shared,
+            g::dispatchOriginalPodMaterialAudio179070(racers_[slot].materialD44->material(),
+                *humanResetOwners_[slot],input,&listener_,1,mode_->fields(),shared,
                 actualEvents,actualActors,actualEventOwner33CBound):
             g::dispatchOriginalPodMaterialAudio179070(racers_[slot].materialD44->material(),
                 racers_[slot].engine,input,&listener_,1,mode_->fields(),shared);
@@ -668,7 +671,8 @@ public:
         aural_.retireNativeRegistrations();
         for(std::size_t slot=firstAiSlot_;slot<racerCount_;++slot){auto& r=racers_[slot];
         if(stopSpeech)r.speechProvider.stopAll();r.materials.close();r.materialD44=nullptr;r.wrecks.close();r.loops.close();}
-        humanMaterials_.close();materialD44_.close();humanResetOwner_=nullptr;humanResetD44_=nullptr;
+        for(std::size_t slot=0;slot<firstAiSlot_;++slot){if(slot&&stopSpeech)racers_[slot].speechProvider.stopAll();racers_[slot].materials.close();racers_[slot].materialD44=nullptr;}
+        humanResetOwners_.fill(nullptr);materialD44_.close();
     }
     bool prepared()const noexcept{return prepared_;}
     bool ownsSlot(std::size_t actualManagerOrdinal)const noexcept {
@@ -681,9 +685,9 @@ private:
         const rr::game::OriginalAiEmitterIdentity* id=nullptr;
         const rr::game::OriginalPodCollisionResponseOwners::Emitter* row=nullptr;
         if(slot<firstAiSlot_){
-            if(slot!=0u||firstAiSlot_!=1u||!humanResetOwner_||!humanResetOwner_->bound()||
+            if(!humanResetOwners_[slot]||!humanResetOwners_[slot]->bound()||
                frame.fields.vehicle58!=0u||frame.fields.nativeAiOwnersBound50IV)return nullptr;
-            id=&humanResetOwner_->identity();row=humanResetD44_;
+            id=&humanResetOwners_[slot]->identity();row=racers_[slot].materialD44;
         }else{
             if(!ownsSlot(slot)||frame.fields.vehicle58!=1u||
                !frame.fields.nativeAiOwnersBound50IV)return nullptr;
@@ -763,9 +767,7 @@ private:
         returned=true;return true;
     }
     unsigned skippedBoostSoundLogs_=0;
-    rr::game::OriginalHumanEngineResetOwner50LB* humanResetOwner_=nullptr;
-    rr::game::OriginalPodCollisionResponseOwners::Emitter* humanResetD44_=nullptr;
-    Channel humanMaterials_{};
+    std::array<rr::game::OriginalHumanEngineResetOwner50LB*,2> humanResetOwners_{};
     rr::game::OriginalPodCollisionResponseOwners materialD44_{};
     std::size_t firstAiSlot_=0,racerCount_=0;
     std::array<Racer,8> racers_{};

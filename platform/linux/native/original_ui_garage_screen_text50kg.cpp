@@ -744,10 +744,10 @@ bool OriginalUiGarageScreenText50KG::writeText29D990(std::string_view text,Diagn
     text.find('\0')!=std::string_view::npos)return rejectSetter("screen_guard");
  //29D970..988 compare the FULL source strlen before capacity truncation.
  if(text.size()==length5C_&&(text.empty()||!std::memcmp(string8_.get(),text.data(),text.size())))return true;
- // The source equality branch above performs no store. Only an actual text
- // change needs exclusive access to the retained packet/string owner; do not
- // admit a truncated-prefix match or clear its live FIFO borrow.
- if(nativeGarageFifoPins_||nativeMenuWarningPins_)return rejectSetter("screen_pinned_mutation");
+ // A Garage widget can queue its previous glyph packet before the Page
+ // writes next frame's label. This setter only updates the string and dirty
+ // flags. Packet regeneration and destruction still require released pins.
+ if(nativeMenuWarningPins_)return rejectSetter("screen_pinned_mutation");
  if(packetRevision_==std::numeric_limits<std::uint64_t>::max())return rejectSetter("screen_revision_exhausted");
  ++packetRevision_;
  const auto copied=std::min<std::size_t>(text.size(),capacity5B_);
@@ -889,17 +889,21 @@ bool OriginalUiGarageScreenText50KG::lowerRetainedPacketBody(std::size_t primiti
  const std::array<std::uint32_t,2>& offset,LoweredPacket& out,Diagnostic& d)const {
  d={};auto reject=[&](std::uint32_t pc){d.status=Status::source;d.sourcePC=pc;return false;};
  if(!coldInputsCurrent()||phase_!=Phase::coldLoaded||
-    (flags5A_&7u)||std::fegetround()!=FE_TONEAREST||offset[0]>65535u||offset[1]>65535u||
+    ((flags5A_&7u)&&!nativeGarageFifoPins_)||std::fegetround()!=FE_TONEAREST||offset[0]>65535u||offset[1]>65535u||
     primitiveIndex>=active5E_||primitiveIndex>=packetCount5D_||!packets64_||!primitives4_||!glyphsC_)
   return reject(0x327ED8);
  const auto& packet=packets64_[primitiveIndex];const auto& primitive=primitives4_[primitiveIndex];
  const auto* q=packet.buffer00.get();const auto first=primitiveIndex*36u;
  if(!q||!primitive||!primitive->materialRetained||primitive->material00<0||primitive->type0C!=15||
     primitive->optional04||primitive->optional14||primitive->flags0F||primitive->packet10!=q||
-    packet.qwords!=packet.glyphs*6+6||packet.glyphs>36||first>=length5C_||
+    packet.qwords!=packet.glyphs*6+6||packet.glyphs>36||
     first+packet.glyphs>capacity5B_||packet.vif04!=q+1||packet.gif08!=q+2||packet.giftag0C!=q+3||
     !packet.dmaPointerPublished||packet.dmaData4!=q+1)return reject(0x2E03F0);
- const auto count=std::min<std::size_t>(36,length5C_-first);
+ // The GIFtag records the submitted length even if a later Page callback
+ // has already written a new string into the same widget.
+ const auto count=std::size_t(q[2].words[0]&0x7fffu)/2u;
+ if(!count||count>packet.glyphs||(!(flags5A_&7u)&&
+    (first>=length5C_||count!=std::min<std::size_t>(36,length5C_-first))))return reject(0x327ED8);
  if(q[0].words[0]!=(0x30000000u|static_cast<std::uint32_t>(packet.glyphs*6+4))||
     q[1].words!=std::array<std::uint32_t,4>{{0x11000000u,0x03000000u,0x02000200u,
          0x6c008000u|static_cast<std::uint32_t>((packet.glyphs*6+2)<<16)}}||

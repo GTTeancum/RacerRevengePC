@@ -15,21 +15,23 @@ template<class Selection> constexpr bool originalCourseSelectionEncoding50KG(con
 // Mode0 writes at 1DED0C/1DED48 and 1DEDB4, preserving rider/human bits.
 // This computes field values only; source lifecycle request ordering remains
 // owned by the UI transition bridge, not simulated by this helper.
-constexpr std::uint16_t originalCourseLaunchPackedMode050KG(std::uint16_t before,
-    std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants) noexcept {
+constexpr std::uint16_t originalCourseLaunchPacked50KG(std::uint16_t before,
+    std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants,bool versus=false) noexcept {
     const auto humans=(before>>5)&3u;
-    const auto opponents=((subtype==2?entrants:8u)-humans)&15u;
+    const auto opponents=(((versus||subtype==2)?entrants:8u)-humans)&15u;
     return static_cast<std::uint16_t>((before&~0x79fu)|(opponents<<7)|(laps&31u));
 }
-// Single-human native capability, separate from the authored UI transaction.
+// Roster shape after the authored UI transaction. VS retains both humans and its selected entrant count.
 // Mode2 has its real fixed-three-lap eight-racer launch. Mode0 subtype2 uses
 // its selected active extent. Subtype3's Course request initially packs eight,
 // then its real1AD520 writer clears AI bits to leave one live human; both
 // phases retain the same selected rider/course, never fabricated opponent rows.
-template<class Selection> constexpr bool nativeSingleHumanCourseMode50KG(const Selection& s) noexcept {
+template<class Selection> constexpr bool nativeCourseMode50KG(const Selection& s) noexcept {
     const auto humans=(s.packed1125C>>5)&3u;
     const auto opponents=(s.packed1125C>>7)&15u;
-    if(humans!=1||s.laps<1||s.laps>25||s.entrants!=humans+opponents)return false;
+    if(s.laps<1||s.laps>25||s.entrants!=humans+opponents)return false;
+    if(s.mode34==1)return humans==2&&s.subtype==1&&s.entrants>=2&&s.entrants<=8;
+    if(humans!=1)return false;
     if(s.mode34==2)return s.subtype==1&&s.laps==3&&s.entrants==8;
     if(s.mode34!=0)return false;
     if(s.subtype==1)return s.entrants==8;

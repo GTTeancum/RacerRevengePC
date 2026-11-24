@@ -44,9 +44,13 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
-        p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&(!p.cardFlag100BC||p.nativeBetaStorage)&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
-        ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
+    const bool versus=p.mode34==1;
+    const auto course=versus?p.course710:p.course700;
+    const auto laps=versus?p.laps718:p.laps704;
+    const auto entrants=versus?p.entrants714:p.entrants708;
+    return p.ownerReady&&p.mode34<=1&&common.mode34==p.mode34&&course>=1&&course<=13&&(versus||(p.subtype70C>=1&&p.subtype70C<=3))&&
+        laps>=1&&laps<=25&&entrants>=(versus?2u:1u)&&entrants<=8&&(!p.cardFlag100BC||p.nativeBetaStorage)&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
+        ((common.playerBits1125C>>5)&3)==(versus?2:1)&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
 // PORT EXTENSION, NOT ORIGINAL (DLC add-on courses, 147c): the stock anchor of the
@@ -294,7 +298,7 @@ struct OriginalUiCourseSession50KG::Storage {
             state.inputContainerShown&&t.requested.screen==6&&t.requested.page==1&&t.lifecycle==Life::idle&&
             t.phase==Phase::none&&!t.initialRestartPending&&a.inputEnabled268&&a.state==game::OriginalUiApertureState50KG::open;
     }
-    bool context(game::OriginalUiCourseContext50KG& c)const noexcept{
+    bool context(game::OriginalUiCourseContext50KG& c,bool secondPresent)const noexcept{
         if(!profileCurrent()||!cold.resources->widgets()->navigation()||!selection.page())return false;
         const auto* n=cold.resources->widgets()->navigation();
         // Source Confirm/Back dispatch does not require course-row focus.
@@ -306,14 +310,14 @@ struct OriginalUiCourseSession50KG::Storage {
         }else if(n->controllerGroup[0]<1||n->controllerGroup[0]>3||state.laps14EC<1||state.laps14EC>25||
             state.entrants14F0<1||state.entrants14F0>8||state.subtypeSlot14F4<1||state.subtypeSlot14F4>3||
             (state.subtypeSlot14F4==3&&n->controllerGroup[0]==3)||n->groups[1].selectedSlot!=state.courseSlot14E4||
-            n->groups[2].selectedSlot!=state.subtypeSlot14F4)return false;
+            (state.mode34==0&&n->groups[2].selectedSlot!=state.subtypeSlot14F4))return false;
         game::OriginalUiCourseControl50KG control;
         if(!selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),control)||
             control.planet40!=state.selectedPlanet40||control.course44!=state.selectedCourse44)return false;
         c={};c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
         OriginalUiRiderProfileOwner50KG::CourseRaceSelection retained;
         if(!cold.profile->courseRaceSnapshot(retained))return false;
-        c.mode34=state.mode34;c.packed1125C=retained.packed1125C;c.firstControllerPresent=true;
+        c.mode34=state.mode34;c.packed1125C=retained.packed1125C;c.firstControllerPresent=true;c.secondControllerPresent=secondPresent;
         c.confirmEnabled42C=(state.promptMask42C&1)!=0;c.courseSlot14E4=static_cast<std::uint16_t>(state.courseSlot14E4);
         c.subtypeSlot14F4=static_cast<std::uint16_t>(state.subtypeSlot14F4);
         c.courseGroupSlotCount=static_cast<std::uint16_t>(selection.page()->groups[1].controls.size());
@@ -335,7 +339,7 @@ struct OriginalUiCourseSession50KG::Storage {
             out.selectedRider=rider.rider;out.selectedUnlock10FAC=rider.unlock10FAC;
             out.courseSlot14E4=m.courseSlot14E4;out.tier14E8=m.tier14E8;
         }
-        out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
+        out.mode34=p.mode34;out.course700=p.mode34==1?p.course710:p.course700;out.subtype70C=p.mode34==1?1u:p.subtype70C;
         out.nativeBetaStorage=p.nativeBetaStorage;out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
     }
@@ -416,6 +420,20 @@ struct OriginalUiCourseSession50KG::Storage {
     // input event: its0.65 initial timer would erase the source0.13 repeat.
     // Nor gate this on row/input/aperture state. Row changes leave the timers
     // intact, and expiry reads the current subtype14F4, including subtype3.
+    float entrantRight14DC=0,entrantLeft14E0=0;
+    void stepVersusEntrants(bool forward)noexcept{
+        auto& n=state.entrants14F0;
+        n=forward?(n==8?2:n+1):(n==2?8:n-1);
+    }
+    bool updateVersusEntrants(const std::array<bool,2>& held,float dt)noexcept{
+        const bool right=entrantRight14DC>0&&held[1];
+        if(!right&&!(entrantLeft14E0>0&&held[0])){entrantRight14DC=entrantLeft14E0=0;return true;}
+        auto& timer=right?entrantRight14DC:entrantLeft14E0;
+        timer-=dt;
+        if(timer>0)return true;
+        stepVersusEntrants(right);timer=std::bit_cast<float>(std::uint32_t{0x3E051EB8});
+        return effect(right?4u:3u,right?0x1E01A4:0x1E0280);
+    }
     bool updateHeldCount1DFEA0(const std::array<bool,2>& held,float dt)noexcept{
         if(!std::isfinite(state.repeatRight14D4)||!std::isfinite(state.repeatLeft14D8)){
             fault(S::unsupportedState,0x1DFEA0);return false;
@@ -491,13 +509,13 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
            p->decision.request.sourceScreen!=9||p->decision.request.sourcePage!=1||p->decision.request.targetScreen!=6||
            p->decision.request.targetPage!=1||p->decision.request.sourcePC!=0x1F2374||p->decision.profileChanges.count||
            !sameStamp(p->profileStamp,cold.profile->stamp())||p->profileStamp.mode34!=2)return result(d,S::profile,0x1F2374);
-    }else if(cold.tournamentProposal||cold.profile->stamp().mode34!=0)return result(d,S::unsupportedState);
+    }else if(cold.tournamentProposal||cold.profile->stamp().mode34>1)return result(d,S::unsupportedState);
     if((cold.audioMode==OriginalUiMainAudioMode50KG::muted&&cold.audio)||
        (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&(!cold.audio||!cold.audio->courseMenuReady()))||
        (cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled))
         return result(d,S::audio,0x1DA924);
     try{
-        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();s->state.mode34=tournament?2u:0u;
+        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();s->state.mode34=s->coldStamp.mode34;
         if(!s->processCurrent()||!s->profileCurrent()||s->coldStamp.generation>std::numeric_limits<std::uint64_t>::max()-2)return result(d,S::profile);
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
         game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
@@ -574,14 +592,14 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
         const auto stamp=s->cold.profile->stamp();OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         const bool origin=s->state.mode34==2?(s->tournamentContinueAccepted&&sameStamp(stamp,s->coldStamp)):
-            s->cold.pauseCourseOrigin?(sameStamp(stamp,s->coldStamp)&&stamp.mode34==0&&
+            s->cold.pauseCourseOrigin?(sameStamp(stamp,s->coldStamp)&&stamp.mode34==s->state.mode34&&
                 s->cold.pauseCourseOrigin->current(*this)&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
             (s->cold.previousScreen==11||s->cold.previousScreen==6)?
-                (sameStamp(stamp,s->coldStamp)&&stamp.mode34==0&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
+                (sameStamp(stamp,s->coldStamp)&&stamp.mode34==s->state.mode34&&s->cold.profile->courseRiderSelectionSnapshot(rider)):
             s->cold.previousScreen==10?
-                (stamp.mode34==0&&(stamp.generation==s->coldStamp.generation||stamp.generation==s->coldStamp.generation+1)&&
+                (stamp.mode34==s->state.mode34&&(stamp.generation==s->coldStamp.generation||stamp.generation==s->coldStamp.generation+1)&&
                  s->cold.profile->courseRiderSelectionSnapshot(rider)):
-            (stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&s->cold.profile->courseRiderSelectionSnapshot(rider));
+            (stamp.mode34==s->state.mode34&&stamp.generation==s->coldStamp.generation+1&&s->cold.profile->courseRiderSelectionSnapshot(rider));
         valid=(s->state.mode34!=2||s->published)&&s->profileCurrent()&&origin&&s->entryPlan(entry,mode2)&&
             !entry.showPopup438&&entry.courseSlot14E4<=13&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}
@@ -608,7 +626,7 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         if(!s->widgets().disableFreshPopup438(s->faultDetail.widget)){s->fault(S::widget,0x1DA714);break;}
         s->state.popupEnabled438=s->widgets().popupEnabled438();s->state.cameraActive=true;s->state.pageShown=true;
         // PORT EXTENSION (DLC add-on courses, 147c): reopen on the raced add-on entry.
-        if(s->addonCarousel&&s->state.mode34==0)s->restoreAddonEntry();
+        if(s->addonCarousel&&s->state.mode34<=1)s->restoreAddonEntry();
         s->cold.application->uiObject3D8=0;s->entered=true;break;}
     case Notice::managerEntry84:
         valid=s->entered&&!s->managerEntered&&t.lifecycle==Life::initialEntry&&t.phase==Phase::none&&e.sourcePC==0x2A3D68;
@@ -679,7 +697,11 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
             if(!s->widgetProfile(profile))return result(d,S::profile);
             if(!s->effectReady(forward?4u:3u))return result(d,S::audio,forward?0x1DF58C:0x1DF2D8);
             s->cpuDrain();s->inOperation=true;
-            if(!s->widgets().moveEventType(forward,profile,s->hooks(),d.widget))s->fault(S::widget,forward?0x1DF4A8:0x1DF1F0);
+            if(s->state.mode34==1){
+                s->stepVersusEntrants(forward);
+                s->entrantRight14DC=forward?0.65f:0.0f;s->entrantLeft14E0=forward?0.0f:0.65f;
+                s->effect(forward?4u:3u,forward?0x1DF58C:0x1DF2D8);out.selectionChanged=true;
+            }else if(!s->widgets().moveEventType(forward,profile,s->hooks(),d.widget))s->fault(S::widget,forward?0x1DF4A8:0x1DF1F0);
             else {s->state.subtypeSlot14F4=s->widgets().navigation()->groups[2].selectedSlot;
                 s->effect(forward?4u:3u,forward?0x1DF58C:0x1DF2D8);out.selectionChanged=true;}
             s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}
@@ -777,21 +799,21 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     // its item offers (subtype 3 = Time Trial, 1/2 = Single Event); otherwise nothing happens.
     if(confirm&&s->addonSlot){
         const auto* a=s->addon();
-        const auto mode=s->state.subtypeSlot14F4==3?game::dlc50DL::AddonCourseMode::timeTrial:game::dlc50DL::AddonCourseMode::single;
+        const auto mode=s->state.mode34==1?game::dlc50DL::AddonCourseMode::vs:s->state.subtypeSlot14F4==3?game::dlc50DL::AddonCourseMode::timeTrial:game::dlc50DL::AddonCourseMode::single;
         if(!a||!game::dlc50DL::addonCourseAllowsMode(a->plan.number,mode)){
             std::fprintf(stderr,"dlc_course_confirm key=%s number=%u status=refused reason=\"mode not offered by the item\" subtype=%u\n",
                 a?a->plan.key.c_str():"-",a?a->plan.number:0u,s->state.subtypeSlot14F4);
             return result(d,S::noChange,0x1DED58);
         }
     }
-    game::OriginalUiCourseContext50KG context;if(!s->context(context))return result(d,S::profile);
+    game::OriginalUiCourseContext50KG context;if(!s->context(context,in.secondControllerObservation==WindowControllerPresence50DQ::Present))return result(d,S::profile);
     game::OriginalUiRouteDecision50KG decision;
     const auto status=game::dispatchOriginalUiCourse50KG(0,confirm?game::OriginalUiRouteInput50KG::activate:game::OriginalUiRouteInput50KG::back,context,decision);
     const auto blocker=confirm?game::OriginalUiRouteBlocker50KG::courseLaunchOwner:game::OriginalUiRouteBlocker50KG::destinationOwner;
     if(status!=game::OriginalUiRouteStatus50KG::unavailable||decision.admitted||!decision.profileProposalComplete||
         decision.blockers!=static_cast<std::uint32_t>(blocker)||
-        (confirm?(decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch||decision.profileChanges.count!=(s->state.mode34==2?4u:8u)):
-                 (decision.request.targetScreen!=(s->state.mode34==2?9:5)||decision.request.targetPage!=1||
+        (confirm?(decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch||decision.profileChanges.count!=(s->state.mode34==2?4u:s->state.mode34==1?7u:8u)):
+                 (decision.request.targetScreen!=(s->state.mode34==2?9:5)||decision.request.targetPage!=(s->state.mode34==1?2:1)||
                   (s->state.mode34==2&&decision.profileChanges.count))))return result(d,S::unavailableDestination,decision.inputPC);
     if(s->proposalSerial==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState);
     ++s->proposalSerial;s->pendingContext=context;s->pendingDecision=decision;s->pendingStamp=s->cold.profile->stamp();
@@ -806,7 +828,7 @@ bool OriginalUiCourseSession50KG::routeProposalCurrent(const OriginalUiCourseRou
         !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameLife(s->transition(),s->pendingLifecycle)||!sameDecision(p.decision,s->pendingDecision))return false;
     if(!s->effectReady(s->pendingDecision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch?1u:5u))return false;
     game::OriginalUiCourseContext50KG context;game::OriginalUiRouteDecision50KG current;
-    return s->context(context)&&game::dispatchOriginalUiCourse50KG(0,
+    return s->context(context,s->pendingContext.secondControllerPresent)&&game::dispatchOriginalUiCourse50KG(0,
         s->pendingDecision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch?game::OriginalUiRouteInput50KG::activate:game::OriginalUiRouteInput50KG::back,context,current)==
         game::OriginalUiRouteStatus50KG::unavailable&&sameDecision(current,s->pendingDecision);
 }
@@ -820,7 +842,7 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
         !sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent())return result(d,S::invalidInput);
     const bool launch=p.decision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch;
     if(!s->effectReady(launch?1u:5u))return result(d,S::audio,launch?0x1DEF18:0x1DF0E0);
-    auto expected=s->pendingLifecycle;if(!launch)expected.requested={static_cast<std::uint8_t>(s->state.mode34==2?9:5),1};
+    auto expected=s->pendingLifecycle;if(!launch)expected.requested={static_cast<std::uint8_t>(s->state.mode34==2?9:5),static_cast<std::uint8_t>(s->state.mode34==1?2:1)};
     expected.lifecycle=launch?Life::requestCourseExit:Life::requestScreenExit;
     const auto stamp=s->cold.profile->stamp();game::OriginalUiCourseRememberedProfile50KG profile;
     if(!sameLife(s->transition(),expected))return result(d,S::profile,0x1DEFCC);
@@ -834,15 +856,15 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
                actual.mode34!=2||actual.course!=s->pendingContext.selectedControlWord44||
                actual.planet!=s->state.selectedPlanet40||actual.rider!=career.career100C0||
                actual.subtype!=1||actual.laps!=3||actual.entrants!=8||
-               actual.packed1125C!=game::originalCourseLaunchPackedMode050KG(s->pendingContext.packed1125C,1,3,8))
+               actual.packed1125C!=game::originalCourseLaunchPacked50KG(s->pendingContext.packed1125C,1,3,8))
                 return result(d,S::profile,0x1DEEB0);
         }else if(p.decision.profileChanges.count||p.decision.request.targetScreen!=9||
            p.decision.request.targetPage!=1||p.decision.request.sourcePC!=0x1DF0B4||
            !sameStamp(stamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::profile,0x1DF0B4);
     }else if(s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
-        stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=0||!s->cold.profile->courseSnapshot(profile)||
-        !bounded(profile,*s->cold.commonProfile)||profile.course700!=s->pendingContext.courseSlot14E4||
-        profile.laps704!=s->pendingContext.laps14EC||profile.entrants708!=s->pendingContext.entrants14F0||profile.subtype70C!=s->pendingContext.subtypeSlot14F4)
+        stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=s->state.mode34||!s->cold.profile->courseSnapshot(profile)||
+        !bounded(profile,*s->cold.commonProfile)||(profile.mode34==1?profile.course710:profile.course700)!=s->pendingContext.courseSlot14E4||
+        (profile.mode34==1?profile.laps718:profile.laps704)!=s->pendingContext.laps14EC||(profile.mode34==1?profile.entrants714:profile.entrants708)!=s->pendingContext.entrants14F0||(profile.mode34==0&&profile.subtype70C!=s->pendingContext.subtypeSlot14F4))
         return result(d,S::profile,0x1DEFCC);
     s->cpuDrain();s->liveStamp=stamp;s->state.backProposalPending=false;s->state.backAccepted=!launch;s->state.launchAccepted=launch;
     // PORT EXTENSION (DLC add-on courses): the accepted launch hands the highlighted
@@ -927,9 +949,9 @@ S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,
         --s->state.deferred14D0;if(!s->state.deferred14D0)s->selectionRefreshCompleted=false;
     }
     // Source's first repeat pair follows deferred refresh and precedes the
-    // 2A6BB0 page-child update. The second pair14DC/14E0 is only armed by mode1,
-    // outside this Session's admitted modes0/2, and remains constructor zero.
-    if(!s->updateHeldCount1DFEA0(in.courseHorizontalHeld,in.elapsedSeconds)){
+    // 2A6BB0 page-child update. VS also updates its separate entrant timers.
+    if(!s->updateHeldCount1DFEA0(in.courseHorizontalHeld,in.elapsedSeconds)||
+       (s->state.mode34==1&&!s->updateVersusEntrants(in.courseHorizontalHeld,in.elapsedSeconds))){
         s->inOperation=false;d=s->faultDetail;return d.status;
     }
     const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds);
@@ -963,7 +985,7 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     s->collector.setAddonFrame(addon?&s->addonFrame:nullptr);
     bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,backgroundPlanet)&&s->collector.projectOrdinaryWidgets(true,d.draw);
     game::OriginalUiCoursePageDrawDiagnostic50KG pageDiagnostic;
-    if(okay&&s->state.mode34==0&&!s->page.setEventSelection(s->state.subtypeSlot14F4,s->state.laps14EC,s->state.entrants14F0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    if(okay&&s->state.mode34<=1&&!s->page.setEventSelection(s->state.subtypeSlot14F4,s->state.laps14EC,s->state.entrants14F0,pageDiagnostic,s->state.mode34==1)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&!s->page.applyPlanetPalette(s->widgets(),colors.primary79C,colors.secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&s->state.mode34==2){
         game::OriginalUiCourseTournamentDrawState50KG actual;

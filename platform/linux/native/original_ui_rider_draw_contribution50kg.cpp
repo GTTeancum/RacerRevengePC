@@ -570,7 +570,9 @@ bool OriginalUiRiderDrawContribution50KG::nativeDrawableModels(const std::array<
     for(std::uint16_t id=1;id<120;++id)if(models[id]){
         if(!drawableModel(id,d))return false;pod=pod||bool(s.dynamic->podAssets(id));
     }
-    if(pod){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
+    const auto* addons=s.backend->addonModels();
+        // An add-on pod draws its binder even while its stock model widget is hidden.
+        if(pod||(addons&&addons->size())){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
         if(!images||!images->textures()||!pass)return fail(d,E::resource);
         for(std::uint32_t i=0;i<images->textures()->textureCount();++i){
             const auto* map=s.backend->binderImage(i);if(!map)return fail(d,E::bank);bool found=false;
@@ -636,7 +638,9 @@ bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
                 }
         }
         // Real binder material ownership is independent of parent clipping.
-        if(pod){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
+        const auto* addons=s.backend->addonModels();
+        // An add-on pod draws its binder even while its stock model widget is hidden.
+        if(pod||(addons&&addons->size())){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
             if(!images||!images->textures()||!pass)return fail(d,E::resource);
             for(std::uint32_t i=0;i<images->textures()->textureCount();++i){
                 const auto* map=s.backend->binderImage(i);if(!map||!add(map->combinedIndex))return fail(d,E::bank);
@@ -1639,7 +1643,12 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
             if(index==unresolved)continue;
             const auto* cpu=s.bank->images()->textures()->texture(index);
             const auto* gpu=s.gpu->asset(index);
-            if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity){s.failed=true;return fail(d,E::publication);}
+            if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity){
+                std::fprintf(stderr,"rider_texture_publication image=%u cpu=%d gpu=%d gl=%u material=%u name=%s kind=%u\n",
+                    unsigned(index),int(cpu!=nullptr),int(gpu!=nullptr),gpu?unsigned(gpu->name):0u,unsigned(packet.binding),
+                    s.bindings[packet.binding].registeredName.c_str(),unsigned(s.bindings[packet.binding].kind));
+                s.failed=true;return fail(d,E::publication);
+            }
         }
         for(std::size_t i=0;i<s.packets.size();++i){const auto& p=s.packets[i];
             if(p.binding>=s.bindings.size()||!s.bindings[p.binding].sourceRegistered||s.bindings[p.binding].leaf==unresolved||!p.count||

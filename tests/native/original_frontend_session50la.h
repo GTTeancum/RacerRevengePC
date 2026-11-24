@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdio>
+#include "../../src/game/original_ui_garage_state50kg.h"
 #include "../../platform/linux/native/loading_progress_step113a.h"
 #include "../../platform/linux/native/test_results_input50pd.h"
 #include <cstdlib>
@@ -260,6 +261,17 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   std::cerr<<"ORIGINAL MAIN COLD: dedicated frontend; no race corpus, racer, world, or gameplay renderer constructed.\n";
   auto reportUiState=[&](const char* reason){originalMain.report(reason,originalMainApplication,0,0);};
   bool capturePending=false;
+  const char* previewScreen=std::getenv("RR_PREVIEW_CAREER_SCREEN");
+  const bool previewTournament=previewScreen&&std::strcmp(previewScreen,"tournament")==0;
+  const bool previewWin=previewScreen&&std::strcmp(previewScreen,"win")==0;
+  const bool previewGarage=previewScreen&&std::strcmp(previewScreen,"garage")==0;
+  bool previewCaptured=false,secondRiderCaptured=false;
+  unsigned previewReadyFrames=0;
+  const bool buyUpgrade=captureRun.unattended()&&std::getenv("RR_TEST_GARAGE_BUY_ONE")&&
+      std::strcmp(std::getenv("RR_TEST_GARAGE_BUY_ONE"),"1")==0;
+  unsigned purchaseActions=0;
+  unsigned purchaseStep=0;
+  std::uint64_t nextPurchaseFrame=0;
   std::vector<std::uint8_t> captureBuffer(headlessLive?static_cast<std::size_t>(nativeVideo->width)*nativeVideo->height*4u:0u);
   std::vector<std::uint8_t> captureRgbRow(headlessLive?static_cast<std::size_t>(nativeVideo->width)*3u:0u);
   auto captureCommitted=[&](){
@@ -505,10 +517,12 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
        "original frontend physical controller snapshot invalid");
    // Separate physical identity and release-to-arm lifetime for port two.
-   // An inactive Controls2 route disarms it; keyboard always remains port zero.
+   // Disarm on leaving a second-player page. Keyboard input stays on port zero.
    const auto secondInputRoute=originalMain.coordinator.route();
+   const bool secondPlayerPage=(secondInputRoute.screen==12&&secondInputRoute.page==3)||
+       (secondInputRoute.screen==5&&secondInputRoute.page==2);
    require50DU(originalUiSecondControllerNavigation.observe(input,active&&
-       secondInputRoute.screen==12&&secondInputRoute.page==3,secondMenuEvents,1),
+       secondPlayerPage,secondMenuEvents,1),
        "original frontend second physical controller snapshot invalid");
    const auto mainClock=originalMain.sampleClock(applicationClock,active);
    originalMain.audioOutput.pause(!active);
@@ -552,16 +566,16 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
       originalMainApplication.courseHumanController=courseConfirmFromController;
     }
    // Never merge two physical ports or retag keyboard input as controller one.
-   if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
+   if(secondPlayerPage&&
       input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
     for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u}){
      const auto currentRoute=originalMain.coordinator.route();
-     if(currentRoute.screen!=12||currentRoute.page!=3)break;
+     if(currentRoute.screen!=secondInputRoute.screen||currentRoute.page!=secondInputRoute.page)break;
      if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
     }
    }
    if(tournamentRoute.enabled()){
-    require50DU(originalMain.inputCount==tournamentRoute.issuedActions(),"physical menu input interrupted unattended tournament route");
+    require50DU(originalMain.inputCount==tournamentRoute.issuedActions()+purchaseActions,"physical menu input interrupted unattended tournament route");
     const auto snapshot=originalMain.coordinator.snapshot();
     const auto* navigation=originalMain.navigation();
     const auto group=navigation?navigation->controllerGroup[0]:0;
@@ -570,10 +584,39 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto action=tournamentRoute.poll(snapshot,group,slot,
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));tournamentRoute.validateDispatch(originalMain.coordinator.snapshot());}
+    if(buyUpgrade&&action<0&&snapshot.route.screen==13&&snapshot.garageLoaded&&
+       snapshot.garageTargetPublished&&snapshot.garageRootReturned&&snapshot.garageTimingCommitted&&
+       snapshot.garageManagerLifecycle==0&&snapshot.garageManagerTransition==0&&snapshot.garageAperture.inputEnabled268&&
+       purchaseStep<3&&originalMain.frameCount>=nextPurchaseFrame){
+     using Profile=platform::OriginalUiRiderProfileOwner50KG;
+     Profile::GarageProfileSnapshot profile;
+     require50DU(originalMainApplication.riderProfile->selectedGarageProfileSnapshot(profile),"Garage purchase profile unavailable");
+     const auto row=snapshot.garageSelectedStat;
+     require50DU(row<profile.current1920.size(),"Garage purchase row unavailable");
+     unsigned event=4;
+     if(purchaseStep==0){
+      std::int32_t current=0,maximum=0;
+      require50DU(rr::game::convertOriginalUiGarageStat50KG(profile.current1920[row],current)&&
+          rr::game::convertOriginalUiGarageStat50KG(profile.maximum0408[row],maximum),"Garage purchase row conversion");
+      if(current>=maximum||profile.career.unspent2194<50u*(current+1)+300u){
+       require50DU(purchaseActions<6,"Garage has no affordable upgrade");
+       event=3;
+      }else {event=1;++purchaseStep;}
+     }else if(purchaseStep==1)++purchaseStep;
+     else if(originalMainApplication.state->controllerPopupState.result3D8==1)++purchaseStep;
+     else event=8;
+     if(event<8){
+      std::cerr<<"garage_purchase_input row="<<row<<" credits="<<profile.career.unspent2194<<" ability="<<profile.current1920[row]<<" event="<<event<<'\n';
+      originalMain.input(static_cast<std::uint8_t>(event));++purchaseActions;
+      nextPurchaseFrame=originalMain.frameCount+25;
+     }
+    }
    }
    if(tournamentReturnRoute.enabled()){
     require50DU(originalMain.inputCount==tournamentReturnRoute.issuedActions(),"physical menu input interrupted unattended tournament return route");
-    const auto action=tournamentReturnRoute.poll(originalMain.coordinator.snapshot(),
+    const auto returnScreen=originalMain.coordinator.snapshot();
+    const bool holdWinPreview=previewWin&&!captureRun.logsOnly()&&!previewCaptured&&returnScreen.route.screen==7;
+    const auto action=holdWinPreview?-1:tournamentReturnRoute.poll(returnScreen,
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&renderer.initialized());
     if(action>=0){
      std::cerr<<"tournament_return_route action="<<action<<" screen="<<unsigned(originalMain.coordinator.snapshot().route.screen)<<'\n';
@@ -618,7 +661,13 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         courseCatalogPrepared&&raceRequested&&!courseColdLoad.pending()&&
         renderer.initialized(),
         originalMain.sourceFrameGeneration,originalMain.submittedPublication);
-    if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));captureRoute.validateDispatch(originalMain.coordinator.snapshot());}
+    if(action>=0){
+     if(captureRoute.versus()){
+      const auto port=static_cast<std::uint8_t>(snapshot.route.screen==5&&snapshot.route.page==2);
+      originalMain.input(static_cast<std::uint8_t>(action),platform::WindowControllerPresence50DQ::Present,port);
+     }else originalMain.input(static_cast<std::uint8_t>(action));
+     captureRoute.validateDispatch(originalMain.coordinator.snapshot());
+    }
    }
    // Unattended EXIT GAME test (see RR_TEST_MAIN_EXIT above): one menu input at most every
    // 20 native frames, only on a settled screen, never while another unattended route runs.
@@ -706,8 +755,26 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const bool settled=(stage==windows_capture50LD::Stage::hall?original_ui_capture_navigation50LA::HallRoute::settled(snapshot):
         original_ui_capture_navigation50LA::Route::settled(snapshot))&&
         (stage!=windows_capture50LD::Stage::rider||sourceAccepted);
-    const bool captureWindowImage=host.hasWindow()&&captureRoute.captureAllowed(snapshot,sourceAccepted,originalMain.sourceFrameGeneration,
-        originalMain.submittedPublication)&&(!hallRoute.enabled()||hallRoute.captureAllowed(snapshot))&&windowCapture.due(stage,settled);
+    bool previewReady=false;
+    if(windowCapture.enabled()&&!captureRun.logsOnly()&&!previewCaptured){
+     if(previewTournament&&snapshot.route.screen==9)
+      previewReady=originalMain.submittedScreen==9&&original_ui_capture_navigation50LA::TournamentRoute::settledPublic(snapshot);
+     if(previewWin&&snapshot.route.screen==7&&originalMain.submittedScreen==7)
+      previewReady=snapshot.winBound&&snapshot.screenPageShown&&snapshot.screenInputShown&&snapshot.screenFramePublished;
+     if(previewGarage&&snapshot.route.screen==13&&originalMain.submittedScreen==13){
+      const auto garage=originalMain.coordinator.snapshot();
+      previewReady=garage.garageLoaded&&garage.frameSubmitted&&garage.garageRootReturned&&garage.garageTimingCommitted&&
+          garage.garageTargetPublished&&garage.garageAperture.inputEnabled268&&
+          originalMain.submittedGaragePublication==garage.garagePublication;
+     }
+    }
+    if(previewReady)previewReady=++previewReadyFrames>=90;
+    else previewReadyFrames=0;
+    const bool secondRiderReady=windowCapture.enabled()&&captureRoute.versus()&&captureRoute.secondRiderMoved()&&
+        !secondRiderCaptured&&stage==windows_capture50LD::Stage::rider&&snapshot.route.page==2&&settled&&
+        sourceAccepted&&snapshot.rider.selectedCharacterReady;
+    const bool captureWindowImage=host.hasWindow()&&(secondRiderReady||previewReady||(captureRoute.captureAllowed(snapshot,sourceAccepted,originalMain.sourceFrameGeneration,
+        originalMain.submittedPublication)&&(!hallRoute.enabled()||hallRoute.captureAllowed(snapshot))&&windowCapture.due(stage,settled)));
     const auto swapStart=originalMain.stageStart();
     if(host.hasWindow()&&!windowCapture.swapAndCapture(renderer,host,captureWindowImage,windowSwaps+1,
         [&](){return host.swapWindow(hostDiagnostic);})){
@@ -736,7 +803,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
           {"course",snapshot.course.selectedCourse44},{"planet",snapshot.course.selectedPlanet40},
           {"course_slot",snapshot.course.courseSlot14E4},{"subtype_slot",snapshot.course.subtypeSlot14F4},
           {"laps",snapshot.course.laps14EC},{"entrants",snapshot.course.entrants14F0}};
-      windowCapture.record(renderer,host,stage,settled,std::move(receipt));
+      windowCapture.record(renderer,host,stage,settled||previewReady,std::move(receipt));
+      if(secondRiderReady)secondRiderCaptured=true;
+      if(previewReady)previewCaptured=true;
      }
     }
    }

@@ -5,7 +5,7 @@
 namespace original_camera_session50KX {
 Session::~Session(){
         invalidateSelectedGameplayCamera50LA(); //Native observation only; not115690.
-        if(coldController_.entity.reference00)std::terminate();
+        if(coldController_.entity.reference00||secondColdController_.entity.reference00)std::terminate();
         if(nativeTaCutChildPhase_==NativeTaCutChildPhase::constructed&&
            !abortUnpublishedTaCutChildNative())std::terminate();
     }

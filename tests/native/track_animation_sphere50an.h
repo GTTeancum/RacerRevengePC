@@ -44,6 +44,17 @@ inline bool identityBasis(const g::BodyMatrix48G& root)noexcept{
  for(unsigned i=0;i<12;++i)if(root.v[i]!=(i%5==0?1.f:0.f))return false;
  return true;
 }
+// Imported child animations can inherit rotation. The same transpose inverse
+// applies to an orthonormal basis, within float rotation/interpolation error.
+inline bool rigidBasis(const g::BodyMatrix48G& root)noexcept{
+ if(!affine(root))return false;
+ for(unsigned i=0;i<3;++i)for(unsigned j=i;j<3;++j){
+  float dot=0.f;
+  for(unsigned k=0;k<3;++k)dot+=root.v[4*i+k]*root.v[4*j+k];
+  if(std::fabs(dot-(i==j?1.f:0.f))>0.0001f)return false;
+ }
+ return true;
+}
 inline g::BodyMatrix48G inverse28BD50(const g::BodyMatrix48G& root,Math& m)noexcept{
  g::BodyMatrix48G inverse=root;
  //28BE38..44 add-zero copies of all basis/fourth lanes, then the six ordered transpose moves.
@@ -68,8 +79,8 @@ inline g::BodyMatrix48G inverse28BD50(const g::BodyMatrix48G& root,Math& m)noexc
 // Caller supplies every retained PSG row's bounds[0..2]/bounds[6] and its refreshed world, in
 // source order (26F548..580 passes each descendant to 28D940 without recursion). Output commits
 // only on success; strict native FP (nearest rounding) required.
-inline bool compute(const g::BodyMatrix48G& root,const Row* rows,std::size_t rowCount,Result& output)noexcept{
- if(std::fegetround()!=FE_TONEAREST||!rows||!rowCount||!detail::identityBasis(root))return false;
+inline bool compute(const g::BodyMatrix48G& root,const Row* rows,std::size_t rowCount,Result& output,bool inheritedRotation=false)noexcept{
+ if(std::fegetround()!=FE_TONEAREST||!rows||!rowCount||!(inheritedRotation?detail::rigidBasis(root):detail::identityBasis(root)))return false;
  for(std::size_t i=0;i<rowCount;++i){const auto& row=rows[i];
   if(!detail::affine(row.world)||!std::isfinite(row.radius)||row.radius<0.f)return false;
   for(float v:row.center)if(!std::isfinite(v))return false;

@@ -11,9 +11,9 @@ struct FogPreparation {
     std::array<float,3> position{};
     float nearPlane=0,farPlane=0;
 };
-FogPreparation fogPreparation_;
+FogPreparation fogPreparation_,secondFogPreparation_;
 std::uint64_t fogPreparationRevision_=0;
-void invalidateFogPreparation()noexcept {fogPreparation_={};}
+void invalidateFogPreparation()noexcept {fogPreparation_={};secondFogPreparation_={};}
 static bool sameFogSource(const OriginalRaceFogFields& a,const OriginalRaceFogFields& b)noexcept {
     return a.color30==b.color30&&same(a.start34,b.start34)&&same(a.end38,b.end38)&&
         same(a.authoredFraction3C,b.authoredFraction3C)&&same(a.authoredFraction40,b.authoredFraction40)&&
@@ -34,29 +34,38 @@ static bool sameFogPose(const TVCameraUpdateOutput49F& a,const TVCameraUpdateOut
     return a.mode==b.mode&&sameFogVector(a.position,b.position)&&sameFogVector(a.target,b.target)&&
         sameFogVector(a.look,b.look)&&sameFogVector(a.up,b.up)&&same(a.fov,b.fov);
 }
-bool readFogPreparation(FogPreparation& out)const noexcept {
-    const auto& p=fogPreparation_;
+bool readFogPreparation(FogPreparation& out,unsigned view=0)const noexcept {
+    if(view>1)return false;
+    const auto& matrices=view?secondMatrices_:matrices_;
+    const auto& scene=view?secondScene_:scene_;
+    const auto& pose=view?secondPose_:pose_;
+    const auto& viewport=view?secondViewport_:viewport_;
+    const auto& p=view?secondFogPreparation_:fogPreparation_;
     if(!p.revision||!coldBound_||closed_||abandoned_||frameStage_!=FrameStage::published||
        !displayInputs_||displayInputs_->trackFog3EC!=p.owner||!p.owner||
        display_.actualTrackFog3EC!=p.owner||p.generation!=generation_||
        p.publication!=publicationCount_||p.frame!=completedFrame_||
-       !sameFogSource(*p.owner,p.source)||!sameFogScene(scene_,p.scene)||!sameFogPose(pose_,p.pose)||
-       !sameFogScene(matrices_.sceneAfter,p.camera.sceneAfter)||
-       !sameFogVector(matrices_.position,p.camera.position)||
-       matrices_.targetAccepted!=p.camera.targetAccepted||matrices_.fovWritten!=p.camera.fovWritten||
-       !sameFogMatrix(matrices_.view,p.camera.view)||!sameFogMatrix(matrices_.projection,p.camera.projection)||
-       !sameFogMatrix(matrices_.combined,p.camera.combined)||!sameFogMatrix(viewport_.screen140,p.screen)||
-       !sameFogMatrix(viewport_.combinedScreen250,p.combinedScreen)||
-       !sameFogMatrix(viewport_.guardProjection290,p.guardProjection)||
-       !sameFogMatrix(viewport_.guardCombined2D0,p.guardCombined))return false;
+       !sameFogSource(*p.owner,p.source)||!sameFogScene(scene,p.scene)||!sameFogPose(pose,p.pose)||
+       !sameFogScene(matrices.sceneAfter,p.camera.sceneAfter)||
+       !sameFogVector(matrices.position,p.camera.position)||
+       matrices.targetAccepted!=p.camera.targetAccepted||matrices.fovWritten!=p.camera.fovWritten||
+       !sameFogMatrix(matrices.view,p.camera.view)||!sameFogMatrix(matrices.projection,p.camera.projection)||
+       !sameFogMatrix(matrices.combined,p.camera.combined)||!sameFogMatrix(viewport.screen140,p.screen)||
+       !sameFogMatrix(viewport.combinedScreen250,p.combinedScreen)||
+       !sameFogMatrix(viewport.guardProjection290,p.guardProjection)||
+       !sameFogMatrix(viewport.guardCombined2D0,p.guardCombined))return false;
     out=p;return true;
 }
-void publishFogPreparation(const OriginalRaceFogFields& fog)noexcept {
-    FogPreparation next;next.owner=&fog;next.revision=++fogPreparationRevision_;
+void publishFogPreparation(const OriginalRaceFogFields& fog,unsigned view=0)noexcept {
+    const auto& matrices=view?secondMatrices_:matrices_;
+    const auto& scene=view?secondScene_:scene_;
+    const auto& pose=view?secondPose_:pose_;
+    const auto& viewport=view?secondViewport_:viewport_;
+    FogPreparation next;next.owner=&fog;next.revision=fogPreparationRevision_;
     next.generation=generation_;next.publication=publicationCount_;next.frame=completedFrame_;
-    next.source=fog;next.camera=matrices_;next.scene=scene_;next.pose=pose_;
-    next.screen=viewport_.screen140;next.combinedScreen=viewport_.combinedScreen250;
-    next.guardProjection=viewport_.guardProjection290;next.guardCombined=viewport_.guardCombined2D0;
-    next.position={{pose_.position.x,pose_.position.y,pose_.position.z}};
-    next.nearPlane=scene_.nearPlane;next.farPlane=scene_.farPlane;fogPreparation_=next;
+    next.source=fog;next.camera=matrices;next.scene=scene;next.pose=pose;
+    next.screen=viewport.screen140;next.combinedScreen=viewport.combinedScreen250;
+    next.guardProjection=viewport.guardProjection290;next.guardCombined=viewport.guardCombined2D0;
+    next.position={{pose.position.x,pose.position.y,pose.position.z}};
+    next.nearPlane=scene.nearPlane;next.farPlane=scene.farPlane;(view?secondFogPreparation_:fogPreparation_)=next;
 }

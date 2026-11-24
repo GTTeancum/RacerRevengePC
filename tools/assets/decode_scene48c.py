@@ -105,7 +105,7 @@ def decode_payload(blob, start, end, components, expected_vertices, expected_str
     return groups,indices,{'commands':commands,'trailing_padding':end-pos,**topology}
 
 
-def decode_psg3_scene(blob, allow_signed32_quantized_positions=False):
+def decode_psg3_scene(blob, allow_signed32_quantized_positions=False, *, allow_collision_only=False):
     require(12<=len(blob)<=8*1024*1024,'unsupported PSG size')
     require(blob[:8]==b'psg\0\x03\0\0\0','expected original PSG3')
     n=unpack('<I',blob,8)[0];require(1<=n<=256,'invalid hierarchy count')
@@ -121,7 +121,7 @@ def decode_psg3_scene(blob, allow_signed32_quantized_positions=False):
         nodes.append({'index':i,'name':name,'matrix':m,'bounds_center_half_radius':bb[:7],
                       'parent':parent,'bind_matrix':global_m,'header_offset':at})
         at+=224
-    nm=unpack('<I',blob,at)[0];at+=4;require(1<=nm<=4096,'invalid material count')
+    nm=unpack('<I',blob,at)[0];at+=4;require((nm>0 or allow_collision_only) and nm<=4096,'invalid material count')
     require(at+64*nm<=len(blob),'truncated material names')
     materials=[string(blob[at+64*i:at+64*(i+1)]) for i in range(nm)];at+=64*nm
     quant=unpack('<7fI',blob,at);at+=32
@@ -133,7 +133,7 @@ def decode_psg3_scene(blob, allow_signed32_quantized_positions=False):
     lods=[];all_local=[[] for _ in nodes];total_vertices=0;all_surfaces=0
     for li in range(flags):
         cutoff,ns=unpack('<fI',blob,at);at+=8
-        require(math.isfinite(cutoff) and cutoff>0 and 1<=ns<=4096,'invalid LOD metadata')
+        require(math.isfinite(cutoff) and cutoff>0 and (ns>0 or (allow_collision_only and nm==0)) and ns<=4096,'invalid LOD metadata')
         surfaces=[]
         for si in range(ns):
             header_at=at;mat,component_word,uv_size,nv,nstrip,size=unpack('<IIfHHI',blob,at);at+=20

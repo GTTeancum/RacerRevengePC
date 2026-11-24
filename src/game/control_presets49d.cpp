@@ -3,14 +3,7 @@
 namespace rr::game {
 namespace {
 constexpr ControlActionRow49D rows[8]={
-    { 3, 2,5,4,9,0,1,8,6,7},
-    { 0, 1,7,6,9,3,2,8,4,5},
-    { 1, 2,5,4,9,0,3,8,6,7},
-    { 3, 2,7,5,9,0,1,8,6,4},
-    {-1,-1,5,4,9,0,1,8,6,7},
-    {-1,-1,7,6,9,3,2,8,4,5},
-    {-1,-1,5,4,9,0,3,8,6,7},
-    {-1,-1,7,5,9,0,1,8,6,4}
+#include "control_preset_rows.inc"
 };
 }
 bool selectControlPreset49D(ControlPresets49D& state,std::uint32_t slot,

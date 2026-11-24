@@ -5,7 +5,7 @@ bool Owner::prepareRaZonePrefix114D00(CameraVisibilityLease& lease,
     OriginalApplicationEntities50LA& app,const CameraViewOutput49F& camera,
     std::uint32_t parent38,const OriginalCameraViewportFields& viewport,
     const assets::OriginalStandardMaterialTable50LA& materials,
-    std::array<OriginalRacerEntityCold50LA,8>& racers,const OriginalCameraSceneOwner& actualCamera,
+    std::array<OriginalRacerEntityCold50LA,8>& racers,const OriginalCameraSceneOwner& actualCamera,const OriginalCameraSceneOwner* peerCamera,
     const RaRacerSelectionDispatch50LA& dispatch,const OriginalRendererDispatchFields& rendererFields,
     platform::VehicleWindowGl50DS& renderer,platform::VehicleWindowDiagnostic50DS& rendererDiagnostic,
     Diagnostic& d)noexcept {
@@ -118,7 +118,7 @@ bool Owner::prepareRaZonePrefix114D00(CameraVisibilityLease& lease,
     if(s.zones[root].firstMethod&&!selectRaStaticMethod44(lease,app,s.zones[root].firstMethod,
         camera,viewport,materials,rendererFields,renderer,rendererDiagnostic,d))return false;
     if(s.zones[root].secondMethod&&s.zones[root].secondMethod!=s.zones[root].firstMethod&&
-       !selectRaDynamicMethod44(lease,app,s.zones[root].secondMethod,racers,actualCamera,dispatch,
+       !selectRaDynamicMethod44(lease,app,s.zones[root].secondMethod,racers,actualCamera,peerCamera,dispatch,
            rendererFields,renderer,rendererDiagnostic,d))return false;
     //27F890 /27FC40: neighboring selection is PREORDER, unlike27FEE0 draw.
     // This continuation is reached only if every prior real callback returned.
@@ -140,7 +140,7 @@ bool Owner::prepareRaZonePrefix114D00(CameraVisibilityLease& lease,
         if(methods.firstMethod&&!selectRaStaticMethod44(lease,app,methods.firstMethod,camera,
             viewport,materials,rendererFields,renderer,rendererDiagnostic,d))return false;
         if(methods.secondMethod&&methods.secondMethod!=methods.firstMethod&&
-           !selectRaDynamicMethod44(lease,app,methods.secondMethod,racers,actualCamera,dispatch,
+           !selectRaDynamicMethod44(lease,app,methods.secondMethod,racers,actualCamera,peerCamera,dispatch,
                rendererFields,renderer,rendererDiagnostic,d))return false;
         auto edge=world.portalHeads[zone];std::size_t links=0;
         while(edge){

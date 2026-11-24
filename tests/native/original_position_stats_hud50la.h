@@ -142,15 +142,18 @@ public:
     const OriginalPositionStatsNativeDraw50LA& nativeDraw()const noexcept override{return draw_;}
     void invalidateNativeDraw()noexcept{draw_.prepared=false;}
     bool prepareNativeDisplay(const original_main_entry50KG::Application& application,
-        const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,D& d)noexcept {
+        const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,D& d,unsigned view=0)noexcept {
         d={};draw_.prepared=false;draw_.quadCount=draw_.packetCount=0;
         const auto r=resources_.lock();OriginalPositionStatsNumbers50LA observation;
-        if(!nativeCpuResourcesPrepared()||!r||!application.capturePositionStatsNumbers50LA(*r,camera,manager,observation,d)||
-           !application.preparePositionStatsText50LA(*r,camera,manager,d)||
-           !application.preparePositionStatsRadar50LA(*r,camera,manager,d))return false;
-        const auto& viewport=camera.viewport();
+        if(!nativeCpuResourcesPrepared()||!r||!application.capturePositionStatsNumbers50LA(*r,camera,manager,observation,d,view)||
+           !application.preparePositionStatsText50LA(*r,camera,manager,d,view)||
+           !application.preparePositionStatsRadar50LA(*r,camera,manager,d,view))return false;
+        const auto* selectedViewport=camera.hudViewport(observation.viewIndex);
+        if(!selectedViewport)return fail(d,0x191be0);
+        const auto& viewport=*selectedViewport;
         if(!viewport.prepared||!viewport.matricesReady||viewport.sessionGeneration!=observation.sessionGeneration||
-           viewport.width1E8!=640||viewport.height1EC!=448||viewport.x1E0||viewport.y1E4||
+           !matchesRaceHudViewport(viewport,observation.viewIndex,observation.raceFlags1B0&3u,observation.raceMode8C,
+               (observation.raceFlags1B0&16u)||(observation.raceEntityFlags29&4u)||(observation.uiFlags1E4&1u))||
            !observation.cameraPublication||observation.cameraPublication<draw_.cameraPublication||
            draw_.serial==std::numeric_limits<std::uint64_t>::max())return fail(d,0x191be0);
         draw_.viewport=&viewport;draw_.cameraPublication=observation.cameraPublication;++draw_.serial;

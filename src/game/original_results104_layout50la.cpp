@@ -87,7 +87,7 @@ OriginalResults10450LA::Slot48CpuPrefix OriginalResults10450LA::captureNativeSlo
         return out.prefix;
     }
     out.nextSourcePC=0x1c2170;
-    captureNativeSingleHumanBaseCpu1B9220(root,race,observer,d);
+    captureNativeBaseCpu1B9220(root,race,observer,d);
     if(!p.nativeDisplay||!p.nativeDisplay->boundedSharedReturned)return out.prefix;
     out.prefix=P::sharedBaseCpu;out.nextSourcePC=0x1c2198;out.interrupted=false;
     p.stop(d,Impl::S::incomplete,0x1c2198,

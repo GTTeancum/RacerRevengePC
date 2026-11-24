@@ -1,0 +1,103 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-ark-roose",
+    "name": "Ark 'Bumpy' Roose (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Ark 'Bumpy' Roose from Star Wars Racer Arcade, as an add-on pod (stem a2r_ark, 7 wreck pieces). Borrowed from stock pod 04 until own data exists: stats, pilot voice, camera presets, material set-ups, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_ARK": "ARK 'BUMPY' ROOSE",
+        "RIDER_A2R_ARK_HUT": "ARK (BUMPY) ROOSE"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-ark",
+        "stem": "a2r_ark",
+        "archive": "PODS/A2R_ARK/A2R_ARK.RES",
+        "camera": "PODS/A2R_ARK/A2R_ARK.CAM",
+        "name_key": "RIDER_A2R_ARK",
+        "ui": {
+          "archive": "UI/A2R_ARK_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_ark.psg",
+          "character": [
+            "ui\\anim\\a2r_arkc.psg",
+            "ui\\anim\\a2r_arkc.mcf",
+            "ui\\anim\\a2r_arkc.vut",
+            "ui\\anim\\a2r_arkc_ent.mot",
+            "ui\\anim\\a2r_arkc_idl1.mot",
+            "ui\\anim\\a2r_arkc_idl2.mot",
+            "ui\\anim\\a2r_arkc_idl3.mot",
+            "ui\\anim\\a2r_arkc_breathe.mot",
+            "ui\\anim\\a2r_arkc_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_arkc_1.pst",
+            "ui\\textures\\a2r_arkc_1.psm",
+            "ui\\textures\\a2r_arkc_2.pst",
+            "ui\\textures\\a2r_arkc_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_ark_1.pst",
+            "UI\\Textures\\a2r_ark_2.pst",
+            "UI\\Textures\\a2r_ark_3.pst",
+            "ui\\textures\\a2r_ark_1.psm",
+            "ui\\textures\\a2r_ark_2.psm",
+            "ui\\textures\\a2r_ark_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_ark_shdw.pst",
+            "ui\\textures\\a2r_ark_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_ark_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_ark_bkg.pst",
+            "ui\\textures\\a2r_ark_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_ark_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_arke.psg",
+            "ui\\textures\\a2r_arke_1.pst",
+            "ui\\textures\\a2r_arke_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "huttese_name_key": "RIDER_A2R_ARK_HUT",
+          "layout_slot": "04"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_ARK/A2R_ARK.RES",
+        "bytes": 199708,
+        "sha256": "89c03dcd91ef501446028c58c6589d35f6a017701f3a9b31ef2aa4b8b6ed5d12",
+        "role": "pod archive (members named by the stem: pods\\a2r_ark\\..., textures\\a2r_ark_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_ARK/A2R_ARK.CAM",
+        "bytes": 5777,
+        "sha256": "d5f537ee333b1a9fd4e35fc18ae248f8bdf52055ba1ed3abf5f9de2ac3b927e8",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_ARK_UI.RES",
+        "bytes": 176281,
+        "sha256": "a99a71828a016bc0ed1622bd0431f2102998c7a83e7f09783feede1df9f78012",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

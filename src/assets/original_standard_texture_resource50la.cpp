@@ -1405,7 +1405,12 @@ bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
         // a single Garage binds at most 11 leases (checked below).
         if(!count||count>64){std::fprintf(stderr,"garage_static_ipum_rejected count=%zu\n",count);return fail(d,E::source,0x24E880);}
         for(std::size_t i=0;i<count;++i){
-            if(OriginalUiIpumTextureCache50KG::garageSourceArchive(i)!=archive->identity())continue;
+            const auto* sourceArchive=OriginalUiIpumTextureCache50KG::garageSourceArchive(i);
+            if(archive->addon()){
+                if(!sourceArchive||sourceArchive->id!=OriginalUiArchiveId50KG::garage)continue;
+                const auto candidate=archive->find(OriginalUiIpumTextureCache50KG::garageSourceMember(i));
+                if(!candidate.identity||!cache->provenanceFor(candidate,0,candidate.size))continue;
+            }else if(sourceArchive!=archive->identity())continue;
             found=true;const auto* name=OriginalUiIpumTextureCache50KG::garageSourceMember(i);
             if(!name){std::fprintf(stderr,"garage_static_ipum_rejected name_missing=%zu\n",i);return fail(d,E::source,0x24E880);}
             const auto member=archive->find(name);
@@ -1452,7 +1457,7 @@ bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
             lease->cache=cache;lease->archive=archive;lease->member=member;
             lease->texture=texture;lease->provenance=provenance;next.push_back(std::move(lease));
         }
-        if(!found){std::fprintf(stderr,"garage_static_ipum_rejected not_found archive=%s count=%zu\n",archive->identity()->discPath,count);return fail(d,E::source,0x24E880);}
+        if(!found&&!archive->addon()){std::fprintf(stderr,"garage_static_ipum_rejected not_found archive=%s count=%zu\n",archive->identity()->discPath,count);return fail(d,E::source,0x24E880);}
         storage_->garageIpum=std::move(next);return true;
     }catch(...){return fail(d,E::allocation,0x24E880);}
 }
@@ -2791,7 +2796,7 @@ bool OriginalStandardTextureResource50LA::loadCub24F2C0(std::size_t& cursor,
         c.lastPC=pc;if(!cubSourceCurrent1295B0()||cursor>end||bytes>end-cursor)return false;
         std::memcpy(destination,source.memberData+cursor,bytes);cursor+=bytes;c.orderedReadBytes+=bytes;return true;
     };
-    flagsF8_=static_cast<std::uint8_t>((flagsF8_&0xfeu)|1u); //24F3A8, source format32→34.
+    flagsF8_=static_cast<std::uint8_t>((flagsF8_&0xfeu)|1u); //24F3A8, source format32â†’34.
     bitsPerPixelE8_=16; //24F400 actual29E910(0x613).
     width14_=height18_=128;c.fieldA8=16; //24F568/570/574.
     levelCountB0_=0;

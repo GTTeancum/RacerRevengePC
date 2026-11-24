@@ -149,8 +149,8 @@ class OriginalSpeedBoost50LA final {
     std::uint64_t verifiedProviderRevision_=0;
     Diagnostic terminal_;
     OriginalSpeedBoostNativeDraw50LA nativeDraw_;
-    const OriginalCameraViewportFields* nativeViewport_=nullptr;
-    std::uint64_t nativeScene_=0;
+    std::array<const OriginalCameraViewportFields*,2> nativeViewports_{};
+    std::array<std::uint64_t,2> nativeScenes_{};
     static const char* imageName(std::size_t i)noexcept {
         static const char* names[]={"spdbost1","boost_a1","boost_a2","boost_a3","boost_a4","boost_a5",
             "boost_a6","boost_a7","boost_a8","boost_a9","eurostileboldbolditalic26ingame","eurostileboldbold13ingame"};
@@ -477,21 +477,26 @@ public:
     void invalidateNativeDraw()noexcept{nativeDraw_.prepared=false;}
     bool prepareNativeDisplay(const OriginalSpeedBoostNativeFrame50LA& frame,Diagnostic& d)noexcept {
         d={};nativeDraw_.prepared=false;nativeDraw_.primitiveCount=nativeDraw_.packetCount=0;
-        if(!nativeCpuResourcesPrepared()||!frame.viewport||!frame.preferences||frame.viewIndex||
-           frame.selectedSlot>=8||frame.raceMode8C!=0||
-           (frame.raceFlags1B0&3u)!=1u||frame.sessionGeneration!=entity_.session||!frame.cameraPublication||
+        const unsigned viewCount=frame.raceFlags1B0&3u;
+        const bool split=viewCount==2u&&(frame.raceMode8C==1||frame.raceMode8C==2);
+        if(!nativeCpuResourcesPrepared()||!frame.viewport||!frame.preferences||frame.viewIndex>=viewCount||
+           frame.selectedSlot>=8||(!split&&(viewCount!=1u||frame.raceMode8C!=0))||
+           frame.sessionGeneration!=entity_.session||!frame.cameraPublication||
            frame.cameraPublication<nativeDraw_.cameraPublication||
            nativeDraw_.serial==std::numeric_limits<std::uint64_t>::max())return stop(d,Error::phase,0x18BBB0);
         const auto& view=*frame.viewport;
+        const auto index=frame.viewIndex;
+        const bool hidden=(frame.raceFlags1B0&16u)||(frame.raceEntityFlags29&4u)||(frame.uiFlags1E4&1u);
         if(!view.prepared||!view.matricesReady||!view.sceneKey||view.sessionGeneration!=entity_.session||
-           view.x1E0||view.y1E4||view.width1E8!=640||view.height1EC!=448||
-           (nativeViewport_&&(nativeViewport_!=&view||nativeScene_!=view.sceneKey)))return stop(d,Error::source,0x18AD30);
-        nativeViewport_=&view;nativeScene_=view.sceneKey;nativeDraw_.viewport=&view;
+           !matchesRaceHudViewport(view,index,viewCount,frame.raceMode8C,hidden)||
+           (nativeViewports_[index]&&(nativeViewports_[index]!=&view||nativeScenes_[index]!=view.sceneKey)))
+            return stop(d,Error::source,0x18AD30);
+        nativeViewports_[index]=&view;nativeScenes_[index]=view.sceneKey;nativeDraw_.viewport=&view;
         nativeDraw_.cameraPublication=frame.cameraPublication;++nativeDraw_.serial;
         state_.raceMode6CC=frame.raceMode8C;
         if(!state_.prepareSelected18BBB0(frame.selectedBodySpeed34,frame.viewIndex+1))
             return stop(d,Error::geometry,0x18BC44);
-        if((frame.raceFlags1B0&16u)||(frame.raceEntityFlags29&4u)||(frame.uiFlags1E4&1u)){
+        if(hidden){
             nativeDraw_.prepared=true;return true;}
         for(std::size_t i=0;i<12;++i){assets::OriginalStandardMaterialMapBindingView50LA map;
             if(!domain_->materials382B38()->prepareColdScreenPrototypeMap249610(collector_,

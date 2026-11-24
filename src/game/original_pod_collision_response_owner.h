@@ -54,7 +54,7 @@ public:
     OriginalPodCollisionResponseOwners(OriginalPodCollisionResponseOwners&&)=delete;
     OriginalPodCollisionResponseOwners& operator=(OriginalPodCollisionResponseOwners&&)=delete;
 
-    // Bounded actual roster: zero or one human, one through eight total.
+    // Bounded actual roster: zero through two humans, one through eight total.
     // The actual packed profile is mandatory; unused fixed pool rows are not racers.
     // The source creates all eight rows in both cases;1AE524..1AE540 selects
     // each AI row by its opponent ordinal plus profile human count. A human
@@ -62,7 +62,7 @@ public:
     bool prepare(std::uint64_t session,std::uint16_t actualPacked1125C) noexcept {
         const auto humans=std::uint32_t((actualPacked1125C>>5u)&3u);
         const auto opponents=std::uint32_t((actualPacked1125C>>7u)&15u);
-        if(closed_||session_||!session||humans>1u||! (humans+opponents)||humans+opponents>count)return false;
+        if(closed_||session_||!session||humans>2u||! (humans+opponents)||humans+opponents>count)return false;
         session_=session;humanCount_=humans;opponentCount_=opponents;
         for(std::size_t i=0;i<count;++i){auto& row=emitters_[i];
             row.pool_=this;row.poolOrdinal_=static_cast<std::uint32_t>(i);
@@ -102,18 +102,18 @@ public:
     // or claiming human material playback/source scheduling is implemented.
     Emitter* bindHumanRacer(const OriginalHumanEngineResetOwner50LB& actualD40) noexcept {
         const auto& id=actualD40.identity();
-        if(closed_||!session_||humanCount_!=1||!actualD40.bound()||
-           id.session!=session_||id.managerOrdinal!=0||!id.racer)return nullptr;
-        auto& row=emitters_[0];
+        if(closed_||!session_||!actualD40.bound()||
+           id.session!=session_||id.managerOrdinal>=humanCount_||!id.racer)return nullptr;
+        auto& row=emitters_[id.managerOrdinal];
         if(row.pool_!=this||row.engine_||row.human_||row.material_.vehicle248)return nullptr;
         row.human_=&actualD40;row.material_.vehicle248=&id;return &row;
     }
     std::uint32_t* resetHumanField24C(Emitter* actualD44,
         const OriginalHumanEngineResetOwner50LB& actualD40) noexcept {
         const auto& id=actualD40.identity();
-        if(closed_||!session_||humanCount_!=1||!actualD40.bound()||
-           id.session!=session_||id.managerOrdinal!=0||!id.racer)return nullptr;
-        auto& row=emitters_[0];
+        if(closed_||!session_||!actualD40.bound()||
+           id.session!=session_||id.managerOrdinal>=humanCount_||!id.racer)return nullptr;
+        auto& row=emitters_[id.managerOrdinal];
         if(actualD44!=&row||row.pool_!=this||row.human_!=&actualD40||
            row.engine_||row.material_.vehicle248!=&id)return nullptr;
         return &row.material_.disabled24C;

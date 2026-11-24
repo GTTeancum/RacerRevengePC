@@ -491,9 +491,6 @@ struct Context final {
     // The same owner tests as restartGridPlacementCall for one slot, with no store
     // (the 1AC8E0 preflight). False reports the refusing pc and reason.
     BorrowedCall<bool(std::size_t slot,std::uint32_t& pc,const char*& why)noexcept> restartGridPreflightCall;
-    // After a whole 1AC8E0 restart (race1B0 bit4 clear): the fresh race's one neutral setup tick
-    // for every racer (common_race_start50CR::Hooks::restartSetupTick). False names the racer.
-    BorrowedCall<bool()noexcept> restartSetupTickCall;
     using renderDiagnosticsType = render_diagnostics50GQ::Interval;
     renderDiagnosticsType& renderDiagnostics;
     using renderedCameraPublicationType = std::uint64_t;

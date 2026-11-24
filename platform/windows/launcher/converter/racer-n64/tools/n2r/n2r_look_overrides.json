@@ -1,0 +1,19 @@
+{
+ "schema": "n2r-look-overrides/1",
+ "about": "Per-material appearance overrides that the USER chose by eye. NOT faithful N64 values: every row here departs from the converter's rule on purpose and is reported as a flag in the track manifest. Read by n2r_geo.py (one generic hook for every track); a row applies only when the N64 model and the named N64 materials match, and the converter refuses a row whose materials are missing or not blended. Fields: model = N64 track model index (track.json model_index); n64_materials = N64 material names (materials.json keys); n64_texture = the texture those materials use (checked); vertex_alpha = Revenge prelit vertex alpha written for their triangles (128-based GS units; 128 = 1.0); faithful_value = what the rule gives without the override.",
+ "overrides": [
+  {
+   "model": 143,
+   "track": "Spice Mine Run",
+   "what": "start hangar light beams (the white shafts over the grid)",
+   "n64_materials": ["m060e48", "m0612d8"],
+   "n64_texture": "tex1077_I8_32x32.png",
+   "revenge_material": "sm_tex1077_b",
+   "vertex_alpha": 63,
+   "faithful_value": 128,
+   "kind": "user-approved look choice (not the faithful N64 value)",
+   "reason": "The user approved the fainter beams of the Nov 14 01:33 build (silo\\assets-smr SC.RES 81b6e109..., frames racer-n64\\work\\look3 / look6), where every blended material had vertex alpha 63. The general fix of Nov 14 (blended vertex alpha 128 = the exact N64 texture alpha; notes\\n2r-bwr.md section 1) doubled the beams; on 2026-11-15 the user chose 'fainter, as before' for these beams only. Every other blended material keeps the faithful 128.",
+   "decided": "2026-11-15"
+  }
+ ]
+}

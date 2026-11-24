@@ -82,11 +82,11 @@ struct Request final {
 enum class Step : std::uint8_t {
     triggerReset2DCC70, app11CClear, aural103210, music1AC960, particles161F60, world2702E0, race90,
     racers1AEA70, grid2A2880, startLock1AED30, countdown94, record1ACB18, flush267BE0, tail1ACB7C,
-    cameraReset, vcr1ACD68, startOverlay197040, restartSetupTick, done
+    cameraReset, vcr1ACD68, startOverlay197040, done
 };
 inline std::uint32_t stepPc(Step s)noexcept {
     static constexpr std::uint32_t pcs[]={0x2DCC70u,0x1AC920u,0x103210u,0x1AC960u,0x161F60u,0x2702E0u,0x1AC994u,
-        0x1AEA70u,0x2A2880u,0x1AED30u,0x1ACA98u,0x1ACB18u,0x267BE0u,0x1ACB7Cu,0x1750A0u,0x1ACD68u,0x197040u,0x1AEA70u,0u};
+        0x1AEA70u,0x2A2880u,0x1AED30u,0x1ACA98u,0x1ACB18u,0x267BE0u,0x1ACB7Cu,0x1750A0u,0x1ACD68u,0x197040u,0u};
     static_assert(sizeof(pcs)/sizeof(pcs[0])==static_cast<std::size_t>(Step::done)+1u);
     return pcs[static_cast<std::size_t>(s)];
 }
@@ -117,12 +117,6 @@ struct Hooks final {
     // Read only, for common_race_start best_lap_cb4= (PLAN 5.5 run 3): the human slot's CB4
     // after the 216690 reset. Empty = the field is logged as 0; never a refusal.
     Hook<bool(std::size_t slot,float& bestLapCB4)noexcept> readBestLapCB4;
-    // Restart with race1B0 bit4 clear, after the whole 1AC8E0 body: the fresh race's one neutral
-    // setup tick (graphics/ground of every racer, opponents first, slot 0 last), so the restarted
-    // pods publish graphics exactly as after the cold load. PORT STAND-IN (existing, flagged): the
-    // original updates every racer on every intro/countdown frame (1AED30 only locks axes); the
-    // port's held phase runs no racer frame, only this tick. Refusal names the racer (step pc 1AEA70).
-    Hook<bool()noexcept> restartSetupTick;
     // Restart only, before any 1AC8E0 effect (the original 1AC8E0 has no refusal path): every
     // port-side owner test the hooks above would make for this restart, for every racer, with
     // no store (2A2880/2169C0 poses computed and checked, the 1AEA70 racer owners, the 1ACBA0

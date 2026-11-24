@@ -325,8 +325,10 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             if(scan.indexS0<=0){++scan.indexS0;break;}
             scan.cut=Cut::controllerSlot;break;
         case Cut::controllerSlot:
-            stop(S::incomplete,0x1aba24,
-                "Actual nonzero-index Race34 controller/virtual18 owner remains unrepresented; scans retained");return;
+            if(!disableResultsCamera1ABA24(scan.indexS0)){
+                stop(S::owner,0x1aba24,"Results second camera activity dispatch rejected");return;
+            }
+            ++scan.indexS0;scan.cut=Cut::controllerLow2;break;
         case Cut::owner78: {
             //Only actual1A6E48/7C publication may select this positive branch.
             //Constructor-null/native absence is NOT the source loaded-null path.
@@ -364,17 +366,12 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             flags1B0KnownMask_=std::uint8_t(flags1B0KnownMask_|0x10u);
             scan.cut=Cut::worldReset;break;
         case Cut::worldReset: {
-            //Actual1AC8E0(A1=0), first mandatory call: World74+3D0,
-            //TriggerList2DC320 table3D5230 slot80=2DCC70. Every race, one World:
-            //the track's own owners perform the 1AC8E0 World74 leaves (2DCC70 /
-            //161F60 / 2702E0) through the one restartWorld hook (R9, common rewrite;
-            //no RA world74_ route). PORT STAND-IN (flagged, existing): the three
-            //World leaves run together here, before App11C/103210/1A4AB0.
-            scan.cut=Cut::worldResetStopped;scan.stoppedPC=0x1ac8f8;
-            const char* why=nullptr;auto& hook=native_common_results50PD::state().restartWorld;
-            if(!world74_||!hook||!hook(why)){
-                stop(S::incomplete,scan.stoppedPC,why?why:"Common race world restart (2DCC70/161F60/2702E0) unavailable");return;
+            scan.cut=Cut::worldResetStopped;scan.stoppedPC=0x1ac90c;
+            auto& flow=native_common_results50PD::state();
+            if(!world74_||!flow.resetTriggers||!flow.resetParticles||!flow.resetScene){
+                stop(S::incomplete,scan.stoppedPC,"Race world restart owners unavailable");return;
             }
+            flow.resetTriggers();
             scan.cut=Cut::pause;break;
         }
         case Cut::pause: {
@@ -425,28 +422,33 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
             }
             scan.cut=Cut::particleBoundary;break;
         }
-        case Cut::particleBoundary:
-            //161F60 and 2702E0 ran in the one world restart above (every race);
-            //1AC994 then clears Race90 after the World return.
+        case Cut::particleBoundary: {
+            scan.cut=Cut::particleStopped;scan.stoppedPC=0x1ac978;
+            const char* why=nullptr;auto& particles=native_common_results50PD::state().resetParticles;
+            if(!particles||!particles(why)){
+                stop(S::incomplete,scan.stoppedPC,why?why:"Particle restart unavailable");return;
+            }
+            scan.cut=Cut::worldRestartBoundary;break;
+        }
+        case Cut::worldRestartBoundary: {
+            scan.cut=Cut::worldRestartStopped;scan.stoppedPC=0x1ac98c;
+            const char* why=nullptr;auto& scene=native_common_results50PD::state().resetScene;
+            if(!scene||!scene(why)){
+                stop(S::incomplete,scan.stoppedPC,why?why:"Scene restart unavailable");return;
+            }
             scan.stoppedPC=0x1ac994;field90_=0;
             scan.cut=Cut::racerRestart;break;
-        case Cut::worldRestartBoundary:
-            stop(S::source,0x1ac98c,"Separate World2702E0 cut is not reached on the common race");return;
+        }
         case Cut::racerRestart: {
             //1AC998 loads the actual B0.1AC9A4 passes the saved original
             //1AC8E0 A1, which is zero for THIS1ABAD8 Results call (delay1ABADC).
             // Claim before any16E830 mutation; never replay a reached AI row.
             scan.cut=Cut::racerRestartStopped;scan.stoppedPC=0x1ac998;
-            // Every race: the 1AEA70/1AED30 racer restart of this Results-waiting
-            // replay (1ABAD8 -> 1AC8E0(race,0)) is the native replay owner's
-            // race78 posing. PORT STAND-IN (flagged, existing): the in-place
-            // common_race_start50CR owner (Pause RESTART, Time Trial 1ABC0C) is
-            // not used here, because the Results rows still read this race's
-            // timing lanes after the replay starts (1AC440 at the acknowledgement).
             {
-                // 1AEA70/1AED30 racer restart, then 1ABAE8..1ABB68: every
-                // racer +3C = 1 with 229F80, VCR bit1 off / bit2 on. The
-                // native replay owner poses the racers from race78 from now.
+                auto& grid=native_common_results50PD::state().resetReplayGrid;
+                if(!grid||!grid()){
+                    stop(S::incomplete,scan.stoppedPC,"1AEA70/1AED30 Results grid reset failed");return;
+                }
                 //1ACB7C, 1AC8E0's tail on both paths: race1B0 bit3 = 1, so the
                 // next race update (1A7BD0) fades the restarted scene back in.
                 flags1B0KnownValue_=std::uint8_t(flags1B0KnownValue_|8u);
@@ -454,7 +456,7 @@ void OriginalRaceConstructor50LA::continuePreAck1AB520(
                 const char* why=nullptr;auto& hook=native_common_results50PD::state().beginReplay;
                 // common_race_start line for this 1AC8E0 call (caller 1ABAD8, a1=0).
                 common_race_log50CR::RaceStart line;line.restart=true;line.a1=0;
-                line.caller=common_race_start50CR::callerResultsWaiting1ABAD8;
+                line.caller=common_race_start50CR::callerResultsWaiting1ABAD8;line.racers=current.managerCount30;
                 if(!hook||!hook(why)){
                     line.ok=false;line.refusedPc=0x1ac998u;
                     line.reason=why?why:"Native common-race replay start unavailable";

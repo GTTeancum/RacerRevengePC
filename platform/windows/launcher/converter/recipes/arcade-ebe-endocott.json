@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-ebe-endocott",
+    "name": "Ebe Endocott (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Ebe Endocott from Star Wars Racer Arcade, as an add-on pod (stem a2r_ebe, 7 wreck pieces). Borrowed from stock pod 23 until own data exists: stats, pilot voice, camera presets, material set-ups, a few stock model members, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_EBE": "EBE ENDOCOTT"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-ebe",
+        "stem": "a2r_ebe",
+        "archive": "PODS/A2R_EBE/A2R_EBE.RES",
+        "camera": "PODS/A2R_EBE/A2R_EBE.CAM",
+        "name_key": "RIDER_A2R_EBE",
+        "ui": {
+          "archive": "UI/A2R_EBE_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_ebe.psg",
+          "character": [
+            "ui\\anim\\a2r_ebec.psg",
+            "ui\\anim\\a2r_ebec.mcf",
+            "ui\\anim\\a2r_ebec.vut",
+            "ui\\anim\\a2r_ebec_ent.mot",
+            "ui\\anim\\a2r_ebec_idl1.mot",
+            "ui\\anim\\a2r_ebec_idl2.mot",
+            "ui\\anim\\a2r_ebec_idl3.mot",
+            "ui\\anim\\a2r_ebec_breathe.mot",
+            "ui\\anim\\a2r_ebec_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_ebec_1.pst",
+            "ui\\textures\\a2r_ebec_1.psm",
+            "ui\\textures\\a2r_ebec_2.pst",
+            "ui\\textures\\a2r_ebec_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_ebe_1.pst",
+            "UI\\Textures\\a2r_ebe_2.pst",
+            "UI\\Textures\\a2r_ebe_3.pst",
+            "ui\\textures\\a2r_ebe_1.psm",
+            "ui\\textures\\a2r_ebe_2.psm",
+            "ui\\textures\\a2r_ebe_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_ebe_shdw.pst",
+            "ui\\textures\\a2r_ebe_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_ebe_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_ebe_bkg.pst",
+            "ui\\textures\\a2r_ebe_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_ebe_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_ebee.psg",
+            "ui\\textures\\a2r_ebee_1.pst",
+            "ui\\textures\\a2r_ebee_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "layout_slot": "23"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_EBE/A2R_EBE.RES",
+        "bytes": 295235,
+        "sha256": "3e7fb0b77034ff1e4b936506841801e2e5284c1a46152beb002018d826bd6e8a",
+        "role": "pod archive (members named by the stem: pods\\a2r_ebe\\..., textures\\a2r_ebe_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_EBE/A2R_EBE.CAM",
+        "bytes": 5784,
+        "sha256": "1953830ab0481d9be7da30d2568148b8e1e7ead8bacf9907a8c145ca7cdbb6f0",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_EBE_UI.RES",
+        "bytes": 274409,
+        "sha256": "e15eb8e96bb7e3a25889098dacee254ac3f0d775917aa9c6aa01f13b4eba07e7",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

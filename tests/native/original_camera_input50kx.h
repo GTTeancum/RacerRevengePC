@@ -1,5 +1,6 @@
 #pragma once
 #include "original_camera_session50kx.h"
+#include "../../platform/linux/native/keyboard_bindings.h"
 #include "../../src/game/controller_actions50ec.h"
 #include "../../platform/linux/native/keyboard_packet50dr.h"
 #include "../../platform/linux/native/window_host50dq.h"
@@ -46,15 +47,16 @@ public:
     bool sample(const rr::platform::WindowInput50DQ& window,bool enabled,std::uint8_t rootFlags) noexcept {
         using namespace rr::game;namespace p=rr::platform;
         if(!session_||!preferences_||failed_)return false;
+        const auto cameraKey=p::keyboard_bindings::physical(preferences_->slots[0].preset11048>=4,6);
         if(!enabled)armed_=false;
-        else if(!window.down[6])armed_=true;
+        else if(!cameraKey||!window.down[cameraKey])armed_=true;
         enabled=enabled&&armed_; //Native pause/menu policy requires releasing C before re-arming.
         const auto code=preferences_->slots[0].actions.action6A4;
         if(code<0||code>=static_cast<std::int32_t>(dualShockActiveButtons48Y)){failed_=true;return false;}
         p::KeyboardPacketMapping50DR mapping{};
         for(auto& axis:mapping.axes)axis.source=p::KeyboardAxisSource50DR::Centered;
         for(auto& button:mapping.buttons)button.source=p::KeyboardButtonSource50DR::Released;
-        mapping.buttons[static_cast<std::size_t>(code)]={p::KeyboardButtonSource50DR::Key,6}; //Native C.
+        if(cameraKey)mapping.buttons[static_cast<std::size_t>(code)]={p::KeyboardButtonSource50DR::Key,cameraKey}; //Native C.
         DevicePacket48Y base{},packet{};base.bytes[2]=base.bytes[3]=0xff;
         p::KeyboardPacketDiagnostic50DR diagnostic;
         if(!p::composeKeyboardPacket50DR({true,enabled},{window.down.data(),window.down.size()},mapping,

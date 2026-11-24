@@ -127,7 +127,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      !originalMainApplication.riderProfile->courseRaceSnapshot(launched)){
    rr::game::dlc50DL::clearRaceRider();return selectedRacer60;
   }
-  return rr::game::dlc50DL::latchRaceRider(selectedRacer60,launched.mode34==0,
+  return rr::game::dlc50DL::latchRaceRider(selectedRacer60,launched.mode34==0||launched.mode34==1,
       rr::platform::hostTrackCode50IM(effectiveTrack));
  }();
  const auto loadedTrack=effectiveTrack;
@@ -252,6 +252,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 #endif
  constexpr std::uint32_t deviceIndex=0,playerSource5C=0,playerActionIndexFFC=0;
  rr::platform::SelectedControlInput50KY humanControlInput{};
+ // Apply the selected player's original action row and engine configuration together.
+ if(!enterOriginalUi){
+  for(unsigned slot=0;slot<2;++slot){
+   const char* scheme=std::getenv(slot?"RR_PLAYER2_SCHEME":"RR_PLAYER1_SCHEME");
+   if(scheme&&scheme[0]>='0'&&scheme[0]<='7'&&!scheme[1])
+    require50DU(selectControlPreset49D(controlPresets,slot,scheme[0]-'0'),"launcher control scheme refused");
+  }
+ }
  require50DU(allAiEnabled||rr::platform::bindSelectedControlInput50KY(controlPresets,
      playerActionIndexFFC,playerSource5C,humanControlInput),"selected human preset/configuration is outside the exposed original rows");
  // PC enhancement (native_zero_gravity50zg.h): the player's zero-g lean is
@@ -273,9 +281,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool dynamicContactEnabled=nativeOriginalFleet||(dynamicContactSetting&&std::string(dynamicContactSetting)=="1");
  require50DU(!dynamicContactEnabled||originalAiEnabled,
      "dynamic source contacts require the bounded original AI session");
+ const std::uint32_t originalAiHumanCount=allAiEnabled?0u:
+     (originalMainApplication.profile&&originalMainApplication.profile->mode34==1?2u:1u);
  constexpr std::size_t originalAiSlot=1;
  const auto originalAiOwnsSlot=[&](std::size_t slot) noexcept {
-  return originalAiEnabled&&(allAiEnabled||(humanCourseEnabled?slot!=0:slot==originalAiSlot));
+  return originalAiEnabled&&(allAiEnabled||(humanCourseEnabled?slot>=originalAiHumanCount:slot==originalAiSlot));
  };
  // One admission for every course (B-C02), replacing the per-course require50DU
  // admissions: a fresh rooted race in mode2 with the one native cold request.
@@ -361,14 +371,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(originalMainApplication.profile&&originalMainApplication.profile->known&&
        originalMainApplication.riderProfile&&originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
        selected.mode34==originalMainApplication.profile->mode34&&
-       (selected.mode34==0||selected.mode34==2)&&selected.subtype>=1&&selected.subtype<=3&&
-       selected.entrants>=1&&selected.entrants<=raceRacerCapacity&&
-       ((selected.packed1125C>>5)&3u)==1&&
-       ((selected.packed1125C>>7)&15u)+1u==selected.entrants&&
-       (selected.subtype==2||
-        (selected.subtype==3?nativeRacerManager&&selected.entrants==1u:
-         selected.entrants==raceRacerCapacity))&&
-       (selected.mode34!=2||(selected.subtype==1&&selected.laps==3)),
+       rr::game::nativeCourseMode50KG(selected)&&selected.entrants<=raceRacerCapacity&&
+       (selected.subtype!=3||(nativeRacerManager&&selected.entrants==1u)),
        "native Course requires its actual committed live roster extent");
    return selected.entrants;
   }
@@ -377,7 +381,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const std::uint32_t raceOpponentCount=raceRacerCount-1;
  // Native selected roster, not the retail human-dependent boot root1AE620.
  // Counts use the original1125C layout; every AI retains its real pod/profile.
- const std::uint32_t originalAiHumanCount=allAiEnabled?0u:1u;
  const std::uint32_t originalAiOpponentCount=raceRacerCount-originalAiHumanCount;
  const std::uint16_t originalAiSettings1125C=[&]() -> std::uint16_t {
   // Actual mode0/mode2 human Course launch consumes the retained
@@ -391,10 +394,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        original_course_targets50KX::target(selected)&&
        original_course_targets50KX::target(selected)->track==loadedTrack&&
        selected.mode34==originalMainApplication.profile->mode34&&
-       rr::game::nativeSingleHumanCourseMode50KG(selected)&&
+       rr::game::nativeCourseMode50KG(selected)&&
        selected.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&selected.subtype>=1&&selected.subtype<=3&&selected.laps>=1&&selected.laps<=25&&
-       selected.entrants==raceRacerCount&&((selected.packed1125C>>5)&3u)==1&&
-       ((selected.packed1125C>>7)&15u)==raceOpponentCount,
+       selected.entrants==raceRacerCount&&((selected.packed1125C>>5)&3u)==originalAiHumanCount&&
+       ((selected.packed1125C>>7)&15u)==originalAiOpponentCount,
        "human Course lap configuration requires its actual retained profile");
    return static_cast<std::uint16_t>(selected.packed1125C&0x7ffu);
   }
@@ -498,9 +501,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       original_course_targets50KX::target(selected)->track==loadedTrack&&
       selected.rider==rr::game::dlc50DL::profileRider(playerRacer60)&&originalMainApplication.profile&&
       selected.mode34==originalMainApplication.profile->mode34&&
-      rr::game::nativeSingleHumanCourseMode50KG(selected)&&
+      rr::game::nativeCourseMode50KG(selected)&&
       selected.subtype>=1&&selected.subtype<=3&&selected.laps==(humanCourseEnabled?(originalAiSettings1125C&31u):3u)&&selected.entrants==raceRacerCount&&
-      ((selected.packed1125C>>5)&3)==1&&((selected.packed1125C>>7)&15)==raceOpponentCount&&
+      ((selected.packed1125C>>5)&3)==originalAiHumanCount&&((selected.packed1125C>>7)&15)==originalAiOpponentCount&&
       (!humanCourseEnabled||(selected.packed1125C&0x7ffu)==originalAiSettings1125C),
       "native Course cold load requires its actual retained track/racer profile");
   dynamicProfile.game34=originalMainApplication.profile->mode34;

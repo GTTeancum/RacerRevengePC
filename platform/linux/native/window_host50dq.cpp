@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cstdlib>
 #include "native_dynamic_library50win.h"
 #include <exception>
 #include <new>
@@ -120,6 +121,9 @@ struct WindowHost50DQ::State {
     bool controllerRumbling[2]{};
     Int (RR_SDL50WIN_CALL *numJoysticks)() = nullptr;
     Int (RR_SDL50WIN_CALL *isGameController)(Int) = nullptr;
+    Int (RR_SDL50WIN_CALL *attachVirtual)(Int,Int,Int,Int)=nullptr;
+    Int (RR_SDL50WIN_CALL *detachVirtual)(Int)=nullptr;
+    std::array<Int,2> testControllerIds{{-1,-1}};
     Int (RR_SDL50WIN_CALL *deviceInstanceId)(Int) = nullptr;
     SdlJoystick* (RR_SDL50WIN_CALL *controllerJoystick)(SdlGameController*) = nullptr;
     Int (RR_SDL50WIN_CALL *joystickInstanceId)(SdlJoystick*) = nullptr;
@@ -168,6 +172,11 @@ struct WindowHost50DQ::State {
 #define RR_SDL50DQ_CONTROLLER(member, entry) \
         member = reinterpret_cast<decltype(member)>(native_library50win::symbol(library, entry, loaderDetail)); \
         if (!member) return fail(d, WindowHostError50DQ::MissingEntryPoint, entry, loaderDetail)
+        const char* testPads=std::getenv("RR_TEST_VS_SDL_PADS");
+        if(testPads&&std::strcmp(testPads,"1")==0){
+            RR_SDL50DQ_CONTROLLER(attachVirtual,"SDL_JoystickAttachVirtual");
+            RR_SDL50DQ_CONTROLLER(detachVirtual,"SDL_JoystickDetachVirtual");
+        }
         RR_SDL50DQ_CONTROLLER(numJoysticks,"SDL_NumJoysticks");
         RR_SDL50DQ_CONTROLLER(isGameController,"SDL_IsGameController");
         RR_SDL50DQ_CONTROLLER(deviceInstanceId,"SDL_JoystickGetDeviceInstanceID");
@@ -352,6 +361,18 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
         return sdlFail(r.gameControllers?WindowHostError50DQ::ControllerFailure:WindowHostError50DQ::VideoFailure,
             r.gameControllers?"SDL_Init(video|gamecontroller)":"SDL_Init(video)");
     s.controllersEnabled=r.gameControllers;
+    if(s.attachVirtual){
+        // SDL2 keeps these virtual devices inside this process. The normal
+        // controller scan, input reader and Results device check see the same ports.
+        int mapped=0;
+        for(int i=0;i<s.numJoysticks();++i)if(s.isGameController(i))++mapped;
+        for(int slot=mapped;slot<2;++slot){
+            const int device=s.attachVirtual(1,6,21,0); // SDL_JOYSTICK_TYPE_GAMECONTROLLER
+            if(device<0||!s.isGameController(device))
+                return sdlFail(WindowHostError50DQ::ControllerFailure,"SDL_JoystickAttachVirtual");
+            s.testControllerIds[slot]=s.deviceInstanceId(device);
+        }
+    }
     s.stopTextInput(); // Keyboard controls only; no IME/text-input consumer.
     // Disable heap-payload events before creating the window/pumping events.
     // SDL_Quit alone does not free application-owned payloads left in its queue.
@@ -839,6 +860,13 @@ bool WindowHost50DQ::closeOwned(WindowHostDiagnostic50DQ& d) noexcept {
             }
             s.controllerRumbling[slot]=false;
             s.closeController(s.controllers[slot]);s.controllers[slot]=nullptr;s.controllerIds[slot]=-1;
+        }
+        if(s.detachVirtual){
+            for(int i=s.numJoysticks()-1;i>=0;--i){
+                const auto id=s.deviceInstanceId(i);
+                if(id>=0&&(id==s.testControllerIds[0]||id==s.testControllerIds[1]))s.detachVirtual(i);
+            }
+            s.testControllerIds={{-1,-1}};
         }
         s.controllersEnabled=false;
         if (s.context) { s.deleteContext(s.context); s.context = nullptr; }

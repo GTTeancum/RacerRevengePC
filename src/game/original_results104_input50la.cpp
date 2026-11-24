@@ -117,24 +117,6 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
         out.nextSourcePC=pc;out.blocked=out.sourceEffectsCommitted;return p.stop(d,status,pc,why);
     };
     const auto changed=[&](){p.displayCpu.reset();p.nativeDisplay.reset();out.sourceEffectsCommitted=true;};
-    // The Results Restart rows (1C8DF0 summary, 1C9774 tournament). The row's own store before
-    // its 1AC8E0 runs here: race1B0 bit4 (the Results replay) cleared when set. The in-place
-    // 1AC8E0(race,0) itself, which needs the race-start hooks the race loop owns, and the
-    // row's tail after it (1A4AB0(0.5) on the tournament row, 1A4B90(2)) run in the race loop
-    // on this same poll, exactly as the Pause RESTART row hands 1BD990 over (one in-place
-    // restart for every caller; it logs common_race_start reason=restart caller=<pc>). This
-    // invocation ends here and is not left blocked: the restart disables this Results
-    // (1ACCD8), and the next race's Results starts a fresh input.
-    // PORT STAND-IN (flagged): the 1C98DC tail of this event and any later events of this
-    // poll are not run after the handover (the restarted race has no active Results).
-    const auto handRestart=[&](std::uint32_t pc,const char* why){
-        if((race.flags1B0KnownMask_&0x10u)&&(race.flags1B0KnownValue_&0x10u))
-            race.flags1B0KnownValue_=std::uint8_t(race.flags1B0KnownValue_&~0x10u);
-        // race10C+160, the same emitter this input's feedback uses, for the row's 1A4B90(2).
-        ::native_common_results50PD::state().raceCycleAudio=&audio;
-        out.nextSourcePC=pc;out.blocked=false;
-        return p.stop(d,Impl::S::incomplete,pc,why);
-    };
     // Read-only diagnostic of a refused Results 26D070 stop (cr15 MA 1CA708 / MC 1C8EF0 after
     // the Results replay): names the FIRST owner gate of the stop condition that failed, then
     // the Aural stop's own status/pc when the stop itself ran. No store, no retry.
@@ -167,6 +149,14 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
         if(r!=A::started&&r!=A::unavailable&&r!=A::muted)
             return stop(Impl::S::owner,pc,"Results actual race UI feedback owner unavailable after reached stores");
         return true;
+    };
+    const auto restartRow=[&](std::uint32_t pc,std::uint32_t feedbackPC){
+        auto& restart=::native_common_results50PD::state().restartFromResults;
+        if(!restart)return stop(Impl::S::owner,pc,"Results restart owner missing");
+        race.flags1B0KnownValue_&=~0x10u;
+        out.sourceEffectsCommitted=true;
+        if(!restart(pc))return stop(Impl::S::owner,pc,"Results in-place restart refused");
+        return feedback(2,feedbackPC);
     };
     try {
         const auto first=resumed?host.retainedResultsPollEvent50LA_:0u;
@@ -206,13 +196,8 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                        !observer.readResultsRaceTimeCB8(row,values.timeCB8,observed)||
                        !observer.readResultsObservedTimingCD0(row,values.countCD0,observed))
                         return stop(Impl::S::owner,0x1ac440,"Results Hall same single-human Bank operands unavailable");
-                    std::optional<OriginalRaceRecordInsertionStage50KG> stage;
-                    OriginalRaceRecordInsertionStage50KG::Diagnostic insertion;
-                    std::unique_ptr<platform::OriginalSaveProfileOwner50KG> prepared;
-                    if(!race.profile_->prepareSingleHumanRecordInsertion1AC440(values,1u,stage,insertion)||!stage||
-                       !race.profile_->prepareHallRecordProvenance1AC440(*stage,prepared)||!prepared||
-                       !observer.resultsRowsCurrent(p.application.get(),materials,p.component.sessionGeneration,current.publication)||
-                       !application.commitResultsHallTransfer50LA(race,*stage,*prepared))
+                    if(!observer.resultsRowsCurrent(p.application.get(),materials,p.component.sessionGeneration,current.publication)||
+                       !application.commitResultsHallTransfer50LA(race,values))
                         return stop(Impl::S::owner,0x1ca6a4,"Results Hall actual mutation/dirty/queued request incomplete");
                     // Special subtype3 has NO20C acknowledgement store.
                 }else p.derived->acknowledgement20C=1u; //1C8F7C /1C98D8 /1CA794.
@@ -277,13 +262,11 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                         //  1C8DF0 1AC8E0(race,0), then 1C8E08 1A4B90(race10C,2), then 1C98DC.
                         if(action){
                             if(!race.profile_)return stop(Impl::S::owner,0x1c8d94,"Results actual Profile absent");
-                            if(race.profile_->stamp().mode34!=2u)
-                                return handRestart(0x1c8df0,
-                                    "Results row 1C8DF0: 1AC8E0(race,0) handed to the race loop");
+                            if(race.profile_->stamp().mode34!=2u&&!restartRow(0x1c8df0,0x1c8e08))return false;
                         }
-                        if(!input.matchesNativeCategory2Code1277D0(2,event,action))
+                        else if(!input.matchesNativeCategory2Code1277D0(2,event,action))
                             return stop(Impl::S::owner,0x1c8e20,"Results source action2 mapping unavailable");
-                        if(action){
+                        else if(action){
                             // Source2E0 short circuit BEFORE Profile34/7E4.
                             if(!application.sourceUseProfile2E0_)
                                 return stop(Impl::S::incomplete,0x1c8e38,"Actual Application2E0 producer absent");
@@ -593,11 +576,10 @@ bool OriginalResults10450LA::pressHostInput1C8C30(const ::original_main_entry50K
                     // 1C972C Restart row (flow audit F15), every course: race1B0 bit4 cleared
                     // when set (1C9734..1C9768), 1C9774 1AC8E0(race,0), then 1C9790
                     // 1A4AB0(race10C,0.5), 1C97A8 1A4B90(race10C,2), then 1C98DC.
-                    if(action)return handRestart(0x1c9774,
-                        "Results row 1C9774: 1AC8E0(race,0) handed to the race loop");
-                    if(!input.matchesNativeCategory2Code1277D0(2,event,action))
+                    if(action){if(!restartRow(0x1c9774,0x1c97a8))return false;}
+                    else if(!input.matchesNativeCategory2Code1277D0(2,event,action))
                         return stop(Impl::S::owner,0x1c97c0,"Results tournament action2 mapping unavailable");
-                    if(action){
+                    else if(action){
                         bool record=false;
                         if(!race.profile_||!race.profile_->resultsRecordBit7E4(record))
                             return stop(Impl::S::owner,0x1c97dc,"Results tournament actual Profile7E4 unavailable");

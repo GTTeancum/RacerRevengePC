@@ -27,6 +27,8 @@ inline bool raceFogFarAdmissible50NF(float farDistance) noexcept {
 namespace race_fog_far50nf_detail {
 inline float& storage() noexcept {static float farDistance=originalRaceFogFar50NF;return farDistance;}
 }
+// The projection cutoff is independent of the authored atmospheric ramp.
+inline float gameplayDrawDistanceScale50NF=1.f;
 inline float raceFogFarDistance50NF() noexcept {return race_fog_far50nf_detail::storage();}
 inline bool setRaceFogFarDistance50NF(float farDistance) noexcept {
     if(!raceFogFarAdmissible50NF(farDistance))return false;

@@ -1,0 +1,90 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-scrappers-run",
+    "name": "Scrapper's Run (Ord Ibanna, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.2",
+    "description": "Scrapper's Run on Ord Ibanna, from Star Wars Episode I Racer (N64) model 136, as an add-on course (code nr, physics class B). AI class B (medium evidence); rival stock:16, Wan Sandage (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NR": "SCRAPPER'S RUN",
+        "PLANET_NR": "ORD IBANNA"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nr",
+        "code": "nr",
+        "archive": "TRACKS/NR.RES",
+        "name_key": "COURSE_NR",
+        "planet_name_key": "PLANET_NR",
+        "phy_class": "B",
+        "ai_class": "B",
+        "rival": "stock:16",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NR.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NR.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nr",
+        "enhancements": [
+          "surface_rules"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NR.RES",
+        "bytes": 791058,
+        "sha256": "28f999002f639fd2094158c99543dd6b164e2fcdee4a371b0d731552ede848f7",
+        "role": "course archive (members named tracks\\nr.* / anr.spl / mnr.spl / nrNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NR.PST",
+        "bytes": 66588,
+        "sha256": "9fc391b154703a99b1bcfcc14b28e57b1fe02e3c2a59040cc6d29208fe399204",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NR.PST",
+        "bytes": 287772,
+        "sha256": "52117987a6d6f7211390186280eff74587ea4cf63c9608c98fb093c37f2870fc",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      23560.0,
+      3600.0,
+      33900.0
+    ],
+    "target": [
+      12340.0,
+      1180.0,
+      17400.0
+    ]
+  }
+}

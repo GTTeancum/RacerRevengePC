@@ -95,8 +95,8 @@ bool Owner::continue1A7DD0(const ::original_position_stats_adapter50LA::Owner& o
         // 1ABCBC..1ABCFC VCR channel loop / 1ABD04 288630, then 1ABD10..2C race1B0
         // bit4 (replay) set and 1ABD28 1AC8E0(race,0) (its bit4 branch: 17BCE0
         // per human, no countdown). The replay then plays from race78.
-        // PORT STAND-IN (flagged): the VCR channel loop is the replay owner's
-        // beginReplay (1ABAE8..1ABB68 shape), as for the Results-waiting replay.
+        // 1ABCBC..1ABD04 enables and backs up the channels before any restart,
+        // using the same VCR operations as the Results loop at 1ABA68.
         // 1ABD04 288630(race78): race-internal (W0 round 2), through the race leaf.
         auto& r=*race;
         {
@@ -183,8 +183,12 @@ bool Application::departRace50CR(rr::game::OriginalRaceConstructor50LA& race,
         *scope->gameplay_,*scope->engines_,scope->countdown_,race.entity_.sessionGeneration,ad))
         return refuse("aural_26D070",mainMenu?0x1BD9D4u:0x1BDB6Cu,"26D070 Aural stop refused");
     released("aural_26D070",0x26D070u);
-    if(!scope->music_->requestFade1A4AB0(0.5f).completed())
-        return refuse("music_1A4AB0",0x1A4AB0u,"1A4AB0(0.5) music fade incomplete");
+    using Music=rr::game::OriginalRaceMusicManager50LA;
+    rr::game::OriginalRaceMusicManagerDiagnostic50LA musicDiagnostic;
+    const auto call=mainMenu?Music::PauseReturnCall::main1BD9F0:Music::PauseReturnCall::course1BDB88;
+    if(!race.music10C_||!race.music10C_->pauseReturnNativeFade1A4AB0(race,*scope,call,musicDiagnostic))
+        return refuse("music_1A4AB0",musicDiagnostic.sourcePC?musicDiagnostic.sourcePC:0x1A4AB0u,
+            musicDiagnostic.operation?musicDiagnostic.operation:"Pause return music owner unavailable");
     released("music_1A4AB0",0x1A4AB0u);
     if(!feedbackOk(*cycle,2u))return refuse("feedback_1A4B90",0x1A4B90u,"1A4B90(2) feedback owner unavailable");
     released("feedback_1A4B90",0x1A4B90u);
@@ -192,11 +196,9 @@ bool Application::departRace50CR(rr::game::OriginalRaceConstructor50LA& race,
         return refuse("aural_267BE0",0x267BE0u,"267BE0 Aural transport finish refused");
     released("aural_267BE0",0x267BE0u);
     const auto fade=[&]()noexcept {
-        // 2AED60(500 ms): PORT STAND-IN (flagged, F05 remainder): the blocking
-        // 500 ms fade over the race is not run here; the frontend receiver's
-        // fade-in after the 17DE10 departure covers the screen change.
-        std::fprintf(stderr,"race_depart step=2AED60 ms=500 performed_by=frontend_receiver stand_in=1\n");
-        out.reachedPc=0x2AED60u;
+        auto& fadeOut=native_common_results50PD::state().fadeDeparture;
+        if(!fadeOut||!fadeOut())return refuse("fade_2AED60",0x2AED60u,"race departure fade refused");
+        released("fade_2AED60",0x2AED60u);return true;
     };
     const auto close=[&]()noexcept {
         // 1BE830 on this race's Pause100 (App11C = 0, Pause+200 = 0, 1ACF50 resume,
@@ -204,16 +206,14 @@ bool Application::departRace50CR(rr::game::OriginalRaceConstructor50LA& race,
         const auto& pause=race.pause100_;
         if(!pause||!pause->active200_){released("pause_1BE830",0x1BE830u);return true;}
         setExplicitAnimationPause(false);pause->active200_=0;
-        // PORT STAND-IN (flagged, 149p): a world whose 4D8 group the open could
-        // not pause has nothing to resume; its refusal is logged, not fatal.
         if(!pauseConsumedRaceWorld1ACF50(race,false))
-            std::fprintf(stderr,"race_depart step=1ACF50 resume=refused stand_in=1\n");
+            return refuse("pause_1ACF50",0x1ACF50u,"race world resume refused");
         if(!pauseConsumedRaceEntity142040(race,false)||!pause->entity_||!pause->entity_->setActivity141630(false))
             return refuse("pause_1BE830",0x1BE878u,"1BE830 Pause close refused");
         released("pause_1BE830",0x1BE830u);return true;
     };
-    if(mainMenu){if(!close())return false;fade();}
-    else{fade();if(!close())return false;}
+    if(mainMenu){if(!close()||!fade())return false;}
+    else if(!fade()||!close())return false;
     rr::game::OriginalRaceAckDestination50PD request;
     request.route=rr::game::OriginalRaceAckRoute50PD::course; // label only; the screen lane selects
     request.flags=6u;request.screen=mainMenu?4u:6u;request.page=1u;request.sourcePC=mainMenu?0x1bda64u:0x1bdbfcu;

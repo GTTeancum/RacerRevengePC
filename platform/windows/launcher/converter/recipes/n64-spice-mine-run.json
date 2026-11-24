@@ -1,0 +1,90 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-spice-mine-run",
+    "name": "Spice Mine Run (Mon Gazza, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.3",
+    "description": "Spice Mine Run on Mon Gazza, from Star Wars Episode I Racer (N64) model 143, as an add-on course (code ns, physics class B). AI class A (medium evidence); rival stock:08, Mars Guo (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NS": "SPICE MINE RUN",
+        "PLANET_NS": "MON GAZZA"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "ns",
+        "code": "ns",
+        "archive": "TRACKS/NS.RES",
+        "name_key": "COURSE_NS",
+        "planet_name_key": "PLANET_NS",
+        "phy_class": "B",
+        "ai_class": "A",
+        "rival": "stock:08",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NS.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NS.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "ns",
+        "enhancements": [
+          "surface_rules"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NS.RES",
+        "bytes": 1492371,
+        "sha256": "a805661d0b981f681e3913c07482e887eced88e4ece9832d4f33098d2ab84b03",
+        "role": "course archive (members named tracks\\ns.* / ans.spl / mns.spl / nsNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NS.PST",
+        "bytes": 66588,
+        "sha256": "41d0ed1eb618bb695eeb4497d0514afea572f32f40b76f90dd8d9b411ce7dd5f",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NS.PST",
+        "bytes": 287772,
+        "sha256": "5503579d29c05b440089b1b7788d7994adc532772c3dfe9abe0fb913c77d5330",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      6424.0,
+      2100.0,
+      37693.0
+    ],
+    "target": [
+      26816.0,
+      5840.0,
+      17303.0
+    ]
+  }
+}

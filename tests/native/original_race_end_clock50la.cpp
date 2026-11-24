@@ -8,6 +8,11 @@
 #include "source_announcer50ie_fixture.h"
 #include <bit>
 
+original_camera_session50KX::Result rr::game::OriginalRaceConstructor50LA::advanceStartFade1A7BD0(
+    original_camera_session50KX::Session& session){
+    return session.advanceRaceFadeInPrefix(flags1B0KnownValue_,flags1B0KnownMask_);
+}
+
 namespace original_camera_session50KX {
 // Every counted race (every course) once its counted Camera34 and end HUD are
 // both bound. An unengaged Session keeps the previous end policy below.
@@ -109,7 +114,8 @@ bool Registration::endStateCurrent(const rr::game::OriginalRaceConstructor50LA& 
        !race.raceCamera34Issued(session)||!session.coldBound_||!session.readsBound_||
        session.closed_||session.abandoned_||session.generation_!=generation_||!session.displayInputs_||
        &session.actual_.bank!=bank_||&session.actual_.all8Manager!=&manager_->manager||
-       &session.actual_.race94!=&race.field94_||session.actual_.humanCount34!=1u||
+       &session.actual_.race94!=&race.field94_||!session.actual_.humanCount34||session.actual_.humanCount34>2u||
+       session.actual_.humanCount34!=(session.raceFlags1B0_&3u)||
        session.actual_.applicationEntities!=race.application_||
        !session.actual_.applicationAnimation.sameOwner(application_->animationClock()))return false;
     try{return session.identitiesCurrent();}catch(...){return false;}
@@ -199,30 +205,7 @@ original_camera_session50KX::Result Registration::advanceFadeIn1A7BD0(
             unsigned(video.flags404Low6),unsigned(video.covered3DC),unsigned(app.fadeManagerA8),
             (race.flags1B0KnownValue_&8u)?1:0,session.endingFadeRequest_.pending()?1:0,
             session.retainedFadeInRequestPending50LA()?1:0);}}
-        if(session.endingFadeRequest_.pending()||
-           (session.retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))return session.set(S::owner,0x2ae93c);
-        if((video.flags404Low6&3u)&&!(video.flags404Low6&4u)&&
-           !(app.fadeManagerA8==8&&session.retainedFadeInRequestPending50LA()))return session.set(S::videoPending);
-        if((race.flags1B0KnownMask_&8u)!=8u)return session.set(S::owner,0x1a7bd0);
-        if(race.flags1B0KnownValue_&8u){
-            // Existing real accepted-restored-image scheduling; no fabricated
-            // guest FC/null, fade acknowledgment or alternative video object.
-            if(app.fadeManagerA8||!(video.covered3DC||(video.flags404Low6&16u)))
-                return session.set(S::videoPending,0x1a7bf8);
-            session.result_.start=rr::game::requestOriginalFirstMainFade1B7D50(video,app.fadeManagerA8,app.fadeDuration98);
-            if(session.result_.start.status!=rr::game::OriginalCameraStartStatus::complete)
-                return session.set(S::videoPending,session.result_.start.sourcePC);
-            race.flags1B0KnownValue_=std::uint8_t(race.flags1B0KnownValue_&~8u); //1A7C18, ONLY after actual acceptance.
-        }
-        // One-way native camera projection; unknown low2 and all other lanes
-        // retain their independent ownership. Later video failure keeps bit3.
-        session.raceFlags1B0_=std::uint8_t((session.raceFlags1B0_&~8u)|(race.flags1B0KnownValue_&8u));
-        if(app.fadeManagerA8==8){
-            session.result_.start=session.serviceAsyncFadeInRequest260610();
-            if(session.result_.start.status!=rr::game::OriginalCameraStartStatus::complete)
-                return session.set(S::videoPending,session.result_.start.sourcePC);
-        }else if(app.fadeManagerA8)return session.set(S::sourcePath,0x2ae7fc);
-        return session.set(S::complete,0x2ae958);
+        return session.serviceRaceFadeIn1A7BD0(race.flags1B0KnownValue_,race.flags1B0KnownMask_);
     }catch(...){return {S::owner,0x1a7bd0};}
 }
 }

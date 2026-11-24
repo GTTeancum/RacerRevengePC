@@ -345,11 +345,11 @@ OriginalCountdownStep advanceOriginalRaceCountdown1AFA84(OriginalRaceStartCountd
     if(!a.ok)return OriginalCountdownStep::arithmetic;c.countdown34=n;return OriginalCountdownStep::advanced;
 }
 OriginalCameraStartResult restoreOriginalRaceFog1A98DC(OriginalRaceFogFields& fog,
-    std::uint32_t& rendererColor) noexcept {
+    std::uint32_t& rendererColor,bool split) noexcept {
     if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x13e968);
     // far50: the original constant 4000 unless the course's Fog block authors the
     // N64-canonical FarDistance (DLC only; stock never does, so stock stays 4000).
-    auto n=fog;Arithmetic a;n.far50=raceFogFarDistance50NF();n.near54=constant(0x44a6a99a);n.minimum58=64;n.color30|=0xff000000u;
+    auto n=fog;Arithmetic a;n.far50=split?2000.f:raceFogFarDistance50NF();n.near54=split?2000.f:constant(0x44a6a99a);n.minimum58=64;n.color30|=0xff000000u;
     const float distance=a.sub(n.far50,n.near54);
     n.end38=a.add(n.near54,a.mul(n.authoredFraction3C,distance));
     n.start34=a.mul(a.sub(1,n.authoredFraction40),a.sub(n.end38,n.minimum58));
@@ -378,11 +378,19 @@ OriginalCameraStartResult prepareOriginalRaceViewport2361C0(OriginalCameraViewpo
     p.prepared=true;destination=p;scene.aspect1F8=aspect;return result(S::complete,0x23637c);
 }
 OriginalCameraStartResult setOriginalFullRaceViewport1158A0(OriginalCameraViewportFields& viewport,
-    CameraSceneState49F& scene,OriginalCameraSceneTick& tick,std::uint32_t buffers) noexcept {
+    CameraSceneState49F& scene,OriginalCameraSceneTick& tick,std::uint32_t buffers,std::int32_t mode,unsigned view) noexcept {
     if(!viewport.prepared||!tick.bound||tick.sceneKey!=viewport.sceneKey||
        tick.sessionGeneration!=viewport.sessionGeneration)return result(S::owner,0x1158a0);
     if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x1158d4);
     auto p=viewport;Arithmetic a;p.x1E0=p.y1E4=0;p.width1E8=p.fullWidth204;p.height1EC=p.fullHeight208;
+    if(mode<0||mode>2||view>1||(!mode&&view))return result(S::sourcePath,0x1a9840);
+    if(mode==1){
+        p.height1EC=p.fullHeight208/2;
+        if(view)p.y1E4=p.height1EC;
+    }else if(mode==2){
+        p.width1E8=p.fullWidth204/2;
+        if(view)p.x1E0=p.width1E8;
+    }
     p.depthNear1F0=0;p.depthFar1F4=1;
     const float width=static_cast<float>(p.width1E8),height=static_cast<float>(p.height1EC);
     const float fullRatio=a.div(static_cast<float>(p.fullHeight208),static_cast<float>(p.fullWidth204));

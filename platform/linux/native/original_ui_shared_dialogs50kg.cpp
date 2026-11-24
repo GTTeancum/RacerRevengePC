@@ -426,15 +426,9 @@ bool OriginalUiSharedDialogs50KG::reappendInitialMain1D7CF4(Diagnostic& d)noexce
 }
 bool OriginalUiSharedDialogs50KG::reappendNativeMenu1B86D0(Diagnostic& d)noexcept {
  d={};if(popup47CDraw_||nativePopup47CFifoPins_||firstPass470Draw_||demand470Pending_||thirdPass470Draw_||nativeWarning470FifoPins_||nativeMenuWarning470Pins_||menuMainDraw_||menuOptionsDraw_||menuRiderDraw_||menuUpdateFailedOwner_||menuUpdateAborted_)return fail(d,Status::phase,0x1B86D0);
- // PORT STAND-IN (same rule as reappend1B86D0's Garage first attach, and the
- // never-attached topology handled at advance4702048F0/142590): a race-return
- // frontend whose first screen performs no 1B86D0 (Course6, Hall11, Win7,
- // Unlock10) boots 470/47C per frontend but leaves them off the dispatcher. The
- // original keeps them attached across the race, so the next manager's 1B86D0
- // (Rider 1E809C, Options, Main 1D7CF4 re-entry) simply detaches and re-appends
- // them. Here that same first 1B86D0 appends them and establishes the menu
- // topology. Keyed on the actual topology, never on a screen. Main's initial
- // reset (initialMainResetPending_) belongs to the boot reorder only.
+ // 17C1C4..17C21C constructs the race-return dispatcher and activates the
+ // requested screen. 1B7BD0..1B7C28 constructs its own 470/47C pair.
+ // A manager's first 1B86D0 attaches that pair; later calls reorder it.
  const bool neverAttached=!initialMainAttached_&&!reorderStep_&&!completedReorders_&&!initialMainResetPending_&&
     dialog470_.entity.parent1C!=&scope_->dispatcher_&&controller47C_.entity.parent1C!=&scope_->dispatcher_;
  if(!loadedCurrent()||(!initialMainAttached_&&!neverAttached&&!reorderStep_)||scope_->managerLive_||reorderingPage_||
@@ -503,7 +497,6 @@ bool OriginalUiSharedDialogs50KG::advance4702048F0(float delta,Diagnostic& d)noe
  // but, unlike Main 1D7CF4 or Garage 1FB648, performs no 1B86D0 reappend:
  // neither entity is under the dispatcher yet, so its child update 2048F0
  // is not reached until a later manager (the Garage) attaches them.
- // STAND-IN: the port boots these per frontend; the original keeps them.
  if(!initialMainAttached_&&!reorderStep_&&loadedCurrent()&&
     dialog470_.entity.parent1C!=&scope_->dispatcher_&&controller47C_.entity.parent1C!=&scope_->dispatcher_){
   d.sourcePC=0x2048F0;return true;}
@@ -898,12 +891,8 @@ namespace rr::game {
 OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::beginSharedDialogRetirement142590(
  SharedDialogs& owner,std::size_t ordinal,C& c)noexcept {
  auto r=live();if(!r.okay())return r;
- // PORT STAND-IN (retires the stand-in noted at advance4702048F0): a race-return
- // first screen (Course6, Hall11, Win7, Unlock10) boots 470/47C per frontend
- // but no manager has attached them under the dispatcher yet. The original
- // keeps them attached across the race, so its 142590 never sees this state.
- // Same release for both topologies; the never-attached one has no dispatcher
- // links to repair. Keyed on the actual topology, never on a screen.
+ // A frontend can retire before a manager calls 1B86D0. Its newly
+ // constructed pair has no dispatcher links to detach in that case.
  const bool unattached=[&]()noexcept {
   // Both counted dialogs constructed (203C90/2054D0), neither ever appended by
   // 1B86D0, and no reorder in flight: no dispatcher link names either one.
@@ -938,7 +927,7 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::beginSharedDialogRe
 }
 bool OriginalUiEntityScope50KG::sharedDialogRetirementCurrent(const SharedDialogs& owner,
  std::size_t ordinal,const C& c)const noexcept {
- // Never-attached topology: see beginSharedDialogRetirement142590 (PORT STAND-IN).
+ // Never-attached topology: see beginSharedDialogRetirement142590.
  const bool unattached=!sharedDialogEverAttached_[0]&&!sharedDialogEverAttached_[1]&&
     !sharedDialogDetached_&&!c.parent1C&&!c.mask20&&!c.previous10&&!c.next14;
  if(ordinal>1||!live().okay()||sharedDialogsOwner_!=&owner||owner.scope_.get()!=this||
@@ -1130,6 +1119,11 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
   if(!standardMaterialDomainOwner_->appendOriginalSources(materials,textures,sourceDiagnostic)){
    error="Shared UI canonical Popup corpus rejected at source PC "+std::to_string(sourceDiagnostic.sourcePC);
    return SharedUiBootResult::unavailable;
+  }
+  // Preserve the original archive member on the first popup texture lookup.
+  rr::assets::OriginalStandardTextureDiagnostic50LA textureDiagnostic;
+  if(!standardMaterialDomainOwner_->resolver3E1A70()->bindProvider3E1A70(globalsProvider,textureDiagnostic)){
+   error="Shared UI Popup texture namespace binding failed";return SharedUiBootResult::unavailable;
   }
  }catch(...){error="Shared UI Popup source admission allocation failed";return SharedUiBootResult::unavailable;}
  const auto& q=state->controllerPopupState;

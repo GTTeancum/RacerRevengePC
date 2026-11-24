@@ -50,12 +50,15 @@ bool constructCountedControllerWithoutCuts174A30()noexcept {
     // [CSCameras] count (World+3E4) is zero. Data, never a course code.
     const bool cutsZero=launchZeroesCuts174EA8()||
         (nativeTaIssuance_&&nativeTaIssuance_->world&&nativeTaIssuance_->world->cutCount3E4()==0u);
-    //1A95B0 builds one controller per human (race+1B0 low2); the native
-    // camera owns the single-human slot only. Zero humans: no controller.
-    if(zeroCutController_||actual_.humanCount34!=1u||!nativeTaIssuance_||nativeTaCutAuthoring_||taCuts_||
+    // 1A95DC and 1A9640 store separately constructed controllers at +48 and +4C.
+    if(zeroCutController_||!actual_.humanCount34||actual_.humanCount34>2u||!nativeTaIssuance_||nativeTaCutAuthoring_||taCuts_||
        actual_.taIntroAuthoring||actual_.taIntroAudio||!cutsZero)return false;
     if(!constructColdController174A30(nativeTaIssuance_->generation))return false;
-    zeroCutController_=true; //One-way native history; never rearmed.
+    if(actual_.humanCount34==2u&&!constructColdController174A30(nativeTaIssuance_->generation,1)){
+        if(!releaseColdController174C20())std::terminate();
+        return false;
+    }
+    zeroCutController_=true;
     return true;
 }
 bool bindTaIntroEntity()noexcept {
@@ -329,7 +332,14 @@ bool retireTaController()noexcept {
     if(!retireNativeRaStart7C())return false; //174D34..54, AFTER78 and BEFORE queries.
     coldController_.children64.fill(nullptr);coldController_.script5C=nullptr;
     coldController_.scene3C=nullptr;coldController_.racer40=nullptr;
-    return releaseColdController174C20();
+    if(display_.controllers48[1]){
+        if(display_.controllers48[1]!=&secondControllerEntity_||
+           secondControllerEntity_.actualController!=&secondColdController_.entity)return false;
+        display_.controllers48[1]=nullptr;
+        secondControllerEntity_={};
+    }
+    display_.secondScene={};
+    return releaseColdController174C20(1)&&releaseColdController174C20();
 }
 
 unsigned taExitReason_=0;

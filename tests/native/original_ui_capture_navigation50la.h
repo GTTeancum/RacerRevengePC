@@ -55,7 +55,10 @@ class Route final {
     using Life=rr::game::OriginalUiTransitionLifecycle50KG;
     using Phase=rr::game::OriginalUiTransitionPhase50KG;
     using Aperture=rr::game::OriginalUiApertureState50KG;
-    bool enabled_=false,awaitingDispatch_=false;
+    bool enabled_=false,awaitingDispatch_=false,versus_=false,secondPageRequested_=false;
+    bool secondRiderMoved_=false,awaitingSecondMove_=false;
+    std::uint32_t secondRiderBefore_=0,secondHighlightBefore_=0,secondMoves_=0;
+    const char* secondAddonKey_=nullptr;
     std::uint8_t issued_=0;
     std::uint32_t entryRider_=19;
     // PORT EXTENSION, NOT ORIGINAL (DLC add-on rider test).
@@ -131,7 +134,7 @@ class Route final {
     int pollCourse(const Snapshot& s,bool courseCaptured) {
         resolveCourse();
         if((course_.set||lapsTarget_||subtypeTarget_)&&!courseMoves_)
-            require(s.course.mode34==0,"Course route targets require the free-play Course screen");
+            require(s.course.mode34==(versus_?1u:0u),"Course route mode differs from the selected event");
         if(courseMoves_&&s.course.renders<=priorCourseRenders_)return -1;
         if(courseTargetsReady(s))return proceed;
         require(!courseCaptured,"Course route captured the Course screen before its targets");
@@ -140,7 +143,7 @@ class Route final {
         const auto group=s.course.controllerGroup;
         const auto subtype=s.course.subtypeSlot14F4;
         if(!lapsReady(s)){
-            if(subtype!=1){if(group!=2)return arm(s,towards(group,2));return arm(s,1);}   // Single Race first
+            if(!versus_&&subtype!=1){if(group!=2)return arm(s,towards(group,2));return arm(s,1);}   // Single Race first
             if(group!=3)return arm(s,towards(group,3));
             return arm(s,s.course.laps14EC>lapsTarget_?0:1);
         }
@@ -184,7 +187,9 @@ class Route final {
     }
 public:
     explicit Route(bool enabled):enabled_(enabled){
+        versus_=enabled&&std::getenv("RR_TEST_VERSUS")&&std::string(std::getenv("RR_TEST_VERSUS"))=="1";
         if(!enabled_)return;
+        if(versus_)secondAddonKey_=std::getenv("RR_TEST_VS_P2_ADDON_RIDER");
         entryRider_=expectedEntryRider50LA();
         const char* key=std::getenv("RR_TEST_ADDON_RIDER");
         addon_=key&&*key;addonKey_=addon_?key:nullptr;
@@ -213,8 +218,10 @@ public:
         }
     }
     bool enabled()const noexcept{return enabled_;}
-    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+courseMoves_);}
+    std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+addonMoves_+courseMoves_+unsigned(secondPageRequested_)+secondMoves_);}
     // Dispatch completion is not proof of a loaded race or a captured track.
+    bool versus()const noexcept{return versus_;}
+    bool secondRiderMoved()const noexcept{return secondRiderMoved_&&(!secondAddonKey_||rr::game::dlc50DL::highlightedAddonRider(1)==addonNumber(secondAddonKey_));}
     bool actionsDispatched()const noexcept{return issued_==3&&!awaitingDispatch_;}
 
     // Use this SAME predicate before accepting an automatic menu screenshot.
@@ -224,7 +231,7 @@ public:
         const auto& t=s.transition;
         if(!s.prepared||!s.active||s.faulted||s.quitRequested||!s.frameSubmitted||
            s.deferredQueue||!t.bound||t.initialRestartPending||t.applicationRequestQueued||
-           t.lifecycle!=Life::idle||t.phase!=Phase::none||s.route.page!=1||
+           t.lifecycle!=Life::idle||t.phase!=Phase::none||(s.route.page!=1&&!(s.route.screen==5&&s.route.page==2))||
            !same(s.route,t.current)||!same(s.route,t.requested))return false;
         if(s.route.screen==4)return s.main.bound&&!s.main.faulted&&!s.main.quitRequested&&
             s.main.mainPageShown&&s.main.inputContainerShown&&s.main.framePublished&&open(s.main.aperture);
@@ -247,7 +254,7 @@ public:
         // skipping animation, advancing time, or changing original inputs.
         if(s.route.screen==5&&!s.rider.selectedCharacterReady)return false;
         // Add-on test: only the settled frame with the requested add-on highlighted.
-        if(addon_&&s.route.screen==5)return addonTarget_&&!awaitingDispatch_&&issued_==1&&
+        if(addon_&&s.route.screen==5&&s.route.page==1)return addonTarget_&&!awaitingDispatch_&&issued_==1&&
             rr::game::dlc50DL::highlightedAddonRider()==addonTarget_&&settled(s)&&
             sourceAccepted&&source>priorAddonSource_&&publication;
         // Course: only the settled frame with every requested target shown.
@@ -272,19 +279,33 @@ public:
         require(!s.faulted&&!s.quitRequested,"unattended original UI became unavailable");
         if(issued_==3)return -1;
         const auto expectedScreen=static_cast<std::uint8_t>(4+issued_);
-        const bool expected=s.route.screen==expectedScreen&&s.route.page==1&&s.switches==issued_;
-        const bool outgoing=issued_&&s.route.screen==expectedScreen-1&&s.route.page==1&&s.switches==issued_-1;
+        const bool expected=s.route.screen==expectedScreen&&s.route.page==(issued_==1&&secondPageRequested_?2:1)&&s.switches==issued_;
+        const bool outgoing=(issued_&&s.route.screen==expectedScreen-1&&s.route.page==(versus_&&issued_==2?2:1)&&s.switches==issued_-1)||
+            (versus_&&issued_==1&&secondPageRequested_&&s.route.screen==5&&s.route.page==1);
         require(expected||outgoing,"unattended UI left the bounded Main/Rider/Course route");
         if(!expected||!settled(s))return -1;
         if(issued_==0){
-            require(mainGroup==1&&mainSlot==1,"unattended Main requires its group1/slot1 selection (the runner seeds slot 1)");
+            require(mainGroup==1&&mainSlot==(versus_?2:1),"unattended Main selection differs from the seeded event");
             if(!mainCaptured)return -1;
         }else if(issued_==1){
             require(mainCaptured,"unattended Rider arrived without the completed Main screenshot");
-            if(addon_){
+            if(addon_&&s.route.page==1){
                 const int action=pollAddonRider(s,riderCaptured,riderSourceAccepted,riderSource,riderPublication);
                 if(action!=2)return action;
-            }else{
+            }
+            if(versus_){
+                if(!riderCaptured||!riderSourceAccepted)return -1;
+                if(!secondPageRequested_){secondPageRequested_=awaitingDispatch_=true;return 4;}
+                const auto secondHighlight=rr::game::dlc50DL::highlightedAddonRider(1);
+                const auto secondTarget=secondAddonKey_?addonNumber(secondAddonKey_):0u;
+                require(!secondAddonKey_||secondTarget,"requested P2 add-on rider is unavailable");
+                if(!secondRiderMoved_||(secondTarget&&secondHighlight!=secondTarget)){
+                    require(secondMoves_<27u+rr::game::dlc50DL::addonRiderCount(),"P2 carousel did not reach requested rider");
+                    secondRiderBefore_=s.rider.rider4C4;secondHighlightBefore_=secondHighlight;
+                    awaitingSecondMove_=awaitingDispatch_=true;return 1;
+                }
+                if(!s.rider.selectedCharacterReady)return -1;
+            }else if(!addon_){
                 require(s.rider.rider4C4==entryRider_,
                     "unattended Rider did not open on the profile's remembered free-play racer");
             }
@@ -359,12 +380,20 @@ public:
                 <<" addon="<<highlighted<<'\n';
             return;
         }
+        if(versus_&&issued_==1&&secondPageRequested_&&awaitingDispatch_){
+            if(awaitingSecondMove_){
+                require(s.route.screen==5&&s.route.page==2&&(s.rider.rider4C4!=secondRiderBefore_||rr::game::dlc50DL::highlightedAddonRider(1)!=secondHighlightBefore_),"P2 Rider move did not update P2 selection");
+                awaitingSecondMove_=false;++secondMoves_;secondRiderMoved_=true;
+            }else require(s.transition.lifecycle==Life::requestPageExit&&s.transition.requested.screen==5&&s.transition.requested.page==2,
+                "VS P1 Confirm did not request Rider page two");
+            awaitingDispatch_=false;return;
+        }
         require(enabled_&&awaitingDispatch_&&issued_>=1&&issued_<=3,
             "unattended UI has no pending dispatch receipt");
         const auto source=static_cast<std::uint8_t>(3+issued_);
         const auto target=static_cast<std::uint8_t>(issued_<3?source+1:source);
         const auto& t=s.transition;
-        require(!s.faulted&&!s.quitRequested&&s.route.screen==source&&s.route.page==1&&
+        require(!s.faulted&&!s.quitRequested&&s.route.screen==source&&s.route.page==(versus_&&issued_==2?2:1)&&
             s.switches==issued_-1&&t.bound&&same(t.current,s.route)&&
             t.requested.screen==target&&t.requested.page==1&&t.phase==Phase::none&&
             t.lifecycle==(issued_<3?Life::requestScreenExit:Life::requestCourseExit)&&

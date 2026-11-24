@@ -1,21 +1,24 @@
 // Included privately INSIDE the actual Session class. No independent owner,
 // callable dispatch, source-clock input, parent attachment or readiness grant.
-bool constructColdController174A30(std::uint64_t issuerGeneration)noexcept {
-    auto& p=coldController_;const auto& app=actual_.applicationEntities;
+bool constructColdController174A30(std::uint64_t issuerGeneration,unsigned view=0)noexcept {
+    if(view>1||(view==1&&actual_.humanCount34!=2))return false;
+    auto& p=view?secondColdController_:coldController_;
+    auto& numeric=view?secondController_:controller_;
+    auto& children=view?secondCollection_:collection_;const auto& app=actual_.applicationEntities;
     if(nativeTaCutChildPhase_!=NativeTaCutChildPhase::empty||
        !issuerGeneration||p.started||p.entity.reference00||!app||!app->application10()||
        app->nativeOwnerThread_!=std::this_thread::get_id()||app->attachmentLock423F58()||
        app->objectCount423F60()==std::numeric_limits<std::uint32_t>::max()||
        generation_||displayInputs_||coldPhase_||authoredPhase_||coldBound_||readsBound_||
-       closed_||abandoned_||frameStage_!=FrameStage::idle||controller_.bound||
-       collection_.bound||collection_.registered38||collection_.count30||collection_.selected34||
+       closed_||abandoned_||frameStage_!=FrameStage::idle||numeric.bound||
+       children.bound||children.registered38||children.count30||children.selected34||
        controllerEntity_.controllerKey||objectChildren_.controllerKey||
        !original_entity_chain_detail50LA::forest(app->entityAuthority_.view()))return false;
     for(const auto* displayed:display_.controllers48)if(displayed)return false;
     // The existing nonmoving numeric payload supplies this controller's ONE
     // identity. The Entity prefix is separate solely because numeric leaves
-    // copy controller_; those copies must never copy links/reference ownership.
-    const auto identity=key(controller_);
+    // copy numeric; those copies must never copy links/reference ownership.
+    const auto identity=key(numeric);
     if(!app->entityAuthority_.reserveAdditional(1)||
        !app->entityAuthority_.canEnroll(p.entity,identity))return false;
     p.started=true;p.issuerGeneration=issuerGeneration;
@@ -27,7 +30,7 @@ bool constructColdController174A30(std::uint64_t issuerGeneration)noexcept {
     if(made.status!=OriginalWreckComponentStatus50LA::complete||
        !app->entityAuthority_.enroll(p.entity))std::terminate();
     p.vtable08=0x3ccab0u; //115B7C: source identity, never an executable pointer.
-    collection_.count30=0;collection_.selected34=0;collection_.registered38=nullptr;
+    children.count30=0;children.selected34=0;children.registered38=nullptr;
     p.scene3C=nullptr;
     p.vtable08=0x3ce310u; //174A4C.
     p.mode84=0;p.racer40=nullptr;
@@ -41,25 +44,25 @@ bool constructColdController174A30(std::uint64_t issuerGeneration)noexcept {
     bitsA8(0x000fu,0); //174A74, only low cursor nibble.
     for(auto& child:p.children64)child=nullptr; //174A78..94, source order64..80.
     p.script5C=nullptr;
-    bits60(0x001e0000u,0);controller_.flags62&=static_cast<std::uint8_t>(~0x1eu);
+    bits60(0x001e0000u,0);numeric.flags62&=static_cast<std::uint8_t>(~0x1eu);
     bitsA8(0x01f0u,0); //174AD4, signed5-bit cut count.
-    controller_.mode44=4;
-    bits60(0x00200000u,0);controller_.flags62&=static_cast<std::uint8_t>(~0x20u);
-    bits60(0x00400000u,0);controller_.flags62&=static_cast<std::uint8_t>(~0x40u);
-    bits60(0x00800000u,0);controller_.flags62&=static_cast<std::uint8_t>(~0x80u);
-    bits60(0x0001f000u,0);controller_.flags62&=static_cast<std::uint8_t>(~1u); //174B58 includes62 bit0.
-    controller_.cooldown8C=0.f;controller_.cutRemaining90=0.f;
-    bits60(0x01000000u,0);controller_.flags63Low5&=static_cast<std::uint8_t>(~1u);
-    bits60(0x02000000u,0);controller_.flags63Low5&=static_cast<std::uint8_t>(~2u);
-    controller_.specialDelayA4=1.f;
-    bits60(0x04000000u,0x04000000u);controller_.flags63Low5|=4u;
-    controller_.shakeDuration98=0.f;controller_.shakeRemaining94=-1.f;
-    controller_.shakeMagnitude9C=0.f;
-    bitsA8(0x0200u,0);controller_.shakeDecayingA9=false; //174BC0.
-    controller_.shakeDelayA0=0.f;
+    numeric.mode44=4;
+    bits60(0x00200000u,0);numeric.flags62&=static_cast<std::uint8_t>(~0x20u);
+    bits60(0x00400000u,0);numeric.flags62&=static_cast<std::uint8_t>(~0x40u);
+    bits60(0x00800000u,0);numeric.flags62&=static_cast<std::uint8_t>(~0x80u);
+    bits60(0x0001f000u,0);numeric.flags62&=static_cast<std::uint8_t>(~1u); //174B58 includes62 bit0.
+    numeric.cooldown8C=0.f;numeric.cutRemaining90=0.f;
+    bits60(0x01000000u,0);numeric.flags63Low5&=static_cast<std::uint8_t>(~1u);
+    bits60(0x02000000u,0);numeric.flags63Low5&=static_cast<std::uint8_t>(~2u);
+    numeric.specialDelayA4=1.f;
+    bits60(0x04000000u,0x04000000u);numeric.flags63Low5|=4u;
+    numeric.shakeDuration98=0.f;numeric.shakeRemaining94=-1.f;
+    numeric.shakeMagnitude9C=0.f;
+    bitsA8(0x0200u,0);numeric.shakeDecayingA9=false; //174BC0.
+    numeric.shakeDelayA0=0.f;
     bitsA8(0x0400u,0);
-    bits60(0x08000000u,0);controller_.flags63Low5&=static_cast<std::uint8_t>(~8u);
-    bits60(0x10000000u,0);controller_.flags63Low5&=static_cast<std::uint8_t>(~16u);
+    bits60(0x08000000u,0);numeric.flags63Low5&=static_cast<std::uint8_t>(~8u);
+    bits60(0x10000000u,0);numeric.flags63Low5&=static_cast<std::uint8_t>(~16u);
     for(auto& query:p.queries48)query=nullptr; //174BF8..C04, source order48..54.
     p.word58=0; //174C08; no destructor/ownership claim for this word.
     // Do not bind the legacy display/object-child projections or race48.
@@ -92,17 +95,20 @@ bool coldControllerIdentity174A30()const noexcept {
     for(const auto* displayed:display_.controllers48)if(displayed)return false;
     return true;
 }
-bool releaseColdController174C20()noexcept {
-    auto& p=coldController_;
+bool releaseColdController174C20(unsigned view=0)noexcept {
+    if(view>1)return false;
+    auto& p=view?secondColdController_:coldController_;
+    auto& numeric=view?secondController_:controller_;
+    auto& children=view?secondCollection_:collection_;
     if(!p.started||p.released)return !p.entity.reference00;
     const auto& app=actual_.applicationEntities;auto& e=p.entity;
     // Retirement after actual child/registry closure also accepts a live-used
     // controller. Never erase links or counts to make the cold predicate pass.
     if(!app||app->nativeOwnerThread_!=std::this_thread::get_id()||!app->objectCount423F60()||
        e.reference00!=1||e.kind!=OriginalWreckComponentKind50LA::cameraController174A30||
-       e.objectKey!=key(controller_)||e.sessionGeneration!=p.issuerGeneration||
+       e.objectKey!=key(numeric)||e.sessionGeneration!=p.issuerGeneration||
        e.firstChild18||e.parent1C||e.previous10||e.next14||e.descendants24||
-       collection_.registered38||collection_.bound||display_.controllers48[0]||taCuts_||
+       children.registered38||children.bound||display_.controllers48[view]||taCuts_||
        nativeCinematographer70_||nativeTv78_||
        (nativeStart7C_.constructed&&!nativeStart7C_.retired)||
        p.nativeScene3COwner||p.race88||

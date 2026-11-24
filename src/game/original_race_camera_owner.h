@@ -18,7 +18,8 @@ namespace rr::game {
 enum class CameraRacerClass : std::uint8_t { unavailable, player, ai };
 enum class CameraBootstrap : std::uint8_t {
     original_single_player, // Original1A6C54 forces one Player before opponents.
-    native_all_ai           // Explicit current-native bootstrap variation.
+    original_versus=2,
+    native_all_ai=1         // Explicit current-native bootstrap variation.
 };
 
 struct RaceCameraBinding {
@@ -60,14 +61,19 @@ struct OriginalRaceCameraOwner {
 // In ALL8, preserve genuine AI class and all existing input/control ownership.
 inline bool bindFreshOriginalRaceCamera(OriginalRaceCameraOwner& destination,
     const RaceCameraBinding& binding) noexcept {
-    if ((binding.bootstrap != CameraBootstrap::original_single_player &&
-         binding.bootstrap != CameraBootstrap::native_all_ai) ||
-        !binding.sessionGeneration || !binding.sceneKey || !binding.racerKey ||
-        !binding.mainBodyKey || binding.managerIndex != 0 ||
-        (binding.bootstrap == CameraBootstrap::original_single_player &&
-         binding.racerClass != CameraRacerClass::player) ||
-        (binding.bootstrap == CameraBootstrap::native_all_ai &&
-         binding.racerClass != CameraRacerClass::ai)) return false;
+    if(!binding.sessionGeneration||!binding.sceneKey||!binding.racerKey||!binding.mainBodyKey)return false;
+    switch(binding.bootstrap){
+    case CameraBootstrap::original_single_player:
+        if(binding.managerIndex||binding.racerClass!=CameraRacerClass::player)return false;
+        break;
+    case CameraBootstrap::original_versus:
+        if(binding.managerIndex>=2u||binding.racerClass!=CameraRacerClass::player)return false;
+        break;
+    case CameraBootstrap::native_all_ai:
+        if(binding.managerIndex||binding.racerClass!=CameraRacerClass::ai)return false;
+        break;
+    default:return false;
+    }
     OriginalRaceCameraOwner next{};
     next.binding = binding;
     next.bound = true;

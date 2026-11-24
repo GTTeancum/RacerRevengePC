@@ -49,7 +49,7 @@ bool OriginalUiCourseSelectionData50KG::authoredCourseIndex(std::uint16_t slot,s
 S planOriginalUiCourseMove50KG(const OriginalUiCourseSelectionData50KG& data,
     const OriginalUiNavigation50KG& navigation,const OriginalUiCourseRememberedProfile50KG& p,
     bool forward,OriginalUiCourseMove50KG& out)noexcept{
-    if(!p.ownerReady)return S::missingProfile;if(p.mode34!=0)return S::unsupportedMode;
+    if(!p.ownerReady)return S::missingProfile;if(p.mode34>1)return S::unsupportedMode;
     const auto* page=data.page();if(!page||!navigation.page||navigation.page->identity!=page->identity||
         navigation.page->groups.size()<2||navigation.controllerGroup[0]!=1||!navigation.groups[1].enabled)
         return S::invalidNavigation;

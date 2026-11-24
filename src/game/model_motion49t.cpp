@@ -38,6 +38,7 @@ const ShortAxisTables& shortAxisTables() noexcept {
 struct Eval {
     ModelMotionSharedState49T& shared;
     bool valid=true;
+    bool independentChannels=false;
     float finite(float x) noexcept {valid=valid&&std::isfinite(x);return x;}
     float add(float a,float b) noexcept {volatile float x=a+b;return finite(x);}
     float sub(float a,float b) noexcept {volatile float x=a-b;return finite(x);}
@@ -93,6 +94,7 @@ struct Eval {
         const auto n=v.rotation[ti].keyCount;Key a{},b{};
         if(n<2||n>assets::maxMotKeysPerTrack49O||!assets::readRotationKey49O(v,ti,0,a)||
            !assets::readRotationKey49O(v,ti,n-1,b)||time<a.time||(!directTime&&time>b.time))return false;
+        if(independentChannels&&b.time>0.f)time=std::fmod(time,b.time);
         if(time>=b.time){result=decode(b);return true;}
         // Same strict upper interval as145850, with checked finite asset view.
         std::uint32_t lo=0,hi=n-1;
@@ -115,6 +117,7 @@ struct Eval {
         const auto n=v.position[ti].keyCount;assets::BezierKey49O a{},b{};
         if(n<2||n>assets::maxMotKeysPerTrack49O||!assets::readPositionKey49O(v,ti,0,a)||
            !assets::readPositionKey49O(v,ti,n-1,b)||time<a.time||(!directTime&&time>b.time))return false;
+        if(independentChannels&&b.time>0.f)time=std::fmod(time,b.time);
         const bool interpolate=time<b.time;std::uint32_t lo=0,hi=n-1;
         if(interpolate){while(hi-lo>1){auto mid=(lo+hi)/2;assets::BezierKey49O k{};
             if(!assets::readPositionKey49O(v,ti,mid,k))return false;
@@ -155,7 +158,7 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
     const assets::MotionNodeBindings49O& bindings, float fraction, float weight,
     const SceneGraph49P& graph, ModelMotionState49T& state,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
-    ModelMotionDiagnostic49T& d,bool directTime=false,const ModelMotionMask50KG* mask=nullptr) noexcept {
+    ModelMotionDiagnostic49T& d,bool directTime=false,const ModelMotionMask50KG* mask=nullptr,bool independentChannels=false) noexcept {
     d={};
     if(std::fegetround()!=FE_TONEAREST)return reject(d,ModelMotionError49T::rounding_mode);
     if(!graph.nodes||!graph.count||graph.count>maxSceneNodes49P||!motion.data||
@@ -205,7 +208,7 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
     RR_MODEL49T_MODEL_WRITE(stagedState.model18,0);
 #endif
     stagedState.model18=0;
-    Eval e{stagedShared};const float time=directTime?fraction:e.mul(motion.duration,fraction);
+    Eval e{stagedShared};e.independentChannels=independentChannels;const float time=directTime?fraction:e.mul(motion.duration,fraction);
     if(!e.valid)return reject(d,ModelMotionError49T::arithmetic);
     for(std::uint32_t channel=0;channel<2;++channel){
         const auto count=channel?motion.positionCount:motion.rotationCount;
@@ -269,11 +272,11 @@ bool sampleModelMotionMasked50KG(const assets::MotionView49O& motion,
 bool sampleModelMotionTime50IG(const assets::MotionView49O& motion,
     const assets::MotionNodeBindings49O& bindings,float sampleTime,
     const SceneGraph49P& graph,ModelMotionSharedState49T& shared,
-    ModelMotionWorkspace49T& workspace,ModelMotionDiagnostic49T& diagnostic) noexcept {
+    ModelMotionWorkspace49T& workspace,ModelMotionDiagnostic49T& diagnostic,bool independentChannels) noexcept {
     //154480 consumes current34 directly, without duration/fraction roundtrip.
     // Its model18 is a live motion pointer, not the49T opaque invalidation word.
     ModelMotionState49T unused{};
-    return sample(motion,nullptr,bindings,sampleTime,0,graph,unused,shared,workspace,diagnostic,true);
+    return sample(motion,nullptr,bindings,sampleTime,0,graph,unused,shared,workspace,diagnostic,true,nullptr,independentChannels);
 }
 bool sampleModelMotionBlend49T(const assets::MotionView49O& first,
     const assets::MotionView49O& second,

@@ -15,7 +15,7 @@ inline bool OriginalRaceConstructor50LA::retireNativeWorldAndGroups(std::uint32_
     gate="race detached identity/flags/children";
     if(!counted_||rolledBack_||!application_||application_->attachmentLock423F58()||
        entity_.reference00!=1||entity_.parent1C||entity_.previous10||entity_.next14||
-       entity_.mask20!=(nativeRootMaskReached_?0xffffffffu:0u)||(entity_.flags29&15u)!=3u||
+       entity_.mask20!=(nativeRootMaskReached_?0xffffffffu:0u)||(entity_.flags29&11u)!=3u||
        !application_->entityAuthority_.canRetire(entity_)||raceGroupCount_>6||
        raceGroupsAttached_>raceGroupCount_||
        entity_.firstChild18!=(raceGroupsAttached_?raceGroups_[0]:nullptr))return false;

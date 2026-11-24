@@ -60,13 +60,13 @@ bool receiptBytes(const std::filesystem::path& path,std::vector<std::uint8_t>& o
 }
 
 // Human/AI order of a field (1AE280): every human row before every AI row,
-// humans34 == number of human rows, no racer twice, count 1..8.
+// humans34 == number of human rows, AI cannot duplicate an earlier row, count 1..8.
 bool fieldShapeValid(const Field& f,std::string& why)noexcept {
     if(!f.count||f.count>maxSlots){why="field size outside 1..8 (1AD520)";return false;}
     if(f.humans34>f.count){why="more humans than racers";return false;}
     for(std::size_t i=0;i<f.count;++i){
         if(f.rows[i].human!=(i<f.humans34)){why="humans must precede every AI (1AE280)";return false;}
-        for(std::size_t k=0;k<i;++k)if(f.rows[k].racer60==f.rows[i].racer60){why="racer twice in the field";return false;}
+        for(std::size_t k=0;!f.rows[i].human&&k<i;++k)if(f.rows[k].racer60==f.rows[i].racer60){why="racer twice in the field";return false;}
     }
     return true;
 }
@@ -86,7 +86,7 @@ bool fill(const std::uint32_t* racer60,std::size_t entries,std::size_t humans,bo
         const bool human=i<humans;
         d.slot=i;
         if(!rowForRacer(racer60[i],human,addonCourse,row,d)){d.slot=i;rosterRefused(i,racer60[i],human,d);return false;}
-        for(std::size_t k=0;k<i;++k)if(next.rows[k].racer60==row.racer60){
+        for(std::size_t k=0;!human&&k<i;++k)if(next.rows[k].racer60==row.racer60){
             refuse(d,i,human?pcHuman1ADF80:pcAi1AE3CC,"racer twice in the field");
             rosterRefused(i,racer60[i],human,d);return false;
         }

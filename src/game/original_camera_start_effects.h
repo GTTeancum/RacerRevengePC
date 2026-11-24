@@ -271,7 +271,7 @@ struct OriginalRaceFogFields {
 };
 //13E920(4000,bits44A6A99A,64), preserving actual authored fractions3C/40.
 OriginalCameraStartResult restoreOriginalRaceFog1A98DC(
-    OriginalRaceFogFields&,std::uint32_t& actualRendererFogColor28) noexcept;
+    OriginalRaceFogFields&,std::uint32_t& actualRendererFogColor28,bool split=false) noexcept;
 //199770(0,1,1,1,1). Source1E0 is deliberately not touched.
 void revealOriginalRaceUi199770(std::uint8_t& actualFlags1E4) noexcept;
 
@@ -289,6 +289,18 @@ struct OriginalCameraViewportFields {
     float depth310=1,depth314=0,focalPixels1D8=0,guardAngle330=0,guardX334=0,guardY338=0;
     std::array<float,16> screen140{},combinedScreen250{},guardProjection290{},guardCombined2D0{};
 };
+inline bool matchesRaceHudViewport(const OriginalCameraViewportFields& viewport,unsigned view,
+    unsigned count,std::int32_t mode,bool hidden) noexcept {
+    if(view>=count||((mode==0)?count!=1u:((mode!=1&&mode!=2)||count!=2u)))return false;
+    const bool full=view==0&&viewport.x1E0==0&&viewport.y1E4==0&&
+        viewport.width1E8==640&&viewport.height1EC==448;
+    if(full)return mode==0||hidden;
+    if(mode==1)return viewport.x1E0==0&&viewport.y1E4==224*int(view)&&
+        viewport.width1E8==640&&viewport.height1EC==224;
+    return mode==2&&viewport.x1E0==320*int(view)&&viewport.y1E4==0&&
+        viewport.width1E8==320&&viewport.height1EC==448;
+}
+
 // Actual1A939C..1A93B4:640,448,bits3FAAAAAB. Establishes genuine1F8 BEFORE
 // any intro composition. This projects the defined post2361C0 bounds/screen
 // fields, not its earlier1146B0/114A00 renderer calls. Platform drain/selection
@@ -302,7 +314,7 @@ OriginalCameraStartResult prepareOriginalRaceViewport2361C0(
 //1A9750(true) and ordinary8C=0 false. Epochs are the same scene-tick owner.
 OriginalCameraStartResult setOriginalFullRaceViewport1158A0(
     OriginalCameraViewportFields&,CameraSceneState49F&,OriginalCameraSceneTick&,
-    std::uint32_t actualRendererBufferCount0C) noexcept;
+    std::uint32_t actualRendererBufferCount0C,std::int32_t mode=0,unsigned view=0) noexcept;
 //2458C0(a2=0) post-drain numeric zoom writes, then236DD0 matrix/guard fields.
 // Renderer current scene0 must be passed separately: source2458C0 updates
 // that scene's zoom, which need not be the scene whose viewport was supplied.

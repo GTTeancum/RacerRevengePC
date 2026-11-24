@@ -23,7 +23,7 @@ public:
     OriginalHumanEngineResetOwner50LB& operator=(const OriginalHumanEngineResetOwner50LB&)=delete;
     bool bind(const OriginalAiEmitterIdentity& id) noexcept {
         if(bound_||!id.session||!id.racer||!id.mainBody||!id.emitterD40||
-           id.managerOrdinal!=0||!id.pod60)return false;
+           id.managerOrdinal>=2||!id.pod60)return false;
         identity_=id;bound_=true;return true;
     }
     bool bound()const noexcept{return bound_;}

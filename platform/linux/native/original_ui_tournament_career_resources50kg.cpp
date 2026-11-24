@@ -591,7 +591,7 @@ bool OriginalUiTournamentCareerResources50KG::acceptRiderConfirmCommit(
        !exactTournamentProposal(proposal,s->confirmBefore)||
        s->confirmBefore.career.stamp.generation==std::numeric_limits<std::uint64_t>::max())return reject();
     auto expected=s->confirmBefore;const auto selected=expected.career.career100C0;
-    expected.selection.remembered6FC=selected; //1EA54C
+    if(!game::dlc50DL::activeAddonCareer(selected))expected.selection.remembered6FC=selected; // stock selection at 1EA54C
     expected.packed1125D=static_cast<std::uint8_t>((expected.packed1125D&7u)|(selected<<3)); //1EA58C
     expected.comparison100C0=selected; //1EA5A8
     ++expected.career.stamp.generation;

@@ -81,6 +81,11 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(same(pass.microprogram,"ScreenObject")){assets::OriginalUiNativeMaterial50KG policy{};
         return assets::prepareOriginalUiNativeMaterial50KG(pass,*texture,policy,d.materialDetail)&&
             convertOriginalUiMaterialSpan50KG(policy,range,output);}
+    const bool packageMaterial=assets::originalUiAddonMemberArchive50DL(pass.identity)!=nullptr;
+    if(packageMaterial && pass.textureName.size()>5 && pass.textureName.compare(pass.textureName.size()-5,5,"_shdw")==0){
+        assets::OriginalUiRider19ShadowMaterial50KM policy{};
+        return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
+            convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
     if(same(pass.textureName,"02_shdw")||same(pass.textureName,"03_shdw")||same(pass.textureName,"04_shdw")||
        same(pass.textureName,"07_shdw")||same(pass.textureName,"10_shdw")||same(pass.textureName,"11_shdw")||
        same(pass.textureName,"12_shdw")||same(pass.textureName,"15_shdw")||
@@ -108,7 +113,8 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
             return assets::prepareOriginalUiTournamentPodWindowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
                 convertOriginalUiRiderWindowMaterialSpan50KM(policy,images,range,output);}
         assets::OriginalUiRider19BodyMaterial50KM policy{};
-        return assets::prepareOriginalUiTournamentPodBodyMaterial50KM(pass,images,index,policy,d.materialDetail)&&
+        const auto prepare=packageMaterial?assets::prepareOriginalUiRider19BodyMaterial50KM:assets::prepareOriginalUiTournamentPodBodyMaterial50KM;
+        return prepare(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19BodyMaterialSpan50KM(policy,images,range,output);
     }
     assets::OriginalUiLitMaterial50KM policy{};
@@ -195,7 +201,10 @@ struct OriginalUiTournamentDrawContribution50KG::Storage {
             b.image=map->combinedIndex;b.provenance=to;
         }else if(map||image!=unresolved)return fail(d,E::material);
         OriginalUiMaterialSpan50KG drawable;
-        if(!material(pass,*bank->images(),b.image,drawable,d))return fail(d,E::material);
+        if(!material(pass,*bank->images(),b.image,drawable,d)){
+            std::fprintf(stderr,"tournament_material name=%s pass=%u field=%s pc=%x\n",
+                name.c_str(),pass.pass,d.materialDetail.field.c_str(),d.materialDetail.sourcePC);
+            return fail(d,E::material);}
         b.resourceSampler=drawable.native.sampler;b.prototype=std::move(drawable);
         out.push_back(std::move(b));return true;
     }
@@ -847,12 +856,25 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
     if(!table.identity||!table.data||table.size!=70962)return fail(d,E::schedule);
     std::vector<std::uint32_t> ranks(input.size(),unresolved),sequence;sequence.reserve(input.size());
     std::size_t cursor=0;std::uint32_t ordinal=0;
+    // The career artwork replaces two Tournament page materials. Keep their
+    // original draw order while using the selected package's passes and pixels.
+    std::string portraitSlot,backgroundSlot;
+    const auto* careerMaterials=career&&career->addonCareer()?career->materials():nullptr;
+    if(careerMaterials){
+        if(!career->career()||careerMaterials->size()<=14)return fail(d,E::resource);
+        const auto index=career->career()->career100C0;
+        const auto prefix=std::string("ui/textures/")+(index<10?"0":"")+std::to_string(index);
+        portraitSlot=prefix+"_flrg";backgroundSlot=prefix+"_bkg";
+    }
     const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
     while(cursor<table.size){
         while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;
         if(cursor==table.size)break;
         const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
-        for(std::size_t i=0;i<input.size();++i){const auto& name=input[i].registeredName;
+        for(std::size_t i=0;i<input.size();++i){
+            const auto& binding=input[i];
+            const auto& name=careerMaterials&&binding.pass==&(*careerMaterials)[13].source.passes[0]?portraitSlot:
+                careerMaterials&&binding.pass==&(*careerMaterials)[14].source.passes[0]?backgroundSlot:binding.registeredName;
             if(input[i].addon)continue; // DLC career add-on model pass: port-owned rank below
             if(name.size()!=cursor-start)continue;std::size_t j=0;
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(table.data[start+j]));++j){}
@@ -873,28 +895,14 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
         ++ordinal;
     }
     if(ordinal!=3235)return fail(d,E::schedule);
-    // PORT EXTENSION (DLC career): the add-on career's own portrait and
-    // background (career materials 13/14 when the career resources carry an
-    // add-on archive) are not APPSTART Mat_Stbl.txt rows: they take port-owned
-    // ranks after the 3235 stock ranks. A stock name in that place (a package
-    // name colliding with a stock row) is refused, for that add-on career only.
-    // Without add-on art nothing here changes.
-    if(career&&career->bankInput()&&!career->bankInput()->addonArchives.empty()&&career->materials()&&career->materials()->size()>14){
-        const std::string addonNames[2]{(*career->materials())[13].registeredName,(*career->materials())[14].registeredName};
-        for(std::size_t i=0;i<input.size();++i)for(std::uint32_t k=0;k<2;++k){
-            if(!same(input[i].registeredName,addonNames[k].c_str()))continue;
-            if(ranks[i]!=unresolved||input[i].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule,0x298C80);
-            ranks[i]=ordinal+k;
-        }
-    }
     // DLC career add-on model passes: one port-owned rank per registered name,
-    // after the stock ranks and the two career-art ranks.
+    // after the stock registrations.
     {std::vector<std::string> names;
      for(std::size_t i=0;i<input.size();++i){if(!input[i].addon)continue;
         if(input[i].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule,0x298C80);
         std::size_t k=0;for(;k<names.size();++k)if(names[k]==input[i].registeredName)break;
         if(k==names.size())names.push_back(input[i].registeredName);
-        ranks[i]=ordinal+2u+static_cast<std::uint32_t>(k);}}
+        ranks[i]=ordinal+static_cast<std::uint32_t>(k);}}
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
         if(input[i].kind==RegistrationKind::ledgerDynamic&&
@@ -902,7 +910,17 @@ bool OriginalUiTournamentDrawContribution50KG::Storage::schedule(std::vector<Bin
         for(std::size_t j=0;j<i;++j)if(ranks[j]==ranks[i]&&input[j].kind!=input[i].kind)return fail(d,E::schedule,0x14D370);
         if(input[i].sourceRegistered)sequence.push_back(static_cast<std::uint32_t>(i));
     }
+    // Package registrations retain their own identities. Submit their geometry in
+    // the pod pass of the Tournament screen, before the foreground UI writes depth.
+    std::uint32_t podOrder=unresolved;
+    for(std::size_t i=0;i<input.size();++i)
+        if(input[i].kind==RegistrationKind::ledgerDynamic&&same(input[i].registeredName,"ui/textures/binder")){
+            podOrder=ranks[i];break;
+        }
     std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
+        const auto orderA=input[a].addon?podOrder:ranks[a],orderB=input[b].addon?podOrder:ranks[b];
+        if(orderA!=orderB)return orderA<orderB;
+        if(input[a].addon!=input[b].addon)return input[a].addon;
         if(ranks[a]!=ranks[b])return ranks[a]<ranks[b];
         if(input[a].pass->pass!=input[b].pass->pass)return input[a].pass->pass<input[b].pass->pass;
         return a<b;

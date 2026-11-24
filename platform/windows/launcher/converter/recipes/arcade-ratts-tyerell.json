@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-ratts-tyerell",
+    "name": "Ratts Tyerell (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Ratts Tyerell from Star Wars Racer Arcade, as an add-on pod (stem a2r_rat, 9 wreck pieces). Borrowed from stock pod 17 until own data exists: stats, pilot voice, camera presets, material set-ups, a few stock model members, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_RAT": "RATTS TYERELL"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-rat",
+        "stem": "a2r_rat",
+        "archive": "PODS/A2R_RAT/A2R_RAT.RES",
+        "camera": "PODS/A2R_RAT/A2R_RAT.CAM",
+        "name_key": "RIDER_A2R_RAT",
+        "ui": {
+          "archive": "UI/A2R_RAT_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_rat.psg",
+          "character": [
+            "ui\\anim\\a2r_ratc.psg",
+            "ui\\anim\\a2r_ratc.mcf",
+            "ui\\anim\\a2r_ratc.vut",
+            "ui\\anim\\a2r_ratc_ent.mot",
+            "ui\\anim\\a2r_ratc_idl1.mot",
+            "ui\\anim\\a2r_ratc_idl2.mot",
+            "ui\\anim\\a2r_ratc_idl3.mot",
+            "ui\\anim\\a2r_ratc_breathe.mot",
+            "ui\\anim\\a2r_ratc_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_ratc_1.pst",
+            "ui\\textures\\a2r_ratc_1.psm",
+            "ui\\textures\\a2r_ratc_2.pst",
+            "ui\\textures\\a2r_ratc_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_rat_1.pst",
+            "UI\\Textures\\a2r_rat_2.pst",
+            "UI\\Textures\\a2r_rat_3.pst",
+            "ui\\textures\\a2r_rat_1.psm",
+            "ui\\textures\\a2r_rat_2.psm",
+            "ui\\textures\\a2r_rat_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_rat_shdw.pst",
+            "ui\\textures\\a2r_rat_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_rat_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_rat_bkg.pst",
+            "ui\\textures\\a2r_rat_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_rat_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_rate.psg",
+            "ui\\textures\\a2r_rate_1.pst",
+            "ui\\textures\\a2r_rate_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "layout_slot": "17"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_RAT/A2R_RAT.RES",
+        "bytes": 301729,
+        "sha256": "1d3000612d8dd9afd31afc826784371f92050eac5f89695b573533bb218f696b",
+        "role": "pod archive (members named by the stem: pods\\a2r_rat\\..., textures\\a2r_rat_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_RAT/A2R_RAT.CAM",
+        "bytes": 5786,
+        "sha256": "bcf5d45b8d60cc0d07aeff7c2069730c4922160046c062a7b45d829edfd3e5b6",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_RAT_UI.RES",
+        "bytes": 304726,
+        "sha256": "51dafe28b8d81bc5e32c26e2b129681d2ae1f547ee013913189daab318433a7e",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

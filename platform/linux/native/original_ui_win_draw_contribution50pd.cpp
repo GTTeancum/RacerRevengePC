@@ -43,6 +43,7 @@ struct OriginalUiWinDrawContribution50PD::Storage {
                 return fail(d,Error::material,keyDetail.sourcePC?keyDetail.sourcePC:detail.sourcePC);
             sequence.push_back(static_cast<std::uint32_t>(i));}
         std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
+            if(bindings[a].drawRank!=bindings[b].drawRank)return bindings[a].drawRank<bindings[b].drawRank;
             return bindings[a].registryToken!=bindings[b].registryToken?bindings[a].registryToken<bindings[b].registryToken:bindings[a].pass().pass<bindings[b].pass().pass;});
         struct Group{std::uint32_t binding=0,redirect=unresolved,limit=unresolved;};std::vector<Group> groups;
         std::uint32_t previous=unresolved;

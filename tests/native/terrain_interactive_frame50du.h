@@ -14,6 +14,8 @@
 #include <functional>
 
 namespace rr::game { class OriginalRaceHud50KG; }
+// Split screen: human 1 input stack (original_second_human_input50sv.h).
+struct SecondHumanInput50SV;
 namespace interactive_frame50DU {
 struct NativeCalls;
 // Borrowed view of the original runSession stack only. All owner, scalar,
@@ -239,6 +241,7 @@ struct Context final {
     effectOwnerIndexType& effectOwnerIndex;
     using playerRacer60Type = const std::uint32_t;
     playerRacer60Type& playerRacer60;
+    const std::array<std::uint32_t,8>& rosterRacer60;
     using effectsWorkspaceType = rr::game::ImpactEffectsWorkspace50B;
     effectsWorkspaceType& effectsWorkspace;
     using generatedEffectsType = rr::game::ImpactEffectEvent50B[rr::game::maxImpactEffectEvents50B];
@@ -471,6 +474,8 @@ struct Context final {
     BorrowedCall<void()> fulfillDynamicMusic;
     using racerBankType = native_racer50HN::Bank;
     racerBankType& racerBank;
+    // Split screen: human 1's input stack (roster slot 1), null otherwise.
+    SecondHumanInput50SV* secondHumanInput50SV=nullptr;
     bool advance(std::size_t actualRacerSlot,Part part,
         float preparedOuterFactor,float liveSubstepScale);
 private:

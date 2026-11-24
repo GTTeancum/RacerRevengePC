@@ -654,6 +654,7 @@ public:
     bool paused()const noexcept{return paused_;}
     bool closed()const noexcept{return closed_;}
     rr::game::OriginalHumanEngineResetOwner50LB& humanController() noexcept{return humanController_;}
+    rr::game::OriginalHumanEngineResetOwner50LB& secondHumanController() noexcept{return secondHumanController_;}
     bool boostPitch()const noexcept{return humanController_.boost.pitchBoost();}
     const rr::game::PodWarningState50HE& warningState()const noexcept{return humanController_.warning;}
     const rr::assets::AudioBank50HC& bank()const noexcept{return bank_;}
@@ -746,7 +747,7 @@ private:
     selected_player_audio50IJ::Authoring selected_{};
     pod_audio50HE::Owner lap_{};
     rr::platform::AudioOutput50HD output_{};
-    rr::game::OriginalHumanEngineResetOwner50LB humanController_{};
+    rr::game::OriginalHumanEngineResetOwner50LB humanController_{},secondHumanController_{};
     Counters counters_{};
     bool prepareAttempted_=false,prepared_=false,outputOpen_=false,paused_=false,closed_=false;
 };

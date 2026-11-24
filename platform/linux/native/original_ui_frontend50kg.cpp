@@ -459,7 +459,6 @@ struct OriginalUiFrontend50KG::Storage {
                 const auto s=course->snapshot();return s.bound&&!s.faulted&&!s.quitRequested&&publishedCourseBank&&
                     courseResources->loaded()&&courseHolograms->loaded()&&course->externalLifecycleOwner()==transition.get()&&
                     course->ownsPreparedPage(1)&&course->canEnterMode(course->intendedMode())&&
-                    (course->intendedMode()==0||course->intendedMode()==2)&&
                     courseResources->exitText()&&courseResources->exitText()->prepared();
             }
             if(same(initialRoute,{9,1})&&tournament&&tournamentResources&&tournamentWidgets&&!main&&!options&&!hall&&!rider&&!course){
@@ -654,8 +653,8 @@ struct OriginalUiFrontend50KG::Storage {
             cold.audioMode!=OriginalUiMainAudioMode50KG::enabled||!cold.audio||!cold.audio->courseMenuReady())||
            !archive(cold.course,Id::course)||!archive(cold.backgrounds,Id::backgrounds)||!cold.riderProfile||
            !cold.riderProfile->initialized()||cold.riderProfile->commonProfile()!=cold.profile.get()||
-           !cold.profile||!cold.profile->known||cold.profile->mode34!=mode||(mode!=0&&mode!=2)||
-           (cold.profile->playerBits1125C&0x60)!=0x20)return false;
+           !cold.profile||!cold.profile->known||cold.profile->mode34!=mode||mode>2||
+           (cold.profile->playerBits1125C&0x60)!=(mode==1?0x40:0x20))return false;
         game::OriginalUiCourseRememberedProfile50KG p;
         if(mode==2){
             // Native capability envelope only, not an original unlock rule.
@@ -670,10 +669,10 @@ struct OriginalUiFrontend50KG::Storage {
                 std::all_of(career.medals1938.begin(),career.medals1938.end(),[](auto value){return value<=8;})&&
                 p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
         }
-        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&
+        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==mode&&
             (p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
-            p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&
-            p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8&&(!p.cardFlag100BC||p.nativeBetaStorage)&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
+            ((mode==1)?(p.course710>=1&&p.course710<=13&&p.laps718>=1&&p.laps718<=25&&p.entrants714>=2&&p.entrants714<=8):
+            (p.course700>=1&&p.course700<=13&&p.subtype70C>=1&&p.subtype70C<=3&&p.laps704>=1&&p.laps704<=25&&p.entrants708>=1&&p.entrants708<=8))&&(!p.cardFlag100BC||p.nativeBetaStorage)&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
     bool tournamentInputsReady(std::uint32_t selected) const noexcept {
@@ -776,6 +775,12 @@ struct OriginalUiFrontend50KG::Storage {
                     r.targetScreen==10&&r.targetPage==1&&m.ownsRoute({10,1})&&
                     &screen==game::findOriginalUiScreenFactory50KG(10)&&&page==game::findOriginalUiBoundedPageFactory50KG(10,1);
             }
+            if(m.rider){
+                const auto& r=s.riderProposal.decision.request;
+                return !s.pending&&s.cold.profile->mode34==1&&r.kind==game::OriginalUiRouteKind50KG::changePage&&
+                    same(m.currentRoute(),{r.sourceScreen,r.sourcePage})&&m.ownsRoute({r.targetScreen,r.targetPage})&&
+                    &screen==game::findOriginalUiScreenFactory50KG(5)&&&page==game::findOriginalUiBoundedPageFactory50KG(5,r.targetPage);
+            }
             if(!m.options||s.pending||!optionsPageShape(s.optionsProposal.decision))return false;
             const auto& r=s.optionsProposal.decision.request;
             return same(m.currentRoute(),{r.sourceScreen,r.sourcePage})&&m.ownsRoute({r.targetScreen,r.targetPage})&&
@@ -865,16 +870,17 @@ struct OriginalUiFrontend50KG::Storage {
         // Original control data and retained profile determine identities. Native
         // mode/resource capability is checked separately, never as an unlock.
         const bool tournament=c.mode34==2;
-        const auto subtype=tournament?1u:c.subtypeSlot14F4;
+        const bool versus=c.mode34==1;
+        const auto subtype=tournament||versus?1u:c.subtypeSlot14F4;
         const auto laps=tournament?3u:c.laps14EC;
         // Only subtype2 consumes the remembered entrant selector. Other
         // source types retain that menu preference but construct eight racers.
-        const auto entrants=!tournament&&subtype==2?c.entrants14F0:8u;
+        const auto entrants=versus||(!tournament&&subtype==2)?c.entrants14F0:8u;
         selection={c.selectedControlWord44,actual.selectedPlanet40,rider.rider,subtype,
-            laps,entrants,game::originalCourseLaunchPackedMode050KG(
-                c.packed1125C,subtype,laps,entrants),c.mode34};
+            laps,entrants,game::originalCourseLaunchPacked50KG(
+                c.packed1125C,subtype,laps,entrants,versus),c.mode34};
         if(!game::originalCourseSelectionEncoding50KG(selection))return reject(A::invalidSelection);
-        if((c.mode34!=0&&!tournament)||!game::nativeSingleHumanCourseMode50KG(selection))return reject(A::unsupportedNativeMode);
+        if(!game::nativeCourseMode50KG(selection))return reject(A::unsupportedNativeMode);
         const auto availability=cold.courseRaceDestination->availability(selection);
         if(reason)*reason=availability;
         return availability==A::ready;
@@ -1000,14 +1006,16 @@ struct OriginalUiFrontend50KG::Storage {
                    decision.inputPC!=0x1DEB90||decision.profileChanges.count)return false;
                 return s.pending->tournament->acceptEntryProfileCommit(s.courseProposal);
             }
-            if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady()||!s.riderInputsReady()||
-               !m.course->routeProposalCurrent(s.courseProposal)||!s.destination({5,1})||!s.pending->rider||
-               !s.pending->rider->canEnterMode(0)||s.pending->rider->intendedMode()!=0||
+            const auto mode=m.course->intendedMode();
+            const std::uint8_t page=mode==1?2:1;
+            if(mode>1||s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady(mode)||!s.riderInputsReady()||
+               !m.course->routeProposalCurrent(s.courseProposal)||!s.destination({5,page})||!s.pending->rider||
+               !s.pending->rider->canEnterMode(mode)||s.pending->rider->intendedMode()!=mode||
                !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
                proposed.admitted||proposed.action!=game::OriginalUiRouteAction50KG::unavailable||
                proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
                !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=6||decision.request.sourcePage!=1||
-               decision.request.targetScreen!=5||decision.request.targetPage!=1||decision.profileChanges.count!=4)return false;
+               decision.request.targetScreen!=5||decision.request.targetPage!=page||decision.profileChanges.count!=(mode==1?3u:4u))return false;
             game::OriginalUiCourseContext50KG context;
             const auto* demand=s.pending->rider->residencyDemand();
             if(!demand||!s.pending->rider->residencyProposalCurrent(*demand))return false;
@@ -1023,8 +1031,14 @@ struct OriginalUiFrontend50KG::Storage {
                !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
                proposed.admitted||proposed.action!=game::OriginalUiRouteAction50KG::unavailable||
                proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
-               !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=5||decision.request.sourcePage!=1||
-               decision.request.targetPage!=1)return false;
+               !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=5||
+               !same(m.currentRoute(),{5,decision.request.sourcePage}))return false;
+            if(decision.request.kind==game::OriginalUiRouteKind50KG::changePage){
+                if(s.pending||s.cold.profile->mode34!=1||decision.request.targetScreen!=5||!m.ownsRoute({5,decision.request.targetPage}))return false;
+                if(decision.request.sourcePC==0x1EADC0)return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
+                return decision.request.sourcePC==0x1EA630&&s.cold.riderProfile->commitRiderConfirmToCourse(decision,s.riderProposal.profileStamp);
+            }
+            if(decision.request.targetPage!=1)return false;
             if(decision.request.targetScreen==4&&s.destination({4,1}))
                 return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
             if(decision.request.targetScreen==9){
@@ -1035,9 +1049,9 @@ struct OriginalUiFrontend50KG::Storage {
                 return s.cold.riderProfile->commitRiderConfirmToTournament(decision,s.riderProposal.profileStamp)&&
                     s.pending->tournament->acceptEntryProfileCommit(s.riderProposal);
             }
-            if(decision.request.targetScreen!=6||!s.courseInputsReady()||!s.destination({6,1})||!s.pending->course||
-               !s.pending->course->canEnterMode(0)||!riderCanConfirm(*s.cold.riderProfile,decision.selectedRider)||decision.profileChanges.count!=3||
-               decision.request.sourcePC!=0x1EA604)return false;
+            if(decision.request.targetScreen!=6||!s.courseInputsReady(s.cold.profile->mode34)||!s.destination({6,1})||!s.pending->course||
+               !s.pending->course->canEnterMode(s.cold.profile->mode34)||!riderCanConfirm(*s.cold.riderProfile,decision.selectedRider)||
+               decision.request.sourcePC!=(s.cold.profile->mode34==1?0x1EAD60u:0x1EA604u))return false;
             return s.cold.riderProfile->commitRiderConfirmToCourse(decision,s.riderProposal.profileStamp);
         }
         // Exact private typed proposal was revalidated after destination admission.
@@ -1174,7 +1188,7 @@ struct OriginalUiFrontend50KG::Storage {
                 m.hallResources=std::make_shared<OriginalUiHallDrawResources50KG>();
                 if(!m.hallResources->load(input,d.hallResources)){result(d,Status::resource);return false;}
                 samplers=m.hallResources->samplers();
-            }else if(same(route,{5,1})){
+            }else if(same(route,{5,1})||(prospectiveMode==1&&same(route,{5,2}))){
                 if(!riderInputsReady()||prospectiveMode>2){result(d,Status::unavailableDestination);return false;}
                 OriginalUiRiderColdInput50KG input;input.appStart=cold.appStart;input.rider=cold.rider;input.fonts=cold.fonts;
                 input.backgrounds=cold.backgrounds;input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
@@ -1198,7 +1212,7 @@ struct OriginalUiFrontend50KG::Storage {
                 session.english=&english;session.profile=cold.riderProfile;session.commonProfile=cold.profile;session.application=cold.application;
                 session.lightManager=cold.lightManager;session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;
                 const bool fromCourse=active&&active->course&&same(active->currentRoute(),{6,1});
-                if(fromCourse&&(!courseInputsReady()||prospectiveMode!=0)){result(d,Status::unavailableDestination);return false;}
+                if(fromCourse&&(prospectiveMode>1||!courseInputsReady(prospectiveMode)||active->course->intendedMode()!=prospectiveMode)){result(d,Status::unavailableDestination);return false;}
                 const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1});
                 if(fromTournament){
                     if(prospectiveMode!=2||!active->tournament->routeProposalCurrent(tournamentProposal)){result(d,Status::unavailableDestination);return false;}
@@ -1216,7 +1230,7 @@ struct OriginalUiFrontend50KG::Storage {
                 samplers=m.rider->samplers();
                 m.publishedRiderBank=m.rider->bank();
             }else if(same(route,{6,1})){
-                const bool fromRider=active&&active->rider&&same(active->currentRoute(),{5,1})&&prospectiveMode==0;
+                const bool fromRider=active&&active->rider&&((same(active->currentRoute(),{5,1})&&prospectiveMode==0)||(same(active->currentRoute(),{5,2})&&prospectiveMode==1));
                 const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1})&&prospectiveMode==2&&
                     active->tournament->routeProposalCurrent(tournamentProposal)&&tournamentProposal.decision.request.targetScreen==6;
                 const bool fromPause=initialNativePauseCourse&&prospectiveMode==0;
@@ -1913,11 +1927,9 @@ bool OriginalUiFrontend50KG::prepareGarageSourceImages12CEA0(
         session.managerArchiveOnlyScope170_;
     if(!selected&&!garage)return reject(assets::OriginalStandardMaterialStatus50LA::phase,
         0x12CEA0,"actual selected/base source bank predecessor required");
-    // PORT EXTENSION (DLC career): a package archive (identity addonUi) has no
-    // authenticated static IPUM sources; its PSTs are decoded by the resolver.
-    if(selected&&archive->addon()){out=s->cold.riderIpumCache;return true;}
     assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
-    if(!s->cold.riderIpumCache->appendGarageArchive12CEA0(archive,cacheDiagnostic)){
+    if((selected&&archive->addon()&&!s->cold.riderIpumCache->appendGarageArchive12CEA0(session.sceneAssets_->archive(),cacheDiagnostic))||
+       !s->cold.riderIpumCache->appendGarageArchive12CEA0(archive,cacheDiagnostic)){
         d.slot=cacheDiagnostic.mip;
         d.texture.status=assets::OriginalStandardTextureStatus50LA::source;
         d.texture.sourcePC=0x24F178;
@@ -2482,15 +2494,23 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         if(status==RiderStatus::backProposed||status==RiderStatus::confirmProposed){
             const bool confirm=status==RiderStatus::confirmProposed;
             s->riderProposal=receipt.rider.routeProposal;const auto& proposal=s->riderProposal.decision;
+            const auto& request=proposal.request;
+            const auto mode=s->cold.profile->mode34;
+            const bool pageChange=request.kind==game::OriginalUiRouteKind50KG::changePage;
+            const Route target{request.targetScreen,request.targetPage};
             if(s->pending||!s->active->rider->routeProposalCurrent(s->riderProposal)||
-               proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=5||
-               proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?(s->cold.profile->mode34==2?9:6):4)||proposal.request.targetPage!=1)
-                return s->fault(d,Status::transition);
-            const bool tournament=confirm&&s->cold.profile->mode34==2;
-            if(confirm&&(!(tournament?s->tournamentInputsReady(proposal.selectedRider):s->courseInputsReady())||
-               !riderCanConfirm(*s->cold.riderProfile,proposal.selectedRider)||proposal.profileChanges.count!=3||
-               proposal.request.sourcePC!=(tournament?0x1EA5E4u:0x1EA604u)))return result(d,receipt.status=Status::unavailableDestination);
-            if(!s->prepareDestination({proposal.request.targetScreen,1},receipt,d,tournament?2:0))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+               !same(s->active->currentRoute(),{5,request.sourcePage})||request.sourceScreen!=5)return s->fault(d,Status::transition);
+            if(pageChange){
+                if(mode!=1||!s->active->ownsRoute(target)||!(confirm?same(target,{5,2}):same(target,{5,1})))
+                    return result(d,receipt.status=Status::unavailableDestination);
+            }else{
+                const bool tournament=confirm&&mode==2;
+                if(request.kind!=game::OriginalUiRouteKind50KG::changeScreen||!same(target,{static_cast<std::uint8_t>(confirm?(tournament?9:6):4),1}))
+                    return s->fault(d,Status::transition);
+                if(confirm&&(!(tournament?s->tournamentInputsReady(proposal.selectedRider):s->courseInputsReady(mode))||
+                    !riderCanConfirm(*s->cold.riderProfile,proposal.selectedRider)))return result(d,receipt.status=Status::unavailableDestination);
+                if(!s->prepareDestination(target,receipt,d,mode))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            }
             if(!s->active->rider->routeProposalCurrent(s->riderProposal))return s->fault(d,Status::transition);
             auto admitted=proposal;
             if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
@@ -2581,15 +2601,17 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                 return s->fault(d,Status::transition,0x1DED58);
         }else if(status==CourseStatus::backProposed){
             s->courseProposal=receipt.course.routeProposal;const auto& proposal=s->courseProposal.decision;
-            const bool toTournament=s->active->course->intendedMode()==2;
+            const auto mode=s->active->course->intendedMode();
+            const bool toTournament=mode==2;
+            const std::uint8_t page=mode==1?2:1;
             const std::uint8_t target=toTournament?9:5;
             if(s->pending||!s->active->course->routeProposalCurrent(s->courseProposal)||
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=6||
-               proposal.request.sourcePage!=1||proposal.request.targetScreen!=target||proposal.request.targetPage!=1||
-               proposal.profileChanges.count!=(toTournament?0u:4u)||(toTournament&&proposal.request.sourcePC!=0x1DF0B4))return s->fault(d,Status::transition);
-            if(!s->courseInputsReady(toTournament?2:0)||!s->riderInputsReady()||!s->renderer->originalUiSourceRgbaAvailable())
+               proposal.request.sourcePage!=1||proposal.request.targetScreen!=target||proposal.request.targetPage!=page||
+               proposal.profileChanges.count!=(toTournament?0u:mode==1?3u:4u)||(toTournament&&proposal.request.sourcePC!=0x1DF0B4))return s->fault(d,Status::transition);
+            if(!s->courseInputsReady(mode)||!s->riderInputsReady()||!s->renderer->originalUiSourceRgbaAvailable())
                 return result(d,receipt.status=Status::unavailableDestination);
-            if(!s->prepareDestination({target,1},receipt,d,toTournament?2:0))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            if(!s->prepareDestination({target,page},receipt,d,mode))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->course->routeProposalCurrent(s->courseProposal))return s->fault(d,Status::transition);
             auto admitted=proposal;
             if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
@@ -2657,6 +2679,8 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         m.options->prepareUpdateAudio(input,d.options)==OptionsStatus::ok:m.hall?m.hall->prepareUpdateAudio(input,d.hall)==HallStatus::ok:m.rider?m.rider->prepareUpdateAudio(input,d.rider)==RiderStatus::ok:
         m.course?m.course->prepareUpdateAudio(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->prepareUpdateAudio(input,d.tournament)==TournamentStatus::ok;
     if(!prepared)return s->fault(d,Status::session,0x234440);
+    if(m.rider&&m.transition->snapshot().lifecycle==Life::selectRequestedPage&&
+       m.rider->retirePageSubmission(*s->renderer,d.renderer,d.rider)!=RiderStatus::ok)return s->fault(d,Status::renderer);
     d.transition=m.transition->tick();
     if(s->faulted)return s->fault(d,Status::session);
     if(d.transition!=Transition::ok&&d.transition!=Transition::noChange&&d.transition!=Transition::pending&&d.transition!=Transition::queued)

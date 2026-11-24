@@ -312,7 +312,7 @@ class OriginalRaceConstructor50LA final {
     std::uint32_t field30_=0,field44_=0,field58_=0,field6C_=0,field70_=0;
     std::uint32_t field8C_=0,field90_=0,field9C_=0,fieldA0_=0,fieldA4_=0,fieldA8_=0;
     // Actual first source Camera34, not a guest integer or a second Session.
-    std::shared_ptr<OriginalFrontendCameraCold50LA> camera34_;
+    std::shared_ptr<OriginalFrontendCameraCold50LA> camera34_,camera38_;
     std::array<std::uint32_t,3> fields38_{}; //Other constructor-null view slots.
     std::array<std::uint32_t,4> fields48_{};
     enum class CameraInitStep:std::uint8_t {unreached,pause,construct,viewportPrefix,
@@ -390,6 +390,7 @@ class OriginalRaceConstructor50LA final {
     common_track50CR::Code launchCourse_{};
     // Actual1A95DC slot48 camera controller (174A30) of the one World.
     OriginalWreckComponent50LA* nativeController48_=nullptr;
+    OriginalWreckComponent50LA* nativeController4C_=nullptr;
     // Native resumable position in THIS World constructor suffix, not source
     // finish/phase authority. Unreached until actual World74 publication.
     // Reset/default-low2 stores cannot replay after a later native rejection.
@@ -426,6 +427,7 @@ class OriginalRaceConstructor50LA final {
     //17D6A0 completion. Records only reached custody for exact partial unwind.
     enum class NativeHumanRootStep:std::uint8_t {unreached,appending,published,detached};
     NativeHumanRootStep nativeHumanRootStep_=NativeHumanRootStep::unreached;
+    bool disableResultsCamera1ABA24(std::int32_t view)noexcept;
     bool attachNativeHumanResultsRoot50LA()noexcept;
     bool detachNativeHumanResultsRoot50LA(const char*&)noexcept;
     bool canRetainPause100()const noexcept;
@@ -493,16 +495,18 @@ class OriginalRaceConstructor50LA final {
             !resourcesAttempted_&&!raceGroupsAttempted_&&
             !application_->attachmentLock423F58()&&application_->entityAuthority_.canRetire(entity_);
     }
-    bool detachedPrefix()const noexcept {
+    bool detachedPrefix(bool retiring=false)const noexcept {
         return counted_&&!rolledBack_&&application_&&entity_.reference00==1&&
             entity_.kind==OriginalWreckComponentKind50LA::entity141300&&
             entity_.objectKey==std::uint64_t(reinterpret_cast<std::uintptr_t>(&entity_))&&
             entity_.sessionGeneration&&!entity_.previous10&&!entity_.next14&&!entity_.parent1C&&
             !entity_.firstChild18&&entity_.mask20==(nativeRootMaskReached_?0xffffffffu:0u)&&
             entity_.descendants24==((constructorSuffix_&&!raceMaskRecomputed_)?0xffffffffu:0u)&&
-            entity_.category28==0xffu&&(entity_.flags29&15u)==3u;
+            entity_.category28==0xffu&&(entity_.flags29&(retiring?11u:15u))==3u;
     }
 public:
+    void armIntroExitFade()noexcept {flags1B0KnownValue_|=8u;}
+    ::original_camera_session50KX::Result advanceStartFade1A7BD0(::original_camera_session50KX::Session&);
     OriginalRaceConstructor50LA(const OriginalRaceConstructor50LA&)=delete;
     OriginalRaceConstructor50LA& operator=(const OriginalRaceConstructor50LA&)=delete;
     ~OriginalRaceConstructor50LA()noexcept {if(counted_&&!rolledBack_)std::terminate();}
@@ -544,26 +548,30 @@ public:
     }
     // Actual1A95DC slot48 publication. This is a pointer store, NOT141960:
     // the inspected original caller/174DF0 path does not attach a parent edge.
-    bool retainNativeIntroControllerSlot48(OriginalWreckComponent50LA& controller)noexcept {
-        if(!nativeIntroRaceEntity()||nativeController48_||!application_||
+    bool retainNativeIntroControllerSlot48(OriginalWreckComponent50LA& controller,unsigned view=0)noexcept {
+        if(view>1||(view==1&&(!camera38_||!nativeController48_||nativeController48_==&controller)))return false;
+        auto& slot=view?nativeController4C_:nativeController48_;
+        if(!nativeIntroRaceEntity()||slot||!application_||
            application_->attachmentLock423F58()||controller.kind!=OriginalWreckComponentKind50LA::cameraController174A30||
            controller.reference00!=1||controller.sessionGeneration!=entity_.sessionGeneration||
            controller.parent1C||controller.previous10||controller.next14||controller.mask20||
            !application_->entityAuthority_.canRetire(controller))return false;
-        nativeController48_=&controller;return true;
+        slot=&controller;return true;
     }
-    bool clearNativeIntroControllerSlot48(const OriginalWreckComponent50LA& controller)noexcept {
-        if(!nativeController48_)return true;
-        if(nativeController48_!=&controller||!application_||application_->attachmentLock423F58()||
+    bool clearNativeIntroControllerSlot48(const OriginalWreckComponent50LA& controller,unsigned view=0)noexcept {
+        if(view>1)return false;
+        auto& slot=view?nativeController4C_:nativeController48_;
+        if(!slot)return true;
+        if(slot!=&controller||!application_||application_->attachmentLock423F58()||
            controller.sessionGeneration!=entity_.sessionGeneration||
            !application_->entityAuthority_.canRetire(controller))return false;
-        nativeController48_=nullptr;return true;
+        slot=nullptr;return true;
     }
     // Reverse native construction-failure cleanup. If world construction has
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(world74_||nativeController48_)return false;
+        if(world74_||nativeController4C_||nativeController48_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -604,7 +612,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(sourcePlayerMusicBorrows_||camera34_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||nativeController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(sourcePlayerMusicBorrows_||camera34_||camera38_||cameraNativeAdapter34_||!endHud_.expired()||pause100_||results104_||f8Owner_||f8Attached_||vcr78Owner_||vcr78Source_||music10C_||timingB4_||racerB0_||mapB8_||nativeRootAttached_||world74_||nativeController4C_||nativeController48_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix(true)||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;

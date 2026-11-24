@@ -17,6 +17,7 @@
 #include "../../src/game/track_zone_visibility50zv.h"
 // Common rewrite (R2): the one track, its one navigation view and the one race World.
 #include "common_track50cr.h"
+#include "../../src/game/original_race_fog_far50nf.h"
 #include "common_race_world50cr.h"
 namespace original_subtype3_record { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
@@ -97,6 +98,8 @@ struct AuthoredInputs {
     const std::uint8_t* tob=nullptr;std::size_t tobBytes=0;
     // The course's upper-case code (data): names its cut/intro rows and TOB.
     common_track50CR::Code code{};
+    const std::uint8_t* secondCam=nullptr;std::size_t secondCamBytes=0;
+    const char* secondPhy=nullptr;std::size_t secondPhyBytes=0;std::uint64_t secondPhyIdentity=0;
 };
 // These are genuine external application/display inputs. Keep one instance
 // for the application's display lifetime, and borrow it here. The explicitly
@@ -610,7 +613,7 @@ class Session final {
     bool zeroCutController_=false;
     std::array<TrackIntroLine50HG,7> taLines_{};
     std::size_t taLineCount_=0; // Actual script span, not storage capacity.
-    OriginalRaceCameraOwner controller_;
+    OriginalRaceCameraOwner controller_,secondController_;
     // ONE noncopyable Entity counterpart for this existing copyable numeric
     // payload. No second controller, borrowed parent, or additional authority.
     struct ColdController174A30 {
@@ -638,9 +641,12 @@ class Session final {
         // are never filled from safe native backing.
         std::uint32_t word60Value=0,word60Known=0;
         std::uint16_t halfA8Value=0,halfA8Known=0;
-    } coldController_;
+    } coldController_,secondColdController_;
     OriginalFollowCamera follow_;
-    OriginalAttachedCamera attached_;
+    OriginalAttachedCamera attached_,secondAttached_;
+    OriginalFollowCamera secondFollow_;
+    std::array<OriginalFollowPreset,32> secondPresets_{};
+    OriginalFollowPresetBank secondPresetBank_;
     OriginalDeathCamera50KG death_;
     OriginalDeathCameraGlobals50KG deathGlobals_;
     OriginalRetirementCameraCursor50KG retirementCursor_;
@@ -648,37 +654,38 @@ class Session final {
     OriginalRaceStartCamera start_;
     std::array<OriginalFollowPreset,32> presets_{};
     OriginalFollowPresetBank presetBank_;
-    OriginalAttachedOffset attachedOffset_;
+    OriginalAttachedOffset attachedOffset_,secondAttachedOffset_;
     OriginalCourseStartActions startActions_;
     OriginalCameraStartPrelude startPrelude_;
     RaceStartPreparationReceipt preparation_;
     std::array<std::uint32_t,16> seedSamples_{};std::size_t seedCount_=0;
-    OriginalCameraChildRegistry collection_;
+    OriginalCameraChildRegistry collection_,secondCollection_;
     std::array<std::uint64_t,12> childOrder_{}; // Three fixed children, up to seven authored cuts, actual7C, TV78.
     OriginalStartChildBinding introChild_;
     OriginalAttachedChildRegistry attachedChild_;
     OriginalFollowChildRegistry followChild_;
     OriginalDeathChildRegistry50KG deathChild_;
     OriginalCameraObjectChildHeads objectChildren_;
-    OriginalCameraControllerEntityFields controllerEntity_;
-    OriginalCameraSceneOwner spatial_;
-    OriginalSelectedCameraVisibilityBacking visibilityBacking_;
-    OriginalSelectedCameraVisibilityKeys visibilityKeys_;
-    OriginalFollowSceneBinding sceneBinding_;
-    CameraSceneState49F scene_;
-    OriginalCameraSceneTick tick_;
-    OriginalCameraViewportFields viewport_;
+    OriginalCameraControllerEntityFields controllerEntity_,secondControllerEntity_;
+    OriginalCameraSceneOwner spatial_,secondSpatial_;
+    OriginalSelectedCameraVisibilityBacking visibilityBacking_,secondVisibilityBacking_;
+    OriginalSelectedCameraVisibilityKeys visibilityKeys_,secondVisibilityKeys_;
+    OriginalFollowSceneBinding sceneBinding_,secondSceneBinding_;
+    CameraSceneState49F scene_,secondScene_;
+    OriginalCameraSceneTick tick_,secondTick_;
+    OriginalCameraViewportFields viewport_,secondViewport_;
     bool coldCameraSelected26F940_=false;
     bool bindCountedRaceCameraNative34()noexcept;
     bool canonicalCourseEndRoute()const noexcept;
     bool completeCountedRaceCameraNative34()noexcept;
     bool completeCountedRaceMusicNative10C(std::uint32_t&)noexcept;
     bool revokeCountedRaceCameraNative34()noexcept;
-    TVCameraUpdateOutput49F pose_{};
+    TVCameraUpdateOutput49F pose_{},secondPose_{};
     // race48+78 (175040/175650): the course TV camera; absent when the course
     // file does not load (then 1ACE14/1A81E4/17623C skip every TV step).
     original_replay_tv50PD::Owner replayTv_;
-    CameraViewOutput49F matrices_;
+    unsigned replayTargetSlot_=0;
+    CameraViewOutput49F matrices_,secondMatrices_;
     OriginalRaceCameraDisplayFields display_;
     OriginalRaceViewportCall coldViewport_;
     OriginalGcGaIntroExitOwner exit_;
@@ -754,21 +761,22 @@ class Session final {
     #include "original_camera_intro_source50la.inl"
     #include "original_camera_racer_binding50la.inl"
     #include "original_camera_fog_publication50la.inl"
-    rr::game::OriginalRacerDiffuseCamera50LA racerDiffuseCamera_;
+    rr::game::OriginalRacerDiffuseCamera50LA racerDiffuseCamera_[2];
     Result set(Status s,std::uint32_t pc=0) noexcept {result_.status=s;result_.sourcePC=pc;return result_;}
     Result fail(Status s,std::uint32_t pc=0) noexcept {invalidateFogPreparation();frameStage_=FrameStage::failed;return set(s,pc);}
     bool constructRacerEntityPrefixes()noexcept {
         const bool entities=bool(actual_.applicationEntities),materials=bool(actual_.applicationMaterials);
         if(!entities&&!materials&&!actual_.actualMaterialDirectory36B970)return true;
+        const unsigned views=raceFlags1B0_&3u;
+        // 1A9284 selects full screen for one view. 1A92A4..DC uses the
+        // saved split orientation for two views, published by Camera34.
+        const bool validLayout=views==1u ||
+            (views==2u && actual_.humanCount34==2u && nativeTaIssuance_ &&
+             (raceMode8C_==1 || raceMode8C_==2));
         if(!entities||!materials||!actual_.actualMaterialDirectory36B970||!displayInputs_||
-           (raceFlags1B0_&3u)!=1u){result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
+           !validLayout){result_.entityCold.status=OriginalRacerEntityColdStatus50LA::binding;
             result_.entityCold.sourcePC=0x1a9240u;return false;}
-        // Source1A6C80/88 passes the actual one-view1B0 low bits to1A9240;
-        //1A9284 writes numeric race8C=0. Zero is not an absent scene pointer.
         if(!nativeTaIssuance_)raceMode8C_=0;
-        // Every issued session binds its race's actual canonical8C (the counted
-        // Camera34 bind) before this native racer-prefix adapter; never invent
-        // its mode from one-view appearance.
         aiDamageRace_={generation_,key(*this),&raceMode8C_};
         if(!aiDamageMaterial_.prepared()){
             rr::assets::OriginalStandardMaterialDiagnostic50LA diagnostic;
@@ -1167,8 +1175,24 @@ class Session final {
         invalidateFogPreparation();
         return {&viewport_,&scene_,&tick_,&pose_.position,&matrices_};
     }
+    bool hudCameraBound(unsigned view) const noexcept {
+        const auto humans=actual_.humanCount34;
+        const unsigned views=humans==2u?2u:1u;
+        if(humans>2||view>=views||view>=actual_.bank.count())return false;
+        const auto& camera=view?secondController_:controller_;
+        const auto& b=camera.binding;
+        const auto expected=views==2u?CameraBootstrap::original_versus:
+            humans?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai;
+        return camera.bound&&b.bootstrap==expected&&b.racerClass==(humans?CameraRacerClass::player:CameraRacerClass::ai)&&
+            b.sessionGeneration==generation_&&b.managerIndex==view&&b.sceneKey==key(view?secondScene_:scene_)&&
+            b.racerKey==key(identity_[view].racerTag)&&b.mainBodyKey==key(identity_[view].mainBodyTag);
+    }
     bool identitiesCurrent() const {
-        if((!actual_.bank.count()||actual_.bank.count()>8)||actual_.humanCount34>1u)return false;
+        if(!actual_.bank.count()||actual_.bank.count()>8||actual_.humanCount34>2u||
+           actual_.humanCount34>actual_.bank.count())return false;
+        if(actual_.humanCount34==2u&&(!secondColdController_.started||secondColdController_.released||
+           secondColdController_.issuerGeneration!=coldController_.issuerGeneration||
+           secondColdController_.entity.objectKey!=key(secondController_)))return false;
         for(std::size_t i=0;i<actual_.bank.count();++i){
             const bool human=i<actual_.humanCount34;
             if(!actual_.bank.active(i)||!actual_.racer60[i]||actual_.racer60[i]!=identity_[i].pod60||
@@ -1221,11 +1245,46 @@ class Session final {
         // source manager30 nor an estimated presentation duration.
         return true;
     }
-    OriginalAttachedFrame attachedFrame() const {
+    OriginalAttachedFrame attachedFrame(unsigned view=0) const {
         if(!nativeRacerCameraBindingsCurrent())return {}; //Invalid identity, never fallback.
-        return {generation_,key(identity_[0].racerTag),key(identity_[0].mainBodyTag),key(identity_[0].modelTag),
-            actual_.bank.read(0,reads_.a4),actual_.bank.read(0,reads_.velocityY),frameDelta_};
+        return {generation_,key(identity_[view].racerTag),key(identity_[view].mainBodyTag),key(identity_[view].modelTag),
+            actual_.bank.read(view,reads_.a4),actual_.bank.read(view,reads_.velocityY),frameDelta_};
     }
+    bool publishSecondAttachedView() noexcept {
+        if(actual_.humanCount34!=2u||display_.cameraCount264!=2u||!(secondControllerEntity_.flags29&1u)||actual_.preferences.slots[1].field11030!=5u)return true;
+        if(!secondAttached_.active){
+            result_.attached=activateOriginalAttachedCamera(secondAttached_);
+            if(result_.attached.status!=OriginalAttachedStatus::ok)return false;
+        }
+        const auto body=attachedFrame(1);
+        result_.attached=actual_.bank.visit(1,[&](){
+            return advanceOriginalAttachedCameraView(secondAttached_,body,{actual_.arena.nodes,actual_.arena.sceneNodeCount},
+                actual_.attachedGlobals,actual_.arena.noiseOwner(),secondPose_,secondScene_,secondMatrices_,
+                displayInputs_->rootFlags228,sceneFlags29_);
+        });
+        if(result_.attached.status!=OriginalAttachedStatus::ok)return false;
+        if(advanceOriginalCameraSceneTick114AE0(secondTick_,generation_,key(secondScene_),secondPose_.position,secondScene_.look,
+                sceneFlags29_)!=OriginalCameraSceneTickStatus::needsMatrixVisibilityAndChildren)return false;
+        lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+        if(!actual_.visibility.beginCameraVisibility(1,lease,diagnostic)||
+           !secondVisibilityKeys_.matches(actual_.visibility,lease,generation_,key(secondScene_)))return false;
+        auto* world=lease.world();auto* workspace=lease.workspace();
+        if(!world||!workspace)return false;
+        const auto& eye=secondPose_.position;
+        result_.spatial=updateOriginalCameraScene114C44(*world,secondSpatial_,{{eye.x,eye.y,eye.z,eye.w}},*workspace);
+        if(result_.spatial.status!=LiveZoneStatus50EN::Complete||
+           !readOriginalFollowSceneBinding(secondSpatial_,secondVisibilityKeys_.view(),secondSceneBinding_))return false;
+        result_.start=rebuildOriginalRaceScene236DD0(secondViewport_,secondScene_,secondPose_.position,secondMatrices_);
+        if(result_.start.status!=OriginalCameraStartStatus::complete)return false;
+        if(!secondPosePublished_)std::fprintf(stderr,"second_attached_camera racer=%u eye=%g,%g,%g primary_eye=%g,%g,%g\n",
+            identity_[1].pod60,secondPose_.position.x,secondPose_.position.y,secondPose_.position.z,
+            pose_.position.x,pose_.position.y,pose_.position.z);
+        secondPosePublished_=true;
+        secondPosePublication_=publicationCount_+1;
+        return true;
+    }
+    bool secondPosePublished_=false;
+    std::uint64_t secondPosePublication_=0;
     OriginalCameraStartResult serviceBeforeChild() noexcept {
         std::int32_t ignored=0;
         return serviceOriginalRenderer244D60(displayInputs_->rendererDispatch,false,
@@ -1329,8 +1388,10 @@ class Session final {
 #include "original_ta_camera_lifecycle.inl"
 public:
     explicit Session(ActualOwners actual) noexcept;
-    OriginalWreckComponent50LA* taControllerEntity174A30()noexcept {
-        return coldController_.started&&!coldController_.released&&!closed_?&coldController_.entity:nullptr;
+    OriginalWreckComponent50LA* taControllerEntity174A30(unsigned view=0)noexcept {
+        if(view>1)return nullptr;
+        auto& cold=view?secondColdController_:coldController_;
+        return cold.started&&!cold.released&&!closed_?&cold.entity:nullptr;
     }
     bool constructTaIntro177750(std::shared_ptr<const rr::assets::AudioBank50HC> bank,
         std::size_t firstVoice,std::size_t voiceCount)noexcept {
@@ -1402,33 +1463,40 @@ public:
         }
         const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
         if(!replay1B0bit4&&!a1&&(launch==2||launch==3)&&!actual_.startMusicRequest){set(Status::owner,0x1ad3c0);return false;}
-        // 1A95B0 builds one controller per human; the native camera owns the
-        // single-human slot. Zero humans: the 1ACBA0 loop does not run.
-        if(actual_.humanCount34>1u){set(Status::owner,0x1750a0);return false;}
-        if(actual_.humanCount34==1u){
-            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(0)){
+        if(actual_.humanCount34>2u||(!replay1B0bit4&&actual_.humanCount34>1u)){set(Status::owner,0x1750a0);return false;}
+        for(unsigned view=0;view<actual_.humanCount34;++view){
+            auto& follow=view?secondFollow_:follow_;
+            auto& attached=view?secondAttached_:attached_;
+            const auto& offset=view?secondAttachedOffset_:attachedOffset_;
+            auto& keys=view?secondVisibilityKeys_:visibilityKeys_;
+            auto& scene=view?secondScene_:scene_;
+            auto& spatial=view?secondSpatial_:spatial_;
+            auto& binding=view?secondSceneBinding_:sceneBinding_;
+            auto& pose=view?secondPose_:pose_;
+            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(view)){
                 set(Status::owner,0x1750a0);return false;}
             // follow+108 clear would be the fresh 179580 path: not a restart.
-            if(!follow_.prepared||!follow_.bank.records||!follow_.bank.count){set(Status::sourcePath,0x175174);return false;}
-            if(!attached_.prepared||!attachedOffset_.sourceMemberIdentity||attachedOffset_.pod60!=attached_.binding.pod60){
+            if(!follow.prepared||!follow.bank.records||!follow.bank.count){set(Status::sourcePath,0x175174);return false;}
+            if(!attached.prepared||!offset.sourceMemberIdentity||offset.pod60!=attached.binding.pod60){
                 set(Status::owner,0x175208);return false;}
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
-               !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_))){set(Status::visibility,0x175224);return false;}
+            if(!actual_.visibility.beginCameraVisibility(view,lease,diagnostic)||
+               !keys.matches(actual_.visibility,lease,generation_,key(scene))){set(Status::visibility,0x175224);return false;}
             auto* world=lease.world();auto* workspace=lease.workspace();const auto* racer7F0=lease.racerVisibility7F0();
             if(!world||!workspace||!racer7F0){set(Status::visibility,0x175224);return false;}
             // 175208..175220 13DDB0: +4 = 90, +10 = racer CE0 (filters 30/34/38 already allocated).
-            attached_.fov04=90.f;attached_.offset10=attachedOffset_.racerCE0;++attached_.revision;
-            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*workspace);
+            attached.fov04=90.f;attached.offset10=offset.racerCE0;++attached.revision;
+            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial,*workspace);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete){set(Status::visibility,0x175224);return false;}
-            result_.spatial=attachOriginalCameraSceneFromRacer175224(*world,spatial_,*racer7F0,*workspace);
+            result_.spatial=attachOriginalCameraSceneFromRacer175224(*world,spatial,*racer7F0,*workspace);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete){set(Status::visibility,0x175250);return false;}
-            if(!readOriginalFollowSceneBinding(spatial_,visibilityKeys_.view(),sceneBinding_)){set(Status::owner,0x175250);return false;}
-            pose_.position=sceneBinding_.position180;
+            if(!readOriginalFollowSceneBinding(spatial,keys.view(),binding)){set(Status::owner,0x175250);return false;}
+            pose.position=binding.position180;
         }
         if(replay1B0bit4){
             // 1ACAC8..1ACAEC per human: 17BCE0(race48[i]+64).
-            if(actual_.humanCount34==1u&&!resetFollowMotion17BCE0())return false;
+            for(unsigned view=0;view<actual_.humanCount34;++view)
+                if(!resetFollowMotion17BCE0(view?secondFollow_:follow_))return false;
             set(Status::complete,0x1ace14);return true;
         }
         rearmRestartVideoOwners1AC8E0();
@@ -1441,7 +1509,7 @@ public:
         // selector, as 1ACE14 does on the replay branch. Absent TV = the beqz 1ACCF4 skip.
         if(replayTv_.present())replayTv_.reset2D30B0();
         // 1ACD10..1ACD3C per human: 17BCE0(race48[i]+64), then 178700(race48[i]).
-        if(actual_.humanCount34==1u&&(!resetFollowMotion17BCE0()||!restoreSavedCamera178700()))return false;
+        if(actual_.humanCount34==1u&&(!resetFollowMotion17BCE0(follow_)||!restoreSavedCamera178700()))return false;
         restartHostRows1AC8E0();
         if(a1){
             if(!restartIntro175430())return false;
@@ -1486,25 +1554,31 @@ public:
         }
         const auto launch=static_cast<std::int32_t>(actual_.launchKind11258);
         if(!replay1B0bit4&&!a1&&(launch==2||launch==3)&&!actual_.startMusicRequest)return 0x1ad3c0u;
-        if(actual_.humanCount34>1u)return 0x1750a0u;
-        if(actual_.humanCount34==1u){
-            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(0))return 0x1750a0u;
-            if(!follow_.prepared||!follow_.bank.records||!follow_.bank.count)return 0x175174u;
-            if(!attached_.prepared||!attachedOffset_.sourceMemberIdentity||attachedOffset_.pod60!=attached_.binding.pod60)
+        if(actual_.humanCount34>2u||(!replay1B0bit4&&actual_.humanCount34>1u))return 0x1750a0u;
+        for(unsigned view=0;view<actual_.humanCount34;++view){
+            auto& follow=view?secondFollow_:follow_;
+            auto& attached=view?secondAttached_:attached_;
+            const auto& offset=view?secondAttachedOffset_:attachedOffset_;
+            auto& keys=view?secondVisibilityKeys_:visibilityKeys_;
+            auto& scene=view?secondScene_:scene_;
+            auto& controller=view?secondController_:controller_;
+            if(!nativeRacerCameraBindingsCurrent()||!identitiesCurrent()||!actual_.bank.active(view))return 0x1750a0u;
+            if(!follow.prepared||!follow.bank.records||!follow.bank.count)return 0x175174u;
+            if(!attached.prepared||!offset.sourceMemberIdentity||offset.pod60!=attached.binding.pod60)
                 return 0x175208u;
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
-               !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return 0x175224u;
+            if(!actual_.visibility.beginCameraVisibility(view,lease,diagnostic)||
+               !keys.matches(actual_.visibility,lease,generation_,key(scene)))return 0x175224u;
             if(!lease.world()||!lease.workspace()||!lease.racerVisibility7F0())return 0x175224u;
             // 17BCE0 (both branches).
-            if(follow_.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get())return 0x17bce0u;
+            if(follow.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get())return 0x17bce0u;
             if(!replay1B0bit4){
                 // 178700.
-                const auto& preference=actual_.preferences.slots[0];
+                const auto& preference=actual_.preferences.slots[view];
                 if(preference.field11030>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max())||
                    preference.field11038>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))return 0x178700u;
                 if(preference.field11030!=0u&&preference.field11030!=5u)return 0x178810u;
-                if(controller_.mode44==4)return 0x1787ccu;
+                if(controller.mode44==4)return 0x1787ccu;
             }
         }
         if(replay1B0bit4)return 0;
@@ -1537,12 +1611,12 @@ private:
     // (1ACACC with race1B0 bit4, 1ACD14 without): +180 and +1A0 = the shared 433DB0
     // packet (the same copy as the 2255B0 reset's motion stage). Filters, presets,
     // activation and timer state are untouched.
-    bool resetFollowMotion17BCE0()noexcept{
-        if(follow_.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get()){
+    bool resetFollowMotion17BCE0(OriginalFollowCamera& follow)noexcept{
+        if(follow.revision==std::numeric_limits<std::uint64_t>::max()||!actual_.followQueries.get()){
             set(Status::owner,0x17bce0u);return false;}
         const auto& zero=actual_.followQueries.get()->sharedZero433DB0();
-        std::memcpy(&follow_.scratch180,&zero,16);
-        std::memcpy(&follow_.collision.localPoint1A0,&zero,16);++follow_.revision;
+        std::memcpy(&follow.scratch180,&zero,16);
+        std::memcpy(&follow.collision.localPoint1A0,&zero,16);++follow.revision;
         return true;
     }
     // 1ACD18 178700(race48[i]) (race1B0 bit4 clear), every course and pod: +63 bit1 = 0,
@@ -1832,18 +1906,22 @@ public:
     // Bound once from an actual cold Session when a selected render consumer
     // requires the source fog phase. This is a nonowning scheduling capability,
     // never a prepared camera publication or substitute renderer authority.
-    const rr::game::OriginalRacerDiffuseCamera50LA* racerDiffuseCamera() noexcept {
-        racerDiffuseCamera_.owner_=this;
-        racerDiffuseCamera_.read_=[](const void* opaque,rr::game::OriginalRacerDiffuseCameraSnapshot50LA& out) noexcept {
-            const auto& session=*static_cast<const Session*>(opaque);
-            FogPreparation p;if(!session.readFogPreparation(p))return false;
-            rr::game::OriginalRacerDiffuseCameraSnapshot50LA next;
-            next.owner=reinterpret_cast<std::uintptr_t>(&session);next.revision=p.revision;
-            next.generation=p.generation;next.publication=p.publication;next.frame=p.frame;
-            next.camera=p.camera;next.guardCombined=p.guardCombined;next.fog=p.source;
-            out=next;return true;
-        };
-        return &racerDiffuseCamera_;
+    template<unsigned View>
+    static bool readDiffuseCamera(const void* opaque,rr::game::OriginalRacerDiffuseCameraSnapshot50LA& out) noexcept {
+        const auto& session=*static_cast<const Session*>(opaque);
+        FogPreparation p;
+        if(!session.readFogPreparation(p,View))return false;
+        out.owner=reinterpret_cast<std::uintptr_t>(&session);out.revision=p.revision;
+        out.generation=p.generation;out.publication=p.publication;out.frame=p.frame;
+        out.camera=p.camera;out.guardCombined=p.guardCombined;out.fog=p.source;
+        return true;
+    }
+    const rr::game::OriginalRacerDiffuseCamera50LA* racerDiffuseCamera(unsigned view=0) noexcept {
+        if(view>1)return nullptr;
+        auto& endpoint=racerDiffuseCamera_[view];
+        endpoint.owner_=this;
+        endpoint.read_=view?readDiffuseCamera<1>:readDiffuseCamera<0>;
+        return &endpoint;
     }
     class GameplayFogRenderPhase final {
         friend class Session;
@@ -1884,14 +1962,33 @@ public:
         //114F20 source clamp: near>=1 and far<=100000. Authenticated GC
         //scene has near1/end2666.6499, so neither value needs an invented cap.
         auto next=scene_;next.nearPlane=1;
-        next.farPlane=fog.end38>100000.f?100000.f:fog.end38;
+        next.farPlane=std::min(100000.f,fog.end38*rr::game::gameplayDrawDistanceScale50NF);
         result_.start=rebuildOriginalRaceScene236DD0(viewport_,next,pose_.position,matrices_);
         if(result_.start.status!=OriginalCameraStartStatus::complete)
             return fail(Status::numeric,result_.start.sourcePC);
-        scene_=next;publishFogPreparation(fog);return set(Status::complete,0x13ea60);
+        scene_=next;
+        ++fogPreparationRevision_;
+        if(hasSecondPublishedView()){
+            auto second=secondScene_;
+            second.nearPlane=next.nearPlane;second.farPlane=next.farPlane;
+            result_.start=rebuildOriginalRaceScene236DD0(secondViewport_,second,secondPose_.position,secondMatrices_);
+            if(result_.start.status!=OriginalCameraStartStatus::complete)return fail(Status::numeric,result_.start.sourcePC);
+            secondScene_=second;publishFogPreparation(fog,1);
+        }
+        publishFogPreparation(fog);return set(Status::complete,0x13ea60);
+    }
+    bool hasSecondPublishedView()const noexcept{
+        return frameStage_==FrameStage::published&&display_.cameraCount264==2u&&
+            secondPosePublished_&&secondPosePublication_==publicationCount_;
+    }
+    const CameraViewOutput49F* secondPublishedView()const noexcept{
+        return hasSecondPublishedView()?&secondMatrices_:nullptr;
     }
     const CameraViewOutput49F& view()const noexcept{return matrices_;}
     const OriginalCameraViewportFields& viewport()const noexcept{return viewport_;}
+    const OriginalCameraViewportFields* hudViewport(unsigned view) const noexcept {
+        return hudCameraBound(view)?(view?&secondViewport_:&viewport_):nullptr;
+    }
     const TVCameraUpdateOutput49F& pose()const noexcept{return pose_;}
     // 175650 load + 1752D0 115DE0 registration, one call for every course and
     // both session routes (after prepare). The native collection order is not
@@ -1908,6 +2005,13 @@ public:
     const rr::assets::TVCameraDiagnostic49E& replayTvLoadError()const noexcept{return replayTv_.lastError();}
     // 1AB520 stores race1B0 bit4 before 1AC8E0; 1ACE14 (and 1A81DC..1A8204 at
     // every replay loop): with race48+78, 2D30B0 then 177AB0(race48,6,0,-1).
+    bool selectResultsViewport1ABB88(unsigned racerSlot)noexcept{
+        if(racerSlot>=actual_.bank.count()||(actual_.humanCount34&&racerSlot>=actual_.humanCount34)||
+           !beginRestartViewport1A9750(true))return false;
+        replayTargetSlot_=racerSlot;
+        std::fprintf(stderr,"results_replay_target slot=%u racer=%u\n",racerSlot,identity_[racerSlot].pod60);
+        return true;
+    }
     bool enterResultsReplayCamera1ACE14()noexcept{
         raceFlags1B0_=static_cast<std::uint8_t>(raceFlags1B0_|0x10u);
         if(!replayTv_.present())return true;
@@ -1955,17 +2059,22 @@ public:
         rr::game::OriginalRaceF8Diagnostic50LA&)const noexcept;
     // Exact camera scene38 parent, projected to the original zero-based zone48.
     // This is never a racer collision zone, AI map node or visible-zone guess.
-    bool readCameraPrimaryZone48(std::uint32_t& out) noexcept {
-        if(!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||!hasView()||!spatial_.registration34.attached||
-           !spatial_.parent38||spatial_.parent38>visibilityKeys_.count)return false;
+    bool readCameraPrimaryZone48(std::uint32_t& out,unsigned viewIndex=0) noexcept {
+        if(viewIndex>1u||(viewIndex==1u&&!hasSecondPublishedView()))return false;
+        const auto& spatial=viewIndex?secondSpatial_:spatial_;
+        const auto& binding=viewIndex?secondSceneBinding_:sceneBinding_;
+        const auto& keys=viewIndex?secondVisibilityKeys_:visibilityKeys_;
+        const auto& scene=viewIndex?secondScene_:scene_;
+        if(!actual_.followQueries.get()||!coldBound_||closed_||abandoned_||!hasView()||!spatial.registration34.attached||
+           !spatial.parent38||spatial.parent38>keys.count)return false;
         lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-        if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
-           !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return false;
+        if(!actual_.visibility.beginCameraVisibility(viewIndex,lease,diagnostic)||
+           !keys.matches(actual_.visibility,lease,generation_,key(scene)))return false;
         OriginalFollowSceneBinding actual;
-        if(!readOriginalFollowSceneBinding(spatial_,visibilityKeys_.view(),actual)||
-           actual.sceneKey!=sceneBinding_.sceneKey||actual.parentZoneKey!=sceneBinding_.parentZoneKey||
-           actual.registrationKey!=sceneBinding_.registrationKey)return false;
-        out=spatial_.parent38-1u;return true;
+        if(!readOriginalFollowSceneBinding(spatial,keys.view(),actual)||
+           actual.sceneKey!=binding.sceneKey||actual.parentZoneKey!=binding.parentZoneKey||
+           actual.registrationKey!=binding.registrationKey)return false;
+        out=spatial.parent38-1u;return true;
     }
     // Original per-frame zone (section) visibility for the track renderer,
     // the same for every course: this camera's scene38 zone, the course's
@@ -1974,12 +2083,15 @@ public:
     // frame; the caller then supplies no zones (frustum-only, as before).
     // Reads the lease's portal world and authoring only; writes nothing in it.
     bool prepareTrackZones50ZV(rr::platform::VehicleWindowTrackZone50DS* out,std::size_t capacity,
-        std::uint32_t& count,float widescreenScaleX=1.f) noexcept {
+        std::uint32_t& count,float widescreenScaleX=1.f,unsigned viewIndex=0) noexcept {
+        const auto& viewport=viewIndex?secondViewport_:viewport_;
+        const auto& keys=viewIndex?secondVisibilityKeys_:visibilityKeys_;
+        const auto& scene=viewIndex?secondScene_:scene_;
         count=0;std::uint32_t root=0;
-        if(!out||!readCameraPrimaryZone48(root)||!viewport_.prepared)return false;
+        if(!out||!readCameraPrimaryZone48(root,viewIndex)||!viewport.prepared)return false;
         lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-        if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
-           !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return false;
+        if(!actual_.visibility.beginCameraVisibility(viewIndex,lease,diagnostic)||
+           !keys.matches(actual_.visibility,lease,generation_,key(scene)))return false;
         const auto* world=lease.world();
         const auto* authored=lease.authoredRenderZone(root);
         if(!world||!authored||authored->exclusionCount>authored->exclusions.size()||
@@ -1987,12 +2099,12 @@ public:
         rr::game::TrackZoneVisibilityInput50ZV in{};
         in.portals=&world->portals;in.rootZone=root;
         in.rootExclusions=authored->exclusions.data();in.rootExclusionCount=authored->exclusionCount;
-        in.camera=&view();in.widescreenScaleX=widescreenScaleX;
+        in.camera=viewIndex?&secondMatrices_:&matrices_;in.widescreenScaleX=widescreenScaleX;
         // 230450's constant quad, built locally (the Application 434940 copy is
         // RA-owned today); nothing is written into any original structure.
         if(!rr::game::constructPortalViewport230450_50EO(in.viewportQuad))return false;
-        in.viewportX=viewport_.x1E0;in.viewportY=viewport_.y1E4;
-        in.viewportWidth=viewport_.width1E8;in.viewportHeight=viewport_.height1EC;
+        in.viewportX=viewport.x1E0;in.viewportY=viewport.y1E4;
+        in.viewportWidth=viewport.width1E8;in.viewportHeight=viewport.height1EC;
         std::array<rr::game::TrackZoneRow50ZV,rr::game::maxTrackZones50ZV> rows{};
         if(rr::game::prepareTrackZoneVisibility50ZV(in,rows.data(),rows.size())!=
            rr::game::TrackZoneVisibilityStatus50ZV::complete)return false;
@@ -2082,6 +2194,20 @@ private:
                     result_.start=prepareOriginalRaceViewport2361C0(viewport_,generation_,key(scene_),scene_);
                     if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::numeric,result_.start.sourcePC);
                 }
+                if(actual_.humanCount34==2u){
+                    if(!secondTick_.bound&&!bindFreshOriginalCameraSceneTick(secondTick_,generation_,key(secondScene_)))
+                        return set(Status::owner,0x1a941c);
+                    if(!secondViewport_.prepared){
+                        result_.start=prepareOriginalRaceViewport2361C0(secondViewport_,generation_,key(secondScene_),secondScene_);
+                        if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::numeric,result_.start.sourcePC);
+                    }
+                }
+                if(actual_.humanCount34==2u){
+                    secondPose_.mode=0;secondPose_.position={0,50,35,1};
+                    secondPose_.look=secondScene_.look;secondPose_.up=secondScene_.up;secondPose_.fov=secondScene_.fovDegrees;
+                    display_.secondScene={&secondViewport_,&secondScene_,&secondTick_,&secondPose_.position,&secondMatrices_};
+                }
+                display_.viewportMode8C=raceMode8C_;
                 pose_.mode=0;pose_.position={0,50,35,1};pose_.look=scene_.look;pose_.up=scene_.up;pose_.fov=scene_.fovDegrees;
                 //target is unconsumed on this mode0-only route. Its native
                 //scratch initialization does not claim a source stack write.
@@ -2291,7 +2417,7 @@ public:
                     return fail(Status::sourcePath,0x1a6d98);
                 if(taPositive_&&!taFirstSelected_){
                     if(!bindTaRegistryBefore7C())return fail(Status::owner,0x1752d0);
-                    result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility(actual_.visibility,generation_,key(scene_),
+                    result_.visibilityJoin=attachFreshSelectedOriginalCameraVisibility(actual_.visibility,0,generation_,key(scene_),
                         spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                     if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete)
                         return fail(Status::visibility,0x175224);
@@ -2314,10 +2440,34 @@ public:
                 if(status!=RaceStartStatus::ok)return set(Status::numeric,0x2d4dc0);
                 ++coldPhase_;break;}
             case 6:{
-                const RaceCameraBinding b{generation_,key(scene_),key(identity_[0].racerTag),key(identity_[0].mainBodyTag),
-                    0,actual_.humanCount34?CameraRacerClass::player:CameraRacerClass::ai,
-                    actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai};
-                if(!controller_.bound&&!bindFreshOriginalRaceCamera(controller_,b))return set(Status::owner);
+                const unsigned views=actual_.humanCount34==2u?2u:1u;
+                for(unsigned view=0;view<views;++view){
+                    auto& controller=view?secondController_:controller_;
+                    auto& scene=view?secondScene_:scene_;
+                    const auto bootstrap=views==2u?CameraBootstrap::original_versus:
+                        actual_.humanCount34?CameraBootstrap::original_single_player:CameraBootstrap::native_all_ai;
+                    const RaceCameraBinding binding{generation_,key(scene),key(identity_[view].racerTag),
+                        key(identity_[view].mainBodyTag),view,actual_.humanCount34?CameraRacerClass::player:
+                        CameraRacerClass::ai,bootstrap};
+                    if(!controller.bound&&!bindFreshOriginalRaceCamera(controller,binding))return set(Status::owner);
+                }
+                if(views==2u){
+                    const auto& id=identity_[1];
+                    const auto pod=static_cast<std::int32_t>(id.pod60);
+                    result_.follow=loadOriginalFollowCam(pod,raceMode8C_,authored.secondCam,authored.secondCamBytes,
+                        secondPresets_.data(),secondPresets_.size(),secondPresetBank_);
+                    if(result_.follow.status!=OriginalFollowStatus::ok)return fail(Status::authoring,result_.follow.sourcePC);
+                    const OriginalFollowIdentity f{generation_,key(id.racerTag),key(id.mainBodyTag),key(id.containerTag),pod};
+                    result_.follow=prepareOriginalFollowCamera(secondFollow_,f,secondPresetBank_);
+                    if(result_.follow.status!=OriginalFollowStatus::ok)return fail(Status::numeric,result_.follow.sourcePC);
+                    auto& offset=secondAttachedOffset_;
+                    if(!readOriginalAttachedOffset215CC0(pod,authored.secondPhyIdentity,authored.secondPhy,authored.secondPhyBytes,offset))
+                        return fail(Status::authoring,0x215cc0);
+                    const OriginalAttachedBinding binding{generation_,key(id.racerTag),key(id.mainBodyTag),key(id.modelTag),
+                        actual_.bank.read(1,reads_.body288),actual_.bank.read(1,reads_.model1B4),pod};
+                    result_.attached=prepareOriginalAttachedCamera(secondAttached_,binding,offset);
+                    if(result_.attached.status!=OriginalAttachedStatus::ok)return fail(Status::numeric,result_.attached.sourcePC);
+                }
                 //Explicit reduced NATIVE registry: actual fully owned children
                 //in source relative order. Cold-only70/78 are NOT registered;
                 //count/ordinals are not retail parity. No dummy success owners.
@@ -2335,6 +2485,12 @@ public:
                 deathChild_={&death_,key(death_),&collection_};
                 objectChildren_={generation_,key(controller_),key(scene_),taPositive_?key(*coldController_.entity.firstChild18):0,0};
                 controllerEntity_.controllerKey=key(controller_);display_.controllers48[0]=&controllerEntity_;
+                if(actual_.humanCount34==2u){
+                    secondControllerEntity_.controllerKey=key(secondController_);
+                    secondControllerEntity_.actualController=&secondColdController_.entity;
+                    secondControllerEntity_.flags29=secondColdController_.entity.flags29;
+                    display_.controllers48[1]=&secondControllerEntity_;
+                }
                 if(taPositive_){
                     if(!bindTaIntroEntity())return fail(Status::owner,0x177750);
                     objectChildren_.actualController=&coldController_.entity;
@@ -2342,8 +2498,14 @@ public:
                 }
                 ++coldPhase_;break;}
             case 7:
+                if(actual_.humanCount34==2u){
+                    result_.visibilityJoin=attachFreshSelectedOriginalCameraVisibility(actual_.visibility,1,generation_,key(secondScene_),
+                        secondSpatial_,secondVisibilityBacking_,secondVisibilityKeys_,secondSceneBinding_);
+                    if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete)return fail(Status::visibility,0x175224);
+                    secondPose_.position=secondSceneBinding_.position180;
+                }
                 if(taPositive_){++coldPhase_;break;}
-                result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility(actual_.visibility,generation_,key(scene_),
+                result_.visibilityJoin=attachFreshSelectedOriginalCameraVisibility(actual_.visibility,0,generation_,key(scene_),
                     spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                 if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete){
                     if(result_.visibilityJoin.sceneAttached)return fail(Status::visibility,0x175224);
@@ -2485,7 +2647,7 @@ public:
                     follow_.shakeScale174=shake.followMagnitude174;follow_.shakeAmplitude170=shake.followFactor170;
                     attached_.shakeScale2C=shake.attachedMagnitude2C;attached_.shakeAmplitude28=shake.attachedFactor28;}
                 original_replay_tv50PD::Decision decision;
-                if(!actual_.bank.visit(0,[&](){return replayTv_.direct176924(bodyLocal288(),frameDelta_,
+                if(!actual_.bank.visit(replayTargetSlot_,[&](){return replayTv_.direct176924(bodyLocal288(),frameDelta_,
                     actual_.arena.noiseOwner(),decision);}))return fail(Status::numeric,0x2d30d0u);
                 if(decision.switched){
                     const auto oldMode=controller_.mode44;bool changed=false;
@@ -2530,7 +2692,7 @@ public:
                         samples[i].inactive40=static_cast<std::int32_t>(actual_.bank.read(i,reads_.state40));
                         actual_.bank.visit(i,[&](){const auto& v=actual_.arena.bodies.main.components.root.body.velocity.v;
                             samples[i].localPosition=bodyLocal288();samples[i].velocity={v[0],v[1],v[2],0.f};
-                            if(i==0){input.resolvedPlayerPosition=bodyWorld288();input.bodyVelocity={v[0],v[1],v[2],0.f};}});
+                            if(i==replayTargetSlot_){input.resolvedPlayerPosition=bodyWorld288();input.bodyVelocity={v[0],v[1],v[2],0.f};}});
                     }
                     input.targetYOffset=original_replay_tv50PD::targetYOffset2D2090;
                     input.elapsed=frameDelta_;input.sceneSamples={samples.data(),count};
@@ -2787,6 +2949,7 @@ public:
             frameStage_=FrameStage::lateVisibility;break;
         case FrameStage::lateVisibility:
             if(!updateSpatial())return fail(Status::visibility,0x114c44);
+            if(!publishSecondAttachedView())return fail(Status::numeric,result_.attached.sourcePC?result_.attached.sourcePC:0x236dd0);
             if(!dispatchTaEntity141ED0())return fail(Status::sourcePath,taFailurePC_);
             frameStage_=FrameStage::published;completedFrame_=frameNumber_;++publicationCount_;return set(Status::framePublished,0x115dd0);
         case FrameStage::stableMatrix:
@@ -2794,6 +2957,7 @@ public:
             //Complete the derived236DD0 screen/guard caches for this same pose.
             result_.start=rebuildOriginalRaceScene236DD0(viewport_,scene_,pose_.position,matrices_);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return fail(Status::numeric,result_.start.sourcePC);
+            if(!publishSecondAttachedView())return fail(Status::numeric,result_.attached.sourcePC?result_.attached.sourcePC:0x236dd0);
             if(!dispatchTaEntity141ED0())return fail(Status::sourcePath,taFailurePC_);
             frameStage_=FrameStage::published;completedFrame_=frameNumber_;++publicationCount_;return set(Status::framePublished,0x115dd0);
         default:return set(Status::order);
@@ -2931,14 +3095,17 @@ public:
     //Call only after fade-out retirement and publication of the actual first
     //restored camera base image. Root owns that real renderer publication, not this
     //numeric camera counter. The backend will capture/validate the image.
-    Result advanceRaceFadeInPrefix(){
+    Result advanceRaceFadeInPrefix(std::uint8_t& flags,std::uint8_t knownMask){
         if(f8Intro_.ownerThread_!=std::this_thread::get_id())return {Status::owner,0x1a7bd0};
         if(abandoned_)return set(Status::abandoned);
-        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_)||!hasView())return set(Status::owner);
+        if(!actual_.followQueries.get()||!coldBound_||!displayInputs_||(!exit_.complete()&&!directStart_.complete()&&!taSkipFadeFinished_&&!displayInputs_->video.covered3DC&&!(displayInputs_->video.flags404Low6&16u))||!hasView())return set(Status::owner);
         if(blockingRequestPending50LA())return set(Status::sourcePath,0x2aed60);
         // Every issued course race once its counted Camera34 and end HUD are bound.
         if(canonicalCourseEndRoute())
             return advanceCanonicalRaceFadeInPrefix();
+        return serviceRaceFadeIn1A7BD0(flags,knownMask);
+    }
+    Result serviceRaceFadeIn1A7BD0(std::uint8_t& flags,std::uint8_t knownMask){
         auto& app=*displayInputs_;auto& video=app.video;
         if(endingFadeRequest_.pending()||(retainedFadeInRequestPending50LA()&&app.fadeManagerA8!=8))
             return set(Status::owner,0x2ae93c);
@@ -2946,15 +3113,17 @@ public:
         // bit2. Only its same retained A8=8 invocation bypasses this gate.
         if((video.flags404Low6&3u)&&!(video.flags404Low6&4u)&&
            !(app.fadeManagerA8==8&&retainedFadeInRequestPending50LA()))return set(Status::videoPending);
-        if(raceFlags1B0_&8u){
+        if(!(knownMask&8u))return set(Status::owner,0x1a7bd0);
+        if(flags&8u){
             //Original2AEE90 returns0 if manager busy or video not covered.
             //Only an actual accepted scheduling write clears the race flag.
             if(app.fadeManagerA8||!(video.covered3DC||(video.flags404Low6&16u)))
                 return set(Status::videoPending,0x1a7bf8);
             result_.start=requestOriginalFirstMainFade1B7D50(video,app.fadeManagerA8,app.fadeDuration98);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::videoPending,result_.start.sourcePC);
-            raceFlags1B0_=static_cast<std::uint8_t>(raceFlags1B0_&~8u);
+            flags=static_cast<std::uint8_t>(flags&~8u);
         }
+        raceFlags1B0_=static_cast<std::uint8_t>((raceFlags1B0_&~8u)|(flags&8u));
         if(app.fadeManagerA8==8){
             //2AE93C..2AE958: actual duration98,+38=260610,a2=1;clear A8.
             result_.start=serviceAsyncFadeInRequest260610();
@@ -3079,11 +3248,13 @@ public:
 
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.get()->close();}))return set(Status::owner,0x120290);
-        if(spatial_.registration34.attached){
+        for(unsigned view=0;view<2u;++view){
+            auto& spatial=view?secondSpatial_:spatial_;
+            if(!spatial.registration34.attached)continue;
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);
+            if(!actual_.visibility.beginCameraVisibility(view,lease,diagnostic))return set(Status::visibility);
             auto* world=lease.world();auto* work=lease.workspace();if(!world||!work)return set(Status::owner);
-            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*work);
+            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial,*work);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete)return set(Status::visibility,0x1148d0);
         }
         if(!retireTaController())return set(Status::owner,0x174c20u);
@@ -3121,11 +3292,13 @@ public:
 
         if(!releaseRacerEntityPrefixes())return set(Status::renderer,result_.entityCleanup.sourcePC);
         if(!actual_.bank.visit(0,[&](){return actual_.followQueries.get()->close();}))return set(Status::owner,0x120290);
-        if(spatial_.registration34.attached){
+        for(unsigned view=0;view<2u;++view){
+            auto& spatial=view?secondSpatial_:spatial_;
+            if(!spatial.registration34.attached)continue;
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
-            if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);
+            if(!actual_.visibility.beginCameraVisibility(view,lease,diagnostic))return set(Status::visibility);
             auto* world=lease.world();auto* work=lease.workspace();if(!world||!work)return set(Status::owner);
-            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial_,*work);
+            result_.spatial=removeOriginalCameraScene1148D0(*world,spatial,*work);
             if(result_.spatial.status!=LiveZoneStatus50EN::Complete)return set(Status::visibility,0x1148d0);
         }
         if(!retireTaController())return set(Status::owner,0x174c20u);

@@ -140,7 +140,17 @@ void Context::run() const {
   require50DU(courseProfile->unlockFacts187E30(facts),
       "free-play opponent draw 1AE620 needs the profile's unlock words 10FAC and course rival 11280");
   namespace reg=rr::assets::dlc50DL;
-  const std::array<original::RacerId,1> humans{static_cast<original::RacerId>(playerRacer60)};
+  const auto humanCount=(mode2Selection.packed1125C>>5u)&3u;
+  require50DU(humanCount==(mode2Selection.mode34==1?2u:1u)&&humanCount<=raceRacerCount,
+      "1AE280 human count differs from committed Course field");
+  std::array<original::RacerId,2> humans{static_cast<original::RacerId>(playerRacer60)};
+  if(humanCount==2){
+   std::uint32_t second=0;
+   require50DU(courseProfile->commonProfile()&&courseProfile->readHumanPodSelection1ADFF4(*courseProfile->commonProfile(),1,second),
+       "1ADFF4 could not read player two's selected pod");
+   const auto addon=rr::game::dlc50DL::selectedAddonRider(1);
+   humans[1]=static_cast<original::RacerId>(addon?addon:second);
+  }
   std::array<original::RacerId,reg::RegistryLimits::pods> addonCandidates{};
   std::size_t addonCount=0;
   if(addonCourse){
@@ -151,8 +161,8 @@ void Context::run() const {
    }
   }
   original::FreePlayInputs1AE620 drawInputs{};
-  drawInputs.humans=std::span<const original::RacerId>(humans.data(),humans.size());
-  drawInputs.opponents=raceRacerCount-1u;
+  drawInputs.humans=std::span<const original::RacerId>(humans.data(),humanCount);
+  drawInputs.opponents=raceRacerCount-humanCount;
   drawInputs.rival11280=facts.rival11280;
   drawInputs.unlock10FAC=facts.unlock10FAC;
   drawInputs.addonCandidates=std::span<const original::RacerId>(addonCandidates.data(),addonCount);
@@ -172,10 +182,10 @@ void Context::run() const {
   }
   require50DU(drew,"free-play opponent draw 1AE620/1AEF70 refused");
   std::array<std::uint32_t,common_roster50CR::maxSlots> ids{};
-  require50DU(raceRacerCount<=ids.size()&&drawn.count+1u==raceRacerCount,"free-play field size differs from the 1AE620 draw");
-  ids[0]=playerRacer60;
-  for(std::uint32_t i=0;i<drawn.count;++i)ids[i+1]=static_cast<std::uint32_t>(drawn.opponents[i]);
-  fieldOk=common_roster50CR::buildCourseField(ids.data(),raceRacerCount,1u,addonCourse,
+  require50DU(raceRacerCount<=ids.size()&&drawn.count+humanCount==raceRacerCount,"free-play field size differs from the 1AE620 draw");
+  std::copy_n(humans.begin(),humanCount,ids.begin());
+  for(std::uint32_t i=0;i<drawn.count;++i)ids[i+humanCount]=static_cast<std::uint32_t>(drawn.opponents[i]);
+  fieldOk=common_roster50CR::buildCourseField(ids.data(),raceRacerCount,humanCount,addonCourse,
       practice?common_roster50CR::FieldKind::practice:common_roster50CR::FieldKind::freePlay,field,fieldDiagnostic);
  }else{
   // PORT STAND-IN (flagged, development direct launch only: no Application
@@ -220,7 +230,7 @@ void Context::run() const {
    racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
   });
   const auto archive=identity::podArchive(runtime_asset_paths50LB::resolve("work/native/project/disc/PODS"),id);
-  if(!racer)coldRacerStage50DU(id,"original display name",[&](){
+  if(row->human||!racer)coldRacerStage50DU(id,"original display name",[&](){
    racerNames[racer]=directOriginalInputs?racerRigs[racer]->displayName:native_racer50HW::loadVerifiedDisplayName(
        runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/original-eight-visuals"),id,row->archiveSha256);
   });
@@ -241,7 +251,7 @@ void Context::run() const {
       courseProfile->selectedTournamentCourseSnapshot(career,course)&&
       courseProfile->stamp().generation==mode2Stamp.generation&&
       courseProfile->stamp().mode34==mode2Stamp.mode34&&
-      career.stamp.generation==mode2Stamp.generation&&career.career100C0==playerRacer60&&
+      career.stamp.generation==mode2Stamp.generation&&career.career100C0==mode2Career.career100C0&&
       current.mode34==2&&current.course==mode2Selection.course&&current.rider==mode2Selection.rider&&
       current.planet==mode2Selection.planet&&current.subtype==mode2Selection.subtype&&
       current.laps==mode2Selection.laps&&current.entrants==mode2Selection.entrants&&

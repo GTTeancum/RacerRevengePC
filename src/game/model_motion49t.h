@@ -81,7 +81,7 @@ bool sampleModelMotionMasked50KG(const assets::MotionView49O&,
 // Same49T graph/binding/shared/transaction contracts apply; time is finite>=0.
 bool sampleModelMotionTime50IG(const assets::MotionView49O&,
     const assets::MotionNodeBindings49O&,float sampleTime,const SceneGraph49P&,
-    ModelMotionSharedState49T&,ModelMotionWorkspace49T&,ModelMotionDiagnostic49T&) noexcept;
+    ModelMotionSharedState49T&,ModelMotionWorkspace49T&,ModelMotionDiagnostic49T&,bool independentChannels=false) noexcept;
 bool sampleModelMotionBlend49T(const assets::MotionView49O& first,
     const assets::MotionView49O& second,
     const assets::MotionNodeBindings49O& bindings, float frameFraction,

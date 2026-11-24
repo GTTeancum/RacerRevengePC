@@ -257,12 +257,12 @@ bool Application::captureNativeResultsAfterRoot50LA(const original_camera_sessio
     const auto display=raceDisplayOwner50LA_.lock();
     std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
     if(!display||display!=race->loadDisplay_||display->application_!=this||display->video_!=videoOwner_||
-       !display->gameplayDisplayIdentityCurrent50LA()||returned.actual_.humanCount34!=1||
+       !display->gameplayDisplayIdentityCurrent50LA()||(returned.actual_.humanCount34<1u||returned.actual_.humanCount34>2u)||
        returned.frameStage_!=original_camera_session50KX::Session::FrameStage::published||
        !returned.frameNumber_||returned.completedFrame_!=returned.frameNumber_||returned.pendingDisplayWork()||
        !display->readGameplayViewport115990(returned,rectangle,revision)||
        rectangle!=std::array<std::int32_t,4>{{0,0,640,448}})
-        return resultsFrameReject(d,0x1a86bc,"Results accepted native final one-human Camera/Display absent");
+        return resultsFrameReject(d,0x1a86bc,"Results accepted native final full-screen Camera/Display absent");
     const auto hud=race->endHud_.lock();
     if(!hud||!hud->endStateCurrent(*race,returned)||!hud->manager_)
         return resultsFrameReject(d,0x1c2124,"Results actual lexical Camera/manager observation absent");
@@ -300,7 +300,7 @@ bool Application::nativeResultsFinalCameraCurrent50LA(const rr::game::OriginalRa
     if(sourceRace28COwner_.get()!=&race||race.application_!=entitiesOwner_||!race.counted_||race.rolledBack_||
        !race.ownsNativeCameraAdapter34(camera)||nativeTaRootRace_!=&race||nativeTaRootEntered_||nativeTaRootAborted_||
        nativeTaRootGeneration_!=race.entity_.sessionGeneration||sourceApplicationMode22C_!=0||sourceUpdateRenderBypass228Bit3_||
-       camera.actual_.humanCount34!=1||camera.actual_.applicationEntities!=entitiesOwner_||
+       (camera.actual_.humanCount34<1u||camera.actual_.humanCount34>2u)||camera.actual_.applicationEntities!=entitiesOwner_||
        camera.generation_!=race.entity_.sessionGeneration||!camera.nativeTaIssuance_||
        camera.nativeTaIssuance_->issuer!=this||camera.nativeTaIssuance_->generation!=camera.generation_||
        !race.raceCamera34Issued(camera)||
@@ -393,7 +393,7 @@ bool Application::prepareNativeResultsFrame50LA(const original_camera_session50K
         if(race->cameraNativeAdapter34_==&expected)camera=race->borrowRaceCamera34();
         std::array<std::int32_t,4> rectangle{};std::uint64_t revision=0;
         if(!camera||camera.get()!=&expected||!race->ownsNativeCameraAdapter34(*camera)||
-           camera->actual_.humanCount34!=1||!camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
+           (camera->actual_.humanCount34<1u||camera->actual_.humanCount34>2u)||!camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=this||
            !race->raceCamera34Issued(*camera)||
            camera->generation_!=race->entity_.sessionGeneration||camera->actual_.applicationEntities!=entitiesOwner_||
            camera->frameStage_!=original_camera_session50KX::Session::FrameStage::published||camera->pendingDisplayWork()||

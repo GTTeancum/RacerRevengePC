@@ -128,10 +128,10 @@ class OriginalResults10450LA final {
     // its retained output is not a draw/queue/completion capability.
     DisplayCpuPrefix captureNativeDerivedCpu1C21B0(const OriginalRaceConstructor50LA&,
         const ::original_position_stats_adapter50LA::Owner&,
-        OriginalResults104Diagnostic50LA&)noexcept;
+        OriginalResults104Diagnostic50LA&,bool twoPlayerBase=false)noexcept;
     // Uncalled single-human shared-base CPU traversal. Reads actual completed
     // native Root timing, not a caller delta or source last-camera authority.
-    DisplayCpuPrefix captureNativeSingleHumanBaseCpu1B9220(
+    DisplayCpuPrefix captureNativeBaseCpu1B9220(
         const ::original_main_entry50KG::Application&,const OriginalRaceConstructor50LA&,
         const ::original_position_stats_adapter50LA::Owner&,
         OriginalResults104Diagnostic50LA&)noexcept;

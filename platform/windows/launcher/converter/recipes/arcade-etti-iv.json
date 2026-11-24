@@ -1,0 +1,87 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-etti-iv",
+    "name": "Smuggler's Cove (Etti IV, Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Smuggler's Cove on Etti IV, from Star Wars Racer Arcade course 1, as an add-on course (code eb, physics class B). AI class B (weak evidence); no rival (the source has no per-course rival). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_EB": "SMUGGLER'S COVE",
+        "PLANET_EB": "ETTI IV"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "eb",
+        "code": "eb",
+        "archive": "TRACKS/EB.RES",
+        "name_key": "COURSE_EB",
+        "planet_name_key": "PLANET_EB",
+        "phy_class": "B",
+        "ai_class": "B",
+        "rival": "none",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_EB.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_EB.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "eb"
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/EB.RES",
+        "bytes": 1684536,
+        "sha256": "713b69117354870f848cb6660e6e240caef15489e2da3a6bd0298bc1c225b12f",
+        "role": "course archive (members named tracks\\eb.* / aeb.spl / meb.spl / ebNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_EB.PST",
+        "bytes": 66588,
+        "sha256": "a3dfa1f6d41b86e28c79e64802005879b5e3192d44cbce9986a555551388d94e",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_EB.PST",
+        "bytes": 287772,
+        "sha256": "4468208f6399ad8c110917377a34578f181968e2b8e3d4b4d3783392c7c7e0c3",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      9972.0,
+      1501.0,
+      4305.0
+    ],
+    "target": [
+      9972.0,
+      1201.0,
+      10133.0
+    ]
+  }
+}

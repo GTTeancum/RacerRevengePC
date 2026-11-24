@@ -34,13 +34,17 @@ struct ZeroGravityStep50ZG {
     float pitchRateDegrees=0.f;        // zeroGPitchRate (+0x220) x 1.5, deg/s
     float flightRollRateDegrees=0.f;   // ZON roll rate (+0x21C), deg/s
     float recoverRollGain=0.f;         // ZOFF: roll rate = gain x bank error (1/s)
-    bool haveSurfaceNormal=false;      // ZOFF: surface whose bank the pod rights to
-    float surfaceNormal[3]{0.f,1.f,0.f};
     // Results the frame reports back (host side, for logs only).
     bool basisWritten=false;
+    bool groundRecenter=false;
+    float roadNormal[3]{0.f,1.f,0.f};
+    float roadDistance=1.e10f;
     float bankErrorDegrees=0.f;
 };
 inline ZeroGravityStep50ZG zeroGravityStep50ZG;
+// The original recovery plane is zero. Imported zero-g courses can contain
+// a playable dive below that plane. Their collision world supplies its lower bound.
+inline float undertrackPlane50ZG=0.f;
 
 // True only while one racer's step is in zero-g Flight / Recover.
 inline bool zeroGravityStepIs50ZG(ZeroGravityMode50ZG mode) noexcept {

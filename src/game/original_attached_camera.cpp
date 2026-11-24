@@ -1,4 +1,5 @@
 #include "original_attached_camera.h"
+#include "n64_pillar_camera_shake50nh.h"
 #include "chariot_scene49u.h"
 #include "scalar_minmax48o.h"
 #include "../assets/pod_physics49n.h"
@@ -174,6 +175,12 @@ Result pose(C& c,const OriginalAttachedFrame& in,const SceneGraph49P& graph,G& g
         offset[axis]=m.add(value,0);}
     V camera{m.add(position.x,offset[0]),m.add(position.y,offset[1]),m.add(position.z,offset[2]),1};
     camera=shake(m,camera,c,rng);
+    if(n64PillarCameraShake50NH.scale>0.f){
+        camera.y=m.add(camera.y,n64PillarCameraShake50NH.eyeHeight());
+        static const bool trace=std::getenv("RR_TEST_N64_PILLAR_CAMERA")!=nullptr;
+        if(trace)std::fprintf(stderr,"n64_pillar_attached seconds=%g eye_y=%g\n",
+            n64PillarCameraShake50NH.elapsed,double(n64PillarCameraShake50NH.eyeHeight()));
+    }
     const V cameraUp=m.normalize(m.cross(right,look));
     if(!m.ok||!scalar(c.fov04))return fail(Status::arithmetic,0x13e3b0);
     out.position=camera;out.look=look;out.up=cameraUp;out.fov=c.fov04;out.mode=0;++c.revision;

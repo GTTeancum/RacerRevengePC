@@ -22,6 +22,45 @@ ROOT = Path(__file__).resolve().parents[2]
 if ROOT.parent.name == 'worktrees' and ROOT.parent.parent.name == '.claude':
     ROOT = ROOT.parents[2]
 
+def career_screen_hold_completed(result, log_text, marker):
+    """A deliberate screen hold ends at the game's wall budget."""
+    _, separator, tail = log_text.partition(marker)
+    return bool(separator and 'windows_capture_timeout ' in tail and
+                'native_exit_code=3' in tail and 'result=pass first_refusal=none' in tail and
+                result.get('exitCode') == 3 and result.get('watchdogExpired') is False and
+                result.get('gameSummary', {}).get('cleanup_complete') and result.get('noImagesWritten'))
+
+
+def player_pilot_finish(log_text, result, track, laps, time_trial, captured_nodes=()):
+    """Check the human timing row; reaching Results also happens after a wreck."""
+    driving = re.search(r'^player_ai_pilot controls slot=0 decisions=[1-9]\d* ', log_text, re.M)
+    race = log_text[driving.end():] if driving else ''
+    completed = [int(n) for n in re.findall(r'^common_lap racer=0 lap=(\d+) ', race, re.M)]
+    finish = re.search(r'^finish_continuation player_finished=1 .*?sealed_place=([1-8]) .*?sealed_laps=(\d+)', race, re.M)
+    observed = []
+    if captured_nodes:
+        for line in log_text.splitlines():
+            if line.startswith('windows_framebuffer_capture '):
+                frame = json.loads(line.partition(' ')[2])
+                if frame.get('stage') == 'track' and frame.get('settled') and frame.get('image_file'):
+                    observed.append(frame)
+    capture_ok = (all(any(f.get('map_node') == node for f in observed) for node in captured_nodes) and
+                  len(observed) >= 1 + 3 * len(captured_nodes)) if captured_nodes else (
+                      result.get('noImagesWritten') if result.get('logsOnly') else 'windows_framebuffer_capture ' in race)
+    normal_exit = (result.get('exitCode') in (0, 3) and result.get('watchdogExpired') is False and
+                   result.get('gameSummary', {}).get('cleanup_complete') and capture_ok)
+    course = f'race_fps_summary track={track} ' in race
+    if time_trial:
+        # The original Time Trial keeps racing after a lap. Verify the normal Pause quit after it.
+        crossed = re.search(r'^common_lap racer=0 lap=[1-9]\d* ', race, re.M)
+        returned = bool(crossed and re.search(r'^pause_quit row=10 site=1BDAB4 qualify_1ABFC0=[01] ', race[crossed.end():], re.M))
+    else:
+        returned = bool(finish and int(finish[2]) >= laps and 'route=results next=1AB5BC' in race)
+    return dict(laps=completed, place=int(finish[1]) if finish else None,
+                verified=bool(course and normal_exit and completed and max(completed) >= laps and
+                              returned and 'windows_capture_return_hold ' in race))
+
+
 # The 23 original racer ids (no pods 5, 6, 13).
 ORIGINAL_RACERS = [r for r in range(1, 27) if r not in (5, 6, 13)]
 # Common rewrite B-C21 (writer R11): ONE free-play route for every course and pod.
@@ -100,7 +139,7 @@ def seed_player_racer(data, racer):
     return bytes(d)
 
 
-def seed_free_play(data):
+def seed_free_play(data, main_slot=1):
     """Return progress-v1.bin bytes for the free-play route on any course: course
     availability 11018 (second header word, saveNativeBetaProgress in
     platform/linux/native/original_ui_rider_profile50kg.cpp) = all 13 stock courses, the
@@ -114,7 +153,7 @@ def seed_free_play(data):
             u32(12) != zlib.crc32(bytes(d[16:])) & 0xffffffff:
         raise ValueError('Seed save is not an intact progress-v1 file')
     struct.pack_into('<I', d, 16 + 4, (u32(16 + 4) & 0xe0) | 13)   # availability11018
-    struct.pack_into('<I', d, 16 + 8, 1)                            # savedSlot6E0
+    struct.pack_into('<I', d, 16 + 8, main_slot)                     # savedSlot6E0
     struct.pack_into('<I', d, 8, len(d) - 16)
     struct.pack_into('<I', d, 12, zlib.crc32(bytes(d[16:])) & 0xffffffff)
     return bytes(d)
@@ -222,6 +261,7 @@ def main():
     parser.add_argument('--route', choices=['main-rider-course', 'main-rider-course-ta',
                         'main-tournament-course-ta', 'none'], default='main-rider-course')
     parser.add_argument('--logs-only', action='store_true', default=True, help='Record stage and timing receipts without pixel readback or image files')
+    parser.add_argument('--capture-node', type=int, action='append', metavar='NODE', help='Capture three native gameplay frames on reaching this map node')
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--profile-performance', action='store_true',
                         help='Enable existing CPU/render/display phase measurements')
@@ -247,6 +287,8 @@ def main():
                         help='Original AI drives every pod, camera on pod 0 (spectator)')
     parser.add_argument('--race-full', action='store_true',
                         help='Keep racing until the watchdog budget instead of stopping after FPS evidence')
+    parser.add_argument('--ai-pilot', action='store_true',
+                        help="Give the player pod the game's opponent AI during races")
     parser.add_argument('--steer-invert', action='store_true',
                         help='Invert the test steering toward the next gate')
     parser.add_argument('--input-device', choices=['keyboard', 'controller'],
@@ -347,7 +389,7 @@ def main():
                              'course arrow (Next) until this admitted add-on course is highlighted, then the original '
                              'Course Confirm (sets RR_TEST_ADDON_COURSE_PICK). Needs --env RR_DLC_ROOT=<DLC folder> and --route '
                              + ' / '.join(ADDON_COURSE_ROUTES))
-    parser.add_argument('--course-mode', '--addon-course-mode', dest='course_mode', choices=['single', 'time_trial'],
+    parser.add_argument('--course-mode', '--addon-course-mode', dest='course_mode', choices=['single', 'time_trial', 'versus'],
                         help='Free-play Course (--route main-rider-course-ta, stock TA or with --addon-course): first set '
                              'the event type (original Down to the event-type row, Right until Single Race / Time Trial '
                              'shows, Up back to the course row), then pick the course (sets RR_TEST_COURSE_SUBTYPE=1 or 3). '
@@ -504,8 +546,9 @@ def main():
             (saves / 'progress-v1.bin').write_bytes(seed_player_racer(seed.read_bytes(), args.player_racer))
         if args.route in FREE_PLAY_ROUTES:  # the free-play route enters on Main slot 1, any course
             target = saves / 'progress-v1.bin'
-            target.write_bytes(seed_free_play(target.read_bytes()))
-            print('test_seed free_play availability=13 main_slot=1', flush=True)
+            main_slot = 2 if args.course_mode == 'versus' else 1
+            target.write_bytes(seed_free_play(target.read_bytes(), main_slot))
+            print(f'test_seed free_play availability=13 main_slot={main_slot}', flush=True)
         if args.seed_slow_hall is not None:
             target = saves / 'progress-v1.bin'
             target.write_bytes(seed_slow_hall(target.read_bytes(), args.seed_slow_hall,
@@ -538,7 +581,11 @@ def main():
         # tests/native/original_ui_capture_navigation50la.h HallRoute).
         env['RR_UNATTENDED_UI_ROUTE'] = 'main-options-hall-ta'
     # A --hold-rider / --hold-course / --eyecheck-dlc-hall run writes its held frame as an image (eye check).
-    logs_only = (args.logs_only and not args.hold_rider and not args.hold_course and not args.hold_results and
+    if args.capture_node is not None:
+        if min(args.capture_node) < 0:
+            parser.error('--capture-node must be nonnegative')
+        env['RR_TEST_CAPTURE_NODE'] = ','.join(map(str,args.capture_node))
+    logs_only = (args.logs_only and args.capture_node is None and not args.hold_rider and not args.hold_course and not args.hold_results and
                  not args.hold_results_hall and args.eyecheck_dlc_hall is None and
                  not ((args.pause_quit or args.pause_restart) and '--logs-only' not in __import__('sys').argv))
     if logs_only:
@@ -612,10 +659,6 @@ def main():
         env['RR_TEST_PLAYER_RACER'] = str(args.player_racer)
     if args.addon_rider is not None:
         env['RR_TEST_ADDON_RIDER'] = args.addon_rider
-        if args.route == TOURNAMENT_ROUTE:
-            # Test only: lets the add-on Tournament Confirm through the career latch
-            # (honoured by the game only with RR_UNATTENDED_CAPTURE=1, which every run sets).
-            env['RR_TEST_ADDON_TOURNAMENT'] = '1'
     if args.hold_tournament:
         env['RR_TEST_TOURNAMENT_HOLD'] = '1'
     if args.hold_garage:
@@ -629,7 +672,9 @@ def main():
         env['RR_TEST_ADDON_COURSE_PICK'] = args.addon_course
     if args.hold_course:
         env['RR_TEST_ADDON_COURSE_HOLD'] = '1'
-    if args.course_mode:
+    if args.course_mode == 'versus':
+        env['RR_TEST_VERSUS'] = '1'
+    elif args.course_mode:
         # (Before R11 this also turned logs-only off, so every Time Trial run wrote images;
         # only --hold-course writes the Course frame now.)
         env['RR_TEST_COURSE_SUBTYPE'] = '3' if args.course_mode == 'time_trial' else '1'
@@ -663,6 +708,8 @@ def main():
     for switch in args.renderer_switch:
         env[switch] = '1'
     command = [str(staged), '--assets', str(assets)]
+    if args.ai_pilot:
+        command.append('--ai-pilot')
     result = dict(command=command, route=args.route, playerRacer=args.player_racer,
                   watchdogSeconds=args.seconds,
                   sourceBuildReceipt=str(build / 'build-receipt.json'),
@@ -789,6 +836,14 @@ def main():
         if logs_only:
             result['noImagesWritten'] = not any(p.suffix.lower() in {'.ppm', '.png', '.jpg', '.pending'} for p in output.rglob('*'))
             result['routeCompleted'] = result['routeCompleted'] and result['noImagesWritten']
+        if logs_only and (args.hold_tournament or args.hold_garage):
+            if args.hold_tournament:
+                marker = 'tournament_route hold screen=9 (no Continue;'
+            elif args.garage_from == 'race':
+                marker = 'tournament_return_route hold screen=13 from=race_return'
+            else:
+                marker = 'tournament_route hold screen=13 from=tournament'
+            result['routeCompleted'] = career_screen_hold_completed(result, log_text, marker)
         if args.eyecheck_dlc_hall is not None:
             # Held on the Hall TA page until the wall budget: complete when the
             # Hall frame was written and the hold was reached.
@@ -894,6 +949,11 @@ def main():
         if args.pause_quit or args.pause_restart or quit_lines:
             result['pauseQuit'] = dict(seconds=args.pause_quit or args.pause_restart,
                                        row=1 if (args.pause_restart and not args.pause_quit) else 10, lines=quit_lines)
+        if args.ai_pilot and (logs_only or args.capture_node) and args.route in FREE_PLAY_ROUTES and args.return_hold:
+            evidence = player_pilot_finish(log_text, result, track, args.laps or 1, args.course_mode == 'time_trial', args.capture_node or ())
+            result['playerPilot'] = evidence
+            if not (args.pause_restart or args.restart_once or args.main_exit or args.hold_results):
+                result['routeCompleted'] = evidence['verified']
         (output / 'execution.json').write_text(json.dumps(result, indent=2) + '\n')
         # Disk hygiene (user request 2026-11-13): a logs-only run keeps its logs and
         # receipts; the staged program, DLL copies and audio recording (~65 MB per

@@ -1,3 +1,4 @@
+#include "original_second_human_input50sv.h"
 #include "native_last_failure50pd.h"
 #include "native_course_archive_release50pd.h"
 #include "native_wreck_debris_sim50pd.h"
@@ -17,6 +18,8 @@
 #include <functional>
 // Complete original lexical suffix; caller prefix outlives every owner below.
 #include "terrain_interactive_continuation50du.h"
+#include "common_roster50cr.h"
+#include "../../src/game/dlc_rider_entries50dl.h"
 #include "../../src/game/original_human_reset_timers50lc.h"
 #include "original_camera_assets50kx.h"
 #include "terrain_interactive_loop50du.h" // Implementation-only complete live providers.
@@ -789,6 +792,7 @@ SessionExit50DU Context::run() {
   .namesForEffects=namesForEffects,
   .effectOwnerIndex=effectOwnerIndex,
   .playerRacer60=playerRacer60,
+  .rosterRacer60=dynamicRacer60,
   .effectsWorkspace=effectsWorkspace,
   .generatedEffects=generatedEffects,
   .spring=spring,
@@ -912,6 +916,7 @@ SessionExit50DU Context::run() {
   .acceptLiveQuery=interactive_frame50DU::BorrowedCall<bool(const rr::game::VehicleLiveQueryResult50EQ&,rr::game::Type2StaticQuery49X&,const rr::game::LiveZoneMembership50EN&,std::uint64_t&,const char*)>{acceptLiveQuery},
   .fulfillDynamicMusic=interactive_frame50DU::BorrowedCall<void()>{fulfillDynamicMusic},
   .racerBank=racerBank,
+  .secondHumanInput50SV=this->secondHumanInput50SV,
  };
  auto advanceFramePart=[&](std::size_t actualRacerSlot,NativeRacerFramePart part,
      float preparedOuterFactor,float liveSubstepScale){
@@ -973,7 +978,7 @@ SessionExit50DU Context::run() {
   if(!actor||actor>racerBank.count()||!dynamicActorResolver.read||
      !dynamicActorResolver.read(dynamicActorResolver.context,actor,identity))return false;
   const auto slot=static_cast<std::size_t>(actor-1u);
-  if(originalAiAudioEnabled&&originalAiOwnsSlot(slot)){
+  if(originalAiAudioEnabled&&(slot!=0u||!humanCourseEnabled)){
    if(!originalAiAudio->speechOwner(slot,identity.vehicle60,counts,state))return false;
   }else{
    if(actor!=1u)return false;
@@ -1339,7 +1344,7 @@ SessionExit50DU Context::run() {
   }
   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
    auto& row=race.racers[slot];
-   require50DU(row.sampled&&s.fields.vehicle58==(humanCourseEnabled&&slot==0?0u:1u)&&
+   require50DU(row.sampled&&s.fields.vehicle58==(humanCourseEnabled&&slot<originalAiHumanCount?0u:1u)&&
        static_cast<bool>(s.fields.impactFlagsCD8&1u)==static_cast<bool>(finishPlaces[slot]),
        "native presentation cannot invent or discard a source finish");
    row.live=row.pending;row.observed=row.pending;row.observedValid=true;row.sampled=false;
@@ -1447,18 +1452,8 @@ SessionExit50DU Context::run() {
   require50DU(::allocations==beforeOpponentAudio,"opponent engine audio update allocated C++ storage");
  };
  std::function<void()> activateColdRace;
- // The one neutral, unscored native setup tick of every racer (opponents first, slot 0
- // last inside its Bank visit; raceSetupFrame set by the caller): establishes actual
- // graphics/ground before countdown rendering. The fresh race runs it after the cold
- // load (activateColdRace); every 1AC8E0 restart with race1B0 bit4 clear runs the SAME
- // tick after its 1AEA70 placements (restartSetupTick1AC8E0), so the replayed intro
- // draws the restarted pods on the fresh intro's path. setupTickSlot names the racer
- // being ticked for a refusal. Every later intro/countdown step then runs one live native
- // frame per racer (terrain_interactive_loop50du.cpp, the held start-gate branch; 1AED30
- // only locks axes), as the original 1A7B40 does. PORT STAND-IN (flagged, narrowed): this
- // first frame, before the first displayed image (cold publication / 1AC8E0 restart), is
- // the quiet setup form (raceSetupFrame: no speech/audio/finish consumers).
- std::size_t setupTickSlot=0;
+ // Direct launches without a counted race use an initial graphics tick.
+ // A published course race first updates its racers in the intro scheduler.
  const auto setupTickRacers=[&](const platform::WindowInput50DQ& noKeys){
   auto initializeGraphics=[&](std::size_t actualRacerSlot){
    if(s.fields.vehicle58==0u){composePacket(false,noKeys,actualRacerSlot);sampleController();}
@@ -1466,7 +1461,6 @@ SessionExit50DU Context::run() {
    require50DU(lapContinuity.state.vehicleCC8==0,"race setup tick unexpectedly completed a lap");
   };
   for(std::size_t racer=1;racer<racerBank.count();++racer){
-   setupTickSlot=racer;
    opponentFrame=true;
    try{
     captureDynamicBeforeFrame(racer);
@@ -1480,7 +1474,6 @@ SessionExit50DU Context::run() {
    }
    opponentFrame=false;
   }
-  setupTickSlot=0;
   captureDynamicBeforeFrame(0);
   if(originalAiEnabled)observeOriginalAiFleet();
   // Slot 0 runs inside its Bank visit on every course (one shared arena).
@@ -1551,10 +1544,11 @@ SessionExit50DU Context::run() {
    const auto stamp=profile->stamp();
    Profile::TournamentCareerSnapshot career{};
    OriginalUiCourseRememberedProfile50KG course{};
+   const auto profileRider=rr::game::dlc50DL::profileRider(playerRacer60);
    require50DU(rootedCourseRace&&profile->selectedTournamentCourseSnapshot(career,course)&&
        stamp.mode34==2&&career.stamp.mode34==2&&course.mode34==2&&
        stamp.generation==career.stamp.generation&&
-       selected.subtype==1&&selected.rider==playerRacer60&&career.career100C0==playerRacer60&&
+       selected.subtype==1&&selected.rider==profileRider&&career.career100C0==profileRider&&
        selected.entrants==8u&&raceRacerCount==8u&&raceOpponentCount==7u&&
        originalAiHumanCount==1u&&playerUsesRosterRig&&
        ((selected.packed1125C>>5)&3u)==1u&&((selected.packed1125C>>7)&15u)==7u&&
@@ -1564,14 +1558,12 @@ SessionExit50DU Context::run() {
    namespace original=rr::game::original_opponent_selection50KG;
    const auto order=original::courseIndex187B10(course.courseOrder100C4,
        static_cast<std::uint8_t>(selected.course))+1u;
-   std::array<original::RacerId,7> opponents{};
-   require50DU(original::deterministic188470(order<5u?1u:(order<9u?2u:3u),
-       static_cast<original::RacerId>(playerRacer60),opponents),
-       "Tournament grid deterministic field rejected");
-   for(std::size_t slot=0;slot<8u;++slot){
-    const auto id=slot?static_cast<std::uint32_t>(opponents[slot-1]):playerRacer60;
-    const auto* identity=original_racer_selection50IJ::findByRacer60(id);
-    require50DU(identity&&racerRigs[slot]&&racerRigs[slot]->podId==identity->podId,
+   common_roster50CR::Field grid;
+   common_roster50CR::Diagnostic fieldDiagnostic;
+   require50DU(common_roster50CR::buildTournamentField188470(order<5u?1u:(order<9u?2u:3u),playerRacer60,grid,fieldDiagnostic)&&
+       grid.count==raceRacerCount,"Tournament grid deterministic field rejected");
+   for(std::size_t slot=0;slot<grid.count;++slot){
+    require50DU(racerRigs[slot]&&racerRigs[slot]->podId==grid.rows[slot].podId,
         "Tournament grid differs from the admitted authenticated field");
    }
    require50DU(profile->stamp().generation==stamp.generation&&profile->stamp().mode34==2,
@@ -1824,7 +1816,11 @@ SessionExit50DU Context::run() {
        "selected human retains another racer's static contact resource");
   });
   for(std::size_t racer=1;racer<racerBank.count();++racer)
-   coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){placeOpponentAtGrid50HN(racer);});
+   coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){
+    placeOpponentAtGrid50HN(racer);
+    if(racer==1u&&this->secondHumanInput50SV)
+     initializeOriginalHumanResetTimers50LC(this->secondHumanInput50SV->player);
+   });
   // Execute the original cold contacts stage synchronously against these same locals.
   interactive_cold50DU::ContactsContext{
   .track=track,
@@ -2045,10 +2041,8 @@ SessionExit50DU Context::run() {
       "selected original speech cursor initialization failed");
    retainActualSpeechOwners();
   }
-  // One neutral, unscored native setup tick establishes actual graphics/ground
-  // before countdown rendering. After this all physics freezes until GO.
+  // Initialize the counted B0/B4 before the first scheduled racer update.
   const platform::WindowInput50DQ noKeys{};
-  raceSetupFrame=true;
   if(originalAiEnabled){
    requireRuntimeNavigation();
    require50DU(!originalAiSession.managerBound&&selectedMapCount()>1&&
@@ -2078,8 +2072,7 @@ SessionExit50DU Context::run() {
   }
   if(originalAiEnabled)for(std::size_t slot=0;slot<racerBank.count();++slot)
    racerBank.visit(slot,[&](){s.fields.applicationByte58=originalAiSession.manager.flags58;});
-  setupTickRacers(noKeys);
-  raceSetupFrame=false;
+  if(!consumedStage.race()){raceSetupFrame=true;setupTickRacers(noKeys);raceSetupFrame=false;}
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
@@ -2142,8 +2135,6 @@ SessionExit50DU Context::run() {
   };
   // One activation point for every course, after the cold rig/grid/contact/draw
   // owners above (publication keeps only its phase-guarded no-op re-check).
-  // PORT STAND-IN: the host's neutral activation tick; GB/MC used to defer it
-  // until after renderer/query admission, now one point for every course.
   if(!originalUiActive)activateColdRace();
  }
  if(originalUiActive){
@@ -2778,6 +2769,10 @@ SessionExit50DU Context::run() {
        *nativeIntroController(),raceRootPublication,error))return closeRejected("TA pending root abandonment");
     raceRootActive=false;
    }
+   if(nativeIntroRace()&&sourceCameraSession){
+    if(auto* second=sourceCameraSession->taControllerEntity174A30(1);second&&
+       !nativeIntroRace()->clearNativeIntroControllerSlot48(*second,1))return closeRejected("second camera controller retirement");
+   }
    if(nativeIntroRace()&&nativeIntroController()&&
       !nativeIntroRace()->clearNativeIntroControllerSlot48(*nativeIntroController()))
     return closeRejected("actual intro race controller slot48 retirement");
@@ -2988,22 +2983,6 @@ SessionExit50DU Context::run() {
    std::cerr<<"common_teardown_detail role=animation session_holder_released="<<bool(trackAnimations)
        <<" use_count_before="<<trackAnimations.use_count()<<'\n';
    trackAnimations.reset();
-   // A session that ends while the race is still under its Pause 142040 (the Pause open at
-   // the wall budget, or the Time Trial record page 3 that 1BDAB4 leaves over the paused
-   // race with App11C set) keeps race flags29 bit2 and the paused race groups; the race's
-   // retirement admits only the running race (flags29 & 15 == 3), so cr20 GC refused
-   // ("race detached identity/flags/children") and terminated. The original leaves through
-   // its screen change and never meets this gate; the port closes the Pause's own effects
-   // first, in 1BE830's order (App11C = 0, 1ACF50 resume, 142040(race,0)), through the same
-   // owners. Same values when nothing is paused. PORT STAND-IN (flagged): teardown-only.
-   if(const auto& pausedRace=consumedStage.race()){
-    const bool app11C=originalMainApplication.animationPaused();
-    originalMainApplication.setExplicitAnimationPause(false);
-    const bool world=originalMainApplication.pauseConsumedRaceWorld1ACF50(*pausedRace,false);
-    const bool entity=originalMainApplication.pauseConsumedRaceEntity142040(*pausedRace,false);
-    std::cerr<<"common_teardown_pause app11C_was="<<app11C<<" world_1ACF50_resume="<<world
-        <<" race_142040_resume="<<entity<<'\n';
-   }
    // One stage close for every course: audio, the counted race and its World
    // at race+74 (1B2870 retire), then the Track's own release (roles in
    // reverse order, then the archive 1316A0; R1/R3).
@@ -3013,6 +2992,7 @@ SessionExit50DU Context::run() {
         <<consumedStage.closeMaterialDiagnostic.sourcePC<<std::dec<<'\n';
     return closeRejected("consumed race/world retirement");
    }
+   if(originalMainApplication.animationPaused())originalMainApplication.setExplicitAnimationPause(false);
   }
   // The course's track bank (1316A0) is released by the Track itself inside the
   // stage close above (course_archive_release is printed there).
@@ -3194,7 +3174,8 @@ SessionExit50DU Context::run() {
      // stamp taken at GO) belongs to the race that is now restarted. An uncommitted arm is
      // dropped so the restarted race arms again at its own GO with a fresh stamp
      // (advanceOriginalAiManager); a committed result stays committed.
-     if(tournamentResultArmed&&!tournamentResultCommitted){
+     if(!replay1B0bit4&&tournamentResultArmed&&!tournamentResultCommitted){
+      originalMainApplication.riderProfile->cancelTournamentResultForRace(originalAiSession.manager);
       tournamentResultArmed=false;
       try{std::cerr<<"tournament_arm reset at=1AEA70 reason=in_place_restart\n";}catch(...){}
      }
@@ -3244,7 +3225,9 @@ SessionExit50DU Context::run() {
       // PORT STAND-IN (flagged): racer350+100 = racer10A4 has no port field.
       if(!replay1B0bit4){rr::game::initializePlayerLapCursor50GF(lapContinuity.state);playerEvents.value1098=5.f;}
       // The Ready lease publishes on the next ordinary graphics sequence.
-      originalManualResetGraphicsDue=graphicsSequence[0]+1u;
+      // Live physics publishes the next 21A660 pose. Results instead publishes
+      // the recorded racer model from race78 on its first replay update.
+      if(slot==0&&!replay1B0bit4)originalManualResetGraphicsDue=graphicsSequence[0]+1u;
      }else{
       // 1AEB88 virtual78 = 216A30 (original AI), same owner set as 2255B0.
       std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
@@ -3323,30 +3306,6 @@ SessionExit50DU Context::run() {
     if(ready){pc=0;why=nullptr;}
     return ready;
    }catch(...){return false;}
-  };
-  // Common rewrite (item 0): after the whole 1AC8E0 body (race1B0 bit4 clear), the fresh
-  // race's one neutral setup tick for every racer (setupTickRacers above), every course and
-  // pod: each restarted racer publishes graphics/ground (21A660 graphics, the light owner's
-  // updateAfterGraphics) exactly as after the cold load, which the render gate and the
-  // racers' light leases require after their 1AEA70 reset. A racer that refuses names its
-  // slot, pod and cause; the restart is refused.
-  const auto restartSetupTick1AC8E0=[&]()noexcept->bool{
-   const platform::WindowInput50DQ noKeys{};
-   const bool wasSetup=raceSetupFrame;
-   raceSetupFrame=true;
-   bool ok=false;std::string why;
-   try{setupTickRacers(noKeys);ok=true;}
-   catch(const std::exception& e){try{why=e.what();}catch(...){}}
-   catch(...){try{why="unknown exception";}catch(...){}}
-   raceSetupFrame=wasSetup;opponentFrame=false;
-   try{
-    const auto slot=setupTickSlot;
-    std::cerr<<"race_start_setup_tick pc=1AEA70 racers="<<racerBank.count()<<" ok="<<ok;
-    if(!ok)std::cerr<<" refused_slot="<<slot<<" pod="<<(slot<racerRigs.size()&&racerRigs[slot]?racerRigs[slot]->podId:std::string("?"))
-        <<" reason="<<why;
-    std::cerr<<" graphics_sequence0="<<graphicsSequence[0]<<" graphics_due="<<originalManualResetGraphicsDue<<'\n';
-   }catch(...){}
-   return ok;
   };
   interactive_publication50DU::Context publicationContext50DU{
   .track=track,
@@ -3589,7 +3548,6 @@ SessionExit50DU Context::run() {
       std::uint32_t,bool)noexcept>{restartGridPlacement1AEA70},
   .restartGridPreflightCall=interactive_frame50DU::BorrowedCall<bool(std::size_t,std::uint32_t&,const char*&)noexcept>{
       restartGridPreflight1AEA70},
-  .restartSetupTickCall=interactive_frame50DU::BorrowedCall<bool()noexcept>{restartSetupTick1AC8E0},
   .renderDiagnostics=renderDiagnostics,
   .renderedCameraPublication=renderedCameraPublication,
   .renderer=renderer,
@@ -3822,7 +3780,7 @@ bool OriginalRaceConstructor50LA::initializeNativeRacerB0(
        !world74_||world74_->trackData()!=&track||!world74_->track||
        !track.roles.collision||!track.roles.collision->queryReady()||!profile_||
        profile_!=context.originalMainApplication.riderProfile||
-       context.originalAiHumanCount>1u||context.originalAiHumanCount>bank.count()||
+       context.originalAiHumanCount>2u||context.originalAiHumanCount>bank.count()||
        context.originalAiOpponentCount!=bank.count()-context.originalAiHumanCount)return false;
     try {
         // Original1A6F4C calls2A1160,1A6F54 publishes B8, then1A6F5C

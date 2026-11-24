@@ -187,8 +187,8 @@ private:
     bool listenerCustodyCurrent(bool allowIncomplete)const noexcept;
     bool currentIncludingIncompleteListener()const noexcept;
     bool listenerTerminalCleanupCurrent()const noexcept;
-    bool beginSingleRaceListener1A4620(const ListenerManager&,Diagnostic&)noexcept;
-    bool removeSingleRaceListener103040(const ListenerManager&,Diagnostic&)noexcept;
+    bool beginRaceListeners1A4620(const ListenerManager&,std::uint32_t,Diagnostic&)noexcept;
+    bool removeRaceListeners103040(const ListenerManager&,Diagnostic&)noexcept;
     bool listenerCurrent(const ListenerManager&)const noexcept;
     //Private actual-manager/Registration lane borrow; neither a public spatial
     //provider nor proof that an original D48 constructor/resource loader ran.

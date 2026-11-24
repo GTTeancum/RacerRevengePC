@@ -305,11 +305,19 @@ public:
     PlayerLoadingPresenter50DU(GameHost50ER& host,const std::filesystem::path& root,const char* code,std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile,std::uint64_t sessionIndex):host_(host),root_(root),code_(code),sessionIndex_(sessionIndex),profile_(std::move(profile)){}
     // Loading-screen +3C after an original 1CC900 call.
     void progress(float total)noexcept {progress3C_=total;stepped_=true;}
-    bool draw(const char*,bool=false)noexcept try {
+    const std::vector<unsigned char>& pixels()const noexcept {return pixels_;}
+    bool draw(const char*,bool=false,const std::vector<unsigned char>* frozen=nullptr,
+        std::uint64_t overlay=0)noexcept try {
         if(!host_.created()||!host_.hasWindow()||!host_.current())return false;
         const auto info=host_.info();if(info.minimized||info.drawableWidth<=0||info.drawableHeight<=0)return true;
         if(!load()||gl_.error()!=0)return false;
-        const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start_).count();compose(elapsed);if(!composeText())return false;
+        const auto elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start_).count();if(frozen){
+            if(frozen->size()!=pixels_.size()||frozen->empty())return false;
+            const unsigned alpha=std::min(128u,unsigned(overlay>>24)&255u);
+            for(std::size_t i=0;i<pixels_.size();i+=4)
+                for(unsigned c=0;c<3;++c)
+                    pixels_[i+c]=static_cast<unsigned char>(((*frozen)[i+c]*(128-alpha)+((overlay>>(8*c))&255u)*alpha)/128);
+        }else{compose(elapsed);if(!composeText())return false;}
         const char* capture=std::getenv("RR_WINDOW_CAPTURE_DIR");
         const char* logsOnly=std::getenv("RR_EVIDENCE_LOGS_ONLY");
         const bool capturing=!(logsOnly&&std::string(logsOnly)=="1")&&capture&&*capture&&captures_<2&&(captures_==0||elapsed>=.5);

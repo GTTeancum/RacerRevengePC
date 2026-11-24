@@ -1,0 +1,90 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-bumpys-breakers",
+    "name": "Bumpy's Breakers (Aquilaris, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.3",
+    "description": "Bumpy's Breakers on Aquilaris, from Star Wars Episode I Racer (N64) model 135, as an add-on course (code nu, physics class B). AI class B (medium evidence); rival arcade-ark-roose/a2r-ark, Ark \"Bumpy\" Roose (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NU": "BUMPY'S BREAKERS",
+        "PLANET_NU": "AQUILARIS"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nu",
+        "code": "nu",
+        "archive": "TRACKS/NU.RES",
+        "name_key": "COURSE_NU",
+        "planet_name_key": "PLANET_NU",
+        "phy_class": "B",
+        "ai_class": "B",
+        "rival": "arcade-ark-roose/a2r-ark",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NU.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NU.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nu",
+        "enhancements": [
+          "surface_rules"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NU.RES",
+        "bytes": 1697168,
+        "sha256": "f8c2ac42a936c440e6e5749c95a12f9317c52157d913057cd8807f75246e6c1f",
+        "role": "course archive (members named tracks\\nu.* / anu.spl / mnu.spl / nuNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NU.PST",
+        "bytes": 66588,
+        "sha256": "13852a93e8a3c62f9ed07d9641a46f6c83f01b64416824048ed89b73e913665b",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NU.PST",
+        "bytes": 287772,
+        "sha256": "3989e6c898105a914f3f7a9f7b09c3bf7e02746f86d45afc7b88c6da1eaac30b",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      47100.0,
+      5960.0,
+      36760.0
+    ],
+    "target": [
+      24000.0,
+      1560.0,
+      18940.0
+    ]
+  }
+}

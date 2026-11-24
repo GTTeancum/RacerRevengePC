@@ -104,6 +104,7 @@ class OriginalDamage50LA final {
     Stage stage_=Stage::fresh;
     bool effects_=false,cpuPrepared_=false;
     Diagnostic terminal_;
+    std::array<const OriginalCameraViewportFields*,2> nativeViewports_{};
     OriginalDamageNativeDraw50LA nativeDraw_;
     OriginalDamage50LA(std::shared_ptr<OriginalApplicationEntities50LA> entities,
         std::uint64_t generation,std::shared_ptr<Domain> domain,
@@ -303,15 +304,16 @@ public:
     // storage. The original health/marker leaf is complete, never health-only.
     bool prepareNativeDisplay(const OriginalDamageNativeFrame50LA& frame,Diagnostic& d)noexcept {
         d={};nativeDraw_.prepared=false;nativeDraw_.quadCount=nativeDraw_.packetCount=0;
-        if(!nativeCpuResourcesPrepared()||!frame.viewport||frame.viewIndex||frame.raceMode8C!=0||
-           (frame.raceFlags1B0&3u)!=1u||frame.sessionGeneration!=entity_.session||
+        if(!nativeCpuResourcesPrepared()||!frame.viewport||frame.viewIndex>=2u||
+           frame.sessionGeneration!=entity_.session||
            !frame.cameraPublication||frame.cameraPublication<nativeDraw_.cameraPublication||
            nativeDraw_.serial==std::numeric_limits<std::uint64_t>::max())return stop(d,Error::phase,0x18f4d0);
         const auto& view=*frame.viewport;
         if(!view.prepared||!view.matricesReady||!view.sceneKey||view.sessionGeneration!=frame.sessionGeneration||
-           view.x1E0||view.y1E4||view.width1E8!=640||view.height1EC!=448||
-           (nativeDraw_.viewport&&nativeDraw_.viewport!=&view))return stop(d,Error::source,0x18ead0);
-        nativeDraw_.viewport=&view;nativeDraw_.cameraPublication=frame.cameraPublication;++nativeDraw_.serial;
+           !matchesRaceHudViewport(view,frame.viewIndex,frame.raceFlags1B0&3u,frame.raceMode8C,
+               (frame.raceFlags1B0&16u)||(frame.raceEntityFlags29&4u)||(frame.uiFlags1E4&1u))||
+           (nativeViewports_[frame.viewIndex]&&nativeViewports_[frame.viewIndex]!=&view))return stop(d,Error::source,0x18ead0);
+        nativeViewports_[frame.viewIndex]=&view;nativeDraw_.viewport=&view;nativeDraw_.cameraPublication=frame.cameraPublication;++nativeDraw_.serial;
         state_.raceModeC58=frame.raceMode8C;
         if(!state_.predraw18F4D0(frame.viewIndex,frame.damage7D4,frame.damage7DC,frame.damage7D0,frame.damage7D8))
             return stop(d,Error::geometry,0x18f4d0);

@@ -10,6 +10,11 @@
 
 namespace rr::platform {
 namespace {
+bool ordinaryEffectSlot(std::size_t slot) noexcept {
+    using Main=OriginalUiMainAudio50KG;
+    return (slot>=Main::effectVoiceForClip(1)&&slot<=Main::effectVoiceForClip(Main::effectVoiceCount))||
+           (slot>=Main::effectVoiceForClip(Main::effectVoiceCount+1)&&slot<=Main::effectVoiceForClip(Main::garageEffectVoiceCount));
+}
 bool validRate(std::uint32_t rate) noexcept { return rate >= 8000 && rate <= 192000; }
 bool validControls(float gain, float pitch, float pan) noexcept {
     return std::isfinite(gain) && gain >= 0.0f && gain <= 8.0f &&
@@ -555,7 +560,7 @@ AudioMixer50HD::NativeVoiceKind AudioMixer50HD::nativeDefaultVoiceKind(std::size
     // Actual retained frontend producers: stereo Song stream, six sample
     // effect instances, Rider stream; four authenticated Scene sample slots.
     if(slot==0||slot==7)return NativeVoiceKind::stream;
-    if(slot>=1&&slot<=6)return NativeVoiceKind::sample;
+    if(ordinaryEffectSlot(slot))return NativeVoiceKind::sample;
     if(nativeSceneRouting_.command&&slot>=nativeSceneRouting_.firstVoice&&
        slot-nativeSceneRouting_.firstVoice<nativeSceneRouting_.voiceCount)return NativeVoiceKind::sample;
     return NativeVoiceKind::unknown;
@@ -751,7 +756,7 @@ bool AudioMixer50HD::playNativeSourceOrdinarySample(const OriginalApplicationAur
     std::size_t slot,const AudioClip50HD& clip,float gain,float pitch,
     const NativeSourceSampleStart50KG& source)noexcept {
     float left=0.f,right=0.f;
-    if(slot<1||slot>6||slot>=count_||!nativeSourceWetProcessor_||
+    if(!ordinaryEffectSlot(slot)||slot>=count_||!nativeSourceWetProcessor_||
        !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_)||
        !nativeWetVoiceAdmitted(slot)||!canRecordControlChanges(1)||
        !validClip(clip)||!validControls(gain,pitch,0.f)||source.stream1A8||

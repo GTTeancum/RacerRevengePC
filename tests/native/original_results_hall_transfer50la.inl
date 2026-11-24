@@ -53,22 +53,22 @@ bool Application::prepareResultsHallTransfer50LA(rr::game::OriginalRaceConstruct
     }catch(...){return false;}
 }
 bool Application::commitResultsHallTransfer50LA(rr::game::OriginalRaceConstructor50LA& race,
-    const rr::game::OriginalRaceRecordInsertionStage50KG& stage,
-    rr::platform::OriginalSaveProfileOwner50KG& prepared)const noexcept {
+    const rr::game::OriginalRaceRecordRacerObservation50KG& values)const noexcept {
     if(!resultsInputContinuationCurrent50LA())return false;
     const auto p=resultsHallTransfer50LA_;const auto input=resultsInputContinuation50LA_;
     if(!p||p->phase!=NativeResultsHallTransfer50LA::Phase::prepared||!p->enrolled||
        p->race.get()!=&race||p->entities!=entitiesOwner_||p->profile!=riderProfile||p->common!=profile||p->video!=videoOwner_||
        input->sourceCallPC!=0x1ca678u||!input->fade.complete()||
        input->profile.generation!=p->stamp.generation||input->profile.mode34!=p->stamp.mode34||
-       stage.secondHumanRanks()||stage.profileMode34()!=0u||
+       p->stamp.mode34!=0u||
        (race.endEntryProfile_&&(race.endEntryProfile_->generation!=p->stamp.generation||
         race.endEntryProfile_->mode34!=p->stamp.mode34)))return false;
     // No callback or foreign mutation between either private write and the
     // corresponding exact immediate-descendant stamp reconciliation.
     p->phase=NativeResultsHallTransfer50LA::Phase::committing;
     rr::platform::OriginalUiRiderProfileStamp50KG after;
-    if(!p->profile->commitSingleHumanHallRecords1AC440(stage,prepared,p->stamp,after))return false;
+    rr::game::OriginalRaceRecordInsertionStage50KG::Diagnostic insertion;
+    if(!p->profile->commitSingleHumanRaceRecords1AC440(values,1u,p->stamp,after,insertion))return false;
     if(after.generation!=p->stamp.generation+1u||after.mode34!=p->stamp.mode34)return false;
     p->stamp=after;input->profile=after;if(race.endEntryProfile_)race.endEntryProfile_=after;
     if(!p->profile->markResultsHallDirty1CA6E4(p->stamp))return false;

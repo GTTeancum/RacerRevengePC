@@ -22,8 +22,19 @@ namespace original_camera_session50KX {
 // the PHY already authenticated by its retained original racer rig. No source
 // decoder is run by recovery tooling: these calls belong to the native game.
 struct AuthoredStorage {
-    std::vector<std::uint8_t> cam,tob;
+    std::vector<std::uint8_t> cam,tob,secondCam;
     AuthoredInputs inputs{};
+    void loadSecondRacer(const std::string& pod,const std::vector<std::uint8_t>& phy){
+        using runtime_startup50fl::require;
+        require(!cam.empty()&&secondCam.empty()&&!phy.empty()&&original_player_identity50IK::admittedPodId(pod),
+            "second camera requires its selected racer rig");
+        secondCam=runtime_startup50fl::readBytes(original_player_identity50IK::podCamera(
+            std::filesystem::path("work/native/project/disc/PODS"),pod));
+        require(!secondCam.empty(),"second selected camera CAM unavailable");
+        inputs.secondCam=secondCam.data();inputs.secondCamBytes=secondCam.size();
+        inputs.secondPhy=reinterpret_cast<const char*>(phy.data());inputs.secondPhyBytes=phy.size();
+        inputs.secondPhyIdentity=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&phy));
+    }
     // Throws (runtime_startup50fl::require) before publishing anything.
     void load(const common_track50CR::Track& track,const std::string& pod,
         const std::vector<std::uint8_t>& actualPhy) {

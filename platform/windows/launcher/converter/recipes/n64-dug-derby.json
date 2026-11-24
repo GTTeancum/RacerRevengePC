@@ -1,0 +1,88 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-dug-derby",
+    "name": "Dug Derby (Malastare, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.3",
+    "description": "Dug Derby on Malastare, from Star Wars Episode I Racer (N64) model 228, as an add-on course (code nd, physics class B). AI class B (medium evidence); rival arcade-elan-mak/a2r-ela, Elan Mak (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_ND": "DUG DERBY",
+        "PLANET_ND": "MALASTARE"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nd",
+        "code": "nd",
+        "archive": "TRACKS/ND.RES",
+        "name_key": "COURSE_ND",
+        "planet_name_key": "PLANET_ND",
+        "phy_class": "B",
+        "ai_class": "B",
+        "rival": "arcade-elan-mak/a2r-ela",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_ND.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_ND.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nd"
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/ND.RES",
+        "bytes": 510130,
+        "sha256": "9a373672ff39da09591f75851fd484b051f4c8b93dc26e1ade501054a8a4e9ab",
+        "role": "course archive (members named tracks\\nd.* / and.spl / mnd.spl / ndNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_ND.PST",
+        "bytes": 66588,
+        "sha256": "22c7e1f90cb439023a70313284170ff532ec5ed15001ecc2647b9b381f18cb8b",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_ND.PST",
+        "bytes": 287772,
+        "sha256": "1816d31dac421949570abe321bdcf8415494f0d68831808d8456fb98a48b61a8",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      4418.0,
+      2894.0,
+      7276.0
+    ],
+    "target": [
+      6653.0,
+      2234.0,
+      1300.0
+    ],
+    "exposure": 0.85
+  }
+}

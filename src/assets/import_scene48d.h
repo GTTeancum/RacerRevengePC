@@ -14,6 +14,7 @@ struct SceneLimits48D {
     // stays V4_16, preserving prior rejection of unproven float V4_32 assets.
     // Caller must establish this original resource uses the compressed path.
     bool allow_signed32_quantized_positions = false;
+    bool allow_collision_only = false;
 };
 struct SceneNode48D {
     std::string name;

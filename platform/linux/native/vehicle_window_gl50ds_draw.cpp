@@ -1301,6 +1301,11 @@ bool VehicleWindowGl50DS::Storage::drawDynamicWorld(U bank, bool transparent) no
             const bool deferred = faded || (span.sourcePassCount == 1 &&
                 material.policy.blend != VehicleWindowBlend50DS::opaque);
             if (deferred != transparent) continue;
+            if(frameDynamicWorld.uvOffset){
+                float u=0.f,v=0.f;
+                if(!frameDynamicWorld.uvOffset(frameDynamicWorld.uvOwner,i,u,v))return false;
+                gl.uniform4f(trackUvTranslationUniform,u,v,0.f,0.f);
+            }
             diagnostic->dynamicWorldSpan = i;
             diagnostic->texture = material.textureIndex;
             VehicleWindowMaterialBinding50DS fadedPolicy = material.policy;
@@ -2388,6 +2393,28 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // PC-native FXAA smooths the completed 3D scene only; every HUD,
         // Results, F8 and Pause layer below is drawn afterwards, unsmoothed.
         if (!s.drawFxaa(bank)) return false;
+        if(s.splitPass){
+            const auto& layout=s.frameGameplayBlur;
+            auto& gl=s.gl;
+            const U target=s.targets[bank];
+            gl.disable(0x0C11);
+            gl.bindFramebuffer(readFramebuffer,target);gl.readBuffer(colorAttachment);
+            gl.bindFramebuffer(drawFramebuffer,s.gameplaySceneTarget);gl.drawBuffer(colorAttachment);
+            gl.blitFramebuffer(0,0,s.width,s.height,0,0,s.width,s.height,colorBufferBit,0x2600);
+            gl.bindFramebuffer(drawFramebuffer,target);gl.drawBuffer(colorAttachment);
+            if(s.splitPass==2){
+                if(s.splitFirstTarget==target)return fail(*s.diagnostic,VehicleWindowError50DS::frame,"split pair reused the first render target");
+                gl.bindFramebuffer(readFramebuffer,s.splitFirstTarget);gl.readBuffer(colorAttachment);
+                gl.blitFramebuffer(0,0,s.width,s.height,0,0,s.width,s.height,colorBufferBit,0x2600);
+            }
+            const auto& rect=s.splitPass==1?layout.cameraRectangle:layout.secondRectangle;
+            const auto x=[&](I v){return I(std::int64_t(v)*s.width/layout.originalWidth);};
+            const auto y=[&](I v){return s.height-I(std::int64_t(v)*s.height/layout.originalHeight);};
+            gl.bindFramebuffer(readFramebuffer,s.gameplaySceneTarget);gl.readBuffer(colorAttachment);
+            gl.blitFramebuffer(0,0,s.width,s.height,x(rect.left),y(rect.bottom),x(rect.right),y(rect.top),colorBufferBit,0x2601);
+            gl.bindFramebuffer(framebuffer,target);gl.drawBuffer(colorAttachment);
+            if(!s.check("compose original racer camera rectangle"))return false;
+        }
         // 1AAE38/48/58/68 attach C8/CC/D0/C4 through141960 tail append;
         // 141D70 traverses firstChild18/next14. Preserve that HUD sibling order.
         // These explicit native joins do not claim recovered parent traversal.
@@ -2395,7 +2422,8 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
         // tail.1A8698 directly draws Results BEFORE1A86C8 visits F8 children.
         // Results admission rejects an active preceding source Pause; its
         // unrelated existing native Pause route remains unchanged otherwise.
-        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawRaceStartOverlay(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank) || !s.drawNativeResultsPackets(bank) || !s.drawNativeF8Bars(bank) || !s.drawPauseDerived(bank)) return false;
+        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawRaceStartOverlay(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank)) return false;
+        if(s.splitPass!=1&&(!s.drawGameplayBlur(bank)||!s.drawNativeResultsPackets(bank)||!s.drawNativeF8Bars(bank)||!s.drawPauseDerived(bank)))return false;
         s.traceRendererStage("hud_blur",stageStart);
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
@@ -2576,10 +2604,19 @@ bool VehicleWindowGl50DS::Storage::validateGameplayBlurFrame(const GameplayBlurF
             r.left,r.top,r.right,r.bottom,0};
         if(!native::admitGameplayBlurNativePass(p))
             return fail(d,VehicleWindowError50DS::frame,"gameplay blur original camera rectangle unavailable");
-        // This join renders one original view. Never silently consume or discard
-        // another view's real queue while pretending split-screen is supported.
-        for(U i=1;i<4;++i)if(input->pending->requested[i] || gameplayBlurVideo.view[i].fixed)
-            return fail(d,VehicleWindowError50DS::frame,"gameplay blur split-view owner is not joined");
+        if(input->hasSecondView){
+            const auto& b=input->secondRectangle;
+            const native::GameplayBlurNativePassParameters second{input->originalWidth,input->originalHeight,
+                b.left,b.top,b.right,b.bottom,0};
+            if(!native::admitGameplayBlurNativePass(second)||r.left!=0||r.top!=0||
+               b.right!=input->originalWidth||b.bottom!=input->originalHeight||
+               !((r.right==b.left&&r.bottom==b.bottom&&b.top==0)||
+                 (r.bottom==b.top&&r.right==b.right&&b.left==0)))
+                return fail(d,VehicleWindowError50DS::frame,"inconsistent gameplay blur split rectangles");
+        }
+        for(U i=input->hasSecondView?2u:1u;i<4;++i)
+            if(input->pending->requested[i]||gameplayBlurVideo.view[i].fixed)
+                return fail(d,VehicleWindowError50DS::frame,"gameplay blur request outside active views");
         return true;
     }
 
@@ -2600,54 +2637,58 @@ bool VehicleWindowGl50DS::Storage::drawGameplayBlur(std::uint8_t bank) noexcept 
         if(!frameGameplayBlurEnabled)return true;
         // Original manager consumption is a Render3D event. It does not advance
         // on simulation ticks, a readback, a pause menu or display fade samples.
-        const auto result=game::consumeGameplayBlur(*frameGameplayBlur.pending,0,0,
-            frameGameplayBlur.cameraRectangle,gameplayBlurVideo);
-        if(result!=game::GameplayBlurConsumeResult::consumed && result!=game::GameplayBlurConsumeResult::no_request)
-            return fail(*diagnostic,VehicleWindowError50DS::frame,"original gameplay blur queue consumption rejected");
-        diagnostic->gameplayBlurRequestConsumed=result==game::GameplayBlurConsumeResult::consumed;
-        const auto& video=gameplayBlurVideo.view[0];
-        diagnostic->gameplayBlurFixed=video.fixed;
-        if(!video.fixed)return true;
-        if(!gameplayHistoryValid)
-            return fail(*diagnostic,VehicleWindowError50DS::noImage,"positive gameplay blur has no actual completed display history");
-        const auto& r=video.rectangle;
-        const native::GameplayBlurNativePassParameters p{frameGameplayBlur.originalWidth,frameGameplayBlur.originalHeight,
-            r.left,r.top,r.right,r.bottom,video.fixed};
-        if(!native::admitGameplayBlurNativePass(p))
-            return fail(*diagnostic,VehicleWindowError50DS::frame,"persistent gameplay blur rectangle exceeds current original video extent");
-        // Renderbuffer scene -> distinct immutable texture. The output remains
-        // the inactive native race FBO; neither sampled image is attached there.
-        gl.disable(0x0C11);gl.disable(0x8DB9);
-        gl.bindFramebuffer(readFramebuffer,targets[bank]);gl.readBuffer(colorAttachment);
-        gl.bindFramebuffer(drawFramebuffer,gameplaySceneTarget);gl.drawBuffer(colorAttachment);
-        gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
-        bool accepted=check("snapshot completed Render3D scene for gameplay blur");
-        if(accepted){
-            gl.bindFramebuffer(framebuffer,targets[bank]);gl.drawBuffer(colorAttachment);
-            if(gl.clipControl)gl.clipControl(0x8CA1,0x935E);
-            gl.viewport(0,0,width,height);
-            constexpr U disabled[]={0x0BE2,0x0B71,0x0B90,0x0C11,0x0B44,0x8C89,0x0BF2,0x0BD0,0x8DB9,
-                0x8037,0x809D,0x80A0,0x809E};
-            for(U capability:disabled)gl.disable(capability);
-            for(I i=0;i<clipDistances;++i)gl.disable(0x3000+static_cast<U>(i));
-            gl.depthMask(0);gl.colorMask(1,1,1,1);gl.polygonMode(0x0408,0x1B02);
-            gl.useProgram(gameplayBlurProgram);drawGl.bindVertexArray(gameplayBlurVertexArray);
-            gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,gameplayHistoryColors[gameplayHistoryPublished]);
-            if(gl.bindSampler)gl.bindSampler(0,0);
-            gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,gameplaySceneColor);
-            if(gl.bindSampler)gl.bindSampler(1,0);
-            gl.uniform1i(gameplayHistoryUniform,0);gl.uniform1i(gameplayCurrentUniform,1);
-            gl.uniform2i(gameplayOriginalSizeUniform,p.originalWidth,p.originalHeight);
-            gl.uniform2i(gameplayNativeSizeUniform,width,height);
-            gl.uniform2i(gameplayHistorySizeUniform,gameplayHistoryWidth,gameplayHistoryHeight);
-            gl.uniform4i(gameplayViewportUniform,p.left,p.top,p.right,p.bottom);
-            gl.uniform1i(gameplayFixedUniform,p.fixed);
-            accepted=check("bind native original gameplay blur inputs");
-            if(accepted){gl.drawArrays(0x0004,0,3);accepted=check("draw original displayed-history gameplay blur");}
-            if(accepted)++diagnostic->gameplayBlurDraws;
+        for(unsigned view=0;view<(frameGameplayBlur.hasSecondView?2u:1u);++view){
+            const auto& rectangle=view?frameGameplayBlur.secondRectangle:frameGameplayBlur.cameraRectangle;
+            const auto result=game::consumeGameplayBlur(*frameGameplayBlur.pending,view,view,
+                rectangle,gameplayBlurVideo);
+            if(result!=game::GameplayBlurConsumeResult::consumed && result!=game::GameplayBlurConsumeResult::no_request)
+                return fail(*diagnostic,VehicleWindowError50DS::frame,"original gameplay blur queue consumption rejected");
+            diagnostic->gameplayBlurRequestConsumed|=result==game::GameplayBlurConsumeResult::consumed;
+            const auto& video=gameplayBlurVideo.view[view];
+            diagnostic->gameplayBlurFixed=video.fixed;
+            if(!video.fixed)continue;
+            if(!gameplayHistoryValid)
+                return fail(*diagnostic,VehicleWindowError50DS::noImage,"positive gameplay blur has no actual completed display history");
+            const auto& r=video.rectangle;
+            const native::GameplayBlurNativePassParameters p{frameGameplayBlur.originalWidth,frameGameplayBlur.originalHeight,
+                r.left,r.top,r.right,r.bottom,video.fixed};
+            if(!native::admitGameplayBlurNativePass(p))
+                return fail(*diagnostic,VehicleWindowError50DS::frame,"persistent gameplay blur rectangle exceeds current original video extent");
+            // Renderbuffer scene -> distinct immutable texture. The output remains
+            // the inactive native race FBO; neither sampled image is attached there.
+            gl.disable(0x0C11);gl.disable(0x8DB9);
+            gl.bindFramebuffer(readFramebuffer,targets[bank]);gl.readBuffer(colorAttachment);
+            gl.bindFramebuffer(drawFramebuffer,gameplaySceneTarget);gl.drawBuffer(colorAttachment);
+            gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
+            bool accepted=check("snapshot completed Render3D scene for gameplay blur");
+            if(accepted){
+                gl.bindFramebuffer(framebuffer,targets[bank]);gl.drawBuffer(colorAttachment);
+                if(gl.clipControl)gl.clipControl(0x8CA1,0x935E);
+                gl.viewport(0,0,width,height);
+                constexpr U disabled[]={0x0BE2,0x0B71,0x0B90,0x0C11,0x0B44,0x8C89,0x0BF2,0x0BD0,0x8DB9,
+                    0x8037,0x809D,0x80A0,0x809E};
+                for(U capability:disabled)gl.disable(capability);
+                for(I i=0;i<clipDistances;++i)gl.disable(0x3000+static_cast<U>(i));
+                gl.depthMask(0);gl.colorMask(1,1,1,1);gl.polygonMode(0x0408,0x1B02);
+                gl.useProgram(gameplayBlurProgram);drawGl.bindVertexArray(gameplayBlurVertexArray);
+                gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,gameplayHistoryColors[gameplayHistoryPublished]);
+                if(gl.bindSampler)gl.bindSampler(0,0);
+                gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,gameplaySceneColor);
+                if(gl.bindSampler)gl.bindSampler(1,0);
+                gl.uniform1i(gameplayHistoryUniform,0);gl.uniform1i(gameplayCurrentUniform,1);
+                gl.uniform2i(gameplayOriginalSizeUniform,p.originalWidth,p.originalHeight);
+                gl.uniform2i(gameplayNativeSizeUniform,width,height);
+                gl.uniform2i(gameplayHistorySizeUniform,gameplayHistoryWidth,gameplayHistoryHeight);
+                gl.uniform4i(gameplayViewportUniform,p.left,p.top,p.right,p.bottom);
+                gl.uniform1i(gameplayFixedUniform,p.fixed);
+                accepted=check("bind native original gameplay blur inputs");
+                if(accepted){gl.drawArrays(0x0004,0,3);accepted=check("draw original displayed-history gameplay blur");}
+                if(accepted)++diagnostic->gameplayBlurDraws;
+            }
+            const bool restored=restoreGameplayBlurState(targets[bank]);
+            if(!accepted||!restored)return false;
         }
-        const bool restored=restoreGameplayBlurState(targets[bank]);
-        return accepted && restored;
+        return true;
     }
 
 void VehicleWindowGl50DS::Storage::noteGameplayDisplayPending(U target,I w,I h) noexcept {

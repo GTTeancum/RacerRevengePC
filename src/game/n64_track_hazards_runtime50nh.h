@@ -29,6 +29,8 @@
 // Host memory only; every index bounds-checked against N64HazardLimits50NH.
 #include "n64_track_hazards50nh.h"
 #include "camera_shake_relay50cs.h"
+#include "n64_pillar_camera_shake50nh.h"
+#include "n64_explosion50nh.h"
 #include "undertrack_reposition50et.h"
 #include "../assets/import_decode48c.h"
 #include <algorithm>
@@ -77,7 +79,7 @@ public:
 };
 
 struct N64ExplodeRequest50NH {
-    bool pending = false, left = false;
+    bool pending = false, left = false, waitForDeath = false;
     std::size_t row = 0;
     const char* gate = "all";             // local | near_camera | all
     float dist = 0.f;                     // to the nearest viewport stand-in (ft)
@@ -88,6 +90,7 @@ struct N64BreakDamageRequest50NH {
     static constexpr std::size_t capacity = 8;  // DamageHits <= 8 (reader bound)
     bool pending = false;
     std::size_t row = 0, count = 0;
+    float thrustFactor = 1.f;
     std::array<unsigned, capacity> mask{};      // 221754 component flag: 1 = index 1, 0x10 = index 0
     std::array<float, capacity> amount{};
 };
@@ -101,7 +104,8 @@ public:
     // read only for the test switch rows.
     template<class Rules>
     void loadCourse(const std::vector<N64HazardRow50NH>& authored, const Rules& rules,
-                    const std::vector<std::uint8_t>* archiveBytes, const char* mapMember, const char* site) noexcept {
+                    const std::vector<std::uint8_t>* archiveBytes, const char* mapMember, const char* site,
+                    const std::vector<std::string>& animatedCarriers, std::uint32_t firstAnimatedIdentity) noexcept {
         reset();
         try {
             std::vector<N64HazardRow50NH> rows = authored;
@@ -110,6 +114,9 @@ public:
             if (rows.size() > L::rows) { std::cerr << "n64_hazards refused site=" << site << " reason=rows_exceed_owner rows=" << rows.size() << '\n'; return; }
             ownerNames_.clear();
             if (rules.loaded()) for (std::size_t k = 0; k < rules.ownerCount(); ++k) ownerNames_.push_back(rules.ownerName(static_cast<std::uint32_t>(k)));
+            staticOwnerCount_ = ownerNames_.size();
+            firstAnimatedIdentity_ = firstAnimatedIdentity;
+            for (const auto& name : animatedCarriers) ownerNames_.push_back(lower(name));
             std::vector<std::vector<std::uint32_t>> resolved(rows.size());
             for (std::size_t i = 0; i < rows.size(); ++i) {
                 const auto& r = rows[i];
@@ -156,8 +163,24 @@ public:
         std::cerr << "n64_hazards race_reset rows=" << hazards_.size() << '\n';
     }
     bool active() const noexcept { return loaded_; }
+    double firstShownAnimationTime() const noexcept { return firstShownAnimationTime_; }
+    void setViewportEye(std::size_t viewport,float x,float y,float z,float lookX,float lookZ) noexcept {
+        if(viewport>=cameraEyes_.size())return;
+        cameraEyes_[viewport]={x,y,z};
+        cameraForward_[viewport]={lookX,lookZ};
+        cameraValid_[viewport]=std::isfinite(x)&&std::isfinite(y)&&std::isfinite(z);
+    }
+    void clearViewportEye(std::size_t viewport) noexcept {
+        if(viewport<cameraValid_.size())cameraValid_[viewport]=false;
+    }
+    std::uint32_t animatedCarrier(std::uint32_t identity) const noexcept {
+        if (identity < firstAnimatedIdentity_) return UINT32_MAX;
+        const auto index = staticOwnerCount_ + std::size_t(identity - firstAnimatedIdentity_);
+        return index < ownerNames_.size() ? static_cast<std::uint32_t>(index) : UINT32_MAX;
+    }
 
     // The common track-animation runtime binds itself here (or nullptr when it goes away).
+    void bindImpactSound(std::weak_ptr<N64ImpactSound50NH> sound) noexcept { impactSound_=sound; }
     void bindAnimation(N64TrackAnimationPort50NH* port) noexcept { animation_ = port; if (loaded_) resolveTargets(); }
 
     // Race loop, once per tick while racing: race clock for logs, door guard timers, effects.
@@ -166,24 +189,35 @@ public:
         const double dt = haveClock_ ? raceSeconds - raceSeconds_ : 0.0;
         raceSeconds_ = raceSeconds; haveClock_ = true;
         if (!(dt > 0.0) || dt > 1.0) return;
+        for(auto& phase:explosionPhase_)phase.advanceProtection(dt);
+        n64PillarCameraShake50NH.advance(dt);
         for (auto& t : toggles_) t.machine.advance(static_cast<float>(dt));
         for (std::size_t i = 0; i < effects_.size(); ++i) {
-            auto& e = effects_[i]; if (!e.live) continue;
+            auto& e = effects_[i];
+            if(e.quake!=QuakeStage::idle){
+                e.age+=static_cast<float>(dt);
+                const auto& target=targets_[i];
+                if(e.quake==QuakeStage::armed&&e.age>1.5f){
+                    const bool hidden=animation_&&animation_->hide(target.row,true);
+                    const bool shown=animation_&&animation_->show(target.effect)&&animation_->fire(target.effect);
+                    n64Log50NH("n64_quake collapse trigger=%u clock=%g structure_hidden=%d effect_playing=%d\n",
+                               hazards_.row(i).trigger,double(e.age),int(hidden),int(shown));
+                    if(shown&&firstShownAnimationTime_<0.)firstShownAnimationTime_=raceSeconds_;
+                    e.age=0.f;e.quake=QuakeStage::collapsed;
+                }else if(e.quake==QuakeStage::collapsed&&e.age>2.2f){
+                    const bool hidden=animation_&&animation_->hide(target.effect,false);
+                    n64PillarCameraShake50NH={};
+                    n64Log50NH("n64_quake clear trigger=%u clock=%g effect_hidden=%d\n",hazards_.row(i).trigger,double(e.age),int(hidden));
+                    e={};
+                }
+                continue;
+            }
+            if (!e.live) continue;
             e.age += static_cast<float>(dt);
             const auto& q = hazards_.row(i).actions[0].breakObject;
-            if (e.age >= q.effectFade) { endEffect(i, true); continue; }
+            if (e.age >= q.effectLifetime) { endEffect(i, true); continue; }
             if (!animation_ || !targets_[i].effectValid) continue;
-            float w[16]{}; w[0] = w[5] = w[10] = w[15] = 1.f;
-            float scale = 1.f;
-            if (e.follow && e.slot < L::slots && humanValid_[e.slot]) {
-                // N64 swrObjTrig_F2: the pod's position + 12 x its forward axis (vB).
-                for (unsigned k = 0; k < 3; ++k) w[12 + k] = humanPos_[e.slot][k] + q.effectAhead * forward_[e.slot][k];
-            } else {
-                const auto& c = hazards_.row(i).centre;
-                for (unsigned k = 0; k < 3; ++k) w[12 + k] = c[k];
-                scale = e.follow ? 1.f : q.effectAiScale;
-            }
-            animation_->setTransform(targets_[i].effect, w, scale, (q.effectFade - e.age) / q.effectFade);
+            positionBreakEffect(i);
         }
     }
 
@@ -193,9 +227,10 @@ public:
     struct StepInput {
         N64HazardStep50NH step;
         bool flight = false;
+        bool recovering = false;
+        float frameSeconds = 0.f;
         bool boosting = false;            // Revenge boost word (+64) nonzero [I] for N64 WAS_BOOSTING
         float forward[3]{0.f, 0.f, 1.f};  // pod body forward axis (effect placement)
-        float dt = 0.f;
         bool havePosition = true;
     };
     void afterStep(StepInput in) noexcept {
@@ -211,15 +246,26 @@ public:
         // not motion; no crossing is tested across it.
         float jump = 0.f; for (unsigned k = 0; k < 3; ++k) jump += (in.step.current[k] - in.step.previous[k]) * (in.step.current[k] - in.step.previous[k]);
         if (jump > 100.f * 100.f) return;
-        // PORT STAND-IN (flagged): the N64 FORCE_GROUND "near a viewport camera" test uses
-        // the nearest human pod (each viewport's camera rides within tens of feet of it).
-        float nearest = 1e30f;
-        for (std::size_t h = 0; h < L::slots; ++h) if (humanValid_[h]) {
-            float d2 = 0.f; for (unsigned k = 0; k < 3; ++k) d2 += (in.step.current[k] - humanPos_[h][k]) * (in.step.current[k] - humanPos_[h][k]);
-            nearest = std::min(nearest, std::sqrt(d2));
+        in.step.speed=N64TrackHazards50NH::signedStepSpeed(in.step.previous,in.step.current,
+            in.forward,in.frameSeconds,in.flight||in.recovering);
+        auto& phase=explosionPhase_[slot];
+        phase.advanceRacer(in.frameSeconds,in.step.speed);
+        float nearest=1e30f;
+        for(std::size_t view=0;view<cameraEyes_.size();++view){
+            if(!cameraValid_[view])continue;
+            float distanceSquared=0.f;
+            for(unsigned k=0;k<3;++k){
+                const auto delta=in.step.current[k]-cameraEyes_[view][k];
+                distanceSquared+=delta*delta;
+            }
+            nearest=std::min(nearest,std::sqrt(distanceSquared));
         }
         in.step.nearestCameraDistance = nearest;
         if (respawn_[slot].armed && in.step.alive) { in.step.alive = false; in.step.notAliveReason = "respawning"; }
+        if(phase.exploding||phase.protectionSeconds>0.f){
+            in.step.alive=false;
+            in.step.notAliveReason=phase.exploding?"exploding":"respawn_invincible";
+        }
         N64HazardEvent50NH events[L::rows]{}; N64HazardSkip50NH skips[L::rows]{}; std::size_t skipCount = 0;
         const auto n = hazards_.step(in.step, events, L::rows, skips, L::rows, &skipCount);
         const unsigned lapKey = in.step.lap < 3 ? in.step.lap : 3u;
@@ -234,8 +280,13 @@ public:
     }
 
     // ---- consumers ----------------------------------------------------------------------
+    const N64Explosion50NH* exploding(std::size_t slot) const noexcept {
+        return slot<L::slots&&explosionPhase_[slot].exploding?&explosionPhase_[slot]:nullptr;
+    }
+    void cancelExplode(std::size_t slot) noexcept {if(slot<L::slots)explosionPhase_[slot]={};}
     bool takeExplode(std::size_t slot, N64ExplodeRequest50NH& out) noexcept {
-        if (slot >= L::slots || !explode_[slot].pending) return false;
+        if (slot >= L::slots || !explode_[slot].pending ||
+            (explode_[slot].waitForDeath&&!explosionPhase_[slot].dead)) return false;
         out = explode_[slot]; explode_[slot] = {}; return true;
     }
     // The 225C50 point dispatched the request (handler chosen there).
@@ -263,6 +314,7 @@ public:
         auto& r = respawn_[slot];
         n64Log50NH("n64_respawn slot=%u trigger=%u after_s=%g delay=%g restore=228110 placement=pending\n", unsigned(slot),
                    r.row < hazards_.size() ? hazards_.row(r.row).trigger : 0u, raceSeconds - r.destroyedAt, double(r.delay));
+        explosionPhase_[slot].respawn();
         r = {}; placement_[slot] = true; prevValid_[slot] = false;
     }
     bool takePlacement(std::size_t slot) noexcept {
@@ -280,25 +332,30 @@ public:
 private:
     struct Toggle { N64AnimationToggle50NH machine; bool guardLogged = false; };
     struct Target { bool valid = false, effectValid = false; std::size_t row = 0, effect = 0; };
-    struct Effect { bool live = false, follow = false; std::size_t slot = 0; float age = 0.f; };
+    enum class QuakeStage { idle,armed,collapsed };
+    struct Effect { QuakeStage quake=QuakeStage::idle; bool live = false, follow = false; std::size_t slot = 0; float age = 0.f; };
     struct Respawn { bool armed = false, destroyedSeen = false; float delay = 3.f; double destroyedAt = 0.0; std::size_t row = 0; };
 
     static std::string lower(std::string s) { for (auto& c : s) if (c >= 'A' && c <= 'Z') c = char(c - 'A' + 'a'); return s; }
     static const char* kindName(N64HazardKind50NH k) noexcept {
         return k == N64HazardKind50NH::explodePod ? "ExplodePod" : k == N64HazardKind50NH::breakObject ? "BreakObject" :
-               k == N64HazardKind50NH::animationPlay ? "AnimationPlay" : "AnimationToggle";
+               k == N64HazardKind50NH::earthquake ? "Earthquake" : k == N64HazardKind50NH::animationPlay ? "AnimationPlay" : "AnimationToggle";
     }
     static const std::int32_t& targetNumber(const N64HazardAction50NH& a) noexcept {
-        return a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNumber :
+        return a.kind == N64HazardKind50NH::earthquake ? a.quake.animationNumber :
+               a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNumber :
                a.kind == N64HazardKind50NH::animationPlay ? a.play.animationNumber : a.toggle.animationNumber;
     }
     static const std::string& targetRef(const N64HazardAction50NH& a) noexcept {
-        return a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNameRef :
+        return a.kind == N64HazardKind50NH::earthquake ? a.quake.animationNameRef :
+               a.kind == N64HazardKind50NH::breakObject ? a.breakObject.animationNameRef :
                a.kind == N64HazardKind50NH::animationPlay ? a.play.animationNameRef : a.toggle.animationNameRef;
     }
     void clearRace() noexcept {
-        explode_.fill({}); damage_.fill({}); respawn_.fill({}); placement_.fill(false);
-        prevValid_.fill(false); humanValid_.fill(false); haveClock_ = false; raceSeconds_ = 0.0;
+        for(auto& fx:effects_)fx={};
+        n64PillarCameraShake50NH={};cameraValid_.fill(false);
+        explosionPhase_.fill({});explode_.fill({}); damage_.fill({}); respawn_.fill({}); placement_.fill(false);
+        prevValid_.fill(false); humanValid_.fill(false); haveClock_ = false; raceSeconds_ = 0.0; firstShownAnimationTime_ = -1.0;
     }
     std::string ownerName(std::uint32_t k) const { return k < ownerNames_.size() ? ownerNames_[k] : std::string("none"); }
     const char* ownerNameView(std::uint32_t k) const noexcept { return k < ownerNames_.size() ? ownerNames_[k].c_str() : "none"; }
@@ -332,6 +389,8 @@ private:
             const auto number = targetNumber(a);
             const auto& ref = targetRef(a);
             if (number >= 1 || !ref.empty()) t.valid = resolveN64AnimationTarget50NH(number, ref, names, t.row);
+            if(a.kind==N64HazardKind50NH::earthquake)
+                t.effectValid=resolveN64AnimationTarget50NH(-1,a.quake.effectNameRef,names,t.effect);
             if (a.kind == N64HazardKind50NH::breakObject && (a.breakObject.effectAnimation >= 1 || !a.breakObject.effectNameRef.empty()))
                 t.effectValid = resolveN64AnimationTarget50NH(a.breakObject.effectAnimation, a.breakObject.effectNameRef, names, t.effect);
             std::cerr << "n64_trigger target trigger=" << hazards_.row(i).trigger << " row=" << (t.valid ? std::to_string(t.row) : std::string("missing"));
@@ -343,6 +402,22 @@ private:
         if (row < unboundLogged_.size() && unboundLogged_[row]) return;
         if (row < unboundLogged_.size()) unboundLogged_[row] = true;
         n64Log50NH("n64_trigger target_unbound trigger=%u action=%s reason=animation_runtime\n", hazards_.row(row).trigger, action);
+    }
+    void positionBreakEffect(std::size_t i) noexcept {
+        const auto& e=effects_[i];
+        const auto& q=hazards_.row(i).actions[0].breakObject;
+        float w[16]{}; w[0] = w[5] = w[10] = w[15] = 1.f;
+        float scale = 1.f;
+        if (e.follow && e.slot < L::slots && humanValid_[e.slot]) {
+            // N64 swrObjTrig_F2: the pod's position + 12 x its forward axis (vB).
+            for (unsigned k = 0; k < 3; ++k) w[12 + k] = humanPos_[e.slot][k] + q.effectAhead * forward_[e.slot][k];
+        } else {
+            const auto& c = hazards_.row(i).centre;
+            for (unsigned k = 0; k < 3; ++k) w[12 + k] = c[k];
+            scale = e.follow ? 1.f : q.effectAiScale;
+        }
+        const float opacity = std::max(0.f,(q.effectFade - e.age) / q.effectFade);
+        animation_->setTransform(targets_[i].effect, w, scale, std::floor(255.f*opacity)/255.f);
     }
     void endEffect(std::size_t i, bool log) noexcept {
         if (i >= effects_.size() || !effects_[i].live) return;
@@ -376,9 +451,11 @@ private:
                            double(in.step.nearestCameraDistance));
                 return;
             }
-            if (explode_[slot].pending) return;
+            if (explode_[slot].pending||explosionPhase_[slot].exploding) return;
+            explosionPhase_[slot].start(e.explosionSeconds);
             auto& q = explode_[slot]; q = {};
             q.pending = true; q.left = e.explodeLeft; q.row = e.row; q.after = a.explode.after; q.respawnDelay = a.explode.respawnDelay;
+            q.waitForDeath=!in.step.human;
             q.gate = in.step.human ? "local" : e.nearCamera ? "near_camera" : "all";
             q.dist = in.step.human ? 0.f : in.step.nearestCameraDistance;
             return;
@@ -400,7 +477,8 @@ private:
                     if (w > 0) used = std::min(sizeof damageText - 1, used + static_cast<std::size_t>(w));
                 }
             }
-            const float thrust = N64TrackHazards50NH::decelerator(q.thrustDeceleration, in.dt);
+            const float thrust = N64TrackHazards50NH::decelerator(q.thrustDeceleration, in.frameSeconds);
+            d.thrustFactor *= thrust;
             const float pitch = hazards_.soundPitch(q);
             bool hidden = false; const char* effect = in.step.human ? "follow" : "fixed";
             if (!animation_) unbound(e.row, "BreakObject");
@@ -408,17 +486,30 @@ private:
                 const auto& t = targets_[e.row];
                 if (t.valid) hidden = animation_->hide(t.row, true);                 // 1011A0 + collision off
                 if (t.effectValid) {
-                    endEffect(e.row, false);
-                    animation_->show(t.effect); animation_->fire(t.effect);            // FX row anim 0 (101170)
-                    auto& fx = effects_[e.row]; fx.live = true; fx.follow = in.step.human; fx.slot = slot; fx.age = 0.f;
+                    // N64 FX slot 0 has one model and animation clock across all asteroids.
+                    for(std::size_t i=0;i<effects_.size();++i)
+                        if(effects_[i].live&&targets_[i].effect==t.effect)endEffect(i,false);
+                    if(animation_->show(t.effect)&&animation_->fire(t.effect)&&animation_->setTime(t.effect,0.f)){
+                        auto& fx=effects_[e.row];fx.live=true;fx.follow=in.step.human;fx.slot=slot;fx.age=0.f;
+                        positionBreakEffect(e.row);
+                        if(firstShownAnimationTime_<0.)firstShownAnimationTime_=raceSeconds_;
+                    }
                 }
             }
             const bool targetValid = animation_ && targets_[e.row].valid;
-            n64Log50NH("n64_break trigger=%u slot=%u target=%lld hidden=%d collision_owners=%d thrust_factor=%g thrust_applied=0 boosting=%d"
-                       " damage=%s effect=%s sound=%s pitch=%g sound_played=0\n", r.trigger, unsigned(slot),
+            n64Log50NH("n64_break trigger=%u slot=%u target=%lld hidden=%d collision_owners=%d thrust_factor=%g boosting=%d"
+                       " damage=%s effect=%s sound=%s pitch=%g sound_played=%d\n", r.trigger, unsigned(slot),
                        targetValid ? static_cast<long long>(targets_[e.row].row) : -1LL, int(hidden), hidden ? 1 : 0, double(thrust),
                        int(in.boosting), damageText, animation_ && targets_[e.row].effectValid ? effect : "none",
-                       q.sound.empty() ? "-" : q.sound.c_str(), double(pitch));
+                       q.sound.empty() ? "-" : q.sound.c_str(), double(pitch), int(playImpact(q,in.step.current,pitch)));
+            return;
+        }
+        case N64HazardKind50NH::earthquake:{
+            const auto& target=targets_[e.row];
+            if(!animation_||!target.valid||!target.effectValid){unbound(e.row,"Earthquake");return;}
+            n64PillarCameraShake50NH.start(a.quake.feetPerUnit,0.25f,8.f,0.f);
+            auto& fx=effects_[e.row];fx.age=0.f;fx.quake=QuakeStage::armed;
+            n64Log50NH("n64_quake armed trigger=%u lap=%u\n",r.trigger,unsigned(in.step.lap+1));
             return;
         }
         case N64HazardKind50NH::animationToggle: {
@@ -430,7 +521,7 @@ private:
             const auto c = tg.machine.fire(q, animation_->time(row));
             if (!c.apply) {
                 if (!tg.guardLogged) { tg.guardLogged = true;
-                    n64Log50NH("n64_door anim=%u event=guard time=%g since_toggle=%g slot=%u\n", unsigned(row),
+                    n64Log50NH("n64_door anim=%u event=%s time=%g since_toggle=%g slot=%u\n", unsigned(row), c.event,
                                double(animation_->time(row)), double(since), unsigned(slot)); }
                 return;
             }
@@ -453,6 +544,11 @@ private:
                 fired = animation_->fire(row);
                 rated = q.rate == 1.f || animation_->setRate(row, q.rate, false);
             }
+            if(q.n64PillarShakeScale>0.f){
+                n64PillarCameraShake50NH.start(q.n64PillarShakeScale);
+                n64Log50NH("n64_pillar_shake trigger=%u slot=%u feet_per_unit=%g\n",r.trigger,unsigned(slot),double(q.n64PillarShakeScale));
+            }
+            if (q.show && shown && fired && firstShownAnimationTime_ < 0.0) firstShownAnimationTime_ = raceSeconds_;
             if (q.shake) cameraShakeRelay50CS.request({q.shakeMagnitude, q.shakeTime, q.shakeDecaying, q.shakeDelay});
             n64Log50NH("n64_play trigger=%u slot=%u target=%lld shown=%d fired=%d rate=%g rate_set=%d shake=%s magnitude=%g time=%g\n",
                        r.trigger, unsigned(slot), animation_ && targets_[e.row].valid ? static_cast<long long>(targets_[e.row].row) : -1LL,
@@ -519,16 +615,44 @@ private:
     N64TrackHazards50NH hazards_;
     std::vector<std::vector<std::uint32_t>> owners_;
     std::vector<std::string> ownerNames_;
+    std::size_t staticOwnerCount_ = 0;
+    std::uint32_t firstAnimatedIdentity_ = 0;
     std::vector<Toggle> toggles_;
     std::vector<Target> targets_;
     std::vector<Effect> effects_;
     std::vector<bool> unboundLogged_, skipLogged_;
+    std::weak_ptr<N64ImpactSound50NH> impactSound_;
+    std::array<std::array<float,2>,2> cameraForward_{};
+    bool playImpact(const N64BreakParams50NH& q, const float* position, float pitch) const noexcept {
+        auto owner=impactSound_.lock();
+        if(!owner || q.sound.empty())return false;
+        float distance=q.soundMaxDistance;
+        int angle=0;
+        for(std::size_t i=0;i<cameraEyes_.size();++i){
+            if(!cameraValid_[i])continue;
+            const float x=position[0]-cameraEyes_[i][0],y=position[1]-cameraEyes_[i][1],z=position[2]-cameraEyes_[i][2];
+            const float d=std::sqrt(x*x+y*y+z*z);
+            if(!(d<distance))continue;
+            distance=d;
+            const auto& f=cameraForward_[i];
+            angle=static_cast<int>(std::atan2(x*f[1]-z*f[0],x*f[0]+z*f[1])*57.29578f);
+            if(angle<0)angle+=360;  // Mixer bearing is clockwise, 0..359.
+        }
+        if(distance>=q.soundMaxDistance)return false;
+        const float gain=distance<=q.soundMinDistance?1.f:
+            (q.soundMaxDistance-distance)/(q.soundMaxDistance-q.soundMinDistance);
+        return owner->playImpact(q.sound,gain,pitch,angle);
+    }
     N64TrackAnimationPort50NH* animation_ = nullptr;
+    std::array<N64Explosion50NH,L::slots> explosionPhase_{};
     std::array<N64ExplodeRequest50NH, L::slots> explode_{};
     std::array<N64BreakDamageRequest50NH, L::slots> damage_{};
     std::array<Respawn, L::slots> respawn_{};
     std::array<bool, L::slots> placement_{}, prevValid_{}, humanValid_{};
+    std::array<std::array<float,3>,2> cameraEyes_{};
+    std::array<bool,2> cameraValid_{};
     float prev_[L::slots][3]{}, humanPos_[L::slots][3]{}, forward_[L::slots][3]{};
+    double firstShownAnimationTime_ = -1.0;
     double raceSeconds_ = 0.0; bool haveClock_ = false;
 };
 inline N64HazardRuntime50NH n64HazardRuntime50NH;

@@ -201,6 +201,7 @@ public:
     for(std::uint32_t r=0;r<row->bindings.count;++r){need(row->bindings.rows[r].sceneNode<row->hierarchy.nodeCount,"VUT binding outside the PSG");++row->bindings.rows[r].sceneNode;}
     row->graphCount=row->hierarchy.nodeCount+1;
     a::SceneLimits48D visual{};visual.input_bytes=row->psg.size();visual.allow_signed32_quantized_positions=true;
+    visual.allow_collision_only=authored.useCollision||authored.transformOnly;
     need(a::decodeScene48D(row->psg,row->scene,d.decode,nullptr,visual),"PSG visual decode rejected: "+row->psgMember);
     // The original model resource (240258, original_standard_model_resource50la.cpp) takes both
     // PSG forms: a node-palette model (palette trailer count 1, identity order) and the one-node

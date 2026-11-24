@@ -340,7 +340,7 @@ static bool decodeSceneInternal48D(const std::vector<std::uint8_t>& input, Scene
             progress(hooks, "scene_nodes", i + 1, nodeCount);
         }
         const auto materialCount = read.u32(at); at += 4;
-        require(materialCount >= 1 && materialCount <= 4096, DecodeKind48C::limit,
+        require((limits.allow_collision_only || materialCount >= 1) && materialCount <= 4096, DecodeKind48C::limit,
             "scene.material_count", at - 4, "Material count outside 1..4096");
         read.range(at, std::size_t(materialCount) * 64);
         parsed.materials.reserve(materialCount);
@@ -366,7 +366,7 @@ static bool decodeSceneInternal48D(const std::vector<std::uint8_t>& input, Scene
             const auto surfaceCount = read.u32(at + 4); at += 8;
             require(std::isfinite(lod.cutoff) && lod.cutoff > 0, DecodeKind48C::malformed,
                 "scene.lod_cutoff", at - 8, "LOD cutoff must be positive/finite");
-            require(surfaceCount >= 1 && surfaceCount <= 4096, DecodeKind48C::limit,
+            require((surfaceCount >= 1 || (limits.allow_collision_only && materialCount == 0)) && surfaceCount <= 4096, DecodeKind48C::limit,
                 "scene.surface_count", at - 4, "Surface count outside 1..4096");
             lod.surfaces.reserve(surfaceCount);
             for (unsigned surfaceIndex = 0; surfaceIndex < surfaceCount; ++surfaceIndex) {

@@ -11,6 +11,11 @@
     game::GameplayBlurVideoState gameplayBlurVideo{};
     GameplayBlurFrame50DS frameGameplayBlur{};
     bool frameGameplayBlurEnabled=false;
+    unsigned splitPass=0;
+    bool awaitingSecondView=false;
+    std::uint64_t splitCameraPublication=0;
+    I splitWidth=0,splitHeight=0;
+    U splitFirstTarget=0;
     std::uint8_t gameplayHistoryPublished=0;
     I gameplayHistoryWidth=0,gameplayHistoryHeight=0;
     I gameplayStagedWidth=0,gameplayStagedHeight=0;

@@ -77,6 +77,7 @@ bool addonCourseAllowsMode(unsigned number,AddonCourseMode mode) noexcept {
 }
 unsigned addonCourseForLaunch(unsigned mode34,unsigned subtype) noexcept {
     const unsigned number=selectedAddonCourse();
+    if(mode34==1)return subtype==1&&addonCourseAllowsMode(number,AddonCourseMode::vs)?number:0u;
     if(!number||mode34!=0)return 0;
     const auto mode=subtype==3?AddonCourseMode::timeTrial:AddonCourseMode::single;
     return (subtype>=1&&subtype<=3&&addonCourseAllowsMode(number,mode))?number:0u;

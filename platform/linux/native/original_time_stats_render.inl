@@ -6,6 +6,7 @@ struct TimeStats {
     static constexpr U maximumPackets=game::OriginalTimeStatsNativeDraw50LA::maximumPackets;
     static_assert(maximumQuads<=originalUiMaximumQuads50KG,"shared UI buffers must cover TimeStats");
     std::shared_ptr<const game::OriginalTimeStats50LA> owner;
+    HudViewports viewports;
     const game::OriginalCameraViewportFields* viewport=nullptr;
     std::uint64_t scene=0,generation=0,serial=0,publication=0;
     MaterialTextureGl50EB textures;

@@ -27,6 +27,8 @@
 #include <algorithm>
 #include <array>
 #include <cfenv>
+#include <cstring>
+#include "../../src/game/n64_track_hazards50nh.h"
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -65,7 +67,30 @@ struct Receipt {bool complete=false;std::size_t eligible=0,started=0,stopped=0,c
 // one centered one-shot on this owner's World4D8 transport pool (source gain 100,
 // pitch 4096, global delivery), replacing the TC-only two-voice owner. The
 // Results 26D070 stop claims exactly this owner's active World4D8 playbacks.
-class Owner final : public native_results_world_stop26D070::Owner {
+class Owner final : public native_results_world_stop26D070::Owner, public g::N64ImpactSound50NH {
+ struct ImpactClip {
+  std::string name;
+  std::vector<std::int16_t> samples;
+  std::uint32_t rate;
+  p::AudioClip50HD view()const noexcept{return {samples.data(),samples.size(),rate,1,0,0};}
+ };
+ std::vector<ImpactClip> impacts_;
+ void loadImpact(const ct::Track& track,const std::string& name){
+  if(name.empty()||std::any_of(impacts_.begin(),impacts_.end(),[&](const auto& clip){return clip.name==name;}))return;
+  ct::Bytes b;ct::Diagnostic diagnostic;
+  need(track.archive.member(name,b,2u*1024u*1024u,diagnostic)&&b.size()>=46,"impact WAV missing or truncated: "+name);
+  auto le16=[&](size_t i){return unsigned(b[i])|(unsigned(b[i+1])<<8);};
+  auto le32=[&](size_t i){return le16(i)|(le16(i+2)<<16);};
+  // Converter contract: canonical PCM16 mono RIFF, a 16-byte fmt chunk followed by data.
+  need(!std::memcmp(b.data(),"RIFF",4)&&le32(4)==b.size()-8&&!std::memcmp(b.data()+8,"WAVEfmt ",8)&&
+       le32(16)==16&&le16(20)==1&&le16(22)==1&&le16(32)==2&&le16(34)==16&&
+       !std::memcmp(b.data()+36,"data",4)&&le32(40)==b.size()-44&&!(b.size()%2),"invalid impact WAV: "+name);
+  ImpactClip clip{name,{},le32(24)};
+  clip.samples.resize((b.size()-44)/2);
+  for(size_t i=0;i<clip.samples.size();++i)clip.samples[i]=static_cast<std::int16_t>(le16(44+2*i));
+  need(p::AudioMixer50HD::validClip(clip.view()),"invalid impact sample rate: "+name);
+  impacts_.push_back(std::move(clip));
+ }
  struct TriggerClip {std::string name;p::AudioClip50HD clip{};};
  std::vector<TriggerClip> triggerClips_;    // one per distinct authored trigger Sound file
  static constexpr int triggerSlot=-2;        // assigned_ marker of a trigger one-shot
@@ -189,6 +214,8 @@ public:
    // Trigger Sound actions (05.09 trigger list, already read): distinct files.
    if(track.roles.triggerSource&&track.roles.triggerSource->ready()){
     const auto& triggers=*track.roles.triggerSource;
+    for(const auto& row:triggers.n64Rows())for(size_t i=0;i<row.actionCount;++i)
+     if(row.actions[i].kind==g::N64HazardKind50NH::breakObject)loadImpact(track,row.actions[i].breakObject.sound);
     for(std::size_t t=0;t<triggers.liveCount();++t)for(const auto& action:triggers.source(t).actions){
      if(action.kind!=course_trigger_sources50CT::ActionKind::Sound)continue;
      // PORT STAND-IN (flagged): a Positional trigger Sound needs the original's
@@ -211,7 +238,7 @@ public:
        <<" trigger_sounds="<<triggerClips_.size()<<" pcm="<<requests.size()<<" ambient_scheduling=unsupported native_transport_slots="<<voiceCount<<"\n";
    // Absent soul-tree data = no positional transport (ambient rows are retained
    // only; PORT STAND-IN, flagged: no ambient scheduler 0x2793A0/0x278D70).
-   if(!count_&&triggerClips_.empty()){error.clear();return true;}
+   if(!count_&&triggerClips_.empty()&&impacts_.empty()){error.clear();return true;}
    for(std::size_t i=0;i<voiceCount;++i)need(!mixer.active(firstVoice+i)&&!mixer.hasVoiceGroupGain50IC(firstVoice+i)&&
       groups.binding(firstVoice+i)==g::RaceAudioGroup50IC::Unrepresented&&groups.canBind(firstVoice+i,g::RaceAudioGroup50IC::World4D8),
       "positional pool conflicts with an actual owner");
@@ -227,10 +254,23 @@ public:
    need(logical_.bind(mixer,firstVoice,voiceCount)&&groups.bindRange(firstVoice,voiceCount,g::RaceAudioGroup50IC::World4D8),"positional transport bind rejected");
    // Each reusable transport is registered with actual PCM. No playback starts
    // here; service assigns the selected descriptor's clip after retirement.
-   const auto& first=count_?*clips_.at(0):triggerClips_.front().clip;
+   const auto first=count_?*clips_.at(0):(!triggerClips_.empty()?triggerClips_.front().clip:impacts_.front().view());
    for(std::size_t i=0;i<voiceCount;++i)need(logical_.registerClip(i,first,true),"positional slot registration rejected");
    ready_=true;error.clear();return true;
   }catch(const std::exception& e){blocked_=true;try{error=e.what();}catch(...){}return false;}
+ }
+ bool playImpact(const std::string& name,float gain,float pitch,int angle) noexcept override {
+  if(!ready())return false;
+  const auto clip=std::find_if(impacts_.begin(),impacts_.end(),[&](const auto& c){return c.name==name;});
+  if(clip==impacts_.end())return false;
+  for(std::size_t slot=0;slot<voiceCount;++slot){
+   if((assigned_[slot]!=-1&&assigned_[slot]!=triggerSlot)||mixer_->active(firstVoice+slot))continue;
+   auto* s=logical_.sound(slot);if(!s)return false;
+   s->clip=clip->view();s->available=true;s->loop1B0=0;
+   if(logical_.startSourceRate(*s,gain,pitch,false,angle)!=p::LogicalAudioOwner::Result::complete)return false;
+   assigned_[slot]=triggerSlot;return true;
+  }
+  return false;
  }
  bool ready()const noexcept{return ready_&&!blocked_&&!closed_&&current();}
  // This owner's World4D8 transport, for the Results 26D070 typed stop claim only.
@@ -284,6 +324,7 @@ public:
   if(mixer_)for(std::size_t slot=0;slot<mixer_->count();++slot)if(mixer_->active(slot)){
    p::AudioVoiceObservation50HD observed{};if(!mixer_->inspectVoice(slot,observed))return false;
    bool borrows=false;for(const auto& clip:bank_.clips)if(observed.voice.clip.samples==clip.pcm.samples.data())borrows=true;
+   for(const auto& clip:impacts_)if(observed.voice.clip.samples==clip.samples.data())borrows=true;
    if(borrows){const auto local=slot>=firstVoice&&slot<firstVoice+voiceCount?slot-firstVoice:voiceCount;
     const auto* owned=local<voiceCount?logical_.sound(local):nullptr;if(!owned||!logical_.active(*owned))return false;}
   }

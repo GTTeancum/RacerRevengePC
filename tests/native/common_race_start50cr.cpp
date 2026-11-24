@@ -167,11 +167,12 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     // as it was (no half-restarted race). Race-internal owners first, then the port-side
     // owners of every racer and the camera (Hooks::preflightRestart1AC8E0). What cannot be
     // tested without running it (a leaf's own internal refusal) still refuses at its step.
+    auto& flow=native_common_results50PD::state();
     {
         const auto refuseBefore=[&](Step s,std::uint32_t pc,const char* why)noexcept {
             out.ok=false;out.reached=s;out.refusedPc=pc?pc:stepPc(s);out.reason=why;return done(false);
         };
-        if(!native_common_results50PD::state().restartWorld)
+        if(!flow.resetTriggers||!flow.resetParticles||!flow.resetScene)
             return refuseBefore(Step::triggerReset2DCC70,0,"World74 restart owner (2DCC70/161F60/2702E0) absent");
         std::uint32_t pause=0;
         if(!application_.animationClock().readPause11C(pause))
@@ -179,7 +180,7 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
         if(r.music10C_&&!r.endHud_.lock())
             return refuseBefore(Step::music1AC960,0,"race HUD/music scope absent for 1AC960");
         if(!hooks.resetRacerTiming216690||!hooks.placeOnGrid2A2880||!hooks.lockStart1AED30||!hooks.resetCamera||
-           !hooks.showStartOverlay197040||(!bit4&&!hooks.restartSetupTick))
+           !hooks.showStartOverlay197040)
             return refuseBefore(Step::racers1AEA70,0,"1AC8E0 race start hook absent");
         // (race78's own belongsToRace identity test is the VCR's, reached only through
         // the race leaves at 1ACB18 / 1ACD68.)
@@ -196,15 +197,8 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
             return refuseBefore(Step::racers1AEA70,pc,why?why:"1AC8E0 restart preflight refused");
     }
     // ---- 1AC8E0 restart body, in the Step order (dis_all.txt 1AC8E0..1ACE48) ----
-    // 1AC900 World74+3D0 2DCC70; 161F60 and 2702E0 run through the same one
-    // world hook. PORT STAND-IN (flagged, existing): the track owners perform
-    // the three World74 leaves together at this first position.
     run.enter(Step::triggerReset2DCC70);
-    {
-        const char* why=nullptr;auto& world=native_common_results50PD::state().restartWorld;
-        if(!world)return run.fail(Step::triggerReset2DCC70,"World74 restart owner (2DCC70/161F60/2702E0) absent"),done(false);
-        if(!world(why))return run.fail(Step::triggerReset2DCC70,why?why:"World74 restart refused"),done(false);
-    }
+    flow.resetTriggers(); // 1AC90C World74+3D0 virtual80
     // 1AC914..938: the same App11C word; nonzero becomes zero, zero is not stored.
     run.enter(Step::app11CClear);
     {
@@ -231,17 +225,20 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
         // manager keeps the native race music owner; restartWorld restored it.
         std::fprintf(stderr,"race_start_step pc=1AC960 music10C=absent stand_in=1\n");
     }
-    run.enter(Step::particles161F60);run.enter(Step::world2702E0); // ran in the world hook above
+    const char* resetFailure=nullptr;
+    run.enter(Step::particles161F60);
+    if(!flow.resetParticles(resetFailure))return run.fail(Step::particles161F60,resetFailure),done(false);
+    run.enter(Step::world2702E0);
+    if(!flow.resetScene(resetFailure))return run.fail(Step::world2702E0,resetFailure),done(false);
     run.enter(Step::race90);
     r.field90_=0; // 1AC994
     // 1AC9A0 1AEA70 (per racer 216690 with its 217420 leaf; its 2A2880 placement
     // is the grid hook), 1AC9A8 1AED30.
     if(!racers1AEA70(run,hooks,out.racers)||!grid2A2880(run,hooks,out.racers,bit4)||!lock1AED30(run,hooks))return done(false);
     if(!bit4){
-        // 1ACA94..1ACAB8: race94 = 4.0, race1B0 bit2 clear. The 2AED60(raceFC,500)
-        // fade is the race's own 1A7BD0 fade-in after bit3 below (PORT STAND-IN,
-        // flagged: the 500 ms raceFC fade is not a separate native call here).
         run.enter(Step::countdown94);
+        if(!flow.fadeDeparture||!flow.fadeDeparture())
+            return run.fail(Step::countdown94,"1ACA8C race fade-out refused"),done(false);
         r.field94_=4.f;
         r.flags1B0KnownValue_=std::uint8_t(r.flags1B0KnownValue_&~0x04u);
         r.flags1B0KnownMask_=std::uint8_t(r.flags1B0KnownMask_|0x04u);
@@ -317,16 +314,7 @@ bool Owner::begin(const Request& request,const Hooks& hooks,Receipt& out)noexcep
     }
     // 1ACDF0 1983A0(raceD4): the race's start overlay reset (hook).
     if(!overlay197040(run,hooks))return done(false);
-    // The restarted pods publish graphics/ground through the fresh race's one neutral
-    // setup tick (PORT STAND-IN, see Hooks::restartSetupTick), after 1AFC70 cleared the
-    // manager's started bit, so the replayed intro runs on the fresh intro's path.
-    // race1B0 bit4 (Practice replay): the racers are posed by race78, no tick.
-    if(!bit4){
-        run.enter(Step::restartSetupTick);
-        if(!hooks.restartSetupTick)return run.fail(Step::restartSetupTick,"restart neutral setup tick owner absent"),done(false);
-        if(!(*hooks.restartSetupTick)())
-            return run.fail(Step::restartSetupTick,"restart neutral setup tick refused (race_start_setup_tick names the racer)"),done(false);
-    }
+    // The first scheduled racer update publishes the restarted grid.
     // 1ACE04 194CC0(raceD0): the port's race has no D0 time-stats object, which
     // is the original's beqz 1ACDFC skip.
     // This race's next finish runs a fresh 1A7DD0 invocation (the suspended
@@ -411,7 +399,8 @@ bool OriginalRaceConstructor50LA::backupPracticeVcr288630(bool& ran,OriginalSimp
     ran=false;d={};
     if(!vcr78Source_)return true; // race78 null: the original skips the VCR block
     if(!vcr78Source_->belongsToRace(*this)){d.sourcePC=0x1abd04;d.operation="1ABD04 race78 is not this race's VCR";return false;}
-    if(!vcr78Source_->copyBackup288630(d))return false;
+    std::int32_t channel=0;
+    if(!vcr78Source_->enableEndChannelsAndBackup1ABA68(*this,channel,d))return false;
     ran=true;return true;
 }
 } // namespace rr::game

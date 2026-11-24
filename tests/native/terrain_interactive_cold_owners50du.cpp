@@ -1,3 +1,4 @@
+#include "player_ai_pilot50du.h"
 // Cold stage bodies retain their original order and borrowed execution arena.
 #include "native_last_failure50pd.h"
 #include "terrain_interactive_cold_owners50du.h"
@@ -198,7 +199,7 @@ void OwnersContext::run() {
    // The actual human preset/configuration belongs to slot0. AI construction
    // uses its genuine mode58 branch and independent cold binding.
    if(!allAiEnabled){
-    if(racer!=0)racerSelection.configurationEntryNonzero=true;
+    if(originalAiOwnsSlot(racer))racerSelection.configurationEntryNonzero=true;
     x.configurationEntryNonzero=racerSelection.configurationEntryNonzero;
    }
    if(originalAiOwnsSlot(racer))racerSelection.mode58Nonzero=true;
@@ -211,7 +212,8 @@ void OwnersContext::run() {
         nativeChariotModels[racer].get());
    });
    // Every AI refusal below names the pod (coldRacerStage50DU), stock or add-on.
-   if(originalAiOwnsSlot(racer))coldRacerStage50DU(rig.podId,"AI cold owners (.ai, 16E2A0)",[&](){
+   const bool pilot=player_ai_pilot50DU::drives(racer)&&!originalAiOwnsSlot(racer);
+   if(pilot||originalAiOwnsSlot(racer))coldRacerStage50DU(rig.podId,"AI cold owners (.ai, 16E2A0)",[&](){
     rr::assets::ResArchive48C source;rr::assets::DecodeError48C error;std::vector<std::uint8_t> profileText;
     const auto sourceBytes=runtime_startup50fl::readBytes(rig.resourceFile);
     std::string lowerPod=rig.podId;for(char&c:lowerPod)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -230,7 +232,7 @@ void OwnersContext::run() {
     const auto* identity=original_racer_selection50IJ::findAnyByPodId(rig.podId.c_str());
     require50DU(identity,"original AI racer60 identity unavailable");
     AiCreateIdentity50IU createIdentity{};
-    require50DU(bindAiCreateIdentity50IU(static_cast<std::uint32_t>(racer-originalAiHumanCount),originalAiHumanCount,
+    require50DU(bindAiCreateIdentity50IU(pilot?static_cast<std::uint32_t>(racer):static_cast<std::uint32_t>(racer-originalAiHumanCount),pilot?0u:originalAiHumanCount,
         static_cast<std::int32_t>(identity->racer60),createSelection.freshCourseRecordPod11280,createIdentity),
         "original AI create identity unavailable");
     initializeAiRuntime50IV(createIdentity.ordinalFE0,identity->racer60,
@@ -244,6 +246,11 @@ void OwnersContext::run() {
     AiColdTrackBindingsView50CR tracks{};
     require50DU(bindAiColdTracks50IU(mapView,aiView,navigationProgress,tracks),
         "original AI cold track owners unavailable");
+    if(pilot){
+     originalAi.pilotNavigation=navigationProgress;
+     std::cerr<<"player_ai_pilot ready slot="<<racer<<" pod="<<rig.podId<<" driver=16E8C0\n";
+     return;
+    }
     s.fields.vehicle58=1u;s.fields.nativeAiOwnersBound50IV=true;s.fields.applicationByte58=0u;
     x.parameters.rates.x=4.f;
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;

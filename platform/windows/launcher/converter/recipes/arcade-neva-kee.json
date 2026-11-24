@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-neva-kee",
+    "name": "Neva Kee (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Neva Kee from Star Wars Racer Arcade, as an add-on pod (stem a2r_nev, 7 wreck pieces). Borrowed from stock pod 11 until own data exists: stats, pilot voice, camera presets, material set-ups, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_NEV": "NEVA KEE"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-nev",
+        "stem": "a2r_nev",
+        "archive": "PODS/A2R_NEV/A2R_NEV.RES",
+        "camera": "PODS/A2R_NEV/A2R_NEV.CAM",
+        "name_key": "RIDER_A2R_NEV",
+        "ui": {
+          "archive": "UI/A2R_NEV_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_nev.psg",
+          "character": [
+            "ui\\anim\\a2r_nevc.psg",
+            "ui\\anim\\a2r_nevc.mcf",
+            "ui\\anim\\a2r_nevc.vut",
+            "ui\\anim\\a2r_nevc_ent.mot",
+            "ui\\anim\\a2r_nevc_idl1.mot",
+            "ui\\anim\\a2r_nevc_idl2.mot",
+            "ui\\anim\\a2r_nevc_idl3.mot",
+            "ui\\anim\\a2r_nevc_breathe.mot",
+            "ui\\anim\\a2r_nevc_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_nevc_1.pst",
+            "ui\\textures\\a2r_nevc_1.psm",
+            "ui\\textures\\a2r_nevc_2.pst",
+            "ui\\textures\\a2r_nevc_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_nev_1.pst",
+            "UI\\Textures\\a2r_nev_2.pst",
+            "UI\\Textures\\a2r_nev_3.pst",
+            "ui\\textures\\a2r_nev_1.psm",
+            "ui\\textures\\a2r_nev_2.psm",
+            "ui\\textures\\a2r_nev_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_nev_shdw.pst",
+            "ui\\textures\\a2r_nev_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_nev_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_nev_bkg.pst",
+            "ui\\textures\\a2r_nev_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_nev_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_neve.psg",
+            "ui\\textures\\a2r_neve_1.pst",
+            "ui\\textures\\a2r_neve_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "layout_slot": "11"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_NEV/A2R_NEV.RES",
+        "bytes": 192687,
+        "sha256": "21eb484cb9e1901738ab2f5b533c37bc825bcc95c748917fa9b0e81d9bd0a16e",
+        "role": "pod archive (members named by the stem: pods\\a2r_nev\\..., textures\\a2r_nev_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_NEV/A2R_NEV.CAM",
+        "bytes": 5784,
+        "sha256": "fe8d63c4d3e1b617ec31e12180bdd992760908b6b9ef1b07a77474fc827d91d0",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_NEV_UI.RES",
+        "bytes": 206026,
+        "sha256": "48d32ae027a776068c527535806b5fb459850352600a073cb7bae4779067f1e6",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

@@ -1,4 +1,5 @@
 #include "original_follow_camera.h"
+#include "n64_pillar_camera_shake50nh.h"
 #include "chariot_scene49u.h"
 #include "scalar_minmax48o.h"
 #include "../assets/pod_physics49n.h"
@@ -7,6 +8,7 @@
 #include <climits>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -145,6 +147,13 @@ Result finish(C& c,OriginalFollowPoseWork& work,const OriginalFollowCollisionRes
     out.position=hit.position70;out.position.x=m.add(out.position.x,dx);
     out.position.y=m.add(out.position.y,dy);out.position.z=m.add(out.position.z,dz);
     out.target=work.collision.target80;out.fov=work.fov118;
+    if(n64PillarCameraShake50NH.scale>0.f){
+        static const bool trace=std::getenv("RR_TEST_N64_PILLAR_CAMERA")!=nullptr;
+        if(trace)std::fprintf(stderr,"n64_pillar_camera seconds=%g eye_y=%g target_y=%g\n",
+            n64PillarCameraShake50NH.elapsed,double(n64PillarCameraShake50NH.eyeHeight()),double(n64PillarCameraShake50NH.targetHeight()));
+        out.position.y=m.add(out.position.y,n64PillarCameraShake50NH.eyeHeight());
+        out.target.y=m.add(out.target.y,n64PillarCameraShake50NH.targetHeight());
+    }
     //115CE8 dispatch initializes camera mode1 and calls virtual+14;17A050
     //does not write the mode. No inherited procedural mode0 may leak through.
     out.mode=1;next.historyC0=hit.position70;next.historyD0=work.collision.target80;

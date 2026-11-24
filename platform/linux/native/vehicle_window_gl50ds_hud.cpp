@@ -18,6 +18,26 @@ inline double extraUnits(std::int32_t width,std::int32_t height) noexcept {
     const double available=double(width)/scale;
     return available>641.0?(available-640.0)*.5:0.0;
 }
+// Race HUD packets are local to their source camera rectangle.
+template<class Gl>
+double setPlayerCanvas(Gl& gl,int uniform,int width,int height,unsigned pass,const GameplayBlurFrame50DS& layout){
+    const double scale=std::min(double(width)/640.0,double(height)/448.0);
+    const double marginX=(width-640.0*scale)*.5,marginY=(height-448.0*scale)*.5;
+    double originX=marginX,originY=marginY;
+    const double extra=extraUnits(width,height);
+    int left=extra>0?0:int(std::floor(marginX)),right=extra>0?width:int(std::ceil(marginX+640*scale));
+    int bottom=int(std::floor(marginY)),top=int(std::ceil(marginY+448*scale));
+    if(pass){
+        const auto& r=pass==1?layout.cameraRectangle:layout.secondRectangle;
+        const auto x=[&](int v){return int(std::int64_t(v)*width/layout.originalWidth);};
+        const auto y=[&](int v){return int(std::int64_t(v)*height/layout.originalHeight);};
+        originX+=x(r.left);originY+=y(r.top);
+        left=x(r.left);right=x(r.right);bottom=height-y(r.bottom);top=height-y(r.top);
+    }
+    gl.uniform4f(uniform,float(2*scale/width),float(-2*scale/height),float(2*originX/width-1),float(1-2*originY/height));
+    gl.scissor(left,bottom,right-left,top-bottom);gl.enable(0x0C11);
+    return extra;
+}
 // Each draw packet (one text string, gleam or widget part) moves as a unit,
 // by the centre of its own extent, so no string or widget is ever split.
 template<class Packet>
@@ -1082,8 +1102,7 @@ bool VehicleWindowGl50DS::Storage::prepareTimeStatsFrame(const game::OriginalTim
     auto& h=*timeStats;const auto& source=owner->nativeDraw();const auto* v=source.viewport;
     if(!source.prepared||!source.serial||source.serial<h.serial||!source.cameraPublication||
        !v||!v->prepared||!v->matricesReady||!v->sceneKey||!v->sessionGeneration||
-       v->x1E0||v->y1E4||v->width1E8!=640||v->height1EC!=448||
-       (h.viewport&&(h.viewport!=v||h.scene!=v->sceneKey||h.generation!=v->sessionGeneration))||
+       !h.viewports.accepts(*v)||
        source.quadCount>TimeStats::maximumQuads||source.packetCount>TimeStats::maximumPackets||
        !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
     std::array<bool,TimeStats::maximumQuads> covered{};
@@ -1106,7 +1125,7 @@ bool VehicleWindowGl50DS::Storage::prepareTimeStatsFrame(const game::OriginalTim
         h.packets[p]=packet;
     }
     for(U q=0;q<source.quadCount;++q)if(!covered[q])return false;
-    h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
+    h.viewports.remember(*v);h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
     h.quads=source.quadCount;h.packetCount=source.packetCount;h.frame=h.quads!=0;return true;
 }
 
@@ -1128,12 +1147,7 @@ bool VehicleWindowGl50DS::Storage::drawTimeStats(U bank) noexcept {
     // Source alpha remains private; gameplay framebuffer alpha is not claimed.
     gl.colorMask(1,1,1,1);gl.enable(0x0B71);gl.depthFunc(0x0206);gl.depthRange(0,1);
     resetNativeGcLighting();gl.useProgram(uiProgram);
-    const double scale=std::min(double(width)/640.0,double(height)/448.0);
-    const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
-    gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
-    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
-        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    const double hudExtra=native_hud_margin50DS::setPlayerCanvas(gl,uiCanvasUniform,width,height,splitPass,frameGameplayBlur);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
     gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1f(uiAlphaUniform,1);gl.uniform1i(uiImageUniform,0);
@@ -1306,8 +1320,7 @@ bool VehicleWindowGl50DS::Storage::preparePositionStatsFrame(const game::Origina
     auto& h=*positionStats;const auto& source=owner->nativeDraw();const auto* v=source.viewport;
     if(!source.prepared||!source.serial||source.serial<h.serial||!source.cameraPublication||
        !v||!v->prepared||!v->matricesReady||!v->sceneKey||!v->sessionGeneration||
-       v->x1E0||v->y1E4||v->width1E8!=640||v->height1EC!=448||
-       (h.viewport&&(h.viewport!=v||h.scene!=v->sceneKey||h.generation!=v->sessionGeneration))||
+       !h.viewports.accepts(*v)||
        source.quadCount>PositionStats::maximumQuads||source.packetCount>PositionStats::maximumPackets||
        !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
     std::array<bool,PositionStats::maximumQuads> covered{};
@@ -1340,7 +1353,7 @@ bool VehicleWindowGl50DS::Storage::preparePositionStatsFrame(const game::Origina
         h.packets[p]=packet;
     }
     for(U q=0;q<source.quadCount;++q)if(!covered[q])return false;
-    h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
+    h.viewports.remember(*v);h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
     h.quads=source.quadCount;h.packetCount=source.packetCount;h.frame=h.quads!=0;return true;
 }
 
@@ -1362,12 +1375,7 @@ bool VehicleWindowGl50DS::Storage::drawPositionStats(U bank) noexcept {
     // Source alpha remains private; gameplay framebuffer alpha is not claimed.
     gl.colorMask(1,1,1,1);gl.enable(0x0B71);gl.depthFunc(0x0206);gl.depthRange(0,1);
     resetNativeGcLighting();gl.useProgram(uiProgram);
-    const double scale=std::min(double(width)/640.0,double(height)/448.0);
-    const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
-    gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
-    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
-        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    const double hudExtra=native_hud_margin50DS::setPlayerCanvas(gl,uiCanvasUniform,width,height,splitPass,frameGameplayBlur);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
     gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1f(uiAlphaUniform,1);gl.uniform1i(uiImageUniform,0);
@@ -1528,8 +1536,7 @@ bool VehicleWindowGl50DS::Storage::prepareDamageFrame(const game::OriginalDamage
     auto& h=*damage;const auto& source=owner->nativeDraw();const auto* v=source.viewport;
     if(!source.prepared||!source.serial||source.serial<h.serial||!source.cameraPublication||
        !v||!v->prepared||!v->matricesReady||!v->sceneKey||!v->sessionGeneration||
-       v->x1E0||v->y1E4||v->width1E8!=640||v->height1EC!=448||
-       (h.viewport&&(h.viewport!=v||h.scene!=v->sceneKey||h.generation!=v->sessionGeneration))||
+       !h.viewports.accepts(*v)||
        source.quadCount>Damage::maximumQuads||source.packetCount>Damage::maximumPackets||
        !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
     std::array<bool,Damage::maximumQuads> covered{};
@@ -1552,7 +1559,7 @@ bool VehicleWindowGl50DS::Storage::prepareDamageFrame(const game::OriginalDamage
         h.packets[p]=packet;
     }
     for(U q=0;q<source.quadCount;++q)if(!covered[q])return false;
-    h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;h.cameraPublication=source.cameraPublication;
+    h.viewports.remember(*v);h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;h.cameraPublication=source.cameraPublication;
     h.quads=source.quadCount;h.packetCount=source.packetCount;h.frame=h.quads!=0;return true;
 }
 
@@ -1575,12 +1582,7 @@ bool VehicleWindowGl50DS::Storage::drawDamage(U bank) noexcept {
     // Source alpha remains private; gameplay framebuffer alpha is not claimed.
     gl.colorMask(1,1,1,1);gl.enable(0x0B71);gl.depthFunc(0x0206);gl.depthRange(0,1);
     resetNativeGcLighting();gl.useProgram(uiProgram);
-    const double scale=std::min(double(width)/640.0,double(height)/448.0);
-    const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
-    gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
-    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
-        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    const double hudExtra=native_hud_margin50DS::setPlayerCanvas(gl,uiCanvasUniform,width,height,splitPass,frameGameplayBlur);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
     gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1f(uiAlphaUniform,1);gl.uniform1i(uiImageUniform,0);
@@ -2188,8 +2190,7 @@ bool VehicleWindowGl50DS::Storage::prepareSpeedBoostFrame(const game::OriginalSp
     auto& h=*speedBoost;const auto& source=owner->nativeDraw();const auto* v=source.viewport;
     if(!source.prepared||!source.serial||source.serial<h.serial||!source.cameraPublication||
        !v||!v->prepared||!v->matricesReady||!v->sceneKey||!v->sessionGeneration||
-       v->x1E0||v->y1E4||v->width1E8!=640||v->height1EC!=448||
-       (h.viewport&&(h.viewport!=v||h.scene!=v->sceneKey||h.generation!=v->sessionGeneration))||
+       !h.viewports.accepts(*v)||
        source.primitiveCount>SpeedBoost::maximumPrimitives||source.packetCount>SpeedBoost::maximumPackets||
        !h.textures.validBorrow(request.context,request.isCurrent,h.publication))return false;
     std::array<bool,SpeedBoost::maximumPrimitives> covered{};
@@ -2216,7 +2217,7 @@ bool VehicleWindowGl50DS::Storage::prepareSpeedBoostFrame(const game::OriginalSp
         h.packets[p]=packet;
     }
     for(U q=0;q<source.primitiveCount;++q)if(!covered[q])return false;
-    h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
+    h.viewports.remember(*v);h.viewport=v;h.scene=v->sceneKey;h.generation=v->sessionGeneration;h.serial=source.serial;
     h.primitives=source.primitiveCount;h.packetCount=source.packetCount;h.frame=h.primitives!=0;return true;
 }
 
@@ -2241,12 +2242,7 @@ bool VehicleWindowGl50DS::Storage::drawSpeedBoost(U bank) noexcept {
     // Source alpha remains private; gameplay framebuffer alpha is not claimed.
     gl.colorMask(1,1,1,1);gl.enable(0x0B71);gl.depthFunc(0x0206);gl.depthRange(0,1);
     resetNativeGcLighting();gl.useProgram(uiProgram);
-    const double scale=std::min(double(width)/640.0,double(height)/448.0);
-    const double ox=(width-640.0*scale)*.5,oy=(height-448.0*scale)*.5;
-    gl.uniform4f(uiCanvasUniform,float(2*scale/width),float(-2*scale/height),float(2*ox/width-1),float(1-2*oy/height));
-    const double hudExtra=native_hud_margin50DS::extraUnits(width,height);
-    gl.scissor(hudExtra>0?0:I(std::floor(ox)),I(std::floor(oy)),hudExtra>0?I(width):I(std::ceil(ox+640*scale))-I(std::floor(ox)),
-        I(std::ceil(oy+448*scale))-I(std::floor(oy)));gl.enable(0x0C11);
+    const double hudExtra=native_hud_margin50DS::setPlayerCanvas(gl,uiCanvasUniform,width,height,splitPass,frameGameplayBlur);
     gl.uniform1i(gcParticleModeUniform,0);gl.uniform1i(uiSourceCompositionUniform,1);
     gl.uniform1i(uiTexturedUniform,1);gl.uniform1i(uiSourceRasterUniform,0);gl.uniform1i(uiSourceFogEnabledUniform,0);
     gl.uniform1i(uiSourceAlphaTestUniform,0);gl.uniform1f(uiAlphaUniform,1);gl.uniform1i(uiImageUniform,0);

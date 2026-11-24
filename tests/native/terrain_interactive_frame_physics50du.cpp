@@ -1,3 +1,4 @@
+#include "player_ai_pilot50du.h"
 // Source-identical Physics suffix; all queries retain the original live Context.
 #include "terrain_interactive_frame_calls50du.h"
 #include "terrain_interactive_storage50du.h"
@@ -104,7 +105,7 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
       static_cast<std::uint32_t>(life.physical19C)<s.sceneNodeCount&&
       refreshSceneWorld49P(graph,life.main190),"test undertrack drop requires the racer's scene forest");
   const float fromY=s.nodes[static_cast<std::uint32_t>(life.main190)].world100.v[13];
-  const float step=rr::game::nativeTestUndertrackY50UT-99.f-fromY;
+  const float step=rr::game::nativeTestUndertrackY50UT+rr::game::undertrackPlane50ZG-99.f-fromY;
   std::cerr<<(testUndertrackDrop?"test_undertrack armed":"n64_respawn drop")<<" slot="<<actualRacerSlot<<" frame="<<completedFrames<<" from_y="<<fromY<<'\n';
   const SceneDisplacement49P down{{0.f,step,0.f,0.f}};
   for(const auto node:{life.main190,life.physical19C,life.hidden198}){
@@ -130,9 +131,11 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  std::optional<rr::game::ScopedZeroGravityStep50ZG> zeroGravityScope;
  if(rr::game::zeroGravity50ZG.active()){
   rr::game::ZeroGravityStepInput50ZG zg{};
-  zg.human=s.fields.vehicle58==0u;
-  zg.from=zg.human?navigationProgress.reset.vehicleC8C:navigationProgress.vehicleC84;
-  zg.to=zg.human?navigationProgress.reset.vehicleC88:navigationProgress.reset.vehicleC80;
+  const bool pilot=player_ai_pilot50DU::drives(actualRacerSlot)&&s.fields.vehicle58==0u;
+  zg.human=s.fields.vehicle58==0u&&!pilot;
+  const auto& route=pilot?originalAi.pilotNavigation:navigationProgress;
+  zg.from=zg.human?route.reset.vehicleC8C:route.vehicleC84;
+  zg.to=zg.human?route.reset.vehicleC88:route.reset.vehicleC80;
   for(unsigned i=0;i<3;++i)zg.position[i]=s.bodies.main.components.root.body.position.v[i];
   zg.steer=s.bodies.main.controls.player.raw.values[0];        // both: the racer's own steering channel
   zg.pitchStick=s.bodies.main.components.bindings.aeroAux50;    // stick Y as 48W binds it (human only read)
@@ -183,7 +186,8 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
  const Vector3_48C queryListener{{audioListener.x,0.f,audioListener.z}};
  auto withTrackQuery=[&](bool secondary,std::uint32_t actualCollider,auto&& queryOperation){
   const track_collision_world50CR::QueryLease lease{actualRacerSlot,qfilter.identity,actualCollider,
-      &navigationProgress.reset.vehicleC80,audioListenerReady?&queryListener:nullptr,audioListenerReady?1u:0u};
+      &navigationProgress.reset.vehicleC80,audioListenerReady?&queryListener:nullptr,audioListenerReady?1u:0u,
+      player_ai_pilot50DU::drives(actualRacerSlot)?&originalAi.pilotNavigation.reset.vehicleC80:nullptr};
   VehicleLiveQueryResult50EQ result{};bool entered=false;
   const bool accepted=collisionWorld.queryRacer(racerBank,lease,[&](track_runtime_storage50IG::Storage& actual){
    if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
@@ -602,13 +606,14 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
   st.alive=state40==0u&&!limping;
   st.notAliveReason=(state40==1u||state40==2u||limping)?"limping":"dead";
   for(unsigned i=0;i<3;++i)st.current[i]=s.bodies.main.components.root.body.position.v[i];
-  st.speed=s.bodies.main.cachedSpeed34;
+  hz.frameSeconds=s.bodies.main.frameFactor;
   st.lap=lapContinuity.state.vehicleCC8; // [I] CC8 = laps completed (N64 +0x78 lap 0/1/2)
   // Carrier owners (N64 0x800665A4: the surface under the pod). Flight: the
   // floor under the line (every owner of the .nft surface, else the zero-g
   // line owner); otherwise this step's collected static owners.
   std::array<std::uint32_t,64> carriers{};std::size_t carrierCount=0;
   hz.flight=rr::game::zeroGravityStepIs50ZG(rr::game::ZeroGravityMode50ZG::Flight);
+  hz.recovering=rr::game::zeroGravityStepIs50ZG(rr::game::ZeroGravityMode50ZG::Recover);
   if(hz.flight){
    const auto& floor=rr::game::zeroGravity50ZG.floorTable();
    const auto* list=floor.lastValid(actualRacerSlot)?floor.owners(floor.lastSurface(actualRacerSlot)):nullptr;
@@ -618,12 +623,13 @@ bool Context::advancePhysics(std::size_t actualRacerSlot,Part part,float liveSub
    const auto& terrain=terrainResult.terrain;
    const auto count=std::min<std::uint32_t>(terrain.collectedCount,static_cast<std::uint32_t>(terrain.collectedIdentities.size()));
    for(std::uint32_t i=0;i<count&&carrierCount<carriers.size();++i){
-    const auto o=rr::game::surfaceRules50ST.ownerOfIdentity(terrain.collectedIdentities[i]);
+    const auto identity=terrain.collectedIdentities[i];
+    auto o=rr::game::surfaceRules50ST.ownerOfIdentity(identity);
+    if(o==rr::game::noSurfaceOwner50ST)o=rr::game::n64HazardRuntime50NH.animatedCarrier(identity);
     if(o!=rr::game::noSurfaceOwner50ST)carriers[carrierCount++]=o;}
   }
   st.groundOwners=carriers.data();st.groundOwnerCount=carrierCount;
   hz.boosting=boostState.vehicle64!=0u; // [I] Revenge boost word for N64 WAS_BOOSTING
-  hz.dt=s.bodies.main.schedule.factorPerSubstep;
   const auto main190=static_cast<std::uint32_t>(x.bindings.lifecycle.main190);
   if(main190<s.sceneNodeCount){const auto& w=s.nodes[main190].world100.v;hz.forward[0]=w[8];hz.forward[1]=w[9];hz.forward[2]=w[10];}
   rr::game::n64HazardRuntime50NH.afterStep(hz);

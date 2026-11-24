@@ -146,20 +146,8 @@ public:
         if(!vcr->startRecord1A80C8(*race_,d)){why=d.operation?d.operation:"287B60 rejected";return false;}
         for(auto& t:tracks_)t.samples.clear();captured_.fill(false);
         // race1B0 bit3 is not touched here: only 1A7C18 clears it, after 2AEE90 accepted
-        // the race fade-in (acceptedFreshFadeIn1A7C18 / the 1A7BD0 owner, every course).
+        // the race fade-in (1A7BD0, every course).
         phase_=Phase::recording;lastWrites_=0;return true;
-    }
-    // 1A7C18 for the fresh race (constructor race1B0 bit3 = 1), every course and pod: the
-    // fresh race's first 1A7BD0 runs on the camera Session's projection of race1B0 (the
-    // restored-camera publication, before the counted end route is engaged). Once that
-    // Session's bit3 is clear, 2AEE90 accepted the fade-in, so the race's own bit3 is
-    // cleared the same way (the in-place restart's 1A7BD0 clears it directly). Only bit3,
-    // only when the Session reports it clear; nothing else is stored.
-    static bool acceptedFreshFadeIn1A7C18(OriginalRaceConstructor50LA& race,std::uint8_t sessionFlags1B0)noexcept{
-        if(sessionFlags1B0&8u)return false;
-        race.flags1B0KnownValue_=std::uint8_t(race.flags1B0KnownValue_&~8u);
-        race.flags1B0KnownMask_=std::uint8_t(race.flags1B0KnownMask_|8u);
-        return true;
     }
     // 1A7F40..1A80EC (race update, non-subtype-3, B4 flags58 bits3..4 = 1 or 3,
     // i.e. a human lap event, and the association head 3C[0]+48 bit0 clear):
@@ -279,6 +267,12 @@ public:
         OriginalSimpleVCRDiagnostic50LA d;
         if(!vcr->reset287BE0(d)||!vcr->setPlayback(false,d)){why=d.operation?d.operation:"loop rejected";return false;}
         ++stats_.loops;return true;
+    }
+    unsigned resultsRacerSlot()const noexcept {
+        // 1ABB9C passes S1 from the completed human-place scan to 1AF330.
+        if(!race_||raceWeak_.expired()||!race_->endWaitingPlaceScan_)return 0;
+        const auto slot=race_->endWaitingPlaceScan_->valueS1;
+        return slot<0?0u:static_cast<unsigned>(slot);
     }
     float playTime()const noexcept{
         return race_&&!raceWeak_.expired()&&race_->vcr78Source_?race_->vcr78Source_->state().play34:0.f;

@@ -1,3 +1,5 @@
+#include "original_second_human_input50sv.h"
+#include "player_ai_pilot50du.h"
 #include "../../src/assets/dlc_files50dl.h"
 #include "../../src/game/original_ui_game_options_controller50kg.h" // C15: 1865B4 profile reset (soundMode1101C)
 #include "native_last_failure50pd.h"
@@ -558,9 +560,19 @@ SessionExit50DU Context::run() {
  StartMusicContext startMusicContext{raceMusic.get(),liveAudio.get(),&nativeOrdinaryLaunch11258};
  const auto requestStartMusic=+[](void* opaque,std::int32_t song,std::int32_t argument)noexcept {
   auto* context=static_cast<StartMusicContext*>(opaque);
-  return context&&context->music&&context->audio&&context->sourceEventType&&
-      (((song==44||song==45)&&argument==1)||(song==25&&argument==0))&&context->audio->outputOpen()&&
-      context->music->request(static_cast<std::uint32_t>(song),static_cast<std::uint32_t>(argument),*context->sourceEventType).completed();
+  if(!context||!context->music||!context->audio||!context->sourceEventType||!context->audio->outputOpen()||
+      !(((song==44||song==45)&&argument==1)||(song==25&&argument==0)))return false;
+  auto request=[&](){return context->music->request(song,argument,*context->sourceEventType);};
+  auto receipt=request();
+  using Result=race_music50IE::Result;
+  // Pause Restart can leave 1AC960's stream envelope queued on the paused mixer.
+  // A zero-cut start requests its song before the first regular mixer update.
+  if(receipt.result==Result::PendingTimedVolume26C8F0||receipt.result==Result::PendingFade234440){
+   if(context->music->update(0.f).completed())receipt=request();
+  }
+  if(!receipt.completed())std::fprintf(stderr,"race_start_music_refused song=%d status=%u pc=%x\n",
+      song,unsigned(receipt.result),receipt.sourcePlayPC);
+  return receipt.completed();
  };
  const auto requestIntroMusicFade=+[](void* opaque,float seconds)noexcept {
   auto* context=static_cast<StartMusicContext*>(opaque);
@@ -818,10 +830,14 @@ SessionExit50DU Context::run() {
    if(humanCourseEnabled){
     // Same stable native slot0 identity convention as the real seven AI rows;
     // this binds the human reset/material fields and its genuine D44 row0.
-    auto& controller=liveAudio->humanController();
-    require50DU(controller.bind({sessionIndex+1,17,18,19,0,playerRacer60})&&
-        originalAiAudio->prepareHumanResetOwner(controller),
-        "actual human controller/material reset ownership rejected");
+    for(std::uint32_t slot=0;slot<originalAiHumanCount;++slot){
+     auto& controller=slot?liveAudio->secondHumanController():liveAudio->humanController();
+     const auto base=std::uint64_t(slot+1)*16;
+     const auto* selection=slot?original_racer_selection50IJ::findAnyByPodId(racerRigs[slot]->podId.c_str()):selectedOriginal;
+     require50DU(selection&&controller.bind({sessionIndex+1,base+1,base+2,base+3,slot,selection->racer60})&&
+         originalAiAudio->prepareHumanResetOwner(controller),
+         "actual human controller/material reset ownership rejected");
+    }
    }
    require50DU(originalAiAudio->prepareSpeech(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,
        *materialMixer,*audioGroups,audioError),audioError.empty()?"actual all-eight D48 banks unavailable":audioError.c_str());
@@ -1702,6 +1718,11 @@ SessionExit50DU Context::run() {
  ManagerEventCallbacks48Z eventCallbacks{};
  require50DU(bindControllerPlayerActions50EC(controller,deviceIndex,eventRecords,
      applicationEvents,playerEventChild,eventCallbacks),"live one-player action binding");
+ std::unique_ptr<SecondHumanInput50SV> secondHuman;
+ if(originalAiHumanCount==2u){
+  secondHuman=std::make_unique<SecondHumanInput50SV>();
+  require50DU(secondHuman->bind(controlPresets),"player 2 control preset and event binding rejected");
+ }
  InputEvent48Z controllerEventStorage[32]{};
  InputEventQueue48Z controllerEvents{controllerEventStorage,32,0};
  ControllerActions50EC controllerActions(controller,controllerEvents,deviceIndex);
@@ -1871,7 +1892,34 @@ SessionExit50DU Context::run() {
  };
  auto composePacket=[&](bool live,const platform::WindowInput50DQ& input,std::size_t actualRacerSlot=0){
   require50DU(!originalUiActive,"Main-only frontend cannot compose a driving packet");
+  const auto tracePad=[&](const rr::game::DevicePacket48Y& data,const platform::SelectedControlInput50KY& binding){
+   static const bool enabled=[](){const char* v=std::getenv("RR_TEST_PAD_REBIND");return v&&!std::strcmp(v,"1");}();
+   if(!enabled||!captureRun.unattended()||!live)return;
+   const auto desc=initialDualShockDescriptors48Y();
+   const int throttle=binding.sourceActions.action694;
+   const std::array<int,4> sample{throttle<0?-1:data.bytes[desc.records[throttle].packetOffset],data.bytes[6],data.bytes[7],data.bytes[5]};
+   static std::array<int,4> previous[2]={{-2},{-2}};
+   if(sample!=previous[binding.player]){
+    previous[binding.player]=sample;
+    std::cerr<<"pad_binding_sample player="<<binding.player+1<<" throttle="<<sample[0]
+        <<" steer="<<sample[1]<<" left_y="<<sample[2]<<" right_y="<<sample[3]<<'\n';
+   }
+  };
   if(allAiEnabled)return;
+  if(secondHuman && actualRacerSlot==1u){
+   const bool released=!input.focused||input.minimized||input.activityLost;
+   require50DU(secondHuman->service(input.controllers[1],live&&!released,released,
+       platform::selectedControllerCountdownHold50KY,secondHuman->state40,secondHuman->gate58),
+       "player 2 controller sample and dispatch rejected");
+   tracePad(secondHuman->packet,secondHuman->binding);
+   return;
+  }
+  if(live&&player_ai_pilot50DU::enabled&&actualRacerSlot==0&&originalAi.physicalReset2255B0Pending){
+   require50DU(executeOriginalManualReset&&executeOriginalManualReset(),"AI pilot player reset unavailable");
+   originalAi.pilotNavigation=navigationProgress;
+   originalAi.physicalReset2255B0Pending=false;
+   std::cerr<<"player_ai_pilot reset slot=0 node="<<originalAi.pilotNavigation.reset.vehicleC80<<'\n';
+  }
   const bool physicalHuman=usePhysicalGameController&&actualRacerSlot==0;
   const bool manualHeld=physicalHuman?platform::selectedControllerHeld50KY(input.controllers[0]):
       platform::selectedKeyboardHeld50KY(input,humanControlInput);
@@ -1903,6 +1951,7 @@ SessionExit50DU Context::run() {
        <<"; selected original action owner is unavailable; whole packet released, release all controls to resume; no action remapped.\n";
    require50DU(composed,"selected physical controller input snapshot is invalid");
    packetLive=physicalControllerReceipt.status==platform::SelectedControllerStatus50KY::live;
+   tracePad(packet,humanControlInput);
   }else{
    // Observe the caller's already-sampled, policy-filtered input before composition.
    // An invalid/unbound descriptor is reported, never dereferenced or repaired.
@@ -1910,8 +1959,9 @@ SessionExit50DU Context::run() {
    const bool resetCodeValid=resetCode>=0&&resetCode<static_cast<std::int32_t>(dualShockActiveButtons48Y);
    const auto resetMapping=resetCodeValid?keyMapping.buttons[static_cast<std::size_t>(resetCode)]:
        platform::KeyboardButtonMapping50DR{};
+   const auto resetKey=platform::keyboard_bindings::physical(humanControlInput.twinEngine,23);
    const std::array<std::uint32_t,13> observation{{
-       input.down[23],input.pressed[23],input.released[23],
+       input.down[resetKey],input.pressed[resetKey],input.released[resetKey],
        static_cast<std::uint32_t>(live),static_cast<std::uint32_t>(packetLive),
        static_cast<std::uint32_t>(input.focused),static_cast<std::uint32_t>(input.minimized),
        static_cast<std::uint32_t>(input.activityLost),static_cast<std::uint32_t>(input.eventBudgetExhausted),
@@ -1920,8 +1970,8 @@ SessionExit50DU Context::run() {
    const bool changed=!manualResetInputObservationValid||observation!=lastManualResetInputObservation;
    if(changed){
     std::cerr<<"original_manual_reset_input phase=before_compose keyboard_packet="<<(allAiKeyboardPackets+1u)
-        <<" sampled_scancode=23 down="<<unsigned(input.down[23])
-        <<" pressed="<<unsigned(input.pressed[23])<<" released="<<unsigned(input.released[23])
+        <<" sampled_scancode="<<resetKey<<" down="<<unsigned(input.down[resetKey])
+        <<" pressed="<<unsigned(input.pressed[resetKey])<<" released="<<unsigned(input.released[resetKey])
         <<" requested_live="<<live<<" prior_packet_live="<<packetLive
         <<" focused="<<input.focused<<" minimized="<<input.minimized
         <<" activity_lost="<<input.activityLost<<" event_budget_exhausted="<<input.eventBudgetExhausted
@@ -1931,11 +1981,34 @@ SessionExit50DU Context::run() {
     lastManualResetInputObservation=observation;manualResetInputObservationValid=true;
    }
    ++allAiKeyboardPackets;
+   // Opt-in input fixture, contained in this race's keyboard packet path.
+   static const bool testBindings=[](){const char* v=std::getenv("RR_TEST_KEYBOARD_REBIND");return v&&std::strcmp(v,"1")==0;}();
+   const auto* physicalKeys=&input.down;
+   std::array<std::uint8_t,512> fixtureKeys;
+   int phase=-1;
+   static unsigned fixtureTicks=0;
+   if(testBindings&&captureRun.unattended()&&live&&fixtureTicks<120){
+    phase=static_cast<int>(fixtureTicks++/30);
+    fixtureKeys.fill(0);
+    if(phase==0)fixtureKeys[26]=1; // old W
+    if(phase==1)fixtureKeys[12]=1; // new I
+    if(phase==2)fixtureKeys[14]=1; // K, right engine on twin layout
+    physicalKeys=&fixtureKeys;
+   }
+   std::array<std::uint8_t,512> drivingKeys;
    require50DU(platform::composeKeyboardPacket50DR({true,live},
-       {input.down.data(),input.down.size()},keyMapping,
+       {platform::keyboard_bindings::drivingKeys(humanControlInput.twinEngine,*physicalKeys,drivingKeys),input.down.size()},keyMapping,
        platform::KeyboardUnavailablePolicy50DR::ReleaseAll,packetTemplate,packet,
        keyboardDiagnostic),"selected keyboard packet composition failed");
    packetLive=live;
+   static int loggedPhase=-1;
+   if(phase>=0&&phase!=loggedPhase){
+    loggedPhase=phase;
+    const auto descriptors=initialDualShockDescriptors48Y();
+    const auto offset=humanControlInput.twinEngine?0:descriptors.records[humanControlInput.sourceActions.action694].packetOffset;
+    std::cerr<<"keyboard_rebind_sample phase="<<phase<<" throttle_pressure="<<unsigned(packet.bytes[offset])
+        <<" left_y="<<unsigned(packet.bytes[7])<<" right_y="<<unsigned(packet.bytes[5])<<'\n';
+   }
    if(changed)std::cerr<<"original_manual_reset_input phase=after_compose keyboard_packet="<<allAiKeyboardPackets
        <<" packet_live="<<packetLive<<" disposition="<<static_cast<unsigned>(keyboardDiagnostic.disposition)
        <<" packet_byte2="<<unsigned(packet.bytes[2])<<" packet_byte3="<<unsigned(packet.bytes[3])<<'\n';
@@ -2549,6 +2622,7 @@ SessionExit50DU Context::run() {
   .zoneLifecycle=zoneLifecycle,
   .zoneQueue=zoneQueue,
   .zoneScratch=zoneScratch,
+  .secondHumanInput50SV=secondHuman.get(),
  };
  return continuation50DU.run();
 }

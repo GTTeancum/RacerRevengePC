@@ -294,10 +294,10 @@ bool OriginalRaceMusicManager50LA::acceptNativeChildren(OriginalRaceConstructor5
         // Native transports keep their OWN already-prepared PCM and state.
         // Explicit native load join for the exact1A4620 listener subgraph.
         // Other platform child IO remains the documented native adapter.
-        if(p.fields.count38!=1u||!scope->gameplay_)
-            return Impl::stop(d,0x1a4620,"Only the actual single-view native listener owner is represented");
+        if(!scope->gameplay_)
+            return Impl::stop(d,0x1a4620,"Race listener setup requires the live gameplay mixer");
         platform::OriginalApplicationAural50KG::Diagnostic listener;
-        const bool registered=p.aural->beginSingleRaceListener1A4620(*this,listener);
+        const bool registered=p.aural->beginRaceListeners1A4620(*this,p.fields.count38,listener);
         // Native custody, NOT readiness: only this actual issuer owns cleanup.
         // A pre-admission rejection must not acquire/remove another manager's listener.
         p.listenerAttempted=p.aural->nativeListenerIssuer_==this;
@@ -818,7 +818,7 @@ bool OriginalRaceMusicManager50LA::retireNativeDetached(OriginalRaceMusicManager
     if(p.sourceOnly&&!retireSourceMusicChildNative(d))return false;
     if(p.listenerAttempted&&!p.listenerRetired){
         platform::OriginalApplicationAural50KG::Diagnostic listener;
-        if(!p.aural||!p.aural->removeSingleRaceListener103040(*this,listener))
+        if(!p.aural||!p.aural->removeRaceListeners103040(*this,listener))
             return Impl::stop(d,listener.sourcePC,"Actual listener removal must precede manager retirement");
         p.listenerRetired=true; // Native receipt AFTER1A45C0's ignored-return removal.
     }

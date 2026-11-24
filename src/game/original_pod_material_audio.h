@@ -473,7 +473,7 @@ template<std::size_t N> inline OriginalPodMaterialAudioReceipt dispatchOriginalP
     const RaceActorResolver50ID& actualActors,bool actualEventOwner33CBound)noexcept {
     const auto& id=engine.identity();
     return original_pod_material_detail::dispatch179070(state,id,engine.flags22C(),
-        engine.bound()&&id.managerOrdinal==0u,0u,
+        engine.bound(),0u,
         in,listeners,listenerCount,mode,shared,[&]()noexcept{
             // Native actor handles are manager ordinal+1 in this real FIFO.
             // Resolve the SAME human at the reached enqueue, never an AI

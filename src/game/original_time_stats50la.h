@@ -159,8 +159,8 @@ class OriginalTimeStats50LA final {
     bool nativeColdPrepared_=false;
     std::uint64_t verifiedProviderRevision_=0;
     OriginalTimeStatsNativeDraw50LA nativeDraw_;
-    const OriginalCameraViewportFields* nativeViewport_=nullptr;
-    std::uint64_t nativeScene_=0;
+    std::array<const OriginalCameraViewportFields*,2> nativeViewports_{};
+    std::array<std::uint64_t,2> nativeScenes_{};
     ResourceStage stage_=ResourceStage::fresh;
     bool effects_=false;
     OriginalTimeStatsDiagnostic50LA terminal_{};
@@ -555,24 +555,25 @@ public:
     bool prepareNativeDisplay(const OriginalTimeStatsNativeFrame50LA& frame,
         OriginalTimeStatsDiagnostic50LA& d)noexcept {
         d={};nativeDraw_.prepared=false;nativeDraw_.quadCount=nativeDraw_.packetCount=0;
-        if(!nativeCpuResourcesPrepared()||!frame.viewport||!frame.preferences||frame.viewIndex||
-           (!frame.count||frame.count>frame.records.size())||frame.selectedSlot>=frame.count||frame.raceMode8C!=0||
-           (frame.raceFlags1B0&3u)!=1u||frame.sessionGeneration!=entity_.session||
+        if(!nativeCpuResourcesPrepared()||!frame.viewport||!frame.preferences||frame.viewIndex>=2u||
+           (!frame.count||frame.count>frame.records.size())||frame.selectedSlot>=frame.count||
+           frame.sessionGeneration!=entity_.session||
            !frame.cameraPublication||frame.cameraPublication<nativeDraw_.cameraPublication)
             return stop(d,Error::phase,0x194FF0);
         const auto& view=*frame.viewport;
         if(!view.prepared||!view.matricesReady||view.sessionGeneration!=entity_.session||!view.sceneKey||
-           view.width1E8!=640||view.height1EC!=448||view.x1E0||view.y1E4||
-           (nativeViewport_&&(nativeViewport_!=&view||nativeScene_!=view.sceneKey)))
+           !matchesRaceHudViewport(view,frame.viewIndex,frame.raceFlags1B0&3u,frame.raceMode8C,
+               (frame.raceFlags1B0&16u)||(frame.raceEntityFlags29&4u)||(frame.uiFlags1E4&1u))||
+           (nativeViewports_[frame.viewIndex]&&(nativeViewports_[frame.viewIndex]!=&view||nativeScenes_[frame.viewIndex]!=view.sceneKey)))
             return stop(d,Error::source,0x193BB0);
         if(nativeDraw_.serial==std::numeric_limits<std::uint64_t>::max())return stop(d,Error::phase,0x194FF0);
-        nativeViewport_=&view;nativeScene_=view.sceneKey;nativeDraw_.viewport=&view;
+        nativeViewports_[frame.viewIndex]=&view;nativeScenes_[frame.viewIndex]=view.sceneKey;nativeDraw_.viewport=&view;
         nativeDraw_.cameraPublication=frame.cameraPublication;++nativeDraw_.serial;
-        state_.mode520=0;
+        state_.mode520=frame.raceMode8C;
         const auto& selected=frame.records[frame.selectedSlot];
-        if(!state_.prepare194F40(0,*frame.preferences,selected.vehicleState40,selected.lapCC8,frame.managerFlags58))
+        if(!state_.prepare194F40(frame.viewIndex,*frame.preferences,selected.vehicleState40,selected.lapCC8,frame.managerFlags58))
             return stop(d,Error::geometry,0x194F40);
-        if(!time_stats_detail50LA::displayGate(0,frame.raceFlags1B0,frame.raceEntityFlags29,frame.uiFlags1E4)){
+        if(!time_stats_detail50LA::displayGate(frame.viewIndex,frame.raceFlags1B0,frame.raceEntityFlags29,frame.uiFlags1E4)){
             nativeDraw_.prepared=true;return true;
         }
         // Reacquire actual effective map state each display. This first

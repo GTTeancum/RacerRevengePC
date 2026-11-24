@@ -15,8 +15,8 @@ struct OriginalCameraVisibilityJoinResult {
 };
 class OriginalSelectedCameraVisibilityKeys;
 class OriginalSelectedCameraVisibilityBacking;
-inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visibility(
-    original_gc_gameplay_lighting_candidate::Owner&,std::uint64_t,std::uint64_t,
+inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCameraVisibility(
+    original_gc_gameplay_lighting_candidate::Owner&,std::uint32_t,std::uint64_t,std::uint64_t,
     OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking&,
     OriginalSelectedCameraVisibilityKeys&,OriginalFollowSceneBinding&) noexcept;
 
@@ -24,8 +24,8 @@ inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visi
 // owner's allocation ceilings (maximumZones keys, maximumPortals+1 memberships);
 // only the current lease's active span is exposed.
 class OriginalSelectedCameraVisibilityBacking final {
-    friend OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visibility(
-        original_gc_gameplay_lighting_candidate::Owner&,std::uint64_t,std::uint64_t,
+    friend OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCameraVisibility(
+        original_gc_gameplay_lighting_candidate::Owner&,std::uint32_t,std::uint64_t,std::uint64_t,
         OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking&,
         OriginalSelectedCameraVisibilityKeys&,OriginalFollowSceneBinding&) noexcept;
     std::array<CollectionZoneLink50BX,original_gc_gameplay_lighting_candidate::maximumPortals+1u> links_{};
@@ -38,8 +38,8 @@ public:
     OriginalSelectedCameraVisibilityBacking& operator=(OriginalSelectedCameraVisibilityBacking&&)=delete;
 };
 class OriginalSelectedCameraVisibilityKeys final {
-    friend OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visibility(
-        original_gc_gameplay_lighting_candidate::Owner&,std::uint64_t,std::uint64_t,
+    friend OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCameraVisibility(
+        original_gc_gameplay_lighting_candidate::Owner&,std::uint32_t,std::uint64_t,std::uint64_t,
         OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking&,
         OriginalSelectedCameraVisibilityKeys&,OriginalFollowSceneBinding&) noexcept;
     const original_gc_gameplay_lighting_candidate::Owner* owner_=nullptr;
@@ -64,14 +64,14 @@ public:
     }
 };
 
-// Concrete fresh175224 join for camera0 -> actual manager racer0 visibility,
+// Concrete fresh175224 join from each camera to its own manager racer visibility,
 // one key projection for every topology. All real racer7F0 records must already
 // exist from the fresh final grid. It borrows their canonical world, allocates
 // no second registry, and invokes the actual point registration kernel. The
 // keys are committed with the real attachment. Subsequent views
 // address the retained member arrays, never this function's staging object.
-inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visibility(
-    original_gc_gameplay_lighting_candidate::Owner& actualWorldOwner,
+inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCameraVisibility(
+    original_gc_gameplay_lighting_candidate::Owner& actualWorldOwner,std::uint32_t racerSlot,
     std::uint64_t sessionGeneration,std::uint64_t sceneKey,
     OriginalCameraSceneOwner& spatial,OriginalSelectedCameraVisibilityBacking& retainedBacking,
     OriginalSelectedCameraVisibilityKeys& keys,OriginalFollowSceneBinding& scene) noexcept {
@@ -82,7 +82,7 @@ inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visi
        keys.owner_||keys.sessionGeneration_||keys.sceneKey_||keys.count||scene.sceneKey||scene.registrationKey){
         r.status=Status::freshness;return r;}
     original_gc_gameplay_lighting_candidate::CameraVisibilityLease lease;
-    if(!actualWorldOwner.beginCameraVisibility(0u,lease,r.owner))return r;
+    if(!actualWorldOwner.beginCameraVisibility(racerSlot,lease,r.owner))return r;
     auto* world=lease.world();auto* workspace=lease.workspace();
     const auto* racer=lease.racerVisibility7F0();
     if(!world||!workspace||!racer||!lease.cameraObject30())return r;

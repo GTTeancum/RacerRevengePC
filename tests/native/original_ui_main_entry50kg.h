@@ -321,8 +321,7 @@ private:
     bool acceptNativePauseMenuReceiver50LA(const Frontend&,const rr::platform::VehicleWindowGl50DS&)const noexcept;
     bool prepareResultsHallTransfer50LA(rr::game::OriginalRaceConstructor50LA&)const noexcept;
     bool commitResultsHallTransfer50LA(rr::game::OriginalRaceConstructor50LA&,
-        const rr::game::OriginalRaceRecordInsertionStage50KG&,
-        rr::platform::OriginalSaveProfileOwner50KG&)const noexcept;
+        const rr::game::OriginalRaceRecordRacerObservation50KG&)const noexcept;
     bool resultsRequestTailCurrent50LA(const rr::game::OriginalRaceConstructor50LA&)const noexcept;
     bool passResultsProcessSuccessors50LA(const rr::game::OriginalRaceConstructor50LA&)const noexcept;
     bool beginNativeResultsHallDeparture50LA(bool& selected)const noexcept;
@@ -1198,16 +1197,16 @@ public:
     bool capturePositionStatsNumbers50LA(const rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsNumbers50LA&,
-        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&,unsigned view=0) const noexcept;
     bool preparePositionStatsLayout50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
-        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&,unsigned view=0) const noexcept;
     bool preparePositionStatsRadar50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
-        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&,unsigned view=0) const noexcept;
     bool preparePositionStatsText50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
-        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&,unsigned view=0) const noexcept;
     // Detached source-stage TunnelTrack ownership; no race publication/activation.
     // W0: the spline bytes come from the race's one Track (m<code>.spl / a<code>.spl), any course (R4).
     std::shared_ptr<rr::game::OriginalTunnelTrack50LA> constructTunnelTrackCold2A1160(
@@ -1221,6 +1220,7 @@ public:
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool publishConsumedRace28C(const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>&)const noexcept;
     const rr::game::OriginalRaceConstructor50LA* race28C()const noexcept{return sourceRace28COwner_.get();}
+    bool prepareVersusCamera38()const noexcept;
     bool beginConsumedRaceLoad1A6AA0(rr::game::OriginalRaceConstructor50LA&,
         rr::game::OriginalRacerModelRenderGlobals50LA&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool closeNativeConsumedRace(rr::game::OriginalRaceConstructor50LA&,

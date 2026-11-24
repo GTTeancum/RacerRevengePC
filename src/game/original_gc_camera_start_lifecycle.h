@@ -85,7 +85,8 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
     for(std::size_t i=0;i<bank.racerCount;++i)if(racerEffects.racers[i].racerKey!=bank.racers[i].racerKey)return result;
     result.status=GcStartFrameStatus::requiresOtherSourcePath;
     if((context.sourceControllerCutCountA8!=0&&owner.mode44!=7)||(context.sourceLaunchKind11258<1||context.sourceLaunchKind11258>3)||
-        (owner.mode44!=4&&owner.mode44!=7)||(frame.raceFlags1B0&3u)!=1u||frame.racerState40!=0||
+        (owner.mode44!=4&&owner.mode44!=7)||frame.racerState40!=0||
+        (frame.raceFlags1B0&3u)!=(owner.binding.bootstrap==CameraBootstrap::original_versus?2u:1u)||
         (frame.raceFlags1B0&0x10)||((frame.raceStateFlags58&1)&&frame.racerCD4==0)||
         (owner.flags62&0x80))return result;
     if(owner.mode44==7&&start.complete240){result.status=GcStartFrameStatus::needsOriginalExit;return result;}

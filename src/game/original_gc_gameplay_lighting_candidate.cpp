@@ -1,3 +1,4 @@
+#include "pod_shape49w.h"
 #include "original_native_list_method_custody50la.h"
 #include "../assets/original_parameter_lookup50cr.h"
 #include <thread>
@@ -387,7 +388,7 @@ struct Owner::Storage {
     // NumberOfLights by readLights2783D0; every append is bounds-checked.
     std::vector<original_light_flash50CR::TrackFlare50CR> flares;
     std::size_t animationBase()const noexcept{return racerCount+1u+staticModels.size();}
-    std::size_t identityCount()const noexcept{return animationBase()+(animations?animations->rows.size():0u);}
+    std::size_t identityCount()const noexcept{return animationBase()+(animations?animations->rows.size():0u)+1u;}
     bool disjointStaticBacking(const std::uint32_t* field)const noexcept {
         if(animations&&(!disjointResetField(field,animations.get(),sizeof(*animations))||
            (!animations->rows.empty()&&!disjointResetField(field,animations->rows.data(),animations->rows.size()*sizeof(AnimationLane::Row)))))return false;
@@ -1180,7 +1181,7 @@ bool Owner::coldVehicleUntouched(std::uint32_t slot,Diagnostic& d) const noexcep
 }
 bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
-    std::uint64_t graphicsSequence,Diagnostic& d) noexcept {
+    std::uint64_t graphicsSequence,Diagnostic& d,bool recordedPose) noexcept {
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x228844);
     auto& o=*storage_;
@@ -1188,7 +1189,8 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
         return fail(d,Status::identity,0x228858);
     auto& v=o.vehicles[slot];
-    if(s.phase!=VehicleFramePhase49W::PostGraphics||!graphicsSequence||
+    const auto phase=recordedPose?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostGraphics;
+    if(s.phase!=phase||!graphicsSequence||
        v.graphicsSequence==std::numeric_limits<std::uint64_t>::max()||
        graphicsSequence!=v.graphicsSequence+1u)return fail(d,Status::phase,0x228844);
     if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||s.shape.type88||
@@ -1197,7 +1199,15 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     // Deliberately do not compare694.world80 to current main.world100 and do
     // not reprepare694.228844 calls1202E0 directly on its EXISTING cached state.
     // A later219FD8 can advance694 without advancing7F0 until the next graphics.
-    const auto bounds=shapeBounds(s.shape,p.shape);
+    auto bounds=shapeBounds(s.shape,p.shape);
+    if(recordedPose){
+        // Race78 moved main190 directly. Compute visibility from that recorded
+        // transform without advancing live body694 or its collision history.
+        auto replayShape=s.shape;
+        const auto& main=s.nodes[static_cast<std::uint32_t>(b.lifecycle.main190)];
+        if(!preparePodShape50IZ(p.shape,main.world100,replayShape))return fail(d,Status::arithmetic,0x228844);
+        bounds=shapeBounds(replayShape,p.shape);
+    }
     d.membership=updateLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.resetOwner.membership7F0,bounds,o.workspace);
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x228884);
@@ -1507,7 +1517,11 @@ const LiveZoneMembership50EN* Owner::cableCallbackVisibility7F0(
     return &v.resetOwner.membership7F0;
 }
 CollectionRef50BX CameraVisibilityLease::cameraObject30() const noexcept {
-    return owner_&&owner_->cameraLeaseCurrent(*this)?owner_->storage_->racerCount+1u:0u;
+    if(!owner_||!owner_->cameraLeaseCurrent(*this))return 0;
+    const auto& storage=*owner_->storage_;
+    // Reserve P2 after all authored objects so static and animated identities stay stable.
+    if(racer_==1u)return static_cast<CollectionRef50BX>(storage.identityCount());
+    return racer_==0u?storage.racerCount+1u:0u;
 }
 std::uint64_t CameraVisibilityLease::zoneKey4C0(std::size_t ordinal) const noexcept {
     if(!owner_||!owner_->cameraLeaseCurrent(*this)||ordinal>=owner_->storage_->visibility.lifecycle.zoneCount)return 0;
@@ -1742,7 +1756,7 @@ std::size_t Owner::trackAnimationStorageReservationBytes(std::size_t rows)noexce
  // payload at the existing eight-racer maximum plus the planned rows.
  if(rows>maximumTrackAnimationRows)return std::numeric_limits<std::size_t>::max();
  return sizeof(std::unique_ptr<Storage::AnimationLane>)+2u*alignof(Storage)+sizeof(Storage::AnimationLane)+
-        rows*sizeof(Storage::AnimationLane::Row)+(maximumRacers+1u+rows)*sizeof(ZoneRegistration50CJ);
+        rows*sizeof(Storage::AnimationLane::Row)+(maximumRacers+2u+rows)*sizeof(ZoneRegistration50CJ);
 }
 bool Owner::bindTrackAnimationRow(const ::track_animation_binding50AN::Binding* owner,std::size_t index,
  const LiveZoneMembership50EN* membership)noexcept {

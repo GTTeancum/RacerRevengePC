@@ -50,7 +50,15 @@ int main(){
         need(wide[1]==fourThree[1]&&wide[2]==fourThree[2]&&wide[3]==fourThree[3],"16:9 keeps Y, Z, W (vertical view unchanged)");
         clip(convert(1280,896),point,psTwo);
         need(std::fabs(psTwo[0]-(4.f*896.f/(3.f*1280.f))*fourThree[0])<1e-5f,"1280x896 corrects the old 7% stretch");
-        need(std::fabs(rr::platform::nativeWidescreenScaleX50DX(2560,1080)-(4.f*1080.f/(3.f*2560.f)))<1e-6f,"21:9 factor");
+        // The same scene point must keep its pixel displacement from the
+        // centre per unit of height, including at 4K and ultrawide sizes.
+        constexpr int sizes[][2]={{3840,2160},{2560,1080},{3440,1440},{3840,1080}};
+        for(const auto& size:sizes){
+            float actual[4];clip(convert(size[0],size[1]),point,actual);
+            const float aspect=float(size[0])/float(size[1]);
+            need(std::fabs(actual[0]*aspect-fourThree[0]*(4.f/3.f))<1e-5f,"horizontal coverage follows output aspect");
+            need(actual[1]==fourThree[1]&&actual[2]==fourThree[2]&&actual[3]==fourThree[3],"vertical projection and depth stay unchanged");
+        }
         std::printf("widescreen projection checks=%u passed (16:9 X factor %.4f)\n",checks,
             static_cast<double>(rr::platform::nativeWidescreenScaleX50DX(1920,1080)));
         return 0;

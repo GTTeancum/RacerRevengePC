@@ -6,6 +6,7 @@ struct SpeedBoost {
     static constexpr U maximumPackets=game::OriginalSpeedBoostNativeDraw50LA::maximumPackets;
     static_assert(maximumPrimitives<=originalUiMaximumQuads50KG,"shared UI buffers must cover SpeedBoost");
     std::shared_ptr<const game::OriginalSpeedBoost50LA> owner;
+    HudViewports viewports;
     const game::OriginalCameraViewportFields* viewport=nullptr;
     std::uint64_t scene=0,generation=0,serial=0,publication=0;
     MaterialTextureGl50EB textures;

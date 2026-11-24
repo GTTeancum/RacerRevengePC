@@ -1182,7 +1182,7 @@ bool OriginalUiGaragePageOwner50KG::sourceLoadReturned1FAAC8()const noexcept {rr
         loadApplication344_.has_value()&&selectedRegistrationCurrent1FB67C()&&
         issuer_->standardMaterialDomainOwner_;
     //The returned phase records the completed first2A4B30. A later genuine
-    //manager1CCE74→2A4B30 rebuild must not erase this historical return.
+    //manager1CCE74â†’2A4B30 rebuild must not erase this historical return.
     //Only continueLoadReturn authenticates that first current collector.
 }
 bool OriginalUiGaragePageOwner50KG::attachToManager1D1C40(Diagnostic& d)noexcept {
@@ -1655,6 +1655,9 @@ bool OriginalUiGaragePageOwner50KG::continueEntry1FAAF0(Diagnostic& d)noexcept {
         held.career100C0=actual.career.career100C0;held.current1920=actual.current1920;
         held.unspent2194=actual.career.unspent2194;held.primaryColor=actual.colors.accent17FA00;
         held.secondaryColor=actual.colors.secondary17FA10;entryProfile_=std::move(held);
+        std::fprintf(stderr,"garage_profile career=%u accent=%06X secondary=%06X credits=%u acceleration=%.3f\n",
+            unsigned(actual.career.career100C0),unsigned(actual.colors.accent17FA00),
+            unsigned(actual.colors.secondary17FA10),unsigned(actual.career.unspent2194),actual.current1920[0]);
         entryPhase_=EntryPhase::appearancePending;pendingPC_=0x1FAB5C;
     }
     if(!entryProfileCurrent())return fail(d,Status::entryProfilePending,pendingPC_);

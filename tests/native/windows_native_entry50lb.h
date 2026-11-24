@@ -7,6 +7,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include "../../platform/linux/native/keyboard_bindings.h"
+#include "../../platform/linux/native/controller_bindings.h"
 #include "native_last_failure50pd.h"
 #include "common_race_log50cr.h"   // common_run_summary at the clean exit
 #include <exception>
@@ -219,6 +221,50 @@ inline void applyVideoSettings(const fs::path& directory) {
         <<" maximized="<<value("RR_VIDEO_MAXIMIZED")<<" window="<<value("RR_VIDEO_WINDOW_SIZE")
         <<" widescreen="<<(value("RR_ORIGINAL_ASPECT")=="1"?0:1)<<" fxaa="<<value("RR_VIDEO_FXAA")<<'\n';
 }
+// Portable settings are shared by the launcher and direct game startup.
+inline void applyControlSettings(const fs::path& directory) {
+    const auto ini=directory/L"RacerRevengePC.ini";
+    using namespace rr::platform::keyboard_bindings;
+    for(auto family:{Standard,Twin}){
+        Layout candidate;
+        std::array<bool,512> used{};
+        bool valid=true;
+        for(const auto& action:actions){
+            if(action.family!=Both&&action.family!=family)continue;
+            wchar_t buffer[32]{};
+            GetPrivateProfileStringW(family==Twin?L"KeyboardTwin":L"KeyboardStandard",action.name,L"",buffer,32,ini.c_str());
+            wchar_t* end=nullptr;
+            long key=*buffer?std::wcstol(buffer,&end,10):action.original;
+            if((end&&*end)||key<0||key>=512||key==41||key==42||key==62||key==69||(key&&used[key])){valid=false;break;}
+            used[key]=true;
+            candidate.keys[action.original]=static_cast<std::uint16_t>(key);
+            candidate.custom=candidate.custom||key!=action.original;
+        }
+        layouts[family]=valid?candidate:Layout{};
+        std::cerr<<"keyboard_bindings family="<<(family==Twin?"twin":"standard")<<" custom="<<layouts[family].custom<<" valid="<<valid<<'\n';
+    }
+    for(unsigned player=0;player<2;++player)for(unsigned preset=0;preset<8;++preset){
+        namespace pads=rr::platform::controller_bindings;
+        const auto section=L"Controller"+std::to_wstring(player+1)+L"Preset"+std::to_wstring(preset+1);
+        wchar_t buttons[256]{},axes[128]{};
+        GetPrivateProfileStringW(section.c_str(),L"Buttons",L"",buttons,256,ini.c_str());
+        GetPrivateProfileStringW(section.c_str(),L"Axes",L"",axes,128,ini.c_str());
+        pads::Layout layout;
+        const bool valid=pads::parse(buttons,layout.buttons)&&pads::parse(axes,layout.axes);
+        pads::layouts[player][preset]=valid?layout:pads::Layout{};
+        if(*buttons||*axes)std::cerr<<"controller_bindings player="<<player+1<<" preset="<<preset<<" valid="<<valid<<'\n';
+    }
+    wchar_t device[24]{};
+    GetPrivateProfileStringW(L"Controls",L"Device",L"Auto",device,24,ini.c_str());
+    if(!std::getenv("RR_HUMAN_INPUT_DEVICE")){
+        if(!_wcsicmp(device,L"Keyboard"))_putenv_s("RR_HUMAN_INPUT_DEVICE","keyboard");
+        if(!_wcsicmp(device,L"Controller"))_putenv_s("RR_HUMAN_INPUT_DEVICE","controller");
+    }
+    for(unsigned i=0;i<2;++i){
+        const auto preset=GetPrivateProfileIntW(L"Controls",i?L"Player2Preset":L"Player1Preset",-1,ini.c_str());
+        if(preset<8)_putenv_s(i?"RR_PLAYER2_SCHEME":"RR_PLAYER1_SCHEME",std::to_string(preset).c_str());
+    }
+}
 // PC enhancement (NOT ORIGINAL): DLC switches from RacerRevengePC.ini [DLC].
 // Read only when the keys are present; nothing is ever written for DLC, so a
 // file without a [DLC] section behaves exactly as before (DLC on, replacements
@@ -285,6 +331,7 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
 #endif
         std::cerr<<"rider_presentation="<<std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")<<'\n';
         applyVideoSettings(assets);
+        applyControlSettings(assets);
         applyDlcSettings(assets);
         // Exact wide directory only, never cwd/PATH search or fallback assets.
         // ASCII relative roots avoid the legacy narrow argv/environment seam.

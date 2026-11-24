@@ -93,6 +93,10 @@ public:
     bool hallRecordSnapshot(std::uint32_t course,game::OriginalUiHallCourseRecords50KG&) const noexcept;
     bool hallPlanetColors(std::uint32_t planet,OriginalUiCourseProfileColors50KG&) const noexcept;
     bool initialized() const noexcept;
+    //Human0 reads1125D>>3;human1 reads1125E&31;others are uninitialized
+    //in original s1 and must not receive a fabricated value.
+    bool readHumanPodSelection1ADFF4(const OriginalUiMainProfile50KG& actualCommon,
+        std::uint32_t humanIndex,std::uint32_t& selected)const noexcept;
     const OriginalUiMainProfile50KG* commonProfile() const noexcept;
     OriginalUiRiderProfileStamp50KG stamp() const noexcept;
     bool selectionSnapshot(game::OriginalUiRiderSelectionProfile50KG&) const noexcept;
@@ -119,6 +123,7 @@ public:
         std::uint32_t mode34=0;
     };
     bool courseRaceSnapshot(CourseRaceSelection&)const noexcept;
+    bool readRiderComparison(game::OriginalUiRiderContext50KG& context)const noexcept;
     bool riderConfirmSnapshot(std::uint8_t& packed1125D,std::uint32_t& comparison100C0)const noexcept;
     struct TournamentCareerSnapshot {
         std::uint32_t career100C0=0,earned2190=0,unspent2194=0,kills2198=0;
@@ -307,10 +312,6 @@ private:
     bool markResultsHallDirty1CA6E4(OriginalUiRiderProfileStamp50KG expected)noexcept;
     bool commitRacerManager1AD520(const CourseRaceSelection& expected,CourseRaceSelection& actual)noexcept;
     //Private current1ADF80 Profile2DC read. No snapshot/selected-ID receipt.
-    //Human0 reads1125D>>3;human1 reads1125E&31;others are uninitialized
-    //in original s1 and must not receive a fabricated value.
-    bool readHumanPodSelection1ADFF4(const OriginalUiMainProfile50KG& actualCommon,
-        std::uint32_t humanIndex,std::uint32_t& selected)const noexcept;
     // Actual Application2DC owner only. Called at the future admitted race
     // constructor boundary, never on a page proposal or resource prewarm.
     // Represents only proven7E4 bit0; upper seven bits stay unrepresented.

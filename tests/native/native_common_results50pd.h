@@ -15,6 +15,7 @@ namespace original_camera_cycle_audio50KX { class Owner; }
 
 namespace native_common_results50PD {
 struct State {
+    std::function<bool(std::uint32_t)> restartFromResults;
     bool rootPublished=false;   // publishNativeHumanResultsRoot50LA succeeded
     bool endActive=false;       // 1A7DD0 end entry has been entered
     // The end dispatch refused (common_race_end route=refused); the race
@@ -35,7 +36,9 @@ struct State {
     // World74). 1AC8E0's World74 leaves (trigger list 2DCC70, particles
     // 161F60, world restart 2702E0) and 1ABAE8..1ABB68 (racer +3C = 1,
     // 229F80, VCR bit1/bit2) are performed by the track's own owners.
-    std::function<bool(const char*&)> restartWorld,beginReplay;
+    std::function<bool()> resetReplayGrid,fadeDeparture;
+    std::function<void()> resetTriggers;
+    std::function<bool(const char*&)> resetParticles,resetScene,beginReplay;
     // Common rewrite (R9): borrowed for the life of the counted race, bound by
     // I3 at race publication next to common_race_start50CR::Owner::bind and
     // cleared by reset(). Never owned here.

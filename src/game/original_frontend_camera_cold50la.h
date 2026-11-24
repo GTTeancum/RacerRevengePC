@@ -103,6 +103,7 @@ private:
     Component entity_;
     const std::uint64_t generation_,key_;
     Phase phase_=Phase::empty;
+    bool sourceConstructorA1_=true;
     bool entityConstructed_=false,fieldsComplete_=false,enrolled_=false;
     std::uint32_t ancestryTable_=0; // source type evidence, never callable
     Fields fields_;
@@ -304,7 +305,7 @@ private:
     }
     static Result adoptPrepared236180(const ::original_main_entry50KG::Application* issuer,
         const std::shared_ptr<Entities>& entities,
-        const std::shared_ptr<OriginalFrontendCameraCold50LA>& next)noexcept {
+        const std::shared_ptr<OriginalFrontendCameraCold50LA>& next,bool sourceA1=true)noexcept {
         if(!next||!next->inertStorageCurrent(issuer,entities)||!next->actualEntitiesAlive())
             return {Status::identity,0x236180};
         if(entities->attachmentLock423F58_)return {Status::attachmentLocked,0x236180};
@@ -318,8 +319,9 @@ private:
             return {Status::identity,0x141300u};
         // Native allocations end before this source141300 boundary.
         const auto initialized=initializeOriginalWreckComponent50LA(next->entity_,
-            Kind::camera236180,next->generation_,next->key_,true,entities->objectCount423F60_);
+            Kind::camera236180,next->generation_,next->key_,sourceA1,entities->objectCount423F60_);
         if(initialized.status!=OriginalWreckComponentStatus50LA::complete)std::terminate();
+        next->sourceConstructorA1_=sourceA1;
         next->entityConstructed_=true;
         next->constructFields1143F0_236180();
         if(!authority.enroll(next->entity_))std::terminate();
@@ -330,12 +332,12 @@ private:
     }
     static Result construct(const ::original_main_entry50KG::Application* issuer,
         const std::shared_ptr<Entities>& entities,
-        std::shared_ptr<OriginalFrontendCameraCold50LA>& output)noexcept {
+        std::shared_ptr<OriginalFrontendCameraCold50LA>& output,bool sourceA1=true)noexcept {
         if(output)return {Status::outputNotEmpty,0x236180u};
         std::shared_ptr<OriginalFrontendCameraCold50LA> next;
         const auto prepared=prepareStorage(issuer,entities,next);
         if(!prepared.okay())return prepared;
-        const auto adopted=adoptPrepared236180(issuer,entities,next);
+        const auto adopted=adoptPrepared236180(issuer,entities,next,sourceA1);
         if(!adopted.okay())return adopted;
         output=std::move(next);return adopted;
     }
@@ -353,7 +355,7 @@ private:
             return {Status::identity,0x104970u};
         if(entity_.reference00!=1||entity_.previous10||entity_.next14||
            entity_.firstChild18||entity_.parent1C||entity_.mask20||entity_.descendants24||
-           entity_.category28!=0xffu||(entity_.flags29&0x0fu)!=3u||
+           entity_.category28!=0xffu||(entity_.flags29&0x0fu)!=(sourceConstructorA1_?3u:0u)||
            entity_.nativeEffectControlId)return {Status::topology,0x104970u};
         if(ancestryTable_!=0x3d1c10u||fields_.searchable30||fields_.type32!=0xffu||
            (fields_.flags33&7u)||fields_.registration34||fields_.parent38||fields_.resource224)

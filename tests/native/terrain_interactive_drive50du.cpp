@@ -4,6 +4,7 @@
 #include "runtime_allocations50fl.h"
 #include "../../src/game/ps2_float_mode50la.h"
 #include "terrain_interactive_session50du.h"
+#include "player_ai_pilot50du.h"
 #include "json.hpp"
 #include "runtime_asset_paths50lb.h"
 #include "../../src/assets/dlc_files50dl.h"
@@ -334,6 +335,12 @@ int nativeApplicationMain50DU(int argc,char**argv){try{
 int main(int argc,char** argv){
  // PS2 EE float rule (no subnormals) for the whole game thread.
  rr::game::enforcePs2FloatMode50LA();
+ for(int index=1;index<argc;++index){
+  if(std::string(argv[index])!="--ai-pilot")continue;
+  player_ai_pilot50DU::enabled=true;
+  for(int i=index;i<argc;++i)argv[i]=argv[i+1];
+  --argc;break;
+ }
 #if defined(_WIN32)
  if(argc==1||(argc==3&&std::string(argv[1])=="--assets"))
   return windows_native_entry50LB::run(nativeApplicationMain50DU,argc,argv,argc==1);

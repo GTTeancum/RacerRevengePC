@@ -7,6 +7,7 @@
 // Candidates and identities are track_animation_candidates50an.h's (the GA/GC/SA route), so a
 // row's candidate is the same on every course whichever storage holds it.
 #include "track_animation_candidates50an.h"
+#include "track_animation_query_test50an.h"
 #include "track_runtime_storage50ig_fixture.h"
 #include "collection_projection50cf.h"
 #include <cstring>
@@ -25,6 +26,9 @@ class Lane final {
  std::vector<g::Type2StaticCandidate49X>* candidates_=nullptr; // the world's candidate store (reserved, never relocated)
  std::size_t first_=0,capacity_=0;                       // candidate index of lane row 0; membership capacity
  bool prepared_=false;
+ bool queryTest_=false;
+ std::array<unsigned,3> querySamples_{};
+
 public:
  // Pre-Storage charge for `rows` collision rows (memberships + their links/entries).
  static std::size_t payloadBytes(std::size_t rows,std::size_t membershipCapacity)noexcept{
@@ -47,6 +51,9 @@ public:
  }
  // After Storage: one membership per collision row (capacity = the storage's membership count).
  void makeMemberships(std::size_t capacity){
+  const char* flag=std::getenv("RR_TEST_MOVING_COLLISION");
+  queryTest_=flag&&std::string(flag)=="1"&&runtime_&&runtime_->label()=="NS";
+  querySamples_={};
   capacity_=capacity;memberships_.clear();committed_.assign(rows_.size(),{});
   for(std::size_t k=0;k<rows_.size();++k)memberships_.push_back(std::make_unique<rt::Membership>(capacity));
  }
@@ -96,7 +103,17 @@ public:
    auto& objectView=s.objects[index];for(unsigned c=0;c<3;++c)objectView.position[c]=projected.object.position[c];
    objectView.scale10=projected.object.scale10;objectView.scale11=projected.object.scale11;
    auto& cached=s.source[index];std::memcpy(cached.cachedCenter.v,projected.state.cachedCenter.v,3*sizeof(float));cached.cachedRadius=projected.state.cachedRadius;
-   committed_[k]=m.state;return true;
+   committed_[k]=m.state;
+   if(queryTest_&&k<querySamples_.size()){
+    constexpr float times[]={1.f,11.f,26.f};
+    auto& sample=querySamples_[k];
+    if(sample<3&&state.time34>=times[sample]){
+     if(!track_animation_query_test50AN::contact(*candidate.compound,candidate.candidate.collision.filter.identity,
+           rows_[k],state.time34,sample))return false;
+     ++sample;
+    }
+   }
+   return true;
   }catch(...){return false;}
  }
  bool remove(rt::Storage& s,std::size_t k,g::LiveZoneResult50EN& result)noexcept{

@@ -1,6 +1,6 @@
 #include "vehicle_base_finish50y.h"
 #include "vehicle_base_tail50x.h"
-#include "vehicle_frame49w.h"
+#include "vehicle_ai_pilot50cr.h"
 #include "vehicle_frame_surface50st.h"
 #include "native_zero_gravity_step50zg.h"
 #include "n64_airborne_gravity50ag.h"
@@ -221,7 +221,7 @@ void installTerrainSurface50FP(S& s,const PreparedTerrainState48J& in) noexcept 
 // own frame state. Yaw is the pod's own (Revenge steering torque, integrated
 // at 219E80); the N64's forward blend toward the lookahead, pitch and roll are
 // applied here. Host float math (an enhancement, not an original-word path).
-bool writeZeroGravityBasis50ZG(S& s,const VehicleFrameBindings49W& bindings,const TerrainSurface48G& surface) noexcept {
+bool writeZeroGravityBasis50ZG(S& s,const VehicleFrameBindings49W& bindings,const Vector3_48C* supportedForward) noexcept {
  auto& step=zeroGravityStep50ZG;
  const auto old=node(s,bindings.lifecycle.main190).world100;
  auto dot=[](const float a[3],const float b[3]){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];};
@@ -231,6 +231,7 @@ bool writeZeroGravityBasis50ZG(S& s,const VehicleFrameBindings49W& bindings,cons
  auto rotate=[&](float v[3],const float k[3],float angle){float kv[3];cross(k,v,kv);const float c=std::cos(angle),sn=std::sin(angle),kd=dot(k,v);
   for(unsigned i=0;i<3;++i)v[i]=v[i]*c+kv[i]*sn+k[i]*kd*(1.f-c);};
  float fwd[3]{old.v[8],old.v[9],old.v[10]},up[3]{old.v[4],old.v[5],old.v[6]};
+ if(supportedForward)for(unsigned i=0;i<3;++i)fwd[i]=supportedForward->v[i];
  const float pos[3]{old.v[12],old.v[13],old.v[14]};
  if(!unit(fwd)||!unit(up))return false;
  // Steps 1-2: d = normalize(lookahead - pod); fwd += blend (d - fwd).
@@ -242,16 +243,17 @@ bool writeZeroGravityBasis50ZG(S& s,const VehicleFrameBindings49W& bindings,cons
  float right[3];cross(up,fwd,right);if(!unit(right))return false;
  cross(fwd,right,up);if(!unit(up))return false;
  // Roll rate: Flight from the host rate; Recover = gain x bank error to the
- // surface (probe when it hits, else the floor under the line).
+ // road surface, with world up as the fallback.
  float roll=step.flightRollRateDegrees;
- if(step.mode==ZeroGravityMode50ZG::Recover){
-  float n[3]{0.f,1.f,0.f};bool have=false;
-  if(surface.hit110||surface.hit114){for(unsigned i=0;i<3;++i)n[i]=surface.normal170.v[i];have=true;}
-  else if(step.haveSurfaceNormal){for(unsigned i=0;i<3;++i)n[i]=step.surfaceNormal[i];have=true;}
+ if(step.mode==ZeroGravityMode50ZG::Recover||step.groundRecenter){
+  float n[3]{step.roadNormal[0],step.roadNormal[1],step.roadNormal[2]};
+  const float along=dot(n,fwd);for(unsigned i=0;i<3;++i)n[i]-=along*fwd[i];
   float error=0.f;
-  if(have){const float along=dot(n,fwd);for(unsigned i=0;i<3;++i)n[i]-=along*fwd[i];
-   if(unit(n)){float c[3];cross(up,n,c);error=std::atan2(dot(fwd,c),dot(up,n))*(180.f/3.14159265f);}}
-  step.bankErrorDegrees=error;roll=step.recoverRollGain*error;
+  if(unit(n)){float c[3];cross(up,n,c);error=std::atan2(dot(fwd,c),dot(up,n))*(180.f/3.14159265f);}
+  step.bankErrorDegrees=error;
+  // Grounded 80067D9C uses the angular increment directly. Convert its
+  // one-eighth per update to our fixed step at the N64 reference cadence.
+  roll=step.groundRecenter?error*(1.f-std::pow(0.875f,30.f*step.dt))/step.dt:step.recoverRollGain*error;
  }
  // Step 4: pitch about right, roll about forward (degrees per second x dt).
  const float toRadians=3.14159265f/180.f;
@@ -290,10 +292,18 @@ bool respondEnabledTerrain50FP(S& s,const VehicleFrameBindings49W& bindings) noe
  const bool zeroGRecover=zeroGravityStepIs50ZG(ZeroGravityMode50ZG::Recover);
  if(zeroGFlight){result.state=initial;result.state.active104=0;result.body=input;}
  else if(!applyTerrainFollowing48G(initial,e.response,surface.surface,input,result))return false;
- bool zeroGChase=zeroGFlight;
- if(zeroGRecover&&!result.state.active104){result.body.loads=input.loads;zeroGChase=true;}
- if(zeroGChase){
-  if(!writeZeroGravityBasis50ZG(s,bindings,surface.surface))return false;
+ if(zeroGRecover&&!result.state.active104)result.body.loads=input.loads;
+ if(zeroGFlight||zeroGRecover||zeroGravityStep50ZG.groundRecenter){
+  // N64 8006B0D8 applies recovery roll even when the hover pads have
+  // contact. Retain their real translation and forces, then write the basis.
+  if(!zeroGFlight&&result.state.active104){
+   auto translated=node(s,bindings.lifecycle.main190).localC0;
+   std::memcpy(translated.v+12,result.body.scene.position.v,12);
+   if(!setLocalMatrix49P(graph(s),bindings.lifecycle.main190,translated)||
+      !refreshSceneWorld49P(graph(s),bindings.lifecycle.main190))return false;
+  }
+  const auto* groundForward=zeroGravityStep50ZG.groundRecenter&&result.state.active104?&result.body.scene.basis.columns[2]:nullptr;
+  if(!writeZeroGravityBasis50ZG(s,bindings,groundForward))return false;
  }else if(result.state.active104){
   //48G contains the original rounded28AF90 translation result. Apply its local
   //write/invalidation first. Parentless190 is required by frame admission.
@@ -318,16 +328,22 @@ bool respondEnabledTerrain50FP(S& s,const VehicleFrameBindings49W& bindings) noe
 }
 } // namespace
 ContactEffects49W contactEffects49W(const S&s) noexcept {const auto&c=s.bodies;const auto&m=c.mainSphere;const auto&z=c.secondary;return {effects(c.main.components.root,m.velocity70W,m.angularVelocityB0W,m.force180W,m.torque190W,s.mainExtra,c.main.components.body20C),effects(z.root,z.velocity70W,z.angularVelocityB0W,z.force180W,z.torque190W,s.secondaryExtra,z.body20C),c.joint,s.fields.impactBA0};}
-bool readAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,float factor,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
- if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x16e8c0);
+static bool beginAiDrivenFrame(S&s,const VehicleFrameBindings49W&b,float factor,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::Ready,w,d))return false;
  if(!std::isfinite(factor)||factor<0.f||factor>fp(0x3d75c28f))return fail(d,E::Input,0x16e8c0);
  auto&m=w.next.bodies.main;m.frameFactor=factor;m.substepIndex=0;
  m.phase=MainBodyPhase49K::AwaitingPostPlayer;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostPlayer;
  return commit(s,w,d,P::PostPlayer);
 }
-bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
- if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x217de0);
+bool readAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,float factor,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x16e8c0);
+ return beginAiDrivenFrame(s,b,factor,w,d);
+}
+bool readPilotedPlayerFrame50CR(S&s,const VehicleFrameBindings49W&b,float factor,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=0u)return fail(d,E::Admission,0x16e8c0);
+ return beginAiDrivenFrame(s,b,factor,w,d);
+}
+static bool bindAiDrivenFrame(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostPlayer,w,d))return false;
  if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||p.rates.x!=4.f)return fail(d,E::Admission,0x16e8d4);
  auto&m=w.next.bodies.main;const auto&actions=m.controls.player;
@@ -340,6 +356,14 @@ bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFra
  m.controls.bound=bound;m.components.bindings=bound.bindings;
  m.phase=MainBodyPhase49K::AwaitingPostBase;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostBase;
  return commit(s,w,d,P::BeforeGraphics);
+}
+bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x217de0);
+ return bindAiDrivenFrame(s,b,p,w,d);
+}
+bool bindPilotedPlayerFrame50CR(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=0u)return fail(d,E::Admission,0x217de0);
+ return bindAiDrivenFrame(s,b,p,w,d);
 }
 bool readVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const FrameReader49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(s.fields.vehicle58)return fail(d,E::Admission,0x1a15c0);
@@ -1073,7 +1097,7 @@ static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBinding
   // Original28B180 copies local F0/F4/F8 only; no world refresh occurs here.
   if(!noiseContinuation(s,w.next,d))return false;RR_VEHICLE_FRAME49W_STAGE(0x228b98);if(!noiseContinuation(s,w.next,d))return false;std::memcpy(position.v,node(r,b.lifecycle.main190).localC0.v+12,12);
   if(!std::isfinite(position.v[1]))return fail(d,E::Arithmetic,0x228bac);
-  if(position.v[1]<0.f){
+  if(position.v[1]<undertrackPlane50ZG){
    if(undertrack){
     if(!undertrackRacer||undertrack->serial==std::numeric_limits<std::uint64_t>::max())
      return fail(d,E::Admission,0x228bbc);

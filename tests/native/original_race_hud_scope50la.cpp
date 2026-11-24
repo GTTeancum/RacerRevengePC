@@ -122,10 +122,10 @@ void Registration::observeConstructed1A8CC4(::interactive_publication50DU::Conte
     const auto& camera=actual.sourceCameraSession;
     if(!race->hudTextSlots_||!camera||camera->closed_||camera->abandoned_||!camera->coldBound_||
        camera->generation_!=registration->generation_||&camera->actual_.bank!=registration->bank_||
-       camera->actual_.raceHud!=registration->hud_||camera->actual_.humanCount34!=1u||
+       camera->actual_.raceHud!=registration->hud_||!camera->actual_.humanCount34||camera->actual_.humanCount34>2u||
        camera->actual_.applicationEntities!=race->application_||
        !camera->viewport_.prepared||camera->viewport_.sessionGeneration!=registration->generation_||
-       !actual.sourceRaceHud.loaded()||actual.sourceRaceHud.viewCount()!=1u){
+       !actual.sourceRaceHud.loaded()||actual.sourceRaceHud.viewCount()!=camera->actual_.humanCount34){
         race->hudTextSlots_.reset();return;
     }
     auto& slots=*race->hudTextSlots_;
@@ -135,22 +135,27 @@ void Registration::observeConstructed1A8CC4(::interactive_publication50DU::Conte
         for(const auto* value:slots.explosions16C[view])if(value)return;
     }
     bool complete=true;
-    const auto publish=[&](const rr::game::OriginalRaceHudText50KG*& slot,
+    const auto publish=[&](unsigned view,const rr::game::OriginalRaceHudText50KG*& slot,
         std::uint32_t offset)noexcept {
-        const auto* value=actual.sourceRaceHud.textAt(0,offset);
+        const auto* value=actual.sourceRaceHud.textAt(view,offset);
         //A foreign viewport is an unsupported native borrow, not a source
         //29CA40 null result. Retain previously reached stores on rejection.
-        if((value&&value->viewport!=&camera->viewport_)||actual.sourceRaceHud.textAt(1,offset))return false;
+        if(value&&value->viewport!=camera->hudViewport(view))return false;
         slot=value; //Original always stores its result, including null.
         if(!value)complete=false; //Null does not roll back or skip later slots.
         return true;
     };
     //Original source order, NOT an atomic afterimage: seven/view1A8D28,
     //then per-view17C1A8DE0,1641A8E58,16C1A8ED0,1701A8F48.
-    for(std::size_t i=0;i<7;++i)if(!publish(slots.records12C[0][i],0x12cu+4u*i))return;
-    if(!publish(slots.status17C[0],0x17c))return;
-    if(!publish(slots.time164[0],0x164))return;
-    for(std::size_t i=0;i<2;++i)if(!publish(slots.explosions16C[0][i],0x16cu+4u*i))return;
+    const auto views=actual.sourceRaceHud.viewCount();
+    for(unsigned view=0;view<views;++view)
+        for(std::size_t i=0;i<7;++i)
+            if(!publish(view,slots.records12C[view][i],0x12cu+4u*i))return;
+    for(unsigned view=0;view<views;++view){
+        if(!publish(view,slots.status17C[view],0x17c)||!publish(view,slots.time164[view],0x164))return;
+        for(std::size_t i=0;i<2;++i)
+            if(!publish(view,slots.explosions16C[view][i],0x16cu+4u*i))return;
+    }
     //Native HUD construction itself preallocates transactionally. This join
     //does not claim to implement original29CA40 allocation/resource failures
     //or their logging, and admits end-stop only for the complete actual owner.
@@ -176,20 +181,20 @@ bool Registration::stop1AD230(const rr::game::OriginalRaceConstructor50LA& race)
         if(!camera->coldBound_||!camera->readsBound_||camera->closed_||camera->abandoned_||
            camera->generation_!=generation_||&camera->actual_.bank!=bank_||
            camera->actual_.applicationEntities!=race.application_||camera->actual_.raceHud!=hud_||
-           camera->actual_.humanCount34!=1u||(camera->raceFlags1B0_&3u)!=1u||
+           camera->actual_.humanCount34!=hud_->viewCount()||(camera->raceFlags1B0_&3u)!=hud_->viewCount()||
            !camera->nativeTaIssuance_||camera->nativeTaIssuance_->issuer!=application_||
            camera->nativeTaIssuance_->generation!=generation_||
            !race.raceCamera34Issued(*camera)||
            !camera->identitiesCurrent()||
            !camera->viewport_.prepared||camera->viewport_.sessionGeneration!=generation_||
-           !hud_->loaded()||hud_->viewCount()!=1u)return false;
+           !hud_->loaded()||!hud_->viewCount()||hud_->viewCount()>2u)return false;
         //Actual1A8CC4 publication constructs eleven distinct view0 objects
         //against this exact viewport; view1 remains null. No gleam stop occurs.
         constexpr std::uint32_t offsets[]{0x17c,0x164,0x12c,0x16c,0x130,0x170,
             0x134,0x138,0x13c,0x140,0x144};
-        for(const auto offset:offsets){
-            const auto* text=hud_->textAt(0,offset);
-            if(!text||text->viewport!=&camera->viewport_||hud_->textAt(1,offset))return false;
+        for(unsigned view=0;view<hud_->viewCount();++view)for(const auto offset:offsets){
+            const auto* text=hud_->textAt(view,offset);
+            if(!text||text->viewport!=camera->hudViewport(view))return false;
         }
         const auto& slots=*race.hudTextSlots_;
         for(std::size_t view=0;view<2;++view){

@@ -691,6 +691,27 @@ bool uiCoverageDisjointTraced=false;
 #include "track_flare_gl_storage.inl"
 #include "original_race_hud_render.inl"
 #include "original_race_start_overlay_render.inl"
+    struct HudViewportIdentity {
+        const game::OriginalCameraViewportFields* viewport=nullptr;
+        std::uint64_t scene=0,generation=0;
+    };
+    struct HudViewports {
+        std::array<HudViewportIdentity,2> views{};
+        static unsigned index(const game::OriginalCameraViewportFields& v) noexcept {
+            return (v.x1E0||v.y1E4)?1u:0u;
+        }
+        bool accepts(const game::OriginalCameraViewportFields& v) const noexcept {
+            const unsigned i=index(v);
+            const auto& previous=views[i];
+            const bool validRect=game::matchesRaceHudViewport(v,i,1,0,false)||
+                game::matchesRaceHudViewport(v,i,2,1,false)||game::matchesRaceHudViewport(v,i,2,2,false);
+            return validRect&&(!previous.viewport||(previous.viewport==&v&&
+                previous.scene==v.sceneKey&&previous.generation==v.sessionGeneration));
+        }
+        void remember(const game::OriginalCameraViewportFields& v) noexcept {
+            views[index(v)]={&v,v.sceneKey,v.sessionGeneration};
+        }
+    };
 #include "original_time_stats_render.inl"
 #include "original_position_stats_render.inl"
 #include "original_damage_render.inl"

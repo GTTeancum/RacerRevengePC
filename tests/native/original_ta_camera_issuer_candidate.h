@@ -175,7 +175,7 @@ inline std::shared_ptr<original_camera_session50KX::Session> Application::create
         const auto effectiveCuts=session->launchZeroesCuts174EA8()?0u:cuts;
         bool built=true;
         if(effectiveCuts)built=bool(session->actual_.taIntroAuthoring)&&constructNativeTaIntroCamera50LA();
-        else if(session->actual_.humanCount34==1u){
+        else if(session->actual_.humanCount34){
             const auto fresh=freshNativeTaCameraSession50LA();
             built=fresh&&fresh==session&&session->constructCountedControllerWithoutCuts174A30();
         }

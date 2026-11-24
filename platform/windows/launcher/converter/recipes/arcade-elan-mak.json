@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "arcade-elan-mak",
+    "name": "Elan Mak (Star Wars Racer Arcade)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.0",
+    "description": "Elan Mak from Star Wars Racer Arcade, as an add-on pod (stem a2r_ela, 7 wreck pieces). Borrowed from stock pod 24 until own data exists: stats, pilot voice, camera presets, material set-ups, a few stock model members, AI behaviour. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "pod",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "RIDER_A2R_ELA": "ELAN MAK"
+      }
+    },
+    "items": [
+      {
+        "kind": "pod",
+        "id": "a2r-ela",
+        "stem": "a2r_ela",
+        "archive": "PODS/A2R_ELA/A2R_ELA.RES",
+        "camera": "PODS/A2R_ELA/A2R_ELA.CAM",
+        "name_key": "RIDER_A2R_ELA",
+        "ui": {
+          "archive": "UI/A2R_ELA_UI.RES",
+          "rider_model": "ui\\geometry\\a2r_ela.psg",
+          "character": [
+            "ui\\anim\\a2r_elac.psg",
+            "ui\\anim\\a2r_elac.mcf",
+            "ui\\anim\\a2r_elac.vut",
+            "ui\\anim\\a2r_elac_ent.mot",
+            "ui\\anim\\a2r_elac_idl1.mot",
+            "ui\\anim\\a2r_elac_idl2.mot",
+            "ui\\anim\\a2r_elac_idl3.mot",
+            "ui\\anim\\a2r_elac_breathe.mot",
+            "ui\\anim\\a2r_elac_sel.mot"
+          ],
+          "character_pages": [
+            "ui\\textures\\a2r_elac_1.pst",
+            "ui\\textures\\a2r_elac_1.psm",
+            "ui\\textures\\a2r_elac_2.pst",
+            "ui\\textures\\a2r_elac_2.psm"
+          ],
+          "pod_pages": [
+            "UI\\Textures\\a2r_ela_1.pst",
+            "UI\\Textures\\a2r_ela_2.pst",
+            "UI\\Textures\\a2r_ela_3.pst",
+            "ui\\textures\\a2r_ela_1.psm",
+            "ui\\textures\\a2r_ela_2.psm",
+            "ui\\textures\\a2r_ela_3.psm"
+          ],
+          "shadow": [
+            "ui\\textures\\a2r_ela_shdw.pst",
+            "ui\\textures\\a2r_ela_shdw.psm"
+          ],
+          "portraits": [
+            "ui\\textures\\a2r_ela_flrg.pst"
+          ],
+          "background": [
+            "ui\\textures\\a2r_ela_bkg.pst",
+            "ui\\textures\\a2r_ela_bkg.psm"
+          ],
+          "results_icon": "ui\\textures\\a2r_ela_fsm.pst",
+          "garage_model": [
+            "ui\\geometry\\a2r_elae.psg",
+            "ui\\textures\\a2r_elae_1.pst",
+            "ui\\textures\\a2r_elae_1.psm",
+            "ui\\textures\\spcgarge.pst"
+          ],
+          "layout_slot": "24"
+        },
+        "ai": "addon_courses",
+        "unlock": "always"
+      }
+    ],
+    "files": [
+      {
+        "path": "PODS/A2R_ELA/A2R_ELA.RES",
+        "bytes": 215611,
+        "sha256": "1e8c152568f1d6eb1beb6223f99d4fad6bca51325c1b1d8ffb178001d6348a53",
+        "role": "pod archive (members named by the stem: pods\\a2r_ela\\..., textures\\a2r_ela_N, ...)"
+      },
+      {
+        "path": "PODS/A2R_ELA/A2R_ELA.CAM",
+        "bytes": 5785,
+        "sha256": "13ef5523f07bb2ca63a28299540398e868dd08ee9ab1afc6d12458d1232f44d7",
+        "role": "camera presets (stock PODnn.CAM format)"
+      },
+      {
+        "path": "UI/A2R_ELA_UI.RES",
+        "bytes": 183950,
+        "sha256": "676bdb9e208cfb84cfb78e1e6175a0a16441809f3552ad1ab8dad55a5e281492",
+        "role": "own menu archive (rider model, character, pages, flag, backdrop, results icon, garage model)"
+      }
+    ]
+  }
+}

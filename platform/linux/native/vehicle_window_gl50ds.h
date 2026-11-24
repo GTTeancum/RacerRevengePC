@@ -406,6 +406,8 @@ struct VehicleWindowDynamicWorldFrame50DS {
     // source-alpha blending, no depth write, alpha scaled. Null = every span 1.
     const float* spanAlphas = nullptr;
     std::uint32_t spanAlphaCount = 0;
+    void* uvOwner=nullptr;
+    bool (*uvOffset)(void*,std::uint32_t,float&,float&) noexcept=nullptr;
 };
 struct VehicleWindowSky50DS {
     // Authored sky geometry only, copied cold into private GPU buffers. Its
@@ -757,6 +759,8 @@ struct GameplayBlurFrame50DS {
     std::int32_t originalWidth = 0, originalHeight = 0;
     std::int32_t logicalView = 0, physicalView = 0; // Current join admits 0/0.
     game::GameplayBlurRect cameraRectangle{}; // Exact original top-left viewport.
+    bool hasSecondView=false;
+    game::GameplayBlurRect secondRectangle{};
 };
 struct VehicleWindowTrackUvFrame50DS {
     void* owner = nullptr;
@@ -835,6 +839,8 @@ struct VehicleWindowFrame50DS {
     // Null is for non-gameplay/legacy paths: no queue consumption or effect.
     // No-request queue retains the video owner's previous coefficient/rectangle.
     const GameplayBlurFrame50DS* gameplayBlur = nullptr;
+    // 0 for a single presentation, 1 and 2 for consecutive original split views.
+    unsigned splitPass = 0;
     const VehicleWindowTrackUvFrame50DS* trackUvAnimation = nullptr;
     //Actual track particle manager packets, borrowed through this one
     //transaction; all5000 slots can draw. Drawn after Binder, before HUD/blur.

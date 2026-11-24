@@ -3187,8 +3187,16 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
     if(out.voiceCount==courseRequiredVoices||retainedGarageOrdinaryCurrent()||garageGroupCurrent()){
         AudioVoiceObservation50HD speech;
         if(!mixer_->inspectVoice(riderConfirmVoice,speech)||speech.groupKnown||speech.groupGain!=1.f||
-           ownsRiderConfirm_||speech.voice.active)
+           (speech.voice.active&&!ownsRiderConfirm_)||speech.playbackRevision!=riderConfirmPlaybackRevision_)
             return reject(SteadyRiderError::foreignEffect,"Rider Confirm speech cannot certify steady navigation",riderConfirmVoice);
+        if(speech.voice.active){
+            bool owned=false;
+            for(std::size_t i=0;i<riderConfirmClips_.size();++i){
+                if(preparedClipMatches(riderConfirmClips_[i],riderConfirmPcm_[i],riderConfirmOriginals[i].file,1)&&
+                   fixedVoiceMatches(speech,riderConfirmClips_[i],riderConfirmPlaybackRevision_,1.f,false)){owned=true;break;}
+            }
+            if(!owned)return reject(SteadyRiderError::foreignEffect,"Rider confirm playback differs",riderConfirmVoice);
+        }
     }
     if(!ownsMusic_||musicSong_!=7||!out.music.voice.active)
         return reject(SteadyRiderError::wrongMusic,"Rider requires owned active Song7",musicVoice);

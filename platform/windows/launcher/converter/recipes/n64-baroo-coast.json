@@ -1,0 +1,90 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-baroo-coast",
+    "name": "Baroo Coast (Baroonda, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.2",
+    "description": "Baroo Coast on Baroonda, from Star Wars Episode I Racer (N64) model 139, as an add-on course (code nc, physics class B). AI class B (medium evidence); rival arcade-neva-kee/a2r-nev, Neva Kee (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NC": "BAROO COAST",
+        "PLANET_NC": "BAROONDA"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nc",
+        "code": "nc",
+        "archive": "TRACKS/NC.RES",
+        "name_key": "COURSE_NC",
+        "planet_name_key": "PLANET_NC",
+        "phy_class": "B",
+        "ai_class": "B",
+        "rival": "arcade-neva-kee/a2r-nev",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NC.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NC.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nc",
+        "enhancements": [
+          "surface_rules"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NC.RES",
+        "bytes": 1271686,
+        "sha256": "5eb43bc2023f26c551ec05bd198894d82681f523e0497ae655760b32b8f593c5",
+        "role": "course archive (members named tracks\\nc.* / anc.spl / mnc.spl / ncNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NC.PST",
+        "bytes": 66588,
+        "sha256": "c4fd0351b469616806311224b83aaeb0ec562a93a443dd342622448861214db5",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NC.PST",
+        "bytes": 287772,
+        "sha256": "dac6301a41a8e73adcca867012cb38f98b1e6cc9b1a0461f6d03ab399816679f",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      42040.0,
+      4520.0,
+      41380.0
+    ],
+    "target": [
+      21800.0,
+      1660.0,
+      21360.0
+    ]
+  }
+}

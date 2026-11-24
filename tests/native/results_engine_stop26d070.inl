@@ -84,12 +84,13 @@ inline bool native_original_ai_audio::Owner::canStopResultsEngines26D070(
     // walks the live Aural groups, not a racer count, so a solo Time Trial field
     // (zero AI engine rows) stops the same groups as an 8-racer Single Race
     // (cr-18: racerCount_!=8 refused every Time Trial Pause QUIT at step 6).
-    if(!prepared_||!activated_||!session||firstAiSlot_!=1||
+    if(!prepared_||!activated_||!session||!firstAiSlot_||firstAiSlot_>humanResetOwners_.size()||
        racerCount_!=materialD44_.racerCount()||materialD44_.humanCount()!=firstAiSlot_||
        racerCount_<firstAiSlot_||racerCount_>racers_.size()||
        !mode_||mode_!=mixer.originalSoundMode50KG()||!mode_->ready()||
-       !humanResetOwner_||!humanResetOwner_->bound()||
-       humanResetOwner_->identity().session!=session||!groups.uses(mixer))return false;
+       !groups.uses(mixer))return false;
+    for(std::size_t i=0;i<firstAiSlot_;++i)
+        if(!humanResetOwners_[i]||!humanResetOwners_[i]->bound()||humanResetOwners_[i]->identity().session!=session)return false;
     return canStopNativeEngineRows26D070(mixer,groups,session);
 }
 inline bool native_original_ai_audio::Owner::canStopAll8Engines26D070(
@@ -97,7 +98,7 @@ inline bool native_original_ai_audio::Owner::canStopAll8Engines26D070(
     const rr::platform::RaceAudioGroups50IC& groups,std::uint64_t session)const noexcept {
     if(!prepared_||!activated_||!session||firstAiSlot_!=0||racerCount_!=8||
        !mode_||mode_!=mixer.originalSoundMode50KG()||!mode_->ready()||
-       humanResetOwner_||humanResetD44_||humanMaterials_.resultsStopCount26D070()||
+       humanResetOwners_[0]||humanResetOwners_[1]||
        materialD44_.humanCount()!=0||materialD44_.racerCount()!=8||!groups.uses(mixer))return false;
     for(std::size_t i=0;i<racerCount_;++i)if(!materialD44_.ownsAiSlot(i))return false;
     return canStopNativeEngineRows26D070(mixer,groups,session);
@@ -148,9 +149,9 @@ inline bool native_original_ai_audio::Owner::canStopNativeAuxiliaryRows26D070(
     if(!group44)return false;
     for(std::size_t i=0;i<racerCount_;++i){
         const bool human=i<firstAiSlot_;
-        const auto* row=human?humanResetD44_:racers_[i].materialD44;
-        const auto& channel=human?humanMaterials_:racers_[i].materials;
-        const auto* vehicle=human?&humanResetOwner_->identity():&racers_[i].engine.identity;
+        const auto* row=racers_[i].materialD44;
+        const auto& channel=racers_[i].materials;
+        const auto* vehicle=human?&humanResetOwners_[i]->identity():&racers_[i].engine.identity;
         if(!row||row->poolOrdinal()!=i||row->vehicle248()!=vehicle||
            vehicle->session!=session||vehicle->managerOrdinal!=i||
            (!human&&!materialD44_.ownsAiSlot(i)))return false;
@@ -168,7 +169,10 @@ inline bool native_original_ai_audio::Owner::canStopNativeAuxiliaryRows26D070(
                s.authoredKey4!=key+1||s.groupState44!=group44||
                groups.binding(channel.resultsStopVoice26D070(j))!=Group::Effects110)return false;
         }
-        if(human)continue;
+        if(human){
+            if(i&&!racers_[i].speechProvider.canStopResultsNative26D070(mixer,groups))return false;
+            continue;
+        }
         const auto& r=racers_[i];
         if(r.wrecks.resultsStopCount26D070()!=4||!r.wrecks.canStopResultsNative26D070(mixer)||
            !r.speechProvider.canStopResultsNative26D070(mixer,groups))return false;
@@ -192,7 +196,14 @@ inline bool native_original_ai_audio::Owner::canStopNativeAuxiliaryRows26D070(
 }
 
 inline std::size_t native_original_ai_audio::Owner::resultsAuxiliaryStopCount26D070()const noexcept {
-    std::size_t count=humanMaterials_.resultsStopCount26D070();
+    std::size_t count=0;
+    for(std::size_t i=0;i<firstAiSlot_;++i){
+        count+=racers_[i].materials.resultsStopCount26D070();
+        if(i)for(std::size_t cue=0;cue<gameplay_audio50HE::cueCount;++cue){
+            std::size_t voice;
+            if(racers_[i].speechProvider.resultsStopVoice26D070(cue,voice))++count;
+        }
+    }
     for(std::size_t i=firstAiSlot_;i<racerCount_;++i){const auto& r=racers_[i];
         count+=r.materials.resultsStopCount26D070()+r.wrecks.resultsStopCount26D070();
         for(std::size_t n=0;n<gameplay_audio50HE::cueCount;++n){std::size_t slot;
@@ -203,9 +214,19 @@ inline std::size_t native_original_ai_audio::Owner::resultsAuxiliaryStopCount26D
 }
 inline std::size_t native_original_ai_audio::Owner::resultsAuxiliaryStopVoice26D070(
     std::size_t ordinal)const noexcept {
-    const auto humanCount=humanMaterials_.resultsStopCount26D070();
-    if(ordinal<humanCount)return humanMaterials_.resultsStopVoice26D070(ordinal);
-    ordinal-=humanCount;
+    for(std::size_t i=0;i<firstAiSlot_;++i){
+        const auto& channel=racers_[i].materials;
+        const auto count=channel.resultsStopCount26D070();
+        if(ordinal<count)return channel.resultsStopVoice26D070(ordinal);
+        ordinal-=count;
+        if(i)for(std::size_t cue=0;cue<gameplay_audio50HE::cueCount;++cue){
+            std::size_t voice;
+            if(racers_[i].speechProvider.resultsStopVoice26D070(cue,voice)){
+                if(!ordinal)return voice;
+                --ordinal;
+            }
+        }
+    }
     for(std::size_t i=firstAiSlot_;i<racerCount_;++i){const auto& r=racers_[i];
         for(const auto* channel:{&r.materials,&r.wrecks}){
             const auto count=channel->resultsStopCount26D070();
@@ -222,7 +243,10 @@ inline std::size_t native_original_ai_audio::Owner::resultsAuxiliaryStopVoice26D
     return rr::platform::audioMaximumVoices50HD;
 }
 inline void native_original_ai_audio::Owner::stopResultsAuxiliaryPreflighted26D070()noexcept {
-    humanMaterials_.stopResultsNativePreflighted26D070();
+    for(std::size_t i=0;i<firstAiSlot_;++i){
+        racers_[i].materials.stopResultsNativePreflighted26D070();
+        if(i)racers_[i].speechProvider.stopResultsNativePreflighted26D070();
+    }
     for(std::size_t i=firstAiSlot_;i<racerCount_;++i){auto& r=racers_[i];
         r.materials.stopResultsNativePreflighted26D070();
         r.wrecks.stopResultsNativePreflighted26D070();

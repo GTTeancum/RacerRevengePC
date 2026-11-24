@@ -702,7 +702,8 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
         static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),delivery,receipt.movement,d.widget);
     if(!widgetOkay(movement)){s->fault(Status::widget,0x2A73F0);status=Status::widget;}
     s->inOperation=false;
-    if(s->cold.externalTransition && !s->state.faulted && in.originalInput==4 && receipt.decision.selectedSlot!=2 &&
+    if(s->cold.externalTransition && !s->state.faulted && in.originalInput==4 &&
+        (receipt.decision.selectedSlot!=2||in.secondControllerObservation==WindowControllerPresence50DQ::Present) &&
         (receipt.decision.action==game::OriginalUiMainAction50KG::unavailableMode ||
          receipt.decision.action==game::OriginalUiMainAction50KG::unavailableScreen)){
         const auto t=s->lifecycle().snapshot();

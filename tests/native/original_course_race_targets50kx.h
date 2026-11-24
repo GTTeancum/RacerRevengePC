@@ -72,7 +72,7 @@ inline const Target courseRouteTarget{Track::Course,nullptr,0xffffffffu,0xffffff
 inline const char* targetCode(const Target& t) noexcept {return t.assets?t.assets->world->code:"course";}
 inline const Target* target(const Selection& s) noexcept {
     if(!rr::game::originalCourseSelectionEncoding50KG(s)||
-       !rr::game::nativeSingleHumanCourseMode50KG(s))return nullptr;
+       !rr::game::nativeCourseMode50KG(s))return nullptr;
     if(rr::game::dlc50DL::addonCourseForLaunch(s.mode34,s.subtype))return &courseRouteTarget;
     for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet)return &t;
     return nullptr;
@@ -255,7 +255,7 @@ public:
     rr::game::OriginalCourseLoadAvailability50KG availability(const Selection& s)const noexcept {
         using A=rr::game::OriginalCourseLoadAvailability50KG;
         if(!rr::game::originalCourseSelectionEncoding50KG(s))return A::invalidSelection;
-        if(!rr::game::nativeSingleHumanCourseMode50KG(s))return A::unsupportedNativeMode;
+        if(!rr::game::nativeCourseMode50KG(s))return A::unsupportedNativeMode;
         if(!attempted_)return A::hostNotReady;
         const Target* selected=nullptr;
         // Registry target (A12): the registry admitted the package file at startup
@@ -272,7 +272,7 @@ public:
         // PORT EXTENSION, NOT ORIGINAL: a selected free-play add-on rider races
         // instead of the profile's stock rider; its row is the DLC registry's
         // and its archive identity the common pod admission's (read once).
-        const unsigned addon=s.mode34==0?rr::game::dlc50DL::selectedAddonRider():0u;
+        const unsigned addon=(s.mode34==0||s.mode34==1)?rr::game::dlc50DL::selectedAddonRider():0u;
         if(addon)rosterPresent=original_player_identity50IK::find(addon)!=nullptr;
         else for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;

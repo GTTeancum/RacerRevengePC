@@ -53,6 +53,7 @@ struct ActionLease {
  std::uint32_t racerMain690=0,queryCollider=0;
  std::uint32_t* nodeC80=nullptr;                       // the querying racer's C80 (LostAI destination)
  const g::Vector3_48C* listeners=nullptr;std::size_t listenerCount=0; // PodSound/Sound listeners (camera)
+ std::uint32_t* pilotNodeC80=nullptr;
 };
 // One authored action reaching its destination.
 struct ActionEvent {
@@ -214,7 +215,9 @@ class Owner final {
    increment(counters_.entries);const auto& a=*e.authored;
    if(a.kind==src::ActionKind::LostAI){
     for(std::size_t i=0;i<racerCount_;++i)if(racers_[i].main690==e.otherCollider){
-     *lease_->nodeC80=a.targetNodeIndex;increment(counters_.lostAiWrites);
+     *lease_->nodeC80=a.targetNodeIndex;
+     if(lease_->pilotNodeC80)*lease_->pilotNodeC80=a.targetNodeIndex;
+     increment(counters_.lostAiWrites);
      if(a.reset&&!destinations_.lostAiReset.apply(destinations_.lostAiReset.context,e)){fail(Status::Action);return {A::Blocked,0x1b5a60u,0};}
     }
     return {A::Complete,0x1b27c0u,0xc80u};

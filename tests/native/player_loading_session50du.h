@@ -1,4 +1,6 @@
 #pragma once
+#include "../../src/game/original_camera_start_effects.h"
+#include <thread>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -131,6 +133,36 @@ public:
     }
     PlayerLoadingSession50DU(const PlayerLoadingSession50DU&)=delete;
     PlayerLoadingSession50DU& operator=(const PlayerLoadingSession50DU&)=delete;
+    static bool coverRaceLoad(int manager,int mode,rr::game::OriginalVideoFadeState& video,
+        rr::game::HostMonotonicClock50ID& clock){
+        using namespace rr::game;
+        if(!active_||!active_->presenter_)return false;
+        struct Backend final : OriginalVideoBlockingBackend {
+            rr::platform::PlayerLoadingPresenter50DU& presenter;
+            std::vector<unsigned char> frozen;
+            explicit Backend(rr::platform::PlayerLoadingPresenter50DU& p):presenter(p),frozen(p.pixels()){}
+            OriginalCameraStartResult begin(OriginalVideoFadeDirection,const OriginalVideoFadeState&)override {
+                return {frozen.empty()?OriginalCameraStartStatus::rendererNoImage:OriginalCameraStartStatus::complete};
+            }
+            OriginalCameraStartResult copyDrawAndComplete(const OriginalVideoBlockingSample& sample)override {
+                return {presenter.draw(nullptr,false,&frozen,sample.gsRgbaq)?OriginalCameraStartStatus::complete:OriginalCameraStartStatus::videoBackend};
+            }
+            OriginalCameraStartResult restoreAndComplete(OriginalVideoFadeDirection)override {
+                // Each presenter draw restores GL state and swaps before returning.
+                return {OriginalCameraStartStatus::complete};
+            }
+        } backend(*active_->presenter_);
+        OriginalResultsBlockingFade2AED60 fade;
+        for(;;){
+            const auto step=fade.advance(manager,mode,video,clock,&backend);
+            if(step.status==OriginalCameraStartStatus::complete)return true;
+            if(step.status!=OriginalCameraStartStatus::videoClockWait)return false;
+            bool close=false;rr::platform::GameHostDiagnostic50ER diagnostic;
+            if(!active_->application_.playerVideo50DU()->host.pollLoading50DU(close,diagnostic))return false;
+            if(close)throw PlayerLoadingCancelled50DU{};
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
     static void checkStop() {
         if(!active_)return;
         if(active_->failed_)throw std::runtime_error("native player loading presentation/event pump failed");

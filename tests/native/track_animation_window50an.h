@@ -6,6 +6,7 @@
 // pass's own non-empty values), the same rule the MA/SA world route uses (selectMaSa), here
 // without a course gate.
 #include "track_animation_materials50an.h"
+#include "../../src/game/original_material_uv_animation50uv.h"
 #include "material_alpha50gx_fixture.h"
 #include "../../src/assets/original_ui_material50kg.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
@@ -35,14 +36,33 @@ class Owner final {
  // extension (d)); handed to the draw only when some row is faded, so stock frames are unchanged.
  mutable std::vector<float> spanAlphas_;
  bool loaded_=false;
+ std::map<std::string,rr::game::OriginalMaterialUv50UV> uvControllers_;
+ std::vector<rr::game::OriginalMaterialUv50UV*> spanUv_;
+ std::uint32_t uvTimestamp_=0;
+ bool uvPaused_=false;
+ unsigned uvSamples_=0;
+ bool serviceUv(std::uint32_t span,float& u,float& v) noexcept {
+  if(span>=spanUv_.size())return false;
+  u=v=0.f;
+  auto* state=spanUv_[span];
+  if(!state||!runtime_->state(runtime_->spans()[span].row).enabled29)return true;
+  if(!rr::game::serviceOriginalMaterialUv50UV(*state,uvTimestamp_,uvPaused_))return false;
+  u=state->matrix.rows[2][0];v=state->matrix.rows[2][1];
+  if(std::getenv("RR_TEST_N64_EFFECT_CAPTURE")&&uvSamples_<3&&u!=0.f){
+   std::fprintf(stderr,"track_animation_uv span=%u timestamp=%u u=%g v=%g\n",span,uvTimestamp_,u,v);
+   ++uvSamples_;
+  }
+  return true;
+ }
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
  bool loadSource(std::shared_ptr<const rt::Owner> runtime,const src::Extract& extract,mat::Diagnostic& d){
   if(loaded_||!runtime||!runtime->ready()){d={};d.message="track animation window requires a fresh window and a ready runtime";return false;}
-  if(!materials_.load(*runtime,extract,d))return false;
+  if(!runtime->spans().empty()&&!materials_.load(*runtime,extract,d))return false;
   runtime_=std::move(runtime);loaded_=true;return true;
  }
  bool loaded()const noexcept{return loaded_&&runtime_&&runtime_->ready();}
+ bool collisionOnly()const noexcept{return loaded()&&runtime_->spans().empty();}
  bool ownsResources()const noexcept{return gpu_.ownsResources();}
  // Teardown: after close() released the GPU side, the window drops its reference to the
  // track's animation runtime (track.roles.animation) so the Track can release it.
@@ -51,12 +71,22 @@ public:
  const mat::Owner& materials()const noexcept{return materials_;}
  bool createGpu(const p::MaterialTextureGlRequest50EB& caller,const a::OriginalUiMaterialTemplates50KG& templates,
       const a::OriginalUiMaterialRuntime50KG& uiRuntime,p::MaterialTextureGlDiagnostic50EB& d){
+  if(collisionOnly())return true;
   if(!loaded()||!materials_.bank())return false;
   const auto& spans=runtime_->spans();const auto textures=materials_.textureCount();
   std::vector<p::MaterialTextureSampler50EB> samplers(textures);std::vector<std::uint8_t> samplerSet(textures,0);
+  uvControllers_.clear();spanUv_.assign(spans.size(),nullptr);
   spans_.assign(spans.size(),{});spanAlphas_.assign(spans.size(),1.f);
   for(std::size_t i=0;i<spans.size();++i){const auto& span=spans[i];const auto& m=materials_.spanMaterial(i);
    if(m.textureIndex>=textures)return false;
+   if(src::detail::iequal(m.program,"DiffuseTexTransCompressed")){
+    std::vector<rr::game::OriginalMaterialUvField50UV> fields;
+    for(const auto& f:m.fields.authored)fields.push_back({f.name,f.value});
+    rr::game::OriginalMaterialUvConfig50UV config;rr::game::OriginalMaterialUvDiagnostic50UV diagnostic;
+    if(!rr::game::readOriginalMaterialUv50UV(fields,config,diagnostic))return false;
+    if(diagnostic.status==rr::game::OriginalMaterialUvStatus50UV::ok)
+     spanUv_[i]=&uvControllers_.try_emplace(m.name,rr::game::makeOriginalMaterialUv50UV(config)).first->second;
+   }
    material_alpha50gx_fixture::Policy alpha{};
    if(!material_alpha50gx_fixture::selectDefaultMtFields(m.fields,m.program,true,templates,uiRuntime,alpha)){
     std::cerr<<"track_animation_window course="<<runtime_->label()<<" span="<<i<<" material="<<m.name<<" program="<<m.program<<" alpha policy rejected\n";return false;}
@@ -82,6 +112,7 @@ public:
   return gpu_.create(request,*materials_.bank(),d);
  }
  bool bindRequest(p::VehicleWindowRequest50DS& request)const noexcept{
+  if(collisionOnly())return true;
   if(!loaded()||!gpu_.initialized())return false;auto& shown=request.dynamicWorld;
   if(shown.mesh||shown.textures||shown.spans||shown.spanCount)return false;
   const src::Limits limits{};
@@ -93,7 +124,8 @@ public:
   shown.maximumNormalBytes=std::size_t(limits.vertices)*sizeof(a::WorldNormal50HK);
   return true;
  }
- bool bindFrame(p::VehicleWindowFrame50DS& frame)const noexcept{
+ bool bindFrame(p::VehicleWindowFrame50DS& frame,std::uint32_t timestamp,bool paused) noexcept{
+  if(collisionOnly())return true;
   if(!loaded()||!gpu_.initialized())return false;const auto& mesh=runtime_->mesh();
   frame.dynamicWorld={mesh.vertices.data(),static_cast<std::uint32_t>(mesh.vertices.size()),
     runtime_->normals().data(),static_cast<std::uint32_t>(runtime_->normals().size())};
@@ -102,6 +134,13 @@ public:
   for(std::size_t i=0;i<spans.size();++i){
    if(spans[i].row>=runtime_->rowCount())return false;
    const float alpha=runtime_->state(spans[i].row).alpha;spanAlphas_[i]=alpha;faded=faded||alpha<1.f;}
+  if(!uvControllers_.empty()){
+   uvTimestamp_=timestamp;uvPaused_=paused;
+   frame.dynamicWorld.uvOwner=this;
+   frame.dynamicWorld.uvOffset=[](void* owner,std::uint32_t span,float& u,float& v) noexcept{
+    return static_cast<Owner*>(owner)->serviceUv(span,u,v);
+   };
+  }
   if(faded){frame.dynamicWorld.spanAlphas=spanAlphas_.data();frame.dynamicWorld.spanAlphaCount=static_cast<std::uint32_t>(spanAlphas_.size());}
   return true;
  }

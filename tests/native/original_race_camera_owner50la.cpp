@@ -40,6 +40,22 @@ std::shared_ptr<original_camera_session50KX::Session> OriginalRaceConstructor50L
 }
 
 namespace original_main_entry50KG {
+bool Application::prepareVersusCamera38()const noexcept {
+    using Camera=rr::game::OriginalFrontendCameraCold50LA;
+    const auto& race=sourceRace28COwner_;
+    if(garageAudioOwnerThread_!=std::this_thread::get_id()||!race||
+       raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
+       !race->counted_||race->rolledBack_||!race->camera34_||
+       (race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=2u||
+       (race->field8C_!=1u&&race->field8C_!=2u))return false;
+    auto& camera=race->camera38_;
+    if(!camera&&!Camera::construct(this,entitiesOwner_,camera,false).okay())return false;
+    if(camera->phase_==Camera::Phase::constructedCold&&
+       !camera->stageViewportPrefix1149D4(this,entitiesOwner_).okay())return false;
+    return camera!=race->camera34_&&camera->phase_==Camera::Phase::beforeViewport114A00&&
+        camera->unpublishedAbortCurrent(this,entitiesOwner_);
+}
+
 bool Application::continueConsumedRaCamera1A9240(
     rr::game::OriginalRaceConstructor50LA& race,std::uint32_t& pc)const noexcept {
     using Step=rr::game::OriginalRaceConstructor50LA::CameraInitStep;
@@ -53,18 +69,18 @@ bool Application::continueConsumedRaCamera1A9240(
        race.worldInitStep_!=rr::game::OriginalRaceConstructor50LA::WorldInitStep::camera||
        !entitiesOwner_||entitiesOwner_->attachmentLock423F58()||
        (race.flags1B0KnownMask_&3u)!=3u)return false;
-    // Exact1A6C8C a1. Only the actual one-view branch has a native backend;
-    // zero/debug and multi-view branches do not borrow Session's one-view value.
-    if((race.flags1B0KnownValue_&3u)!=1u){pc=0x1a9240;return false;}
+    const auto viewCount=race.flags1B0KnownValue_&3u;
+    if(viewCount!=1u&&viewCount!=2u){pc=0x1a9240;return false;}
     if(race.cameraInitStep_==Step::nativeRetiring||race.cameraInitStep_==Step::retired)return false;
     if(race.cameraInitStep_==Step::unreached){
-        race.field8C_=0; //1A9284, before the reached Application2E0 read.
+        if(viewCount==2u&&!gameSettingsProfile){pc=0x1a92b8;return false;}
+        race.field8C_=viewCount==1u?0u:((gameSettingsProfile->flags11050&2u)?2u:1u); // 1A9284 / 1A92CC..D8
         race.cameraInitStep_=Step::pause;
     }
     if(race.cameraInitStep_==Step::pause){
         pc=0x1a9290;
-        if(!sourceUseProfile2E0_)return false;
-        if(*sourceUseProfile2E0_){
+        if(viewCount==1u&&!sourceUseProfile2E0_)return false;
+        if(viewCount==2u||*sourceUseProfile2E0_){
             if(!animationClockOwner_||!animationClockOwner_->applicationAlive_||
                animationClockOwner_->updateInProgress_)return false;
             animationClockOwner_->value_.pause11C=0; //1A92A0 branch delay store.
@@ -160,7 +176,8 @@ bool Application::consumedTaCamera34Engaged(const original_camera_session50KX::S
     const bool sameWorld=race&&issued&&issued->race==race.get()&&issued->world==race->world74_.get();
     if(!race||!race->world74_||!race->camera34_||
        !issued||issued->issuer!=this||!sameWorld||
-       &session.actual_.race94!=&race->field94_||session.actual_.humanCount34!=1u){
+       &session.actual_.race94!=&race->field94_||(session.actual_.humanCount34!=1u&&
+        !(session.actual_.humanCount34==2u&&race->camera38_&&race->nativeController4C_))){
         if(!requireBound){static int reported=0;if(reported++<2)
             std::fprintf(stderr,"common_race_camera34 engaged=0 race=%d world74=%d camera34=%d issued=%d same_world=%d race94=%d humans=%u\n",
                 int(bool(race)),race?int(bool(race->world74_)):-1,race?int(bool(race->camera34_)):-1,
@@ -189,8 +206,17 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
        issued->generation!=race->entity_.sessionGeneration||session.generation_!=issued->generation)return refused(3);
     if(session.closed_||session.abandoned_||!session.displayInputs_)return refused(4);
     if(!session.readsBound_||!session.identitiesCurrent())return refused(5);
-    if(session.actual_.humanCount34!=1u||&session.actual_.race94!=&race->field94_)return refused(6);
-    if((race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||race->field8C_!=0u)return refused(7);
+    const auto views=session.actual_.humanCount34;
+    if((views!=1u&&views!=2u)||&session.actual_.race94!=&race->field94_)return refused(6);
+    if((race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=views)return refused(7);
+    if(views==1u&&race->field8C_!=0u)return refused(7);
+    if(views==2u){
+        const auto& second=race->camera38_;
+        if(!second||second==race->camera34_||!second->unpublishedAbortCurrent(this,entitiesOwner_)||
+           (race->field8C_!=1u&&race->field8C_!=2u)||
+           race->nativeController48_!=session.taControllerEntity174A30()||
+           race->nativeController4C_!=session.taControllerEntity174A30(1))return refused(7);
+    }
     if(race->cameraInitStep_!=Step::nativePending&&race->cameraInitStep_!=Step::nativeReady)return refused(8);
     if(!race||raceConstructorColdOwner50LA_.lock()!=race||race->application_!=entitiesOwner_||
        race->profile_!=riderProfile||!race->ownsNativeCameraAdapter34(session)||
@@ -200,9 +226,7 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
        !session.actual_.applicationAnimation.sameOwner(animationClock())||
        session.closed_||session.abandoned_||!session.displayInputs_||!session.readsBound_||
        session.frameStage_==original_camera_session50KX::Session::FrameStage::failed||
-       !session.identitiesCurrent()||session.actual_.humanCount34!=1u||
-       &session.actual_.race94!=&race->field94_||
-       (race->flags1B0KnownMask_&3u)!=3u||(race->flags1B0KnownValue_&3u)!=1u||race->field8C_!=0u||
+       !session.identitiesCurrent()||
        (race->cameraInitStep_!=Step::nativePending&&race->cameraInitStep_!=Step::nativeReady)||
        (race->cameraNativeAdapter34_&&race->cameraNativeAdapter34_!=&session))return false;
     const auto& camera=race->camera34_;
@@ -232,6 +256,7 @@ bool Application::bindConsumedRaCameraNative34(original_camera_session50KX::Sess
        &session.displayInputs_->renderer!=&display->renderer_||
        &session.displayInputs_->rendererDispatch!=&display->dispatch_)return false;
     race->cameraNativeAdapter34_=&session;
+    session.raceFlags1B0_=static_cast<std::uint8_t>((session.raceFlags1B0_&~3u)|views);
     session.raceMode8C_=static_cast<std::int32_t>(race->field8C_); //One-way native view.
     return true;
     }catch(...){return false;}
@@ -241,6 +266,10 @@ bool Application::completeConsumedRaCameraNative34(original_camera_session50KX::
     if(!bindConsumedRaCameraNative34(session))return false;
     const auto race=sourceRace28COwner_;const auto display=race->loadDisplay_;
     const auto selected=session.selectedGameplayDisplay_.lock();
+    if(session.actual_.humanCount34==2u&&(!session.secondViewport_.prepared||
+       !session.secondTick_.bound||session.secondViewport_.sessionGeneration!=session.generation_||
+       session.secondViewport_.sceneKey!=session.key(session.secondScene_)||
+       session.secondTick_.sceneKey!=session.secondViewport_.sceneKey))return false;
     // Reached native services, not a supplied readiness flag: existing cold
     // viewport owns both renderer drains and matrix work; the real selector has
     // published this exact Session on the same initialized Windows/Linux Display.
@@ -281,6 +310,15 @@ bool Application::retireConsumedRaCameraNative34(
        race.resultsFeedbackThread_!=std::this_thread::get_id())return false;
     if(raceConstructorColdOwner50LA_.lock().get()!=&race||race.application_!=entitiesOwner_||
        race.cameraNativeAdapter34_)return false;
+    if(race.camera38_){
+        if(race.camera38_.use_count()!=1)return false;
+        std::array<rr::game::OriginalWreckComponent50LA*,4> slots;
+        if(!entitiesOwner_->snapshotCameras140200(slots))return false;
+        for(const auto* slot:slots)if(slot==&race.camera38_->entity_)return false;
+        const auto retired=race.camera38_->abortUnpublished236180(this,entitiesOwner_);
+        if(!retired.okay()){pc=retired.sourcePC;return false;}
+        race.camera38_.reset();
+    }
     if(race.loadingCamera34_.entered)return abortConsumedRaLoadingCameraNative34(race,pc);
     if(!race.camera34_)return true;
     // Actual world/session cleanup must already have invalidated the native

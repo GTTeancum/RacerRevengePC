@@ -9,18 +9,6 @@
 namespace original_time_stats_adapter50LA {
 class Owner final {
     using Camera=original_camera_session50KX::Session;
-    // Source camera preparation constructs these two exact view0 identities.
-    // Human count alone cannot authorize an AI/player reinterpretation.
-    static bool supportedSourceView(const Camera& c)noexcept {
-        if(!c.controller_.bound)return false;
-        const auto& binding=c.controller_.binding;
-        return (c.actual_.humanCount34==0u&&
-                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
-                binding.racerClass==rr::game::CameraRacerClass::ai)||
-            (c.actual_.humanCount34==1u&&
-                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
-                binding.racerClass==rr::game::CameraRacerClass::player);
-    }
     using Bank=native_racer50HN::Bank;
     template<class T> using Read=Bank::ReadHandle<T>;
     const Camera* camera_=nullptr;
@@ -47,7 +35,7 @@ public:
         d={};if(bound_){d.status=Status::alreadyBound;return false;}
         try {
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
-               !camera.generation_||!supportedSourceView(camera)||
+               !camera.generation_||!camera.hudCameraBound(0)||
                &camera.actual_.all8Manager!=&manager.manager||
                &camera.actual_.racerTiming!=&continuity.timing||(!camera.actual_.bank.count()||camera.actual_.bank.count()>8))
                 return false;
@@ -76,34 +64,32 @@ public:
     // is unchanged on rejection. Borrowed viewport/preferences live only as
     // long as the actual Session/configuration owners; consume before another
     // world/camera update or teardown, not from an asynchronous renderer.
-    bool capture(rr::game::OriginalTimeStatsNativeFrame50LA& output,Diagnostic& d)const noexcept {
+    bool capture(rr::game::OriginalTimeStatsNativeFrame50LA& output,Diagnostic& d,unsigned view=0)const noexcept {
         d={};if(!bound_||!camera_||!manager_||!settings1125C_)return false;
         try {
             const auto& camera=*camera_;const auto& manager=*manager_;const auto& bank=camera.actual_.bank;
+            const auto* viewport=camera.hudViewport(view);
             if(camera.closed_||camera.abandoned_||!camera.coldBound_||!camera.readsBound_||
                camera.generation_!=generation_||camera.frameStage_!=Camera::FrameStage::published||
                !camera.publicationCount_||!camera.completedFrame_||
-               !camera.viewport_.prepared||!camera.viewport_.matricesReady||
-               camera.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(!supportedSourceView(camera)||(!bank.count()||bank.count()>8)||
+               !viewport||!viewport->prepared||!viewport->matricesReady||
+               viewport->sessionGeneration!=generation_){d.status=Status::phase;return false;}
+            if(!camera.hudCameraBound(view)||(!bank.count()||bank.count()>8)||
                &camera.actual_.all8Manager!=&manager.manager||!manager.managerBound||!manager.rankBound||
                !manager.retired40.bound||manager.retired40.activeCount50>bank.count()||
-               camera.controller_.binding.sessionGeneration!=generation_||
-               camera.controller_.binding.managerIndex!=camera.identity_[0].managerIndex||
-               camera.controller_.binding.racerKey!=Camera::key(camera.identity_[0].racerTag)||
-               (camera.raceFlags1B0_&3u)!=1u||!camera.identitiesCurrent()){
+               (camera.raceFlags1B0_&3u)!=(camera.actual_.humanCount34==2u?2u:1u)||!camera.identitiesCurrent()){
                 d.status=Status::identity;return false;
             }
             const auto publication=camera.publicationCount_;
             rr::game::OriginalTimeStatsNativeFrame50LA next;
             next.sessionGeneration=generation_;next.cameraPublication=publication;
-            next.viewport=&camera.viewport_;next.preferences=&camera.actual_.preferences;
+            next.viewport=viewport;next.preferences=&camera.actual_.preferences;
             next.count=static_cast<std::uint32_t>(bank.count());
-            next.selectedSlot=camera.identity_[0].managerIndex;
+            next.selectedSlot=camera.identity_[view].managerIndex;
             if(next.selectedSlot>=next.count){d.status=Status::identity;return false;}
             // The represented Session has exactly its real camera0, proven
             // by the binding/low2 check above; no human-count inference.
-            next.viewIndex=0;next.subtype11258=camera.actual_.launchKind11258;
+            next.viewIndex=view;next.subtype11258=camera.actual_.launchKind11258;
             next.activeCount50=manager.retired40.activeCount50;
             next.raceMode8C=camera.raceMode8C_;
             next.raceFlags1B0=camera.raceFlags1B0_;next.raceEntityFlags29=camera.raceEntityFlags29_;

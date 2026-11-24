@@ -4,18 +4,6 @@
 namespace original_speed_boost_adapter50LA {
 class Owner final {
     using Camera=original_camera_session50KX::Session;
-    // Source camera preparation constructs these two exact view0 identities.
-    // Human count alone cannot authorize an AI/player reinterpretation.
-    static bool supportedSourceView(const Camera& c)noexcept {
-        if(!c.controller_.bound)return false;
-        const auto& binding=c.controller_.binding;
-        return (c.actual_.humanCount34==0u&&
-                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
-                binding.racerClass==rr::game::CameraRacerClass::ai)||
-            (c.actual_.humanCount34==1u&&
-                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
-                binding.racerClass==rr::game::CameraRacerClass::player);
-    }
     using Bank=native_racer50HN::Bank;
     template<class T>using Read=Bank::ReadHandle<T>;
     const Camera* camera_=nullptr;
@@ -31,7 +19,7 @@ public:
         d={};if(camera_)return false;
         try {
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
-               !camera.generation_||(!camera.actual_.bank.count()||camera.actual_.bank.count()>8)||!supportedSourceView(camera))
+               !camera.generation_||(!camera.actual_.bank.count()||camera.actual_.bank.count()>8)||!camera.hudCameraBound(0))
                 return false;
             if((camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published)||
                !camera.identitiesCurrent()){d.status=Status::phase;return false;}
@@ -45,23 +33,20 @@ public:
     }
     // Use after the actual world/manager/camera publication, outside Bank
     // leases. Consume synchronously before another world tick or teardown.
-    bool capture(rr::game::OriginalSpeedBoostNativeFrame50LA& output,Diagnostic& d)const noexcept {
+    bool capture(rr::game::OriginalSpeedBoostNativeFrame50LA& output,Diagnostic& d,unsigned view=0)const noexcept {
         d={};if(!camera_)return false;
         try {
             const auto& c=*camera_;const auto& bank=c.actual_.bank;
+            if(!c.hudCameraBound(view)||!c.identitiesCurrent()){d.status=Status::identity;return false;}
+            const auto& viewport=view?c.secondViewport_:c.viewport_;
             if(c.closed_||c.abandoned_||!c.coldBound_||!c.readsBound_||!c.displayInputs_||
                c.generation_!=generation_||c.frameStage_!=Camera::FrameStage::published||
-               !c.publicationCount_||!c.completedFrame_||!c.viewport_.prepared||!c.viewport_.matricesReady||
-               c.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if((!bank.count()||bank.count()>8)||!supportedSourceView(c)||
-               c.controller_.binding.sessionGeneration!=generation_||
-               c.controller_.binding.managerIndex!=c.identity_[0].managerIndex||
-               c.controller_.binding.racerKey!=Camera::key(c.identity_[0].racerTag)||
-               (c.raceFlags1B0_&3u)!=1u||!c.identitiesCurrent()){d.status=Status::identity;return false;}
+               !c.publicationCount_||!c.completedFrame_||!viewport.prepared||!viewport.matricesReady||
+               viewport.sessionGeneration!=generation_){d.status=Status::phase;return false;}
             rr::game::OriginalSpeedBoostNativeFrame50LA next;
             next.sessionGeneration=generation_;next.cameraPublication=c.publicationCount_;
-            next.viewport=&c.viewport_;next.preferences=&c.actual_.preferences;
-            next.viewIndex=0;next.selectedSlot=c.identity_[0].managerIndex;
+            next.viewport=&viewport;next.preferences=&c.actual_.preferences;
+            next.viewIndex=view;next.selectedSlot=c.identity_[view].managerIndex;
             if(next.selectedSlot>=bank.count()){d.status=Status::identity;return false;}
             next.selectedBodySpeed34=bank.read(next.selectedSlot,speed34_);
             next.selectedHeat7C=bank.read(next.selectedSlot,heat7C_);

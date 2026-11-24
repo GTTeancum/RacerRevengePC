@@ -56,7 +56,8 @@ bool OriginalResults10450LA::attachedMask(std::uint32_t mask)noexcept {
     impl_->mask=mask;return true;
 }
 bool OriginalResults10450LA::disable1A8B1C()noexcept {
-    if(!constructed()||!impl_->loadComplete||impl_->disabled||!impl_->detached())return false;
+    if(!constructed()||!impl_->loadComplete||impl_->disabled||!retirementCurrent())return false;
+    // Both the detached cold owner and the attached race child use slot 18.
     //Actual slot18=141520 recursively clears both activity bits. The actual
     //Results Entity has no Entity children; ScreenObjects are owned resources.
     impl_->component.flags29=std::uint8_t(impl_->component.flags29&~3u);

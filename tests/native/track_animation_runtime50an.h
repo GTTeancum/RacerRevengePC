@@ -173,7 +173,7 @@ class Owner final:public Control {
  }
  bool sample(std::size_t i,float time,Diagnostic& d){
   auto& s=rows_[i];const auto& m=motion(s.motion18);enterUpdate(*shared_);
-  if(!g::sampleModelMotionTime50IG(m.view,sourceRow(i).bindings,time,graph(i),*shared_,workspace_,d.motion))
+  if(!g::sampleModelMotionTime50IG(m.view,sourceRow(i).bindings,time,graph(i),*shared_,workspace_,d.motion,sourceRow(i).authored.independentChannels))
    return fail(d,"track animation motion sample rejected",0x154480);
   s.visualPending=true;s.collisionDirty=true;return true;
  }
@@ -185,9 +185,12 @@ class Owner final:public Control {
   auto& s=rows_[i];const auto& m=motion(s.motion18);
   s.time34=detail::add(s.time34,dt);
   if(!std::isfinite(s.time34))return fail(d,"track animation motion time not finite",0x154480);
-  if(s.time34>m.view.duration&&m.looping)s.time34=detail::sub(s.time34,m.view.duration);
+  if(!sourceRow(i).authored.independentChannels&&s.time34>m.view.duration&&m.looping)s.time34=detail::sub(s.time34,m.view.duration);
+  const bool ended=!m.looping&&s.time34>m.view.duration;
+  const bool hold=ended&&sourceRow(i).authored.holdLastKey;
+  if(hold)s.time34=m.view.duration;
   if(!sample(i,s.time34,d))return false;
-  if(!m.looping&&s.time34>m.view.duration){s.stopped10=1;s.time34=0.f;}
+  if(ended){s.stopped10=1;if(!hold)s.time34=0.f;}
   return true;
  }
  // PORT EXTENSION (a): signed rate, optional loop, stop-at-end that HOLDS the end pose.
@@ -201,7 +204,21 @@ class Owner final:public Control {
   s.time34=t;return sample(i,t,d);
  }
  bool refreshCollision(std::size_t i,Diagnostic& d){
-  auto& s=rows_[i];if(!s.hasCollision)return true;auto& c=s.collision;const auto& row=sourceRow(i);
+  auto& s=rows_[i];const auto& row=sourceRow(i);
+  if(row.authored.parentAnimation){
+   const auto parent=row.authored.parentAnimation-1;
+   // Both converter pivots are in rest-world axes. Apply the parent's current
+   // rotation and translation to the child's rest offset before its own MOT.
+   const auto node=static_cast<Index>(1);
+   if(parent>=i||!g::refreshSceneWorld49P(graph(parent),node))return fail(d,"animated parent pose unavailable",0);
+   const auto& world=rows_[parent].nodes[1].world100;
+   auto placed=world;
+   for(unsigned axis=0;axis<3;++axis){
+    for(unsigned j=0;j<3;++j)placed.v[12+axis]+=(row.authored.offset[j]-sourceRow(parent).authored.offset[j])*world.v[4*j+axis];
+   }
+   if(!g::setLocalMatrix49P(graph(i),static_cast<Index>(0),placed))return fail(d,"animated child placement rejected",0);
+  }
+  if(!s.hasCollision)return true;auto& c=s.collision;
   if(!g::refreshSceneWorld49P(graph(i),static_cast<Index>(0)))return fail(d,"track animation compound owner refresh rejected",0x11f680);
   c.ownerWorld=s.nodes[0].world100;
   for(std::size_t p=0;p<c.parts.size();++p){
@@ -274,7 +291,7 @@ class Owner final:public Control {
   if(!s.enabled29||s.stopped10)return true;
   if(s.rateOverride){s.elapsedB0=detail::add(s.elapsedB0,dt);return advanceOverride(i,dt,d)&&refreshCollision(i,d);}
   const auto& m=motion(s.motion18);
-  const bool wrapped=detail::add(s.time34,dt)>m.view.duration&&m.looping;
+  const bool wrapped=!row.authored.independentChannels&&detail::add(s.time34,dt)>m.view.duration&&m.looping;
   s.elapsedB0=detail::add(s.elapsedB0,dt);
   if(!advanceCharacter(i,dt,d))return false;
   if(wrapped)s.rehomePending=true;
@@ -282,7 +299,7 @@ class Owner final:public Control {
  }
  // 101DA0
  bool resetRow(std::size_t i,float time,bool force,bool restore,Diagnostic& d){
-  auto& s=rows_[i];if(time<1e-4f)time=1e-4f;
+  auto& s=rows_[i];if(time<1e-4f&&!sourceRow(i).authored.loadLoop)time=1e-4f;
   if(s.stopped10||force){ // 101E0C..101E18: a stopped character, or force
    s.positionA4=0;
    if(restore){s.current9C=s.initial98;s.active90=s.saved8C;}
@@ -290,6 +307,8 @@ class Owner final:public Control {
    start(i,motionAt(i,s.current9C,0));s.time34=0.f;s.elapsedB0=time;s.atEnd=false;
    if(s.rateOverride){if(!advanceOverride(i,time,d))return false;}else if(!advanceCharacter(i,time,d))return false;
    s.rehomePending=true;if(!refreshCollision(i,d))return false;
+   if(sourceRow(i).authored.loadLoop&&restore)std::cerr<<"n64_load_loop_reset course="<<label_<<" mcf="<<sourceRow(i).authored.mcfStem
+       <<" tick="<<ticks_<<" elapsed="<<s.elapsedB0<<" motion_time="<<s.time34<<'\n';
   }
   if(!sourceRow(i).authored.sequences[s.current9C].loop&&!restore){s.stopped10=1;s.active90[s.current9C]=0;}
   if(!s.active90[s.current9C]&&restore)s.stopped10=1;
@@ -401,7 +420,7 @@ public:
       palette[r]=mulm(mulm(palette[r],inv),o);
      }
     }
-    if(shown){
+    if(shown&&count){
      if(!g::projectRigidVertices49S({vertices_.data()+start,count},{palette,row.hierarchy.nodeCount},
          {projected_.data()+start,count},d.projection))return fail(d,"track animation rigid projection rejected",0x241280);
      for(std::size_t j=start;j<start+count;++j){std::memcpy(mesh_.vertices[j].position,projected_[j].v,sizeof projected_[j].v);

@@ -168,8 +168,15 @@ Status OriginalUiTransitionOwner50KG::requestRouteDecision(const OriginalUiRoute
             changes.values[3].field==OriginalUiProfileField50KG::packed1125C&&
             changes.values[3].operation==OriginalUiProfileWrite50KG::maskedByte&&
             changes.values[3].replaceMask==0x1f&&changes.values[3].value==3&&changes.values[3].sourcePC==0x1DEEE4;
+        // VS fixes subtype 1 and remembers the three two-player Course selections.
+        const bool versus=changes.count==7&&
+            changes.values[2].field==OriginalUiProfileField50KG::subtype11258&&
+            changes.values[2].value==1&&changes.values[2].sourcePC==0x1DEE20&&
+            changes.values[4].field==OriginalUiProfileField50KG::courseMode1_710&&
+            changes.values[5].field==OriginalUiProfileField50KG::entrantsMode1_714&&
+            changes.values[6].field==OriginalUiProfileField50KG::lapsMode1_718;
         if(state_.current.screen!=6||state_.current.page!=1||request.targetScreen||request.targetPage||
-           request.sourcePC!=0x1DED58||decision.inputPC!=0x1DEB90||(changes.count!=8&&!tournament))
+           request.sourcePC!=0x1DED58||decision.inputPC!=0x1DEB90||(changes.count!=8&&!tournament&&!versus))
             return Status::invalidDecision;
         if(!callbacks_.admitCourseLaunch||!callbacks_.commitRouteSelection||!callbacks_.queueApplication)
             return Status::missingCallback;

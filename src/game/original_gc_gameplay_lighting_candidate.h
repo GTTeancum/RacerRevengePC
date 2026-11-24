@@ -345,11 +345,11 @@ class Owner final {
         OriginalApplicationEntities50LA&,const CameraViewOutput49F&,
         std::uint32_t actualParent38,const OriginalCameraViewportFields&,
         const assets::OriginalStandardMaterialTable50LA&,
-        std::array<OriginalRacerEntityCold50LA,8>&,const OriginalCameraSceneOwner&,
+        std::array<OriginalRacerEntityCold50LA,8>&,const OriginalCameraSceneOwner&,const OriginalCameraSceneOwner*,
         const RaRacerSelectionDispatch50LA&,const OriginalRendererDispatchFields&,
         platform::VehicleWindowGl50DS&,platform::VehicleWindowDiagnostic50DS&,Diagnostic&) noexcept;
     bool selectRaDynamicMethod44(CameraVisibilityLease&,OriginalApplicationEntities50LA&,
-        std::uint32_t,std::array<OriginalRacerEntityCold50LA,8>&,const OriginalCameraSceneOwner&,
+        std::uint32_t,std::array<OriginalRacerEntityCold50LA,8>&,const OriginalCameraSceneOwner&,const OriginalCameraSceneOwner*,
         const RaRacerSelectionDispatch50LA&,const OriginalRendererDispatchFields&,platform::VehicleWindowGl50DS&,
         platform::VehicleWindowDiagnostic50DS&,Diagnostic&) noexcept;
     bool selectRaModel26EFC0(const CameraVisibilityLease&,OriginalApplicationEntities50LA&,
@@ -478,7 +478,7 @@ public:
     bool updateAfterGraphics(std::uint32_t actualRosterSlot,
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const VehicleFrameParameters49W&,std::uint64_t graphicsSequence,
-        Diagnostic&) noexcept;
+        Diagnostic&,bool recordedPose=false) noexcept;
     // Actual vehicle58=1/PostPlayer reset; never the fresh Ready/frameFactor0
     // adapter. The pointer must name the sole live *(vehicle254)+50 projection,
     // external to this owner, frame and descriptors. Missing ownership rejects

@@ -16,18 +16,6 @@ class Owner final {
     friend class original_results_roster50LA::Read;
     friend class rr::game::OriginalRaceConstructor50LA;
     using Camera=original_camera_session50KX::Session;
-    // Source camera preparation constructs these two exact view0 identities.
-    // Human count alone cannot authorize an AI/player reinterpretation.
-    static bool supportedSourceView(const Camera& c)noexcept {
-        if(!c.controller_.bound)return false;
-        const auto& binding=c.controller_.binding;
-        return (c.actual_.humanCount34==0u&&
-                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
-                binding.racerClass==rr::game::CameraRacerClass::ai)||
-            (c.actual_.humanCount34==1u&&
-                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
-                binding.racerClass==rr::game::CameraRacerClass::player);
-    }
     // Only Application supplies these identities, taken from its real display
     // and canonical owners. Equality of camera/display counters is not proof.
     static bool belongsToApplication(const Camera& camera,
@@ -42,18 +30,13 @@ class Owner final {
     const Manager* manager_=nullptr;
     std::uint64_t generation_=0;
     Bank::ReadHandle<std::uint32_t> state40_,countCD0_;
-    bool identityCurrent()const {
+    bool identityCurrent(unsigned view=0)const {
         const auto& c=*camera_;const auto& m=*manager_;
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.readsBound_&&
-            c.generation_==generation_&&c.actual_.bank.count()>0&&c.actual_.bank.count()<=8&&supportedSourceView(c)&&
+            c.generation_==generation_&&c.actual_.bank.count()>0&&c.actual_.bank.count()<=8&&c.hudCameraBound(view)&&
             &c.actual_.all8Manager==&m.manager&&m.managerBound&&m.rankBound&&
             m.retired40.bound&&m.retired40.activeCount50<=c.actual_.bank.count()&&
-            c.controller_.bound&&c.controller_.binding.sessionGeneration==generation_&&
-            c.controller_.binding.managerIndex==0&&c.identity_[0].managerIndex==0&&
-            c.controller_.binding.racerKey==Camera::key(c.identity_[0].racerTag)&&
-            c.controller_.binding.mainBodyKey==Camera::key(c.identity_[0].mainBodyTag)&&
-            c.controller_.binding.sceneKey==Camera::key(c.scene_)&&
-            (c.raceFlags1B0_&3u)==1u&&c.identitiesCurrent();
+            (c.raceFlags1B0_&3u)==(c.actual_.humanCount34==2u?2u:1u)&&c.identitiesCurrent();
     }
 public:
     enum class Status:std::uint8_t {complete,owner,alreadyBound,phase,identity,read};
@@ -66,7 +49,7 @@ public:
         d={};if(camera_){d.status=Status::alreadyBound;return false;}
         try {
             if(!camera.generation_||camera.closed_||camera.abandoned_||
-               !camera.coldBound_||!camera.readsBound_||!supportedSourceView(camera)||
+               !camera.coldBound_||!camera.readsBound_||!camera.hudCameraBound(0)||
                (!camera.actual_.bank.count()||camera.actual_.bank.count()>8)||&camera.actual_.all8Manager!=&manager.manager||
                !camera.identitiesCurrent())return false;
             if(camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published){
@@ -84,15 +67,16 @@ public:
     // and native all-AI bootstrap retain the same actual view0 manager identity.
     // Consume synchronously after real rank/camera publication and before the
     // next world tick; publication is an observation, not an async lifetime pin.
-    bool capture(rr::game::OriginalPositionStatsNumbers50LA& output,Diagnostic& d)const noexcept {
+    bool capture(rr::game::OriginalPositionStatsNumbers50LA& output,Diagnostic& d,unsigned view=0)const noexcept {
         d={};if(!camera_||!manager_)return false;
         try {
             const auto& c=*camera_;const auto& m=*manager_;
+            const auto* viewport=c.hudViewport(view);
             if(c.frameStage_!=Camera::FrameStage::published||!c.publicationCount_||
-               !c.completedFrame_||!c.viewport_.prepared||!c.viewport_.matricesReady||
-               c.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(!identityCurrent()){d.status=Status::identity;return false;}
-            const auto index=c.controller_.binding.managerIndex;
+               !c.completedFrame_||!viewport||!viewport->prepared||!viewport->matricesReady||
+               viewport->sessionGeneration!=generation_){d.status=Status::phase;return false;}
+            if(!identityCurrent(view)){d.status=Status::identity;return false;}
+            const auto index=c.identity_[view].managerIndex;
             // Actual native manager3C row identity is manager order, not ranking
             // order. Its original rank pass publishes rank[index].placeCCC.
             if(!m.observed[index].bound||m.observed[index].managerIndex!=index||
@@ -100,16 +84,16 @@ public:
                 d.status=Status::identity;return false;}
             rr::game::OriginalPositionStatsNumbers50LA next;
             next.sessionGeneration=generation_;next.cameraPublication=c.publicationCount_;
-            next.viewIndex=0;next.cameraManagerIndex=index;next.managerCount30=static_cast<std::uint32_t>(c.actual_.bank.count());
+            next.viewIndex=view;next.cameraManagerIndex=index;next.managerCount30=static_cast<std::uint32_t>(c.actual_.bank.count());
             next.placeCCC=m.rank[index].placeCCC;next.activeCount50=m.retired40.activeCount50;
-            next.viewState40=c.actual_.bank.read(0,state40_);
-            next.viewCountCD0=c.actual_.bank.read(0,countCD0_);
-            next.preference10F9C=c.actual_.preferences.slots[0].field10F9C;
+            next.viewState40=c.actual_.bank.read(view,state40_);
+            next.viewCountCD0=c.actual_.bank.read(view,countCD0_);
+            next.preference10F9C=c.actual_.preferences.slots[view].field10F9C;
             next.subtype11258=c.actual_.launchKind11258;next.raceMode8C=c.raceMode8C_;
             next.raceFlags1B0=c.raceFlags1B0_;next.raceEntityFlags29=c.raceEntityFlags29_;
             next.uiFlags1E4=c.uiFlags1E4_;
             if(c.frameStage_!=Camera::FrameStage::published||c.publicationCount_!=next.cameraPublication||
-               !identityCurrent()){d.status=Status::phase;return false;}
+               !identityCurrent(view)){d.status=Status::phase;return false;}
             output=next;d.status=Status::complete;return true;
         }catch(...){d.status=Status::read;return false;}
     }
@@ -184,9 +168,9 @@ private:
     //Use that same current view0 racer. The bank visit performs the original
     //lazy world-cache refresh; its canonical cache effects are not rolled back
     //if a later numeric admission fails. No local/world or camera-pose shortcut.
-    bool captureRadar1924C0(RadarObservation& output,Diagnostic& d)const noexcept {
+    bool captureRadar1924C0(RadarObservation& output,Diagnostic& d,unsigned view=0)const noexcept {
         rr::game::OriginalPositionStatsNumbers50LA observation;
-        if(!capture(observation,d))return false;
+        if(!capture(observation,d,view))return false;
         const auto& c=*camera_;
         // One rule for every course: the camera's map view is the race's
         // map role, prepared and runtime-valid (1924C0 reads App+B8).

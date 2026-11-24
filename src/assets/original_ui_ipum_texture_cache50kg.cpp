@@ -552,6 +552,18 @@ bool decodeOriginalMips(const std::shared_ptr<const OriginalUiArchive50KG>& arch
 struct OriginalUiIpumTextureCache50KG::Storage {
     std::shared_ptr<const OriginalUiArchive50KG> archive;
     OriginalUiMemberView50KG source{};
+    struct PackageCopy {
+        std::shared_ptr<const OriginalUiArchive50KG> archive;
+        OriginalUiMemberView50KG member;
+        OriginalUiIpumProvenance50KG evidence;
+    };
+    std::vector<std::unique_ptr<PackageCopy>> packageCopies;
+    const PackageCopy* copyFor(const OriginalUiMemberView50KG& view,std::size_t bytes)const noexcept {
+        for(const auto& copy:packageCopies)
+            if(copy->member.identity==view.identity&&copy->member.data==view.data&&
+               copy->member.size==view.size&&bytes==view.size)return copy.get();
+        return nullptr;
+    }
     Texture48E texture;
     OriginalUiIpumProvenance50KG evidence;
     std::size_t decodedBytes=0;
@@ -797,6 +809,22 @@ bool OriginalUiIpumTextureCache50KG::appendGarageArchive12CEA0(
     if(!archive||!archive->loaded()||!garageCatalogValid())return fail(d,Error::archive);
     std::size_t retainedLimit=0;
     if(!completeGarageCatalogRetainedLimit(retainedLimit))return fail(d,Error::cacheUnavailable);
+    // Package Garage models can reference unchanged compressed Garage textures.
+    // Share decoded pixels only after comparing the complete original PST.
+    if(archive->addon()){
+        for(const auto& entry:garage_){
+            if(!entry||entry->archive->identity()->id!=OriginalUiArchiveId50KG::garage)continue;
+            const auto member=archive->find(entry->source.identity->name);
+            if(!member.identity||entry->copyFor(member,member.size))continue;
+            if(!member.data||member.size!=entry->source.size||
+               std::memcmp(member.data,entry->source.data,member.size))continue;
+            auto copy=std::make_unique<Storage::PackageCopy>();
+            copy->archive=archive;copy->member=member;copy->evidence=entry->evidence;
+            copy->evidence.sourceArchiveSha256=archive->identity()->sha256;
+            entry->packageCopies.push_back(std::move(copy));
+        }
+        return true;
+    }
     const TextureLimits48E nativeLimits; // Per-source decoder limits stay unchanged.
     bool found=false;
     for(std::size_t i=0;i<garageSourceCount;++i){
@@ -1008,7 +1036,7 @@ const Texture48E* OriginalUiIpumTextureCache50KG::textureFor(const OriginalUiMem
         source.identity==entry->source.identity&&source.data==entry->source.data&&source.size==entry->source.size;};
     if(matches(storage_.get()))return &storage_->texture;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->texture;
-    for(const auto& entry:garage_)if(matches(entry.get()))return &entry->texture;
+    for(const auto& entry:garage_)if(matches(entry.get())||(entry&&entry->copyFor(source,bytes)))return &entry->texture;
     for(const auto& entry:unlock_)if(matches(entry.get()))return &entry->texture;
     return nullptr;
 }
@@ -1043,7 +1071,10 @@ const OriginalUiIpumProvenance50KG* OriginalUiIpumTextureCache50KG::provenanceFo
         source.identity==entry->source.identity&&source.data==entry->source.data&&source.size==entry->source.size;};
     if(matches(storage_.get()))return &storage_->evidence;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->evidence;
-    for(const auto& entry:garage_)if(matches(entry.get()))return &entry->evidence;
+    for(const auto& entry:garage_){
+        if(matches(entry.get()))return &entry->evidence;
+        if(entry)if(const auto* copy=entry->copyFor(source,bytes))return &copy->evidence;
+    }
     for(const auto& entry:unlock_)if(matches(entry.get()))return &entry->evidence;
     return nullptr;
 }

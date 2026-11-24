@@ -229,7 +229,10 @@ class Session final {
  std::filesystem::path directory_;
  std::vector<std::uint8_t> rgba_,row_;
  std::array<bool,static_cast<std::size_t>(Stage::count)> captured_{};
- std::uint64_t serial_=0,session_=0;
+ std::uint64_t serial_=0,session_=0;std::size_t sampleTarget_=0;unsigned sampleFrames_=0;
+ double lastPillarElapsed_=0.0;
+ unsigned pillarSamples_=0;
+ unsigned effectSample_=0;
  bool requested_=false,limitReported_=false;
 #if defined(__linux__)
  struct PendingWindowImage {
@@ -300,6 +303,44 @@ public:
  bool enabled()const noexcept{return run_!=nullptr;}
  std::uint64_t serial()const noexcept{return serial_;}
  bool captured(Stage stage)const noexcept{return captured_[static_cast<std::size_t>(stage)];}
+ // Sample a short sequence from the submitted framebuffer on an authored route node.
+ void requestRaceNodeSample(unsigned node){
+  if(!run_||run_->logsOnly())return;
+  static const auto targets=[](){
+   std::vector<unsigned> nodes;const char* cursor=std::getenv("RR_TEST_CAPTURE_NODE");
+   while(cursor&&*cursor){char* end=nullptr;const auto value=std::strtoul(cursor,&end,10);
+    if(end==cursor||(*end&&*end!=','))break;
+    nodes.push_back(static_cast<unsigned>(value));cursor=*end?end+1:end;}
+   return nodes;
+  }();
+  if(sampleTarget_>=targets.size()||(!sampleFrames_&&node!=targets[sampleTarget_]))return;
+  if(sampleFrames_++%6==0)requested_=true;
+  if(sampleFrames_==13){++sampleTarget_;sampleFrames_=0;}
+ }
+private:
+ bool skyFlashActive_=false;
+public:
+ void requestSkyChange(bool active){
+  if(!run_||run_->logsOnly()||active==skyFlashActive_)return;
+  skyFlashActive_=active;
+  if(serial_<56)requested_=true;
+ }
+ void requestEffectSample(double now,double start){
+  static const bool enabled=std::getenv("RR_TEST_N64_EFFECT_CAPTURE")!=nullptr;
+  constexpr double offsets[]={0.0,0.12,0.25,0.5,0.75,1.0,1.5,1.95};
+  if(enabled&&run_&&!run_->logsOnly()&&start>=0.0&&effectSample_<std::size(offsets)&&now>=start+offsets[effectSample_]){
+   ++effectSample_;
+   requested_=true;
+  }
+ }
+ void requestPillarSample(float scale,double elapsed){
+  static const bool enabled=std::getenv("RR_TEST_N64_PILLAR_CAMERA")!=nullptr;
+  if(!enabled||!run_||run_->logsOnly()||scale<=0.f||elapsed<=0.0||
+     elapsed==lastPillarElapsed_||pillarSamples_>=4)return;
+  lastPillarElapsed_=elapsed;
+  ++pillarSamples_;
+  requested_=true;
+ }
  void request(const rr::platform::WindowInput50DQ& input){
   if(!run_||!input.focused||input.minimized||input.activityLost)return;
   if(input.pressed[69])requested_=true; // Existing genuine SDL F12 key edge.

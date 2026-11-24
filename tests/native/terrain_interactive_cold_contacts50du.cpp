@@ -80,7 +80,7 @@ void ContactsContext::run() {
        "trigger LostAI targets require the step-08 map/AI views over the live world");
    require50DU(originalAiEnabled&&racerBank.count()==raceRacerCount&&
        ((allAiEnabled&&originalAiHumanCount==0&&originalAiOpponentCount==raceRacerCount)||
-        (humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&originalAiOpponentCount==raceOpponentCount)),
+        (humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount>=1&&originalAiHumanCount<=2&&originalAiHumanCount+originalAiOpponentCount==raceRacerCount)),
        "triggers require the actual human/AI manager roster and the live AI spline");
    auto borrow=track.roles.collision->borrow();
    require50DU(bool(borrow)&&borrow.world()==&liveWorld,"the track's collision world borrow is unavailable");
@@ -161,10 +161,10 @@ void ContactsContext::run() {
     require50DU(track.roles.lights->attachFreshVehicle(static_cast<std::uint32_t>(racer),s,
         x.bindings,x.parameters,lightDiagnostic),"actual cold racer7F0 registration failed");
     if(originalRecoveryEnabled){
-     // Only the rooted course race's Player0 uses the human constructor role.
+     // Each human roster entry uses the human constructor role.
      // Geometry comes from the same selected pod/probe owners as every AI;
      // neither source vehicle58 nor native AI ownership is rewritten.
-     const auto queryRole=rootedCourseRace&&humanCourseEnabled&&racer==0?
+     const auto queryRole=rootedCourseRace&&humanCourseEnabled&&racer<originalAiHumanCount?
          undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
          undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi;
      //This racer's own 694/7A4 rows (shared world: that slot's pair).

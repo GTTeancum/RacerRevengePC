@@ -66,7 +66,7 @@ class Binding final {
     rows[r].world=state.nodes[r+1].world100;for(unsigned k=0;k<3;++k)rows[r].center[k]=original.bounds[k];rows[r].radius=original.bounds[6];
    }
    track_animation_sphere50AN::Result next{};
-   if(!track_animation_sphere50AN::compute(state.nodes[0].world100,rows,source.hierarchy.nodeCount,next))return fail(d,"track animation visual sphere arithmetic rejected",0x28bd50);
+   if(!track_animation_sphere50AN::compute(state.nodes[0].world100,rows,source.hierarchy.nodeCount,next,source.authored.parentAnimation!=0))return fail(d,"track animation visual sphere arithmetic rejected",0x28bd50);
    visual_[i].sphere=next;if(next.radius198>0.f)state.nodes[0].sceneFlags190|=0x40u;
    out={};out.bounds.shapeTag=1;out.bounds.shapeWorld=state.nodes[0].world100;
    for(unsigned k=0;k<3;++k){out.bounds.localCenter.v[k]=next.center160[k];out.bounds.localHalf.v[k]=next.radius198;}

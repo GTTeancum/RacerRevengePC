@@ -123,26 +123,27 @@ bool OriginalUiCoursePageDraw50KG::prepare(
     }catch(...){return fail(d,E::allocation,0x1D8F10);}
 }
 bool OriginalUiCoursePageDraw50KG::setLapCount(std::uint32_t laps,D& d)noexcept{
-    return setEventSelection(eventSubtype_,laps,eventEntrants_,d);
+    return setEventSelection(eventSubtype_,laps,eventEntrants_,d,versus_);
 }
-bool OriginalUiCoursePageDraw50KG::setEventSelection(std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants,D& d)noexcept{
+bool OriginalUiCoursePageDraw50KG::setEventSelection(std::uint32_t subtype,std::uint32_t laps,std::uint32_t entrants,D& d,bool versus)noexcept{
     d={};if(!prepared())return fail(d,poisoned_?E::poisoned:E::notPrepared,0x1DAF78);
     if(tournament_||subtype<1||subtype>3||laps<1||laps>25||entrants<1||entrants>8)return fail(d,E::geometry,0x1DAB00);
-    if(subtype==eventSubtype_&&laps==lapCount_&&entrants==eventEntrants_)return true;
+    if(versus==versus_&&subtype==eventSubtype_&&laps==lapCount_&&entrants==eventEntrants_)return true;
     const auto* font=images_->font(fontImage_);const auto* atlas=images_->textures()->texture(fontImage_);
     if(!font||!atlas)return fail(d,E::images,0x1DB1C8);
     try{
         auto title=packets_[0],detail=packets_[3];title.vertices.clear();detail.vertices.clear();
         OriginalUiCoursePageTextSnapshot50KG titleText,detailText;
         titleText.color54=texts_[0].color54;detailText.color54=texts_[1].color54;
-        if(!embeddedText(eventLabel125_+"  "+eventNames_[subtype-1],0xAC0,101,*font,atlas->texture,packetZ_,titleText,title,d))return false;
+        const auto heading=versus?entrantsLabel127_+" "+std::to_string(entrants):eventLabel125_+"  "+eventNames_[subtype-1];
+        if(!embeddedText(heading,0xAC0,101,*font,atlas->texture,packetZ_,titleText,title,d))return false;
         // Original mode0 branches: LOC126 + singular/plural laps, LOC127 +
         // entrant count, or no B30/580/5E0 submission for subtype3.
         const auto formatted=subtype==2?entrantsLabel127_+" "+std::to_string(entrants):
             lapLabel126_+"  "+std::to_string(laps)+" "+(laps==1?singularLap133_:pluralLaps134_);
         if(!embeddedText(formatted,0xB30,147,*font,atlas->texture,packetZ_,detailText,detail,d))return false;
         packets_[0]=std::move(title);packets_[3]=std::move(detail);texts_[0]=std::move(titleText);texts_[1]=std::move(detailText);
-        eventSubtype_=subtype;lapCount_=laps;eventEntrants_=entrants;return true;
+        versus_=versus;eventSubtype_=subtype;lapCount_=laps;eventEntrants_=entrants;return true;
     }catch(...){return fail(d,E::allocation,0x1DAB00);}
 }
 bool OriginalUiCoursePageDraw50KG::prepareTournamentFresh(

@@ -1,5 +1,7 @@
 #pragma once
 #include "keyboard_packet50dr.h"
+#include "keyboard_bindings.h"
+#include "controller_bindings.h"
 #include "window_host50dq.h"
 #include "../../../src/game/control_presets49d.h"
 
@@ -13,7 +15,7 @@ struct SelectedControlInput50KY {
     //Canonical selected row retained independently of optional owner binding:
     //an intentionally unmapped descriptor is not a mapped-but-missing action.
     game::ControlActionRow49D sourceActions{};
-    std::uint32_t preset=0;
+    std::uint32_t preset=0,player=0;
     bool twinEngine=false,cameraCycleBound=false,manualResetBound=false;
     // PC enhancement: zero-g lean on packet byte 4 (right stick X; keyboard A/D),
     // default control preset (0) only. Nothing in the original reads byte 4 there.
@@ -37,7 +39,7 @@ inline bool bindSelectedControlInput50KY(const game::ControlPresets49D& preferen
        a.action6B0!=b.action6B0||a.flag6B4!=b.flag6B4||configuration!=(slot.preset11048>=4?1u:0u))return false;
     SelectedControlInput50KY result{};
     if(!game::resolveControlPreset49D(preferences,actionSlot,configurationSlot,result.selected))return false;
-    result.sourceActions=a;
+    result.sourceActions=a;result.player=actionSlot;
     result.preset=slot.preset11048;result.twinEngine=result.selected.configurationEntryNonzero;
     for(auto& axis:result.keyboard.axes)axis.source=KeyboardAxisSource50DR::Centered;
     for(auto& button:result.keyboard.buttons)button.source=KeyboardButtonSource50DR::Released;
@@ -143,7 +145,8 @@ inline bool bindSelectedManualReset50LC(const game::ControlPresets49D& preferenc
 inline bool selectedKeyboardHeld50KY(const WindowInput50DQ& input,
     const SelectedControlInput50KY& binding) noexcept {
     const auto held=[&](std::uint16_t key)noexcept {
-        return key==0||key>=input.down.size()||input.down[key]!=0;
+        key=keyboard_bindings::physical(binding.twinEngine,key);
+        return key>=input.down.size()||(key&&input.down[key]!=0);
     };
     for(const auto& button:binding.keyboard.buttons){
         if(button.source==KeyboardButtonSource50DR::Released)continue;
@@ -159,6 +162,7 @@ inline bool selectedKeyboardHeld50KY(const WindowInput50DQ& input,
 inline void releaseSelectedKeyboard50KY(WindowInput50DQ& input,
     const SelectedControlInput50KY& binding) noexcept {
     const auto release=[&](std::uint16_t key)noexcept {
+        key=keyboard_bindings::physical(binding.twinEngine,key);
         if(key&&key<input.down.size()&&key<input.pressed.size())input.down[key]=input.pressed[key]=0;
     };
     for(const auto& button:binding.keyboard.buttons)
@@ -249,10 +253,12 @@ inline bool composeSelectedControllerPacket50KY(const SelectedControlInput50KY& 
     //4/5 are triggers and therefore sampled from axes below. GUIDE has no
     //original action identity and stays solely with the host/operating system.
     constexpr std::int8_t buttonMap[16]={3,1,0,2,-1,-1,9,10,4,6,8,7,11,14,12,13};
-    std::uint8_t values[16]{};
+    const auto& layout=controller_bindings::layouts[binding.player][binding.preset];
+    std::uint8_t physical[16]{},values[16]{};
     for(unsigned code=0;code<16;++code)if(buttonMap[code]>=0)
-        values[code]=input.buttons[static_cast<unsigned>(buttonMap[code])]?255:0;
-    values[4]=controllerTriggerByte50KY(input.axes[4]);values[5]=controllerTriggerByte50KY(input.axes[5]);
+        physical[code]=input.buttons[static_cast<unsigned>(buttonMap[code])]?255:0;
+    physical[4]=controllerTriggerByte50KY(input.axes[4]);physical[5]=controllerTriggerByte50KY(input.axes[5]);
+    for(unsigned i=0;i<16;++i)if(layout.buttons[i]>=0)values[i]=physical[layout.buttons[i]];
     // Buttons held across a host menu are ignored until released (no edge).
     if(latch.maskOnResume){
         for(unsigned code=0;code<16;++code)latch.masked[code]=values[code]>=26;
@@ -293,8 +299,9 @@ inline bool composeSelectedControllerPacket50KY(const SelectedControlInput50KY& 
         if(!supported){receipt.status=SelectedControllerStatus50KY::unsupportedOriginalAction;
             receipt.unsupportedCode=signedCode;latch.armed=false;out=packet;return true;}
     }
-    packet.bytes[4]=controllerStickByte50KY(input.axes[2]);packet.bytes[5]=controllerStickByte50KY(input.axes[3]);
-    packet.bytes[6]=controllerStickByte50KY(input.axes[0]);packet.bytes[7]=controllerStickByte50KY(input.axes[1]);
+    constexpr unsigned packetAxis[]={6,7,4,5};
+    for(unsigned i=0;i<4;++i)if(layout.axes[i]>=0)
+        packet.bytes[packetAxis[i]]=controllerStickByte50KY(input.axes[layout.axes[i]]);
     const auto descriptors=game::initialDualShockDescriptors48Y();
     std::uint16_t inactive=0xffff;
     for(unsigned code=0;code<16;++code){const auto& descriptor=descriptors.records[code];

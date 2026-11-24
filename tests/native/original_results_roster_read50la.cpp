@@ -58,12 +58,13 @@ bool Read::current(std::size_t& count)const noexcept {
            !roster_->built())return false;
         const std::uint32_t humans=rosterHumanCount(roster_);
         if(humanRacer60_){
-            // The private human caller: one human (the port's one view), the
-            // same profile generation as at the cold load, and roster slot 0
-            // is the session's human racer (humans load first, 1AE280).
-            const auto* first=roster_->row(0);
-            if(humans!=1u||!first||!first->human||first->racer60!=(*humanRacer60_)[0]||
+            // 1AE280 loads the selected human racers into the first manager slots.
+            if(humans==0u||humans>2u||humans>roster_->count()||
                race.profile_->stamp().generation!=humanProfileGeneration_)return false;
+            for(std::size_t slot=0;slot<humans;++slot){
+                const auto* row=roster_->row(slot);
+                if(!row||!row->human||row->racer60!=(*humanRacer60_)[slot])return false;
+            }
         }else if(humans!=0u)return false; //ALL8 spectator field (humans34 == 0).
         const std::size_t n=roster_->count();
         if(!n||n>8u||launchEntrantsDiffer(n))return false;

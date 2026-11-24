@@ -40,7 +40,7 @@ inline bool Application::rollbackNativeRaceLoadPrefix(rr::game::OriginalRaceCons
     d={};d.sourcePC=0x1a6aa0;
     if(raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
        owner.profile_!=riderProfile||owner.world74_||owner.raceAudio_||owner.raceGroupCount_||
-       !owner.detachedPrefix()) {d.status=S::phase;return false;}
+       !owner.detachedPrefix(true)) {d.status=S::phase;d.field="detached Race load-prefix retirement";return false;}
     if(!owner.loadPrefixReached_)return !owner.loadDisplay_&&!owner.loadFifo_;
     if(!owner.loadDisplay_||!owner.loadFifo_||nativeCollectorFifoOwner_!=owner.loadFifo_||
        owner.loadDisplay_->application_!=this||!owner.loadDisplay_->ownerThread()){

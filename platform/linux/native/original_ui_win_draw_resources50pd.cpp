@@ -235,11 +235,13 @@ bool OriginalUiWinDrawResources50PD::load(const OriginalUiWinColdInput50PD& in,D
                 auto inserted=ranks.emplace(normalized(std::string(reinterpret_cast<const char*>(table.data+first),at-first)),++token);
                 if(!inserted.second)inserted.first->second=0;}
             if(token!=3235)return fail(d,Error::registry,0x298724);
+            const auto lastBackground=ranks.find("ui/textures/"+backgroundName(26));
+            if(lastBackground==ranks.end()||!lastBackground->second)return fail(d,Error::registry,0x298724);
             for(std::size_t i=0;i<s->bindings.size();++i){auto& b=s->bindings[i];
-                // DLC career backgrounds: port-owned tokens after the 3235 stock ranks.
+                // Keep a unique material identity, but draw package art with the other backgrounds.
                 const auto addon=std::find(s->addonBindings.begin(),s->addonBindings.end(),i);
-                if(addon!=s->addonBindings.end()){b.registryToken=token+1u+static_cast<std::uint32_t>(addon-s->addonBindings.begin());continue;}
-                const auto it=ranks.find(normalized(b.registeredName));if(it==ranks.end()||!it->second)return fail(d,Error::registry,0x298724);b.registryToken=it->second;}}
+                if(addon!=s->addonBindings.end()){b.drawRank=lastBackground->second;b.registryToken=token+1u+static_cast<std::uint32_t>(addon-s->addonBindings.begin());continue;}
+                const auto it=ranks.find(normalized(b.registeredName));if(it==ranks.end()||!it->second)return fail(d,Error::registry,0x298724);b.drawRank=b.registryToken=it->second;}}
         auto originalImages=std::make_shared<assets::OriginalUiScreenAssets50KG>();
         if(!originalImages->load(sources,d.resource)){
             const auto& r=d.resource;const auto image=r.image<sources.size()&&sources[r.image].member.identity?sources[r.image].member.identity->name:"?";

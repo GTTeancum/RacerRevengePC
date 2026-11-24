@@ -47,7 +47,7 @@ struct OriginalUiWinMaterialBinding50PD {
     assets::OriginalUiNativeUntexturedMaterial50KG untextured{};
     game::OriginalUiTextureAnimationConfig50KG animation{};bool animated=false;
     // One-based Mat_Stbl.txt rank (29C490 registry order); 0 = unregistered.
-    std::uint32_t registryToken=0;
+    std::uint32_t registryToken=0, drawRank=0;
     const assets::OriginalUiMaterialPass50KG& pass()const noexcept{return material.passes[passIndex];}
 };
 struct OriginalUiWinBackground50PD {

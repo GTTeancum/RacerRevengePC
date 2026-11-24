@@ -10,6 +10,7 @@
 #include "../../src/game/native_zero_gravity50zg.h"
 #include "../../src/game/n64_track_hazards_runtime50nh.h"
 #include "n64_track_animation_port50nh.h"
+#include "positional_sound_rows50sr.h"
 #include "../../src/game/n64_airborne_gravity50ag.h"
 #include "../../src/assets/original_parameter_lookup50cr.h"
 #include "../../src/assets/track_start50ad.h"
@@ -356,8 +357,8 @@ SessionExit50DU Context::run() {
  // The launch is the rooted original Course entry (I1); its 11258 subtype decides
  // only the end dispatch, never whether the race exists.
  require50DU(consumedLaunch&&originalCameraEnabled&&rootedCourseRace&&countedRaceLaunch(nativeOrdinaryLaunch11258)&&
-     (dynamicProfile.game34==2u||dynamicProfile.game34==0u),
-     "the counted race requires the rooted original Course launch (11258 1..3, game34 0 or 2)");
+     (dynamicProfile.game34==2u||dynamicProfile.game34==0u||(dynamicProfile.game34==1u&&nativeOrdinaryLaunch11258==1u)),
+     "the counted race requires the rooted original Course launch (11258 1..3, supported game mode)");
  openNativeVideo();
  originalMainApplication.appStart(originalMainApplication.assetRoot);
  originalMainApplication.enterGameplayMaterialDirectory17D7A0();
@@ -754,10 +755,15 @@ SessionExit50DU Context::run() {
   std::vector<std::uint8_t> hazardArchive;const std::vector<std::uint8_t>* hazardBytes=nullptr;
   if(const char* t=std::getenv("RR_TEST_N64_HAZARD");t&&*t){
    hazardArchive=runtime_startup50fl::readBytes(trackSession->archive);hazardBytes=&hazardArchive;}
+  std::vector<std::string> animatedCarriers;
+  if(!courseN64Rows.empty()&&trackAnimations&&trackAnimations->ready())
+   for(const auto row:track_animation_candidates50AN::collisionRows(*trackAnimations))
+    animatedCarriers.push_back(trackAnimations->source().row(row).authored.referenceName);
   rr::game::n64HazardRuntime50NH.loadCourse(courseN64Rows,rr::game::surfaceRules50ST,hazardBytes,
-      track.identity.mapSpline.c_str(),track.identity.code.text.data());
+      track.identity.mapSpline.c_str(),track.identity.code.text.data(),animatedCarriers,track_animation_candidates50AN::firstCollider);
   // The hazards' animation targets (asteroid, debris, door rows) play on the ONE common
   // track-animation runtime (no rows / no [Animations] = the port stays unbound).
+  rr::game::n64HazardRuntime50NH.bindImpactSound(track.roles.sounds);
   auto& n64AnimationPort=n64_track_animation_port50NH::n64TrackAnimationPort50NH;
   n64AnimationPort.bind(trackAnimations.get());
   rr::game::n64HazardRuntime50NH.bindAnimation(trackAnimations?&n64AnimationPort:nullptr);

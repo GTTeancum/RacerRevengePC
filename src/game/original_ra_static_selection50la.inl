@@ -232,7 +232,7 @@ bool Owner::selectRaStaticMethod44(CameraVisibilityLease& lease,OriginalApplicat
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::selectRaDynamicMethod44(CameraVisibilityLease& lease,OriginalApplicationEntities50LA& app,
-    std::uint32_t methodRef,std::array<OriginalRacerEntityCold50LA,8>& racers,const OriginalCameraSceneOwner& camera,
+    std::uint32_t methodRef,std::array<OriginalRacerEntityCold50LA,8>& racers,const OriginalCameraSceneOwner& selectedCamera,const OriginalCameraSceneOwner* peerCamera,
     const RaRacerSelectionDispatch50LA& dispatch,const OriginalRendererDispatchFields& rendererFields,platform::VehicleWindowGl50DS& renderer,
     platform::VehicleWindowDiagnostic50DS& rendererDiagnostic,Diagnostic& d)noexcept {
     if(!cameraLeaseCurrent(lease)||!storage_||storage_->zoneProjectionLease!=&lease||
@@ -259,7 +259,8 @@ bool Owner::selectRaDynamicMethod44(CameraVisibilityLease& lease,OriginalApplica
             const auto identity=word&~1u;
             if(!identity||(identity&3u))return fail(d,Status::registration,0x27eb5cu);
             const auto ref=identity>>2u;
-            if(ref==lease.cameraObject30()){
+            if(ref==lease.cameraObject30()||(peerCamera&&ref==peerCamera->object30)){
+                const auto& camera=ref==lease.cameraObject30()?selectedCamera:*peerCamera;
                 if(camera.object30!=ref||!camera.sessionGeneration||!camera.sceneKey||
                    !camera.searchableConstructed1143F0||!camera.registration34.attached||
                    camera.registration34.object!=ref||camera.registration34.method!=ZoneMethod50CL::Second)

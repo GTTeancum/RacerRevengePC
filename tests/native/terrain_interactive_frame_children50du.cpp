@@ -1,3 +1,6 @@
+#include "original_second_human_input50sv.h"
+#include "player_ai_pilot50du.h"
+#include "../../src/game/vehicle_ai_pilot50cr.h"
 // Source-identical Children prefix; no owners are moved out of runSession.
 #include "native_wreck_debris_sim50pd.h"
 #include "native_wreck_effects50pd.h"
@@ -61,7 +64,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  require50DU(!originalUiActive,"Main-only frontend cannot advance race physics");
  require50DU(!nativeSelectedLights||actualRacerSlot<graphicsSequence.size(),
      "selected-light update requires the actual native racer slot");
- finishDriverAppliedThisFrame=false;
+ if(actualRacerSlot==0)finishDriverAppliedThisFrame=false;
  // Common rewrite (R4, PLAN 2.5): the common_lap line for every racer, human and AI, at
  // the one place each racer's CC8 advances this frame (1A0F18 for the human through
  // lap_drive50GJ, the AI's 1A0DA0 navigation through driveOriginalAi50IV). Read only.
@@ -127,16 +130,9 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
      std::numeric_limits<unsigned>::max()));
  FrameReader49K read{};read.preparedFactor=preparedOuterFactor;read.codes=x.actionCodes;
  read.context.previousFlagsB9C=s.bodies.main.controls.player.flagsB9C;
- if(s.fields.vehicle58==1u){
-  // A retained physical-reset continuation already owns this PostPlayer
-  // frame. Never read/replay its navigation/packing/repair/scalar prefix.
-  if(!originalAi.physicalReset2255B0Pending)
-   runNative([&]{return readAiVehicleFrame50IV(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"original AI frame entry");
-  // Common rewrite (I4): one AI input on every course (AiRuntimeInput50IV over
-  // the one map/AI navigation views and the one live zone world, B-C12).
-  // Metadata comes from aiFF4.metadata(), the 3C track length from the view.
-  const auto aiLapBeforeCC8=lapContinuity.state.vehicleCC8;
-  bool aiReturned=[&]{
+ const bool pilotDriving=player_ai_pilot50DU::drives(actualRacerSlot)&&!raceSetupFrame&&
+     s.fields.vehicle58==0u&&(s.fields.applicationByte58&3u)==2u&&!(s.fields.impactFlagsCD8&1u);
+ const auto driveAi=[&](bool pilot){
    requireRuntimeNavigation();
    AiRuntimeInput50IV aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;
    aiInput.mapFF0=mapView;aiInput.aiFF4=aiView;aiInput.orientationTrackBC=aiView;aiInput.actualWorld=&liveWorld;
@@ -159,9 +155,21 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
    // packed count word, with the actual admitted low5 lap selection retained.
    aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
    aiInput.raceOwnersBound=originalAiSession.rankBound&&aiMainZone!=0;
-   return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
-       lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
-  }();
+   aiInput.playerPilot=pilot;
+   auto pilotLap=lapContinuity.state.vehicleCC8;
+   return driveOriginalAi50IV(s,x.bindings,x.parameters,pilot?originalAi.pilotNavigation:navigationProgress,navigationCA0,
+       pilot?pilotLap:lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
+ };
+ if(s.fields.vehicle58==1u){
+  // A retained physical-reset continuation already owns this PostPlayer
+  // frame. Never read/replay its navigation/packing/repair/scalar prefix.
+  if(!originalAi.physicalReset2255B0Pending)
+   runNative([&]{return readAiVehicleFrame50IV(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"original AI frame entry");
+  // Common rewrite (I4): one AI input on every course (AiRuntimeInput50IV over
+  // the one map/AI navigation views and the one live zone world, B-C12).
+  // Metadata comes from aiFF4.metadata(), the 3C track length from the view.
+  const auto aiLapBeforeCC8=lapContinuity.state.vehicleCC8;
+  bool aiReturned=driveAi(false);
   reportCommonLap50CR(actualRacerSlot,aiLapBeforeCC8);
   if(!aiReturned&&originalAi.physicalReset2255B0Pending&&originalRecoveryEnabled){
    std::uint8_t* flags22C=nullptr;std::uint32_t* field24C=nullptr;
@@ -202,23 +210,58 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   }
   lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
  }else{
+ auto* second=actualRacerSlot==1u?secondHumanInput50SV:nullptr;
+ if(second){
+  second->state40=s.bodies.main.vehicleState40;
+  second->gate58=s.fields.applicationByte58;
+  x.actionCodes=second->selected.actions;
+  x.configurationEntryNonzero=second->selected.configurationEntryNonzero;
+  read.codes=x.actionCodes;
+ }
  if(humanCourseEnabled&&!raceSetupFrame){
   std::uint32_t timerPC=0;
-  const bool timers=advanceOriginalHumanResetTimers50LC(playerEvents,s.fields.vehicle3C,
+  const bool timers=advanceOriginalHumanResetTimers50LC(second?second->player:playerEvents,s.fields.vehicle3C,
       s.fields.applicationByte58,preparedOuterFactor,sourceBlur,timerPC);
   if(!timers)std::cerr<<"original human reset timer source boundary pc="<<std::hex<<timerPC<<std::dec<<'\n';
   require50DU(timers,"original human reset eligibility/blur producer unavailable");
  }
- const DeviceQueryContext48Y queryContext{eventContext.present,applicationEvents.rootFlags228,
-     playerEnvironment.held.context518,eventContext.mask1898};
- runNative([&]{return controller.prepareFrameReader(queryContext,read.context,
-     read.codes,read.preparedFactor,read);},"native held provider");
- runNative([&]{return readVehicleFrame49W(s,x.bindings,read,x.workspace,x.diagnostic);},"persistent reader");
+ if(pilotDriving){
+  runNative([&]{return readPilotedPlayerFrame50CR(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"AI pilot frame entry");
+ }else{
+  const DeviceQueryContext48Y queryContext=second?second->queryContext():DeviceQueryContext48Y{eventContext.present,applicationEvents.rootFlags228,
+      playerEnvironment.held.context518,eventContext.mask1898};
+  runNative([&]{return (second?second->controller:controller).prepareFrameReader(queryContext,read.context,
+      read.codes,read.preparedFactor,read);},"native held provider");
+  runNative([&]{return readVehicleFrame49W(s,x.bindings,read,x.workspace,x.diagnostic);},"persistent reader");
+  static const bool traceVs=[](){const char* value=std::getenv("RR_TEST_VS_INPUTS");return value&&!std::strcmp(value,"1");}();
+  if(traceVs&&secondHumanInput50SV&&actualRacerSlot<2){
+   static std::array<int,2> lastThrottle{{-1,-1}};
+   const auto& controls=s.bodies.main.controls.player;
+   const int throttle=controls.actionB7C>0.f;
+   if(lastThrottle[actualRacerSlot]!=throttle){
+    std::fprintf(stderr,"vs_control_reader slot=%zu channels=%g,%g,%g,%g actions=%g,%g\n",actualRacerSlot,
+        controls.raw.values[0],controls.raw.values[1],controls.raw.values[2],controls.raw.values[3],controls.actionB7C,controls.actionB80);
+    lastThrottle[actualRacerSlot]=throttle;
+   }
+  }
+ }
  //1A15E4/1A160C follows1A1A20 and precedes1A25D0/228620. Consume the
  // prior outer frame's CA0 before228724 copies this frame's local body pose.
  // This owns progression words only; the existing reset cut remains in place.
  require50DU(s.phase==VehicleFramePhase49W::PostPlayer&&!s.fields.vehicle58,
      "source player navigation phase unavailable");
+ if(pilotDriving){
+  // The AI requests its physical reset after input, when the human physics
+  // frame is already open. Apply the player's reset at the next Ready frame.
+  const bool drove=driveAi(true);
+  if(!drove&&!originalAi.physicalReset2255B0Pending){
+   std::cerr<<"player_ai_pilot rejected pc="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec<<" state="<<originalAi.state.aiStateFE8<<'\n';
+   return false;
+  }
+  if(originalAi.dispatchedFrames==1||(originalAi.dispatchedFrames&&originalAi.dispatchedFrames%1000==0))
+   std::fprintf(stderr,"player_ai_pilot controls slot=%zu decisions=%llu node=%u lap=%u\n",actualRacerSlot,
+      static_cast<unsigned long long>(originalAi.dispatchedFrames),originalAi.pilotNavigation.reset.vehicleC80,lapContinuity.state.vehicleCC8);
+ }
  if((s.fields.applicationByte58&3u)==2u||(s.fields.impactFlagsCD8&1u)){
   TrackNavigationInput50EU navigationInput{};
   std::memcpy(navigationInput.previousCA0,navigationCA0,sizeof navigationCA0);
@@ -248,7 +291,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  // Original1A1614: once the human manager gate ends, a finished player runs
  //1A36A0 after navigation and before wrong-way/base processing. Opponents still
  // use the explicitly host-authored course adapter, not this player leaf.
- if(!opponentFrame&&!raceSetupFrame&&humanResultsActive&&(s.fields.impactFlagsCD8&1u)){
+ if((!opponentFrame||second)&&!raceSetupFrame&&humanResultsActive&&(s.fields.impactFlagsCD8&1u)){
   require50DU((s.fields.applicationByte58&3u)!=2u&&(s.fields.impactFlagsCD8&1u),
       "native finish driver requires ended human gate and source CD8");
   const auto current=navigationProgress.reset.vehicleC88;
@@ -274,7 +317,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   // This source model write precedes the first frame use of parameters in
   //217DE0; keep the resulting descriptor unchanged for the rest of this frame.
   x.parameters.bodies.main.aero.steering100=finishResult.aeroSteering100;
-  finishDriverAppliedThisFrame=true;
+  if(actualRacerSlot==0)finishDriverAppliedThisFrame=true;
  }
  //1A1620: after the entire navigation branch, before undertrack processing.
  // Navigation above consumed the previous update's actual flags10CC bit1.
@@ -359,7 +402,9 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   if(m.components.bindings.aeroBrakeEC==1.f&&m.controls.player.raw.values[0]!=0.f)
    ++originalAi.boundBrakeSteerFrames;
  }
+ else if(pilotDriving)runNative([&]{return bindPilotedPlayerFrame50CR(s,x.bindings,x.parameters,x.workspace,x.diagnostic);},"AI pilot control binding");
  else runNative([&]{return bindVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::PlayerAndBaseBefore217DE0),post,x.workspace,x.diagnostic);},"persistent binding");
+ if(rr::game::n64HazardRuntime50NH.exploding(actualRacerSlot))m.controls.player.flagsB9C&=0xfeu;
  const BoostInput50FK boostInput{m.frameFactor,m.components.engine.smoothedDrive[0],
      m.components.engine.smoothedDrive[1],m.cachedSpeed34,m.controls.player.flagsB9C,
      s.fields.vehicle58,dynamicContactEnabled?dynamicProfile.game34:2u,0,sourceAiAudio};
@@ -425,8 +470,8 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   //222D34 skips feedback for every nonzero vehicle58, including all8 AI.
   //Keep the real human-only boundary intact; camera slot0 is no human owner.
   consumer.stopBeforeControllerFeedback50IW=true;
-  consumer.player5CBound50IW=!allAiEnabled&&actualRacerSlot==0u;
-  if(consumer.player5CBound50IW)consumer.player5C=playerSource5C;
+  consumer.player5CBound50IW=!allAiEnabled&&!s.fields.vehicle58&&(actualRacerSlot==0u||(actualRacerSlot==1u&&secondHumanInput50SV));
+  if(consumer.player5CBound50IW)consumer.player5C=actualRacerSlot==0u?playerSource5C:secondHumanInput50SV->player.source5C;
   consumer.finalDamageThreshold64=dynamicFinalTuning.threshold64;
   consumer.finalDamageIncrement68=dynamicFinalTuning.increment68;
   consumer.dynamicPartnerEventsBound=true;consumer.partnerEventThresholdBound=dynamicTuning.bound;
@@ -439,6 +484,14 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  // cooldown and environmental fields (the ones 221754 writes).
  {rr::game::N64BreakDamageRequest50NH hit{};
   if(rr::game::n64HazardRuntime50NH.takeBreakDamage(actualRacerSlot,hit)){
+   // 8007C91C..8007C934 reduces the stored engine drive once per asteroid.
+   // Revenge keeps that drive separately for each engine at +70/+74. Its own
+   // 2E7720 filter resumes from the reduced values on the next force update.
+   auto& drive=s.bodies.main.components.engine.smoothedDrive;
+   const float beforeLeft=drive[0],beforeRight=drive[1];
+   for(float& engine:drive)engine*=hit.thrustFactor;
+   rr::game::n64Log50NH("n64_break_thrust slot=%u factor=%g left=%g->%g right=%g->%g\n",
+       unsigned(actualRacerSlot),double(hit.thrustFactor),double(beforeLeft),double(drive[0]),double(beforeRight),double(drive[1]));
    ImpactConsumerInput49Z in=consumer;
    in.vehicle3C=s.fields.vehicle3C;in.vehicle40=s.bodies.main.vehicleState40;in.vehicle58=s.fields.vehicle58;
    in.flagsCD8=s.fields.impactFlagsCD8;std::memcpy(&in.factor,&s.bodies.main.frameFactor,sizeof(float));
@@ -522,10 +575,11 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   model.effect80C={nativeEffects[fire].id,nativeEffects[fire].state.flags1D4};
  }
  const bool originalMaterialDispatch=originalAiAudioEnabled&&!raceSetupFrame;
- const auto materialRacer60=sourceAiAudio?originalAi.racer60:playerRacer60;
+ require50DU(actualRacerSlot<rosterRacer60.size(),"material audio racer slot outside roster");
+ const auto materialRacer60=sourceAiAudio?originalAi.racer60:rosterRacer60[actualRacerSlot];
  if(originalMaterialDispatch)require50DU((sourceAiAudio?
      originalAi.managerIndexFE0==actualRacerSlot:
-     humanCourseEnabled&&actualRacerSlot==0u&&!opponentFrame)&&
+     humanCourseEnabled&&actualRacerSlot<originalAiHumanCount)&&
      originalAiAudio->materialEventTarget(actualRacerSlot,materialRacer60,s,owners.effectD40),
      "actual current human/AI D40 material event owner unavailable");
  runNative([&]{return effectsVehicleImpacts50O(s,x.bindings,owners,effectsWorkspace,generatedEffects,maxImpactEffectEvents50B,count,x.workspace,x.diagnostic);},"actual effect control bindings");
@@ -635,6 +689,7 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
   if(rr::game::n64HazardRuntime50NH.takeExplode(actualRacerSlot,q)){
    const auto trigger=rr::game::n64HazardRuntime50NH.triggerOf(q.row);
    if(!originalAiEnabled||s.bodies.main.vehicleState40){
+    rr::game::n64HazardRuntime50NH.cancelExplode(actualRacerSlot);
     rr::game::n64Log50NH("n64_explode refused slot=%u trigger=%u reason=%s state40=%u\n",unsigned(actualRacerSlot),trigger,
         originalAiEnabled?"state":"no_destroy_owner",unsigned(s.bodies.main.vehicleState40));
    }else{
@@ -682,32 +737,42 @@ bool Context::advanceChildren(std::size_t actualRacerSlot,float preparedOuterFac
  // 2289BC..228A90 (human, 3C==0, states1/2): 4C -= dt; |BA8| > threshold
  // -> 2261B0, > threshold/2 or 4C <= 0 -> 226750, both without 225C50's
  // suffix. The threshold is the same racer value the state-0 decision uses.
+ const auto* n64Explosion=rr::game::n64HazardRuntime50NH.exploding(actualRacerSlot);
  if((s.bodies.main.vehicleState40==1u||s.bodies.main.vehicleState40==2u)&&!s.fields.vehicle58&&!s.fields.vehicle3C){
   require50DU(actualRacerSlot<rr::game::nativeDestroyedRacers50PD.size()&&
       rr::game::nativeDestroyedRacers50PD[actualRacerSlot].limping,"limping racer has no native limp record");
   auto& limp=rr::game::nativeDestroyedRacers50PD[actualRacerSlot];++limp.limpFrames;
-  float impact=0.f;std::memcpy(&impact,&s.fields.impactBA0.v[2],4);
-  const auto countdown=rr::game::advanceOriginalDetachedDamage50LA(s.bodies.main.vehicleState40,s.fields.vehicle3C,
-      preparedOuterFactor,impact,std::bit_cast<float>(wreckSpeed50Bits),limp.limp4C);
-  const auto& p=s.bodies.main.components.root.body.position;
-  // The cockpit tether: 1B66D0's world anchors from this frame's physics
-  // (A on the cockpit at the surviving hitch, B on the main body at the
-  // surviving engine) against the 1B6670 length.
-  const auto& joint=s.bodies.joint;
-  const float tx=joint.worldAnchor80.v[0]-joint.worldAnchor90.v[0],ty=joint.worldAnchor80.v[1]-joint.worldAnchor90.v[1],
-      tz=joint.worldAnchor80.v[2]-joint.worldAnchor90.v[2];
-  std::cerr<<"pod_limp frame="<<limp.limpFrames<<" state40="<<s.bodies.main.vehicleState40<<" t4C="<<limp.limp4C
-      <<" ba8="<<impact<<" speed="<<s.bodies.main.cachedSpeed34<<" pos="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]
-      <<" tether="<<std::sqrt(tx*tx+ty*ty+tz*tz)<<" tether_len="<<joint.length4C
-      <<" status="<<static_cast<unsigned>(countdown.status)<<'\n';
-  if(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::destructionRequired){
-   std::cerr<<"pod_limp_exit reason="<<(countdown.sourcePC==0x228a30u?"impact88":limp.limp4C<=0.f?"timer":"impact8C")
-       <<" handler=0x"<<std::hex<<countdown.originalTarget<<std::dec<<" after_frames="<<limp.limpFrames<<'\n';
-   const ImpactTransitionResult50C escalation{ImpactTransitionStatus50C::unsupportedTransition,countdown.sourcePC,
-       countdown.vtableSlot,countdown.originalTarget};
-   return commitOriginalDestroyed(actualRacerSlot,escalation,preparedOuterFactor);
+  if(n64Explosion){
+   limp.limp4C=n64Explosion->explosionSeconds;
+   if(n64Explosion->dead){
+    rr::game::n64Log50NH("n64_explode wreck slot=%u remaining_s=%g\n",unsigned(actualRacerSlot),double(limp.limp4C));
+    const ImpactTransitionResult50C wreck{ImpactTransitionStatus50C::unsupportedTransition,0x228a84u,0x8cu,0x226750u};
+    return commitOriginalDestroyed(actualRacerSlot,wreck,preparedOuterFactor);
+   }
+  }else{
+   float impact=0.f;std::memcpy(&impact,&s.fields.impactBA0.v[2],4);
+   const auto countdown=rr::game::advanceOriginalDetachedDamage50LA(s.bodies.main.vehicleState40,s.fields.vehicle3C,
+       preparedOuterFactor,impact,std::bit_cast<float>(wreckSpeed50Bits),limp.limp4C);
+   const auto& p=s.bodies.main.components.root.body.position;
+   // The cockpit tether: 1B66D0's world anchors from this frame's physics
+   // (A on the cockpit at the surviving hitch, B on the main body at the
+   // surviving engine) against the 1B6670 length.
+   const auto& joint=s.bodies.joint;
+   const float tx=joint.worldAnchor80.v[0]-joint.worldAnchor90.v[0],ty=joint.worldAnchor80.v[1]-joint.worldAnchor90.v[1],
+       tz=joint.worldAnchor80.v[2]-joint.worldAnchor90.v[2];
+   std::cerr<<"pod_limp frame="<<limp.limpFrames<<" state40="<<s.bodies.main.vehicleState40<<" t4C="<<limp.limp4C
+       <<" ba8="<<impact<<" speed="<<s.bodies.main.cachedSpeed34<<" pos="<<p.v[0]<<','<<p.v[1]<<','<<p.v[2]
+       <<" tether="<<std::sqrt(tx*tx+ty*ty+tz*tz)<<" tether_len="<<joint.length4C
+       <<" status="<<static_cast<unsigned>(countdown.status)<<'\n';
+   if(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::destructionRequired){
+    std::cerr<<"pod_limp_exit reason="<<(countdown.sourcePC==0x228a30u?"impact88":limp.limp4C<=0.f?"timer":"impact8C")
+        <<" handler=0x"<<std::hex<<countdown.originalTarget<<std::dec<<" after_frames="<<limp.limpFrames<<'\n';
+    const ImpactTransitionResult50C escalation{ImpactTransitionStatus50C::unsupportedTransition,countdown.sourcePC,
+        countdown.vtableSlot,countdown.originalTarget};
+    return commitOriginalDestroyed(actualRacerSlot,escalation,preparedOuterFactor);
+   }
+   require50DU(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::complete,"original 2289BC limp countdown rejected");
   }
-  require50DU(countdown.status==rr::game::OriginalVehicleDamageStatus50LA::complete,"original 2289BC limp countdown rejected");
  }
  }
  require50DU(s.phase==VehicleFramePhase49W::AfterImpactBlock,"source impact outer skip continuation unavailable");
@@ -907,6 +972,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  auto& record=nativeDestroyedRacers50PD[actualRacerSlot];
  auto& main=s.bodies.main;
  const bool human=s.fields.vehicle58==0u;
+ const auto feedbackSource=actualRacerSlot==1u&&secondHumanInput50SV?secondHumanInput50SV->player.source5C:playerSource5C;
  // 2261B0/226750/227370 pass racer+690 -> +E0 -> +4 (the main E0's primary
  // zone) to 22C6A0/22CA60. Use the banked main membership only when its last
  // shape world is this racer's (its E0 sits on the pod body); otherwise 0
@@ -982,8 +1048,8 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
      stops[count].sourcePC=left?0x227428u:0x227af8u;stops[count].target=resetEffectBindings.owners81C[i];++count;}}
    require50DU(consumeEffects(stops,count),"limp entry lost-side effect stops rejected");}
   // 227434..2274CC: human, 3C==0, vibration option: 0.5 s on both motors.
-  if(!s.fields.vehicle3C&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
-   auto& device=feedbackDevices[playerSource5C];clearControllerFeedback50KZ(device,2);
+  if(!s.fields.vehicle3C&&(dynamicConsumerFlags11050&4u)&&feedbackSource<2u){
+   auto& device=feedbackDevices[feedbackSource];clearControllerFeedback50KZ(device,2);
    require50DU(requestControllerFeedback50KZ(device,2,0u,.5f),"limp entry vibration request rejected");}
   // 2274D0 (227BA0): 48 = 0 (no Binder, no detached-cable path). The port's
   // only writer of 48 is its 20F6B4 constructor, which stores 0, so the field
@@ -1185,8 +1251,8 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
  // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
  // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).
- if(human&&!s.fields.vehicle3C&&!replay&&(dynamicConsumerFlags11050&4u)&&playerSource5C<2u){
-  auto& device=feedbackDevices[playerSource5C];
+ if(human&&!s.fields.vehicle3C&&!replay&&(dynamicConsumerFlags11050&4u)&&feedbackSource<2u){
+  auto& device=feedbackDevices[feedbackSource];
   clearControllerFeedback50KZ(device,2);
   require50DU(requestControllerFeedback50KZ(device,2,0u,explode?2.f:1.f),"destroyed racer vibration request rejected");
   std::cerr<<"pod_destroyed_vibration seconds="<<(explode?2:1)<<" capable="<<device.capable<<'\n';

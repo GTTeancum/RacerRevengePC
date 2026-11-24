@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+#include <charconv>
 // N64 track hazards for converted N64 Racer tracks: the N64 trigger volumes (plane gate,
 // capsule), the N64 "carrier surface" gate, and three trigger actions the original Revenge
 // does not have: ExplodePod (N64 trigger 104), BreakObject (102) and AnimationToggle (the
@@ -41,8 +43,14 @@ struct N64HazardLimits50NH {
     static constexpr float maxExtent = 5000.f;         // ft; refuse larger half sizes
 };
 
+class N64ImpactSound50NH {
+public:
+    virtual ~N64ImpactSound50NH() = default;
+    virtual bool playImpact(const std::string& name, float gain, float pitch, int angle) noexcept = 0;
+};
+
 enum class N64Volume50NH : std::uint8_t { plane, capsule };
-enum class N64HazardKind50NH : std::uint8_t { explodePod, breakObject, animationToggle, animationPlay };
+enum class N64HazardKind50NH : std::uint8_t { explodePod, breakObject, animationToggle, animationPlay, earthquake };
 enum class N64ExplodeSide50NH : std::uint8_t { random, left, right };
 enum class N64ExplodeGate50NH : std::uint8_t { all, local, localOrNearCamera };
 enum class N64AfterDestroy50NH : std::uint8_t { retire, respawn };
@@ -66,6 +74,7 @@ struct N64BreakParams50NH {
     float effectAhead = 12.f;            // human: effect follows the pod, 12 ft ahead (N64 vB x 12)
     float effectAiScale = 8.f;           // AI: fixed at the gate centre, scale 8
     float effectFade = 2.f;              // alpha (2 - t)/2, hidden at t >= 2
+    float effectLifetime = 2.f;          // FX slot hides when its first non-looping motion finishes
     std::string sound;                   // converted N64 sound 0x39
     float soundPitch = .25f, soundPitchRandom = .15f, soundMinDistance = 10.f, soundMaxDistance = 500.f;
 };
@@ -73,6 +82,7 @@ struct N64ToggleParams50NH {
     std::int32_t animationNumber = -1;
     std::string animationNameRef;
     float guard = 3.f;                   // s between toggles (timer > 3.0)
+    bool freezeOnFirst = true;
     float rate = 20.f;                   // +-20 x the motion's own speed (13.33 s / 20 = 0.67 s)
 };
 // AnimationPlay: N64 312 falling pillar (0x8007D944 set-up / 0x8007D248 handler: ENABLED at
@@ -85,6 +95,7 @@ struct N64PlayParams50NH {
     float rate = 1.f;                    // signed playback rate; stops at the end (no loop)
     bool show = false;                   // show a StartHidden row first (methane FX)
     // Revenge's own CameraShake (1B5990 fields) issued with the fire; absent = no shake.
+    float n64PillarShakeScale = 0.f; // Revenge feet per N64 world unit
     bool shake = false;
     float shakeMagnitude = 0.f, shakeTime = 0.f, shakeDelay = 0.f;
     std::int32_t shakeDecaying = 1;
@@ -96,6 +107,11 @@ struct N64HazardAction50NH {
     N64BreakParams50NH breakObject;
     N64ToggleParams50NH toggle;
     N64PlayParams50NH play;
+    struct Earthquake {
+        std::int32_t animationNumber=-1;
+        std::string animationNameRef,effectNameRef;
+        float feetPerUnit=0.f;
+    } quake;
 };
 struct N64HazardRow50NH {
     std::uint32_t trigger = 0;           // 1-based TriggerN (log identity)
@@ -169,7 +185,7 @@ inline bool isN64HazardTrigger50NH(const assets::ParameterBlock48F& trigger) noe
     return false;
 }
 inline bool isN64HazardActionType50NH(std::string_view type) noexcept {
-    return type == "ExplodePod" || type == "BreakObject" || type == "AnimationToggle" || type == "AnimationPlay";
+    return type == "ExplodePod" || type == "BreakObject" || type == "AnimationToggle" || type == "AnimationPlay" || type == "Earthquake";
 }
 
 // Reads one N64 row. `number` is the 1-based TriggerN. Output written only on success.
@@ -262,7 +278,8 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 q.effectAhead = d::numberOr(*a, "effectahead", q.effectAhead);
                 q.effectAiScale = d::numberOr(*a, "effectaiscale", q.effectAiScale);
                 q.effectFade = d::numberOr(*a, "effectfade", q.effectFade);
-                d::need(q.effectAhead >= 0.f && q.effectAhead <= 1000.f && q.effectAiScale > 0.f && q.effectAiScale <= 64.f &&
+                q.effectLifetime = d::numberOr(*a, "effectlifetime", q.effectFade);
+                d::need(q.effectLifetime > 0.f && q.effectLifetime <= 30.f && q.effectAhead >= 0.f && q.effectAhead <= 1000.f && q.effectAiScale > 0.f && q.effectAiScale <= 64.f &&
                         q.effectFade > 0.f && q.effectFade <= 30.f, "BreakObject effect values");
                 if (const auto* v = d::field(*a, "filename")) q.sound = d::name(*v, 0x103);
                 q.soundPitch = d::numberOr(*a, "pitch", q.soundPitch);
@@ -271,6 +288,14 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 q.soundMaxDistance = d::numberOr(*a, "maxdistance", q.soundMaxDistance);
                 d::need(q.soundPitch > 0.f && q.soundPitchRandom >= 0.f && q.soundMinDistance >= 0.f &&
                         q.soundMaxDistance >= q.soundMinDistance, "BreakObject sound values");
+            } else if (*type == "Earthquake") {
+                x.kind=N64HazardKind50NH::earthquake;
+                auto& q=x.quake;
+                d::target(*a,q.animationNumber,q.animationNameRef);
+                if(const auto* name=d::field(*a,"effectnameref"))q.effectNameRef=d::name(*name,0x27);
+                q.feetPerUnit=d::numberOr(*a,"feetperunit",0.f);
+                d::need((q.animationNumber>=1||!q.animationNameRef.empty())&&!q.effectNameRef.empty()&&q.feetPerUnit>0.f,
+                        "Earthquake needs structure, splash and scale");
             } else if (*type == "AnimationPlay") {
                 x.kind = N64HazardKind50NH::animationPlay;
                 auto& q = x.play;
@@ -282,6 +307,10 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 const auto* m = d::field(*a, "shakemagnitude"); const auto* t = d::field(*a, "shaketime");
                 const auto* dc = d::field(*a, "shakedecaying"); const auto* dl = d::field(*a, "shakedelay");
                 q.shake = m || t || dc || dl;
+                if(const auto* scale=d::field(*a,"n64pillarshakescale")){
+                    q.n64PillarShakeScale=d::number(*scale);
+                    d::need(q.n64PillarShakeScale>0.f&&!q.shake,"AnimationPlay N64 pillar shake scale");
+                }
                 if (m) q.shakeMagnitude = d::number(*m);
                 if (t) q.shakeTime = d::number(*t);
                 if (dl) q.shakeDelay = d::number(*dl);
@@ -296,7 +325,10 @@ inline bool readN64HazardRow50NH(const assets::ParameterDocument48F& p, const as
                 q.guard = d::numberOr(*a, "toggleguard", q.guard);
                 q.rate = d::numberOr(*a, "togglerate", q.rate);
                 d::need(q.guard >= 0.f && q.guard <= 600.f && q.rate > 0.f && q.rate <= 1000.f, "AnimationToggle guard / rate");
-                if (const auto* v = d::field(*a, "firsttrigger")) d::need(*v == "Freeze", "AnimationToggle FirstTrigger (Freeze only)");
+                if (const auto* v = d::field(*a, "firsttrigger")) {
+                    d::need(*v == "Freeze" || *v == "Arm", "AnimationToggle FirstTrigger");
+                    q.freezeOnFirst = *v == "Freeze";
+                }
             }
         }
         d::need(hazards == 1 && r.actionCount == 1, "an N64 row carries exactly one ExplodePod, BreakObject, AnimationToggle or AnimationPlay");
@@ -342,7 +374,7 @@ struct N64HazardStep50NH {
     bool alive = true;                  // not destroyed / limping / respawning (N64 0x7000 / EXPLODING gate)
     const char* notAliveReason = "dead"; // logged when !alive: dead | limping | respawning
     float previous[3]{}, current[3]{};  // root position before / after this completed step
-    float speed = 0.f;                  // cached speed +34 (ft/s)
+    float speed = 0.f;                  // signed completed-frame speed (ft/s)
     std::uint32_t lap = 0;              // 0-based current lap
     const std::uint32_t* groundOwners = nullptr; std::size_t groundOwnerCount = 0;
     float nearestCameraDistance = 1e30f; // to the nearest viewport camera eye (ft)
@@ -352,6 +384,7 @@ struct N64HazardEvent50NH {
     N64HazardKind50NH kind = N64HazardKind50NH::explodePod;
     int crossingSign = 0;
     float t = 0.f;                      // segment parameter of the hit (logs)
+    float explosionSeconds = 0.f;
     bool explodeLeft = false;           // ExplodePod side after the draw
     const char* refused = nullptr;      // ExplodePod gate refusal: dead | limping | respawning | local | far
     bool nearCamera = false;            // ExplodePod passed by the near-camera half of the gate
@@ -370,16 +403,16 @@ public:
         if (rows.size() > L::rows || resolvedOwners.size() != rows.size()) { error = "N64 hazard rows exceed the owner"; return false; }
         for (std::size_t i = 0; i < rows.size(); ++i) {
             if (resolvedOwners[i].size() > L::ownersPerName * L::surfaceObjects) { error = "N64 carrier owner list too long"; return false; }
-            if (rows[i].surfaceCount && resolvedOwners[i].empty()) { error = "N64 SurfaceObject names no static owner"; return false; }
+            if (rows[i].surfaceCount && resolvedOwners[i].empty()) { error = "N64 SurfaceObject names no collision owner"; return false; }
         }
         rows_ = std::move(rows); owners_ = std::move(resolvedOwners); state_.assign(rows_.size(), {});
-        for (std::size_t i = 0; i < rows_.size(); ++i) state_[i].enabled = rows_[i].startEnabled;
+        initializeRows();
         random_ = seed ? seed : 1u; loaded_ = !rows_.empty(); return true;
     }
     void reset() noexcept { rows_.clear(); owners_.clear(); state_.clear(); loaded_ = false; }
     // Race (re)start: every row enabled as authored, fired cleared (N64 'Load'/'RSet').
     void raceReset(std::uint32_t seed) noexcept {
-        for (std::size_t i = 0; i < rows_.size(); ++i) state_[i] = {}, state_[i].enabled = rows_[i].startEnabled;
+        initializeRows();
         random_ = seed ? seed : 1u;
     }
     bool active() const noexcept { return loaded_; }
@@ -405,7 +438,7 @@ public:
             if (r.oneTimeOnly && s.fired) { skip(i, "fired"); continue; }          // FIRED (FindOrCreate NULL)
             if (r.minSpeed > 0.f && in.speed < r.minSpeed) { skip(i, "speed"); continue; } // flag 0x2
             if (r.localOnly && !in.human) { skip(i, "local"); continue; }          // flag 0x20
-            if (in.lap < 3 && !(r.lapMask & (1u << in.lap))) { skip(i, "lap"); continue; } // flags 0x4/0x8/0x10
+            if (in.lap < 3 && !(s.lapMask & (1u << in.lap))) { skip(i, "lap"); continue; } // flags 0x4/0x8/0x10
             if (!carrierUnder(i, in)) { skip(i, "surface"); continue; }           // surface under the pod
             s.fired = true;
             for (std::size_t k = 0; k < r.actionCount; ++k) {
@@ -424,6 +457,7 @@ public:
                         // N64: r < 0.5 -> Explode(pod, 1) = right engine; else mode 2 = left.
                         e.explodeLeft = x.side == N64ExplodeSide50NH::left ||
                                         (x.side == N64ExplodeSide50NH::random && unit() >= .5f);
+                        e.explosionSeconds=2.f+unit();
                     }
                 }
                 events[used++] = e;
@@ -446,12 +480,44 @@ public:
         return n;
     }
     float soundPitch(const N64BreakParams50NH& q) noexcept { return q.soundPitch + q.soundPitchRandom * unit(); }
+    // N64 8006C24C..8006C2F4. Revenge uses Y for the vertical axis.
+    static float signedStepSpeed(const float previous[3],const float current[3],
+                                 const float forward[3],float seconds,bool zeroGravity) noexcept {
+        if(!(seconds>0.f))return 0.f;
+        const float x=current[0]-previous[0], y=current[1]-previous[1], z=current[2]-previous[2];
+        const float horizontal=x*x+z*z;
+        const float speed=std::sqrt(zeroGravity?horizontal+y*y:horizontal)/seconds;
+        return x*forward[0]+z*forward[2]+y*forward[1]<0.f?-speed:speed;
+    }
+
     // stdMath_Decelerator (PC 0x480650): 1 - 33.333336 dt / (33.333336 dt + k).
     static float decelerator(float k, float dt) noexcept {
-        const float a = dt * 33.333336f; return 1.f - a / (a + k);
+        // N64 80081710 divides seconds by the single at 800ADCB0.
+        const float a = dt / 0.03f; return a > 0.f ? 1.f - a / (a + k) : 1.f;
     }
 private:
-    struct State { bool enabled = true, fired = false; };
+    struct State { bool enabled=true,fired=false; std::uint8_t lapMask=7; };
+    void initializeRows() noexcept {
+        for(std::size_t i=0;i<rows_.size();++i){
+            const auto& row=rows_[i];
+            auto& state=state_[i];
+            state={row.startEnabled,false,row.lapMask};
+            if(row.actions[0].kind!=N64HazardKind50NH::earthquake)continue;
+            // 80082BE0 seeds from the timer and returns abs(signed LCG word), with INT_MIN -> zero.
+            static std::uint32_t quakeRandom=[](){
+                if(const char* value=std::getenv("RR_TEST_N64_QUAKE_SEED")){
+                    const std::string_view text(value);
+                    std::uint32_t timer=0;
+                    const auto parsed=std::from_chars(text.data(),text.data()+text.size(),timer);
+                    if(parsed.ec==std::errc{}&&parsed.ptr==text.data()+text.size())return timer;
+                }
+                return static_cast<std::uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count());
+            }();
+            quakeRandom=quakeRandom*0x41c64e6du+0x3039u;
+            const auto magnitude=quakeRandom==0x80000000u?0u:(quakeRandom>>31?0u-quakeRandom:quakeRandom);
+            if(float(magnitude)/2147483648.f>0.5f)state.lapMask&=~2u;
+        }
+    }
     bool carrierUnder(std::size_t i, const N64HazardStep50NH& in) const noexcept {
         if (!rows_[i].surfaceCount) return true;
         if (!in.groundOwners) return false;
@@ -482,7 +548,9 @@ public:
     void advance(float dt) noexcept { if (armed_) timer_ += dt; }      // N64 F0 timer +0x10 (not while paused)
     N64ToggleCommand50NH fire(const N64ToggleParams50NH& q, float animationTime) noexcept {
         N64ToggleCommand50NH c;
-        if (!armed_) { armed_ = true; timer_ = 0.f; c.apply = c.setTime = true; c.time = 0.f; c.rate = 0.f; c.loop = false; c.event = "freeze"; return c; }
+        if (!armed_) { armed_ = true; timer_ = 0.f;
+            if (!q.freezeOnFirst) { c.event = "armed"; return c; }
+            c.apply = c.setTime = true; c.time = 0.f; c.rate = 0.f; c.loop = false; c.event = "freeze"; return c; }
         if (!(timer_ > q.guard)) { c.event = "guard"; return c; }
         timer_ = 0.f; c.apply = true; c.loop = false;
         c.rate = animationTime <= 0.f ? q.rate : -q.rate; c.event = animationTime <= 0.f ? "open" : "close";

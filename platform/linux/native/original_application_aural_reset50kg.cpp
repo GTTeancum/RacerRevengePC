@@ -140,7 +140,8 @@ bool OriginalApplicationAural50KG::stopResultsNative26D070(
     }else{
         const bool gameplayOk=gameplay.canStopResultsGameplay26D070(*groups.mixer_,groups,session);
         const bool enginesOk=engines.canStopResultsEngines26D070(*groups.mixer_,groups,session);
-        const bool resetOwnerOk=engines.humanResetOwner_==&gameplay.humanController_;
+        const bool resetOwnerOk=engines.humanResetOwners_[0]==&gameplay.humanController_&&
+            (engines.firstAiSlot_<2||engines.humanResetOwners_[1]==&gameplay.secondHumanController_);
         if(!gameplayOk||!enginesOk||!resetOwnerOk){
             // Log only: which human-domain gate refused, and the actual field shape.
             std::fprintf(stderr,"aural_stop26D070_human_gate gameplay=%d engines=%d reset_owner=%d "

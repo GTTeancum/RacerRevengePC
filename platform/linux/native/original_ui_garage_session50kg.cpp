@@ -2763,8 +2763,7 @@ bool Application::prepareGarageManagerEntry1D1950(Frontend& frontend,
         std::shared_ptr<const rr::assets::OriginalUiIpumTextureCache50KG> sourceImages;
         if(!frontend.coordinator.prepareGarageSourceImages12CEA0(custody,selectedArchive,sourceImages,diagnostic))
             return retainedFailure(diagnostic.status,diagnostic.sourcePC,"Garage selected source-image preparation failed; bank retained");
-        if(!selectedArchive->addon()&& // DLC career: no static IPUM sources in a package archive
-           !resolver->bindGarageStaticIpumCache24E880(sourceImages,selectedArchive,bank)){
+        if(!resolver->bindGarageStaticIpumCache24E880(sourceImages,selectedArchive,bank)){
             diagnostic.texture=bank;return retainedFailure(Status::texture,bank.sourcePC?bank.sourcePC:0x24E880,
                 "Garage selected exact static IPUM source binding failed; bank retained");
         }
@@ -3547,7 +3546,7 @@ bool Application::continueGarageManagerLoadReturnCold(std::int32_t requestedPage
         if(!owner->page_->sourceEntryReturned1FAE00()||!owner->managerArchiveScopeCurrent()||
            !standardMaterialDomainOwner_||!materialContextOwner_||!materialContextOwner_->live())
             return fail(0x1CCE74,"Garage second manager population lacks real completed entry/context");
-        //Distinct original1CCE74→2A4B30, AFTER Page entry and before returning.
+        //Distinct original1CCE74â†’2A4B30, AFTER Page entry and before returning.
         //The earlier Page1FAAC0 population is historical, never a replacement.
         if(!standardMaterialDomainOwner_->populate(materialContextOwner_,diagnostic))
             return fail(0x1CCE74,"Garage second canonical material/texture population failed");

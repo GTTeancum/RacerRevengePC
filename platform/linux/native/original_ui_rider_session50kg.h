@@ -217,6 +217,8 @@ private:
         game::OriginalUiRiderColdPopulation50KG,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     const OriginalUiRiderDrawContribution50KG* rendererOwner() const noexcept;
     bool sourceTeardownPending()const noexcept;
+    OriginalUiRiderSessionStatus50KG retirePageSubmission(VehicleWindowGl50DS&,
+        VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     // Frontend-only: obtains genuine completion directly from its renderer,
     // then destroys dynamic domains and consumes their exact retirements while
     // both ledger and collector still live. Failure retains unfinished owners.

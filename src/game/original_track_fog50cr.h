@@ -74,7 +74,7 @@ struct OriginalTrackFog50CR {
     bool colorAuthored=false,visibilityAuthored=false,hazinessAuthored=false;
     // N64-canonical DLC key "FarDistance" (original_race_fog_far50nf.h): the
     // far50 that 1AA158 / 1A98DC pass to 13E920. Absent (every stock SCB) = 4000.
-    float farDistance=originalRaceFogFar50NF;
+    float farDistance=originalRaceFogFar50NF,drawDistanceScale=1.f;
     bool farAuthored=false;
     std::vector<OriginalTrackFogZone50CR> zones350; // index = zone48
     bool zoneFogDiffers4F0=false;                   // World4F0 bit0
@@ -245,6 +245,9 @@ inline bool readOriginalTrackFog50CR(const assets::World48F& world,OriginalTrack
         if(!raceFogFarAdmissible50NF(next.farDistance))return fogFail(d,FogS50CR::range,0,f->value_offset);
     }
 
+    if(!fogField(*fog,"drawdistancescale",f,d,0,0))return false;
+    if(f&&(!fogNumber(*f,next.drawDistanceScale,d,0,0)||next.drawDistanceScale<1.f||next.drawDistanceScale>2.f))
+        return fogFail(d,FogS50CR::range,0,f->value_offset);
     const std::size_t count=world.zones.size(); // World34C
     if(!count||count>originalTrackFogZoneLimit50CR)return fogFail(d,FogS50CR::zoneCount,0x270b58,0);
     next.zones350.resize(count);
@@ -368,6 +371,7 @@ public:
             return track_fog50cr_detail::fogFail(d,OriginalTrackFogStatus50CR::range,0,next.fogBlockOffset);
         OriginalRaceFogFields loaded{};
         if(!loadOriginalRaceFogFields50CR(next,loaded,d)){(void)setRaceFogFarDistance50NF(previousFar);return false;}
+        gameplayDrawDistanceScale50NF=next.drawDistanceScale;
         fog_=std::move(next);fields3EC_=loaded;
         controllersBuilt_=fog_.zoneFogDiffers4F0; //270D1C..270E7C, defaults above
         prepared_=true;return true;

@@ -380,7 +380,6 @@ void Context::run() {
  const auto& refreshAnimatedCandidates=this->refreshAnimatedCandidatesCall;
  const auto& restartGridPlacementCall=this->restartGridPlacementCall;
  const auto& restartGridPreflightCall=this->restartGridPreflightCall;
- const auto& restartSetupTickCall=this->restartSetupTickCall;
  auto& renderDiagnostics=this->renderDiagnostics;
  auto& renderedCameraPublication=this->renderedCameraPublication;
  auto& renderer=this->renderer;
@@ -843,10 +842,14 @@ void Context::run() {
     std::cerr<<"GL "<<field<<": "<<(value?reinterpret_cast<const char*>(value):"unavailable")<<'\n';
    }
   }
-  // Resizable/maximizable window: renderer capacity covers any attached
-  // monitor (bounded 4K). Larger drawables keep the existing oversize pause.
-  std::int32_t maximumWidth=1280,maximumHeight=896;
-  native_display_capacity50DU::capacity(1280,896,maximumWidth,maximumHeight);
+  // The retained player window can be larger than any attached display.
+  // Allocate race targets for its drawable just as the frontend does.
+  const auto& drawable=host.info();
+  require50DU(drawable.drawableWidth<=3840&&drawable.drawableHeight<=2160,
+      "race drawable exceeds the supported 3840x2160 render target");
+  std::int32_t maximumWidth=0,maximumHeight=0;
+  native_display_capacity50DU::capacity(std::max(1280,drawable.drawableWidth),
+      std::max(896,drawable.drawableHeight),maximumWidth,maximumHeight);
   std::cerr<<"native_render_capacity width="<<maximumWidth<<" height="<<maximumHeight<<"\n";
   rr::platform::loading_progress50DU::pulse("Allocating graphics targets");
   PlayerLoadingSession50DU::checkStop();
@@ -922,7 +925,7 @@ void Context::run() {
     if(triggerAudio&&(!triggerAudio->available()||triggerAudio->failed()))return false;
     if(particleMaterials.loaded()&&!particleMaterials.ownsResources())return false;
     // Every course: the common track-animation owner is ready with its window when present.
-    if(trackAnimations&&(!trackAnimations->ready()||!trackAnimationWindow.loaded()||!trackAnimationWindow.ownsResources()))return false;
+    if(trackAnimations&&(!trackAnimations->ready()||!trackAnimationWindow.loaded()||(!trackAnimationWindow.collisionOnly()&&!trackAnimationWindow.ownsResources())))return false;
     if(trackAnimations&&(!trackAnimationBinding||!trackAnimationBinding->ready()||
        trackAnimationBinding->runtimeOwner()!=trackAnimations.get()))return false;
     if(humanCourseEnabled&&!humanOriginalHud)return false;
@@ -1393,7 +1396,9 @@ void Context::run() {
   auto prepareSourceCamera=[&](){
    if(!originalCameraEnabled)return;
    require50DU(!sourceCameraSession&&racerRigs[0]&&nativeOriginalFleet&&
-       originalAiHumanCount==(humanCourseEnabled?1u:0u),
+       (humanCourseEnabled?(originalAiHumanCount==1u||
+        (originalAiHumanCount==2u&&racerRigs[1]&&originalMainApplication.prepareVersusCamera38())):
+        originalAiHumanCount==0u),
        "original camera cold owner requires the actual fresh native roster");
    // New native display extension, initialized once. Existing UI aperture is
    // a separate effect and has finished/retired before this race destination.
@@ -1414,6 +1419,7 @@ void Context::run() {
    // One camera asset load for every course: the selected pod's CAM and the
    // track's own TOB (track.documents.tob), with the pod's authenticated PHY.
    sourceCameraAssets.load(track,playerPodId,racerRigs[0]->phy);
+   if(originalAiHumanCount==2u)sourceCameraAssets.loadSecondRacer(racerRigs[1]->podId,racerRigs[1]->phy);
    require50DU(!sourceCameraAssets.cam.empty(),"original camera assets: selected pod CAM missing");
    makeSourceCameraDisplay();
    if(humanOriginalHud||sourceConsumedPauseActivation){
@@ -1516,6 +1522,11 @@ void Context::run() {
      auto* controller=sourceCameraSession->taControllerEntity174A30();
      require50DU(controller&&nativeIntroRace()->retainNativeIntroControllerSlot48(*controller),
          "actual counted-race slot48 controller publication rejected");
+     if(originalAiHumanCount==2u){
+      auto* second=sourceCameraSession->taControllerEntity174A30(1);
+      require50DU(second&&nativeIntroRace()->retainNativeIntroControllerSlot48(*second,1),
+          "second counted-race camera controller publication rejected");
+     }
      auto* groups=liveAudio->groupsForProviders();
      const auto domain=originalMainApplication.standardMaterialDomain();
      const auto& aural=originalMainApplication.sourceAural00Owner_;
@@ -1675,8 +1686,8 @@ void Context::run() {
     require50DU(sourceTimeStatsRendering,"original TimeStats GPU source join rejected");
    }
    if(humanCourseEnabled){
-    const std::array<const OriginalCameraViewportFields*,2> hudViews{{&sourceCameraSession->viewport(),nullptr}};
-    require50DU(sourceRaceHud.construct1A8CC4(1,hudViews,sourceCameraDisplay->rendererWidth4,sourceCameraDisplay->rendererHeight8),
+    const std::array<const OriginalCameraViewportFields*,2> hudViews{{sourceCameraSession->hudViewport(0),sourceCameraSession->hudViewport(1)}};
+    require50DU(sourceRaceHud.construct1A8CC4(static_cast<std::uint8_t>(originalAiHumanCount),hudViews,sourceCameraDisplay->rendererWidth4,sourceCameraDisplay->rendererHeight8),
         "actual source HUD TextOverlay/view construction rejected");
     //Additional same-owner source-slot publication only. Legacy or
     //absent lexical registration gets no end-HUD authority; startup unchanged.
@@ -1773,7 +1784,9 @@ void Context::run() {
   const bool baselineRequested=baselineSetting&&std::string(baselineSetting)=="1";
   require50DU(!baselineRequested||(!headlessLive&&host.hasWindow()&&raceEnabled&&
       (allAiEnabled||humanCourseEnabled)&&originalAiEnabled&&originalCameraEnabled&&
-      racerBank.count()==raceRacerCount&&originalAiHumanCount==(allAiEnabled?0u:1u)&&!autoDriveEnabled),
+      racerBank.count()==raceRacerCount&&
+      (allAiEnabled?originalAiHumanCount==0u:(originalAiHumanCount==1u||originalAiHumanCount==2u))&&
+      !autoDriveEnabled),
       "track FPS measurement requires the admitted original fleet and camera window, without a host auto-driver");
   track_fps_baseline50LA::Baseline trackBaseline{baselineRequested};
   BaselineDisplayWall50DU baselineDisplayWall{phaseTiming.enabled&&baselineRequested};
@@ -2318,17 +2331,13 @@ void Context::run() {
   raceStartHooks.restartRecordActor.emplace(restartRecordActor);
   raceStartHooks.resetCamera.emplace(resetCamera);
   raceStartHooks.readBestLapCB4.emplace(readBestLapCB4);
-  // After a whole 1AC8E0 restart (race1B0 bit4 clear): the fresh race's one neutral setup
-  // tick for every racer, through the continuation that owns it (PORT STAND-IN, flagged:
-  // see common_race_start50CR::Hooks::restartSetupTick).
-  const auto restartSetupTick=[&]()noexcept->bool{return restartSetupTickCall();};
-  raceStartHooks.restartSetupTick.emplace(restartSetupTick);
   raceStartHooks.preflightRestart1AC8E0.emplace(preflightRestart1AC8E0);
   struct RaceFlowBinding final {
    common_race_start50CR::Owner& start;common_race_end50CR::Owner& end;bool bound=false;
    ~RaceFlowBinding(){
     // The world hook captures this publication's track owners: it never outlives them.
-    native_common_results50PD::state().restartWorld=nullptr;
+    auto& flow=native_common_results50PD::state();
+    flow.fadeDeparture=nullptr;flow.resetReplayGrid=nullptr;flow.resetTriggers=nullptr;flow.resetParticles=nullptr;flow.resetScene=nullptr;
     if(bound){end.unbind();start.unbind();}}
   } raceFlowBinding{raceStart,raceEnd};
   if(const auto& countedRace=consumedStage.race()){
@@ -2352,14 +2361,47 @@ void Context::run() {
    //   The lane route republishes every row's visual/collision membership after the
    //   reset; the static route's next world service does.
    //   PORT STAND-IN (flagged, existing): 27C330 (Scene+0x3D4) and the Particles-action
-   //   emitter reset of 2702E0 are not carried; the three leaves run together.
-   native_common_results50PD::state().restartWorld=[&](const char*& reason)->bool{
+   //   emitter reset of 2702E0 are not carried.
+   auto& flow=native_common_results50PD::state();
+   flow.resetReplayGrid=[&](){
+    // Bit 4 skips the timing-manager reset at 1ACC7C. The finished times
+    // survive for Results while 1AEA70 places and 1AED30 locks the bodies.
+    for(std::size_t slot=0;slot<racerBank.count();++slot)
+     if(!placeOnGrid2A2880(slot,0u,true))return false;
+    return lockStart1AED30();
+   };
+   flow.fadeDeparture=[&](){
+    if(!sourceFadeOut||!sourceCameraDisplay)return false;
+    rr::game::OriginalResultsBlockingFade2AED60 fade;
+    auto& display=*sourceCameraDisplay;
+    for(;;){
+     const auto step=fade.advance(display.fadeManagerA8,display.currentApplicationMode22C(),
+         display.video,applicationClock,sourceFadeOut.get());
+     using Status=rr::game::OriginalCameraStartStatus;
+     if(step.status==Status::complete)return true;
+     if(step.status!=Status::videoClockWait){sourceFadeOut->cancelAndRetire();return false;}
+     // Restart can run inside the Results input callback. The caller owns
+     // that exact poll until its remaining events and successors return.
+     if(!flow.restartFromResults){
+      bool closeRequested=false;
+      if(!host.pollLoading50DU(closeRequested,hostDiagnostic)||closeRequested){sourceFadeOut->cancelAndRetire();return false;}
+     }
+     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+   };
+   flow.resetTriggers=[&](){
+    if(track.roles.triggers)rr::game::raceResetNativeTriggerGroup2DCC70(*track.roles.triggers);
+   };
+   flow.resetParticles=[&](const char*& reason)->bool{
     reason=nullptr;native_wreck_effects50PD::reset();
     if(track.roles.emitters){
      common_track50CR::Diagnostic d;
      if(!track.roles.emitters->restart161F60(d)){static thread_local std::string why;
       why="161F60 track particle emitter restart rejected: "+d.reason;reason=why.c_str();return false;}
     }
+    return true;};
+   flow.resetScene=[&](const char*& reason)->bool{
+    reason=nullptr;
     std::size_t rows=0,triggers=0;
     // PORT EXTENSION (N64 data only): 'RSet' reloads the N64 track fresh - every hazard row
     // as authored and the animation rows they changed restored, before 2702E0 re-poses them.
@@ -2374,7 +2416,7 @@ void Context::run() {
      rows=trackAnimations->rowCount();}
     if(track.roles.triggers)triggers=rr::game::raceResetNativeTriggerGroup2DCC70(*track.roles.triggers);
     std::cerr<<"track_animation_race_reset course="<<(trackAnimations?trackAnimations->label():std::string("-"))
-        <<" rows="<<rows<<" common_triggers="<<triggers<<" at=1AC8E0\n";
+        <<" rows="<<rows<<" common_triggers="<<triggers<<" at=2702E0\n";
     return true;};
    require50DU(originalMainApplication.bindRaceStart50CR(this->raceStartOwner),"Application race start binding rejected");
    // Fresh race: only the shared tail (1AED30, 197040, race94; the cold load
@@ -2396,6 +2438,12 @@ void Context::run() {
   rr::platform::loading_progress50DU::step(.1f,0x1a78dc);
   rr::platform::loading_progress50DU::finish();
   PlayerLoadingSession50DU::checkStop();
+  if(sourceCameraDisplay&&originalMainApplication.sourceRace28COwner_&&originalMainApplication.useProfile2E0()
+      &&originalMainApplication.retainsPlayerWindow50DU()){
+   auto& display=*sourceCameraDisplay;
+   require50DU(PlayerLoadingSession50DU::coverRaceLoad(display.fadeManagerA8,
+       display.currentApplicationMode22C(),display.video,applicationClock),"race loading-screen fade rejected");
+  }
   coldLoadDiagnostics.complete();
   // Opt-in host observations only; each receipt is bounded to this session.
   bool firstMainPollReported=false,firstMainActivityGateReported=false;

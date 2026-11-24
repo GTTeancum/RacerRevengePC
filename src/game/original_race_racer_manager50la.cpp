@@ -57,7 +57,7 @@ struct OriginalRaceRacerManager50LA::Impl final {
          ai(&actualAi),humanCount(&actualHumans) {
         if(!application||application->nativeOwnerThread_!=thread||!application->application10()||
            application->attachmentLock423F58()||!generation||!bank->count()||
-           bank->count()>8u||actualHumans>1u||actualHumans>bank->count()||
+           bank->count()>8u||actualHumans>2u||actualHumans>bank->count()||
            application->objectCount423F60()==std::numeric_limits<std::uint32_t>::max())return;
         // Bind every mutated scalar before constructing a counted owner. These
         // are registration proofs, not copies; no Bank visit/AI reset occurs.
@@ -109,7 +109,7 @@ bool OriginalRaceRacerManager50LA::associateNativeRoster(OriginalRaceConstructor
     if(!p.componentCurrent()||!p.constructed||p.associated||race.racerB0_.get()!=this||
        race.application_!=p.application||race.entity_.sessionGeneration!=p.component.sessionGeneration||
        p.bank!=&bank||p.frame!=&frame||p.ai!=&ai||p.humanCount!=&humans||
-       !bank.count()||bank.count()>8u||humans>1u||humans>bank.count())return false;
+       !bank.count()||bank.count()>8u||humans>2u||humans>bank.count())return false;
     try {
         for(std::size_t i=0;i<bank.count();++i){
             if(bank.read(i,p.vehicle58)!=(i<humans?0u:1u))return false;

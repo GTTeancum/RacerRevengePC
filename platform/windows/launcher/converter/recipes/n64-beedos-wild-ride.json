@@ -1,0 +1,90 @@
+{
+  "manifest": {
+    "schema": "rrpc-dlc/1",
+    "id": "n64-beedos-wild-ride",
+    "name": "Beedo's Wild Ride (Ando Prime, Episode I Racer N64)",
+    "author": "RacerRevengePC converters",
+    "version": "1.0.2",
+    "description": "Beedo's Wild Ride on Ando Prime, from Star Wars Episode I Racer (N64) model 130, as an add-on course (code nb, physics class B). AI class A (medium evidence); rival stock:10, Aldar Beedo (medium evidence: the source track favourite pilot). Race tuning from stock TB and pod effect particles from stock TA, read from your install. Stock loading screen, generated course-screen preview and course background; no announcer intro lines. Built from your own copy of the source games; do not share.",
+    "enabled": true,
+    "kind": "course",
+    "priority": 0,
+    "requires_port": "dlc-contract-2",
+    "personal": true,
+    "personal_note": "built from your own copy of the source games; do not share",
+    "strings": {
+      "english": {
+        "COURSE_NB": "BEEDO'S WILD RIDE",
+        "PLANET_NB": "ANDO PRIME"
+      }
+    },
+    "items": [
+      {
+        "kind": "course",
+        "id": "nb",
+        "code": "nb",
+        "archive": "TRACKS/NB.RES",
+        "name_key": "COURSE_NB",
+        "planet_name_key": "PLANET_NB",
+        "phy_class": "B",
+        "ai_class": "A",
+        "rival": "stock:10",
+        "loading_screen": {
+          "stock": "tb"
+        },
+        "course_screen": {
+          "stock_template": "tb",
+          "preview": "UI/TEXTURES/HOLO_NB.PST"
+        },
+        "course_background": {
+          "file": "UI/TEXTURES/BKG_NB.PST"
+        },
+        "inherit": {
+          "tuning": "tb",
+          "particles": "ta"
+        },
+        "modes": [
+          "single",
+          "time_trial",
+          "vs"
+        ],
+        "records_key": "nb",
+        "enhancements": [
+          "surface_rules"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": "TRACKS/NB.RES",
+        "bytes": 1199170,
+        "sha256": "f3f629faca51c76e2958d3ddb5fb0991743f43182354a09faf626ab6350391c5",
+        "role": "course archive (members named tracks\\nb.* / anb.spl / mnb.spl / nbNN.vub)"
+      },
+      {
+        "path": "UI/TEXTURES/HOLO_NB.PST",
+        "bytes": 66588,
+        "sha256": "180566d44db101bcc077dc907d764ee30fc455fcee3bca4a42b69c7c30031001",
+        "role": "course-screen hologram preview 256x256 (stock template tb)"
+      },
+      {
+        "path": "UI/TEXTURES/BKG_NB.PST",
+        "bytes": 287772,
+        "sha256": "9dacf1255bb158aa7e5fd5a10193d2ca04f8e84271a37a576a8e6965a293fb66",
+        "role": "Single Event course background 640x448 (layout of UICOURSE <planet>_bkg.pst)"
+      }
+    ]
+  },
+  "view": {
+    "eye": [
+      36221.0,
+      3174.0,
+      5762.0
+    ],
+    "target": [
+      19373.0,
+      5400.0,
+      22612.0
+    ]
+  }
+}

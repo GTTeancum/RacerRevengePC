@@ -300,6 +300,9 @@ void Context::run() {
  // over the paused race (App11C stays set, as in the original: no 1BE830). The page owns
  // the pad until its 1CA574..1CA6F0 confirm departs (host bookkeeping, not race state).
  bool pauseRecordPage1BDAB4=false;
+ bool replayFadeNeedsUnderlay=false;
+ bool loadFadeNeedsUnderlay=sourceCameraDisplay&&(sourceCameraDisplay->video.covered3DC||(sourceCameraDisplay->video.flags404Low6&16u));
+ bool introLoadFadeConsumed=false;
  const auto resetLoopAfterRaceStart=[&](){
   restartFadeIn1A7BD0Pending=true;pauseRecordPage1BDAB4=false;
   ++introRace50CR;introPodFrames50CR=0;
@@ -478,7 +481,8 @@ void Context::run() {
      original_all8_frame::AudioIntegrationPolicy audioPolicy,
      auto&& remainingRaceChildren){
   SimulationScope totalTiming(phaseTiming.enabled,simulationTotals[13]);
-  require50DU(originalAiEnabled&&nativeOriginalFleet&&originalAiHumanCount==(humanCourseEnabled?1u:0u)&&
+  require50DU(originalAiEnabled&&nativeOriginalFleet&&(humanCourseEnabled==(originalAiHumanCount!=0u))&&
+      originalAiHumanCount<=2u&&originalAiHumanCount+originalAiOpponentCount==raceRacerCount&&
       racerBank.count()==raceRacerCount,"two-phase entry requires the actual native roster and source manager");
   // The native AI policy services real D40/Aural owners without certifying
   // the missing intervening retail children or their complete RNG chronology.
@@ -567,6 +571,51 @@ void Context::run() {
   return operation(raceSession);
  };
 
+ const auto advanceRacerContacts=[&](bool heldOnGrid){
+  if(!racerContactsEnabled)return;
+  SimulationScope timing(phaseTiming.enabled,simulationTotals[10]);
+  std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
+  std::array<native_racer_contact50HW::Pair,
+      native_racer_contact50HW::maxRacers*(native_racer_contact50HW::maxRacers-1)> contactOrder{};
+  std::size_t contactPairCount=0;
+  for(std::size_t racer=0;racer<racerBank.count();++racer)
+   contactParticipant[racer]=racerBank.active(racer)&&
+       // A destroyed racer's 690/694/364 memberships are removed (2261B0/226750).
+       !rr::game::nativeRacerDestroyed50PD(racer)&&
+       (heldOnGrid||withRace([&](auto& actualRace){return race_session50HM::simulationAllowed(actualRace,static_cast<std::uint32_t>(racer));}));
+  for(std::size_t primary=0;primary<racerBank.count();++primary)if(contactParticipant[primary])
+   for(std::size_t other=0;other<racerBank.count();++other)
+    if(primary!=other&&contactParticipant[other])contactOrder[contactPairCount++]={primary,other};
+  if(contactPairCount){
+   native_racer_contact50HW::Receipt contactReceipt{};
+   native_racer_contact50HW::AiContactBoundary50IV aiContactBoundary{};
+   const auto beforeRacerContacts=::allocations;
+   const auto contactStatus=native_racer_contact50HW::applyAtWorldBoundary(
+       racerBank,*racerContactOwner,s,x.bindings,x.parameters,racerContactIds,racerContactMaterials,
+       contactOrder.data(),contactPairCount,contactReceipt,&aiContactBoundary,
+       dynamicContactEnabled,dynamicContactEnabled?&dynamicRegistry:nullptr);
+   racerContactTotals.lastStatus=contactStatus;
+   if(contactStatus!=native_racer_contact50HW::Status::Complete){
+    addCounter50DU(racerContactTotals.failures);
+    std::cerr<<"RACER CONTACT FAILURE: player_tick="<<completedFrames<<" ordered_pairs="<<contactPairCount
+        <<" status="<<static_cast<unsigned>(contactStatus)<<"; rejected body outputs were not committed.\n";
+    if(aiContactBoundary.unsupported)std::cerr<<"ORIGINAL AI dynamic-contact owner boundary: slot="
+        <<aiContactBoundary.racerSlot<<" pc="<<std::hex<<aiContactBoundary.sourcePC<<std::dec
+        <<" contacts="<<aiContactBoundary.contactCount20C<<"; no pair results committed.\n";
+    reportRacerContacts();
+    require50DU(false,"native racer contact world pass rejected");
+   }
+   require50DU(collisionNormalMode.acceptCompleted(contactReceipt.normalModeWrite),"source collision normal-mode binding unavailable");
+   require50DU(::allocations==beforeRacerContacts,"successful racer contact world pass allocated C++ storage");
+   addCounter50DU(racerContactTotals.passes);
+   addCounter50DU(racerContactTotals.testedPairs,contactReceipt.testedPairs);
+   addCounter50DU(racerContactTotals.geometryPairs,contactReceipt.geometryPairs);
+   addCounter50DU(racerContactTotals.suppressedPairs,contactReceipt.suppressedPairs);
+   addCounter50DU(racerContactTotals.respondedPairs,contactReceipt.respondedPairs);
+   addCounter50DU(racerContactTotals.generatedRecords,contactReceipt.generatedRecords);
+   addCounter50DU(racerContactTotals.activeRecords,contactReceipt.activeRecords);
+  }else addCounter50DU(racerContactTotals.noPairs);
+ };
   for(;;){
    // A suspended source input call still owns its original poll. Do not
    // dispatch fresh input, run simulation or commit tournament work around it.
@@ -695,7 +744,11 @@ void Context::run() {
      const auto elapsed=nowNs-confirmStartNs50PD;
      const bool on=period&&elapsed>=period&&elapsed%period<150000000ull;
      static bool confirmOn50PD=false;
-     if(on&&!confirmOn50PD){testResults50PD.enter=true;
+     if(on&&!confirmOn50PD){
+      static const bool testRestart=std::getenv("RR_TEST_RESULTS_RESTART")&&std::string_view(std::getenv("RR_TEST_RESULTS_RESTART"))=="1";
+      const bool openTournamentSummary=raceEnd.launch().mode34==2u&&confirmTaps50PD==0;
+      if(testRestart&&introRace50CR==1&&!openTournamentSummary)testResults50PD.restart=true;
+      else testResults50PD.enter=true;
       std::cerr<<"test_results_confirm tap="<<++confirmTaps50PD<<'\n';}
      confirmOn50PD=on;
     }
@@ -711,7 +764,7 @@ void Context::run() {
     static const bool resultsHold50PD=[]{const char* v=std::getenv("RR_TEST_RESULTS_HOLD");return v&&std::string(v)=="1";}();
     static std::uint64_t holdStartNs50PD=0;static bool holdCaptured50PD=false;
     if(resultsHold50PD&&captureRun.unattended()&&!holdCaptured50PD&&!sessionMenu.open()&&
-       (humanResultsReady||native_common_results50PD::state().replayActive)){
+       (humanResultsReady||native_common_results50PD::state().replayActive||pauseRecordPage1BDAB4)){
      auto& holdInput50PD=rr::platform::testResultsInput50PD();
      holdInput50PD.focus=true;
      const auto nowNs=monotonicNow50DU();
@@ -719,7 +772,7 @@ void Context::run() {
      if(nowNs>=holdStartNs50PD+3000000000ull){
       holdInput50PD.capture=true;holdCaptured50PD=true;
       std::cerr<<"test_results_hold capture_requested screen="
-          <<(native_common_results50PD::state().replayActive?"results104":"native_panel")<<'\n';
+          <<(pauseRecordPage1BDAB4?"record_page":native_common_results50PD::state().replayActive?"results104":"native_panel")<<'\n';
      }
     }
    }
@@ -915,6 +968,14 @@ void Context::run() {
     // cockpit tether rebind (838/joint) is not undone (Restart rebuilds it),
     // the stopped engine loops are not restarted, and no respawn invincibility
     // window (N64 RESPAWN_INVINC) is applied.
+    if(sourceCameraSession&&sourceCameraSession->publicationCount()){
+     const auto& eye=sourceCameraSession->pose().position;
+     rr::game::n64HazardRuntime50NH.setViewportEye(0,eye.x,eye.y,eye.z,sourceCameraSession->pose().look.x,sourceCameraSession->pose().look.z);
+     if(const auto* second=sourceCameraSession->secondPublishedView()){
+      const auto& position=second->position;
+      rr::game::n64HazardRuntime50NH.setViewportEye(1,position.x,position.y,position.z,second->sceneAfter.look.x,second->sceneAfter.look.z);
+     }else rr::game::n64HazardRuntime50NH.clearViewportEye(1);
+    }
     rr::game::n64HazardRuntime50NH.advance(race.raceSeconds);
     for(std::size_t slot=0;slot<racerBank.count()&&slot<rr::game::nativeDestroyedRacers50PD.size();++slot){
      if(!rr::game::n64HazardRuntime50NH.respawnDue(slot,rr::game::nativeDestroyedRacers50PD[slot].destroyed,race.raceSeconds))continue;
@@ -968,8 +1029,17 @@ void Context::run() {
    const bool nativeModalOwnsInput=sessionMenu.open()||nativeResultsOwnsInput||
        sourcePauseParentAttached||applicationPausedModal||nativeMenuCommand;
    rr::game::OriginalResults104Diagnostic50LA resultsInputDiagnostic;
+   bool resultsRestartAttempted=false;
+   auto& resultsFlow=native_common_results50PD::state();
+   resultsFlow.restartFromResults=[&](std::uint32_t caller){
+    resultsRestartAttempted=true;
+    const bool tournament=caller==common_race_start50CR::callerResultsTournamentReplay1C9774;
+    if(!restartInPlace1AC8E0(caller,0u,tournament?"results_row_1C9774":"results_row_1C8DF0"))return false;
+    return !tournament||(raceMusic&&raceMusic->requestFade1A4AB0(0.5f).completed());
+   };
    const bool resultsInputOkay=(originalUiActive||nativeModalOwnsInput)?true:
        originalMainApplication.pressConsumedResults1C8C30(host,resultsInputDiagnostic);
+   resultsFlow.restartFromResults={};
    if((native_common_results50PD::state().replayActive||pauseRecordPage1BDAB4)&&nativeModalOwnsInput){
     static unsigned reportedModal=0xffffffffu;
     const unsigned modal=unsigned(sessionMenu.open())|
@@ -988,34 +1058,9 @@ void Context::run() {
          <<resultsInputDiagnostic.sourcePC<<std::dec<<" operation="<<(resultsInputDiagnostic.operation?resultsInputDiagnostic.operation:"")
          <<" modal="<<nativeModalOwnsInput<<" ui="<<originalUiActive<<'\n';}
    }
-   // Results Restart rows (flow audit F15), every course: Results input ran the row's own
-   // store (race1B0 bit4) and handed its 1AC8E0(race,0) over, as the Pause RESTART row does.
-   // The one in-place restart (common_race_start reason=restart caller=1C8DF0|1C9774), then
-   // the row's tail in its order: 1C9790 1A4AB0(race10C,0.5) on the tournament row only,
-   // then 1A4B90(race10C,2) (1C8E08 / 1C97A8).
-   if(!resultsInputOkay&&resultsInputDiagnostic.status==rr::game::OriginalResults104Diagnostic50LA::Status::incomplete&&
-      (resultsInputDiagnostic.sourcePC==common_race_start50CR::callerResultsReplay||
-       resultsInputDiagnostic.sourcePC==common_race_start50CR::callerResultsTournamentReplay1C9774)){
-    const auto caller=resultsInputDiagnostic.sourcePC;
-    const bool tournamentRow=caller==common_race_start50CR::callerResultsTournamentReplay1C9774;
-    const bool replayWas=native_common_results50PD::state().replayActive;
-    std::cerr<<"results_row_restart pc="<<std::hex<<caller<<std::dec<<" replay_was="<<replayWas<<'\n';
-    const bool restarted=restartInPlace1AC8E0(caller,0u,tournamentRow?"results_row_1C9774":"results_row_1C8DF0");
-    if(restarted){
-     if(tournamentRow){
-      const bool faded=raceMusic&&raceMusic->requestFade1A4AB0(0.5f).completed();
-      std::cerr<<"results_row_restart step=1A4AB0 seconds=0.5 completed="<<faded<<'\n';
-     }
-     auto* cycle=native_common_results50PD::state().raceCycleAudio;
-     const auto played=cycle?static_cast<int>(cycle->dispatchResultsFeedback(2u)):-1;
-     std::cerr<<"results_row_restart step=1A4B90 key=2 result="<<played<<'\n';
-    }else if(replayWas){
-     // PORT STAND-IN (flagged): the original 1AC8E0 cannot refuse. A refused in-place
-     // restart leaves the Results replay running, so the row's bit4 clear is undone.
-     const bool restored=native_race_replay50PD::owner().markResultsReplay1AB520();
-     std::cerr<<"results_row_restart refused bit4_restored="<<restored<<'\n';
-    }
-    forceSceneRender=true;continue;
+   if(resultsRestartAttempted){
+    require50DU(resultsInputOkay,resultsInputDiagnostic.operation?resultsInputDiagnostic.operation:"Results restart or its input-dispatch tail refused");
+    continue;
    }
    if(originalMainApplication.resultsDonePending50LA()){
     require50DU(resultsInputClaimed,"Results handoff did not retire exact synchronous output");
@@ -1101,10 +1146,12 @@ void Context::run() {
     require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
         "original frontend physical controller snapshot invalid");
     // Separate physical identity and release-to-arm lifetime for port two.
-    // An inactive Controls2 route disarms it; keyboard always remains port zero.
+    // Disarm on leaving a second-player page. Keyboard input stays on port zero.
     const auto secondInputRoute=originalMain.coordinator.snapshot().route;
+    const bool secondPlayerPage=(secondInputRoute.screen==12&&secondInputRoute.page==3)||
+        (secondInputRoute.screen==5&&secondInputRoute.page==2);
     require50DU(originalUiSecondControllerNavigation.observe(input,active&&
-        secondInputRoute.screen==12&&secondInputRoute.page==3,secondMenuEvents,1),
+        secondPlayerPage,secondMenuEvents,1),
         "original frontend second physical controller snapshot invalid");
     const bool traceFirstMainInactive=originalMain.traceStages&&!active&&!firstMainInactiveReported;
     if(traceFirstMainInactive){
@@ -1170,11 +1217,11 @@ void Context::run() {
        originalMainApplication.courseHumanController=courseConfirmFromController;
      }
     // Never merge two physical ports or retag keyboard input as controller one.
-    if(secondInputRoute.screen==12&&secondInputRoute.page==3&&
+    if(secondPlayerPage&&
        input.secondControllerPresence==platform::WindowControllerPresence50DQ::Present)
      for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u}){
       const auto currentRoute=originalMain.coordinator.snapshot().route;
-      if(currentRoute.screen!=12||currentRoute.page!=3)break;
+      if(currentRoute.screen!=secondInputRoute.screen||currentRoute.page!=secondInputRoute.page)break;
       if(secondMenuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence,1);
      }
     const auto uiNow=monotonicNow50DU();
@@ -1755,8 +1802,41 @@ void Context::run() {
    }
    // The countdown is not an input interruption (original 1A1A20 reads held
    // pad state every frame); only a real pause/menu or focus loss is.
+   static const bool testVsInputs=[](){const char* value=std::getenv("RR_TEST_VS_INPUTS");return value&&!std::strcmp(value,"1");}();
+   if(testVsInputs&&originalAiHumanCount==2u&&!paused&&race.phase==race_session50HM::Phase::Racing){
+    // Process-local replay of the default keyboard and second controller. The
+    // normal packet mapper, native event dispatch and vehicle reader consume both.
+    const double time=race.raceSeconds;
+    if(time<9.0){
+     auto& pad=input.controllers[1];
+     pad={};pad.connected=true;pad.instanceId=2;
+     pad.buttons[0]=time>=1.0&&time<4.0;
+     input.down[26]=time>=5.0&&time<8.0;
+     static int lastPhase=-1;
+     const int phase=int(time);
+     if(phase!=lastPhase){
+      std::cerr<<"vs_control_sample seconds="<<time<<" p1_throttle="<<unsigned(input.down[26])
+         <<" p2_throttle="<<unsigned(pad.buttons[0])<<'\n';
+      lastPhase=phase;
+     }
+    }
+   }
+   // Deterministic pad samples for the launcher's opt-in Versus binding check.
+   static const bool testPadMap=[](){const char* v=std::getenv("RR_TEST_PAD_REBIND");return v&&!std::strcmp(v,"1");}();
+   if(testPadMap&&captureRun.unattended()&&!paused&&race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<5){
+    const int phase=static_cast<int>(race.raceSeconds);
+    for(unsigned i=0;i<originalAiHumanCount&&i<2;++i){
+     auto& pad=input.controllers[i];
+     if(!pad.connected)continue;
+     pad.buttons={};pad.axes={};
+     if(phase==1&&i==0){pad.axes[4]=16384;pad.axes[2]=16384;pad.axes[3]=-16384;}
+     if(phase==2&&i==1){pad.buttons[10]=1;pad.axes[0]=-16384;}
+     if(phase==3)pad.buttons[0]=1;
+    }
+   }
    platform::selectedControllerCountdownHold50KY=!paused&&!humanControlsPermitted;
    composePacket(!paused&&humanControlsPermitted,input);
+   if(originalAiHumanCount==2u)composePacket(!paused&&humanControlsPermitted,input,1u);
    platform::selectedControllerCountdownHold50KY=false;
    // Native device-loss/reconnect policy holds the existing world clock. It
    // cannot call the still-unjoined original missing-controller popup.
@@ -1947,26 +2027,27 @@ void Context::run() {
        // the camera and world children as in an ordinary race tick.
        const char* why=nullptr;
        auto& replayTiming=replayFrameTiming50PD;replayTiming.begin(frameHitch50DU.start,frameHitch50DU.started);
-       // 1A7BD0..1A7C18 of this race update: the restart left race1B0 bit3
-       // set; the canonical fade-in prefix requests and services the fade.
-       {const auto fade=originalMainApplication.advanceConsumedSessionFadeIn1A7BD0(*sourceCameraSession);
-        static unsigned reportedFade=0xffu;
-        if(static_cast<unsigned>(fade.status)!=reportedFade){reportedFade=static_cast<unsigned>(fade.status);
-         std::cerr<<"race_replay fade_in status="<<reportedFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec
-             <<" covered="<<sourceCameraSession->endingVideoCovered()<<'\n';}}
+       if(!replayFrames50PD)replayFadeNeedsUnderlay=true;
        replayTiming.lap(1);
        require50DU(replay.step(.016f,false,why),why?why:"race78 playback step rejected");
        if(replay.ended()){
-        require50DU(!common.restartWorld||common.restartWorld(why),why?why:"replay loop world restart rejected");
-        require50DU(replay.loop(why),why?why:"race78 replay loop rejected");
         unwreckReplayRacers229F80("1A8158");
+        require50DU(common.resetScene&&common.resetScene(why),"1A81B0 replay scene reset rejected");
+        require50DU(replay.loop(why),why?why:"race78 replay loop rejected");
         // 1A81DC..1A8204: TV reset and mode 6 at every loop (when the TV exists).
         require50DU(sourceCameraSession->enterResultsReplayCamera1ACE14(),"1A8204 replay-loop TV camera request rejected");
+        require50DU(common.resetParticles&&common.resetParticles(why),"1A824C replay particle reset rejected");
         std::cerr<<"race_replay loop="<<replay.stats().loops<<'\n';
        }
        replayTiming.lap(2);
        {std::size_t poseSlot=racerBank.count();const auto rejectedBefore=replay.stats().rejected;
-        const bool posed=racerBank.visitAll([&](std::size_t slot){poseSlot=slot;return replay.apply(slot,s,x.bindings);});
+        const bool posed=racerBank.visitAll([&](std::size_t slot){poseSlot=slot;
+         if(!replay.apply(slot,s,x.bindings))return false;
+         if(!nativeSelectedLights)return true;
+         auto& seq=graphicsSequence[slot];
+         if(seq==std::numeric_limits<std::uint64_t>::max()||
+            !track.roles.lights->updateAfterGraphics(static_cast<std::uint32_t>(slot),s,x.bindings,x.parameters,seq+1,lightDiagnostic,true))return false;
+         ++seq;return true;});
         if(!posed)std::cerr<<"race_replay pose_rejected slot="<<poseSlot<<" rejected_delta="<<(replay.stats().rejected-rejectedBefore)
             <<" why="<<(replay.stats().lastRejection?replay.stats().lastRejection:"")<<'\n';
         require50DU(posed,replay.stats().lastRejection?replay.stats().lastRejection:"race78 replay pose rejected");}
@@ -2007,7 +2088,7 @@ void Context::run() {
         // replay frame's returned Camera, as on every race tick.
         rr::game::OriginalResults104Diagnostic50LA resultsUpdate;
         const bool updated=originalMainApplication.updateNativeResultsAfterRace50LA(*sourceCameraSession,resultsUpdate);
-        const bool captured=updated&&finishRaceRootWithResults();
+        const bool captured=updated&&(replayFadeNeedsUnderlay?finishRaceRoot():finishRaceRootWithResults());
         if(!updated||!captured||replayFrames50PD<=3||replayFrames50PD%120==0){
          if(!updated||!captured||resultsUpdate.sourcePC!=replayResultsPC50PD)
           std::cerr<<"race_replay results updated="<<updated<<" captured="<<captured<<" pc="<<std::hex
@@ -2196,9 +2277,7 @@ void Context::run() {
       // The player's pad is read every frame (1A1A20): slot 0 gets this poll's live packet,
       // composed with controls not yet permitted (the same countdown hold the racing step
       // applies), not a neutral one. A second human slot keeps the racing step's own packet.
-      // PORT STAND-IN (flagged): the port's racer-contact pass and host race session are
-      // host owners stepped only by the racing step; neither runs before GO (pods apart and
-      // axis-locked on the grid). Not proven which original owner performs racer contacts.
+      // The race clock stays held while the world processes the locked grid bodies.
       // The racers' per-frame audio consumers (boost 217DE0 boundary, repair, engine, material,
       // speech timers) run inside these frames, as after GO. The host display service pauses
       // the shared mixer while a fade runs (intro fade-in, intro skip); the countdown service
@@ -2212,7 +2291,7 @@ void Context::run() {
        const auto introFrame=[&](std::size_t slot){
         if(s.fields.vehicle58==0u){
          if(slot==0){composePacket(false,input);sampleController(true);}
-         else{composePacket(false,introNoKeys,slot);sampleController();}
+         else if(slot>=originalAiHumanCount){composePacket(false,introNoKeys,slot);sampleController();}
         }
         require50DU(advanceFrame(slot),"live intro pod frame rejected");
        };
@@ -2229,6 +2308,7 @@ void Context::run() {
        captureDynamicBeforeFrame(0);
        if(originalAiEnabled)observeOriginalAiFleet();
        racerBank.visit(0,[&](){introFrame(0);});
+       advanceRacerContacts(true);
        ++introPodFrames50CR;
        heldLap50DU("intro_pod_frames");
       }
@@ -2447,7 +2527,7 @@ void Context::run() {
        // racer position/C80/speed after that racer completed its native frame.
        if(originalAiEnabled)observeOriginalAiFleet();
        const bool advanced=racerBank.step(racer,true,[&](){
-        if(s.fields.vehicle58==0u){composePacket(true,noKeys,racer);applyCourseInput(racer);sampleController();}
+        if(s.fields.vehicle58==0u&&racer>=originalAiHumanCount){composePacket(true,noKeys,racer);applyCourseInput(racer);sampleController();}
         const auto beforeOpponentFrame=::allocations;
         const bool completed=advanceFrame(racer);
         if(completed)require50DU(::allocations==beforeOpponentFrame,
@@ -2513,6 +2593,7 @@ void Context::run() {
           // Every racer 3C = 1 and 229F80. 1AC8E0's 161F60 / 2702E0 ran once already, in the
           // dispatch's world-reset cut (restartWorld, 1AC978 / 1AC98C) before this hook.
           unwreckReplayRacers229F80("1AB520");
+          if(!sourceCameraSession->selectResultsViewport1ABB88(native_race_replay50PD::owner().resultsRacerSlot())){reason="1ABB88 Results viewport selection rejected";return false;}
          }
          const auto& owned=originalMainApplication.sourceRace28COwner_;
          const auto st=owned?native_race_replay50PD::Owner::vcrState(*owned):rr::game::OriginalSimpleVCR50LA::State{};
@@ -2649,50 +2730,7 @@ void Context::run() {
             <<" camera_to_debris="<<std::sqrt(ex*ex+ey*ey+ez*ez)<<" camera_height="<<ey;
        }
        std::cerr<<'\n';}}
-     if(racerContactsEnabled){
-      SimulationScope timing(phaseTiming.enabled,simulationTotals[10]);
-      std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
-      std::array<native_racer_contact50HW::Pair,
-          native_racer_contact50HW::maxRacers*(native_racer_contact50HW::maxRacers-1)> contactOrder{};
-      std::size_t contactPairCount=0;
-      for(std::size_t racer=0;racer<racerBank.count();++racer)
-       contactParticipant[racer]=racerBank.active(racer)&&
-           // A destroyed racer's 690/694/364 memberships are removed (2261B0/226750).
-           !rr::game::nativeRacerDestroyed50PD(racer)&&
-           withRace([&](auto& actualRace){return race_session50HM::simulationAllowed(actualRace,static_cast<std::uint32_t>(racer));});
-      for(std::size_t primary=0;primary<racerBank.count();++primary)if(contactParticipant[primary])
-       for(std::size_t other=0;other<racerBank.count();++other)
-        if(primary!=other&&contactParticipant[other])contactOrder[contactPairCount++]={primary,other};
-      if(contactPairCount){
-       native_racer_contact50HW::Receipt contactReceipt{};
-       native_racer_contact50HW::AiContactBoundary50IV aiContactBoundary{};
-       const auto beforeRacerContacts=::allocations;
-       const auto contactStatus=native_racer_contact50HW::applyAtWorldBoundary(
-           racerBank,*racerContactOwner,s,x.bindings,x.parameters,racerContactIds,racerContactMaterials,
-           contactOrder.data(),contactPairCount,contactReceipt,&aiContactBoundary,
-           dynamicContactEnabled,dynamicContactEnabled?&dynamicRegistry:nullptr);
-       racerContactTotals.lastStatus=contactStatus;
-       if(contactStatus!=native_racer_contact50HW::Status::Complete){
-        addCounter50DU(racerContactTotals.failures);
-        std::cerr<<"RACER CONTACT FAILURE: player_tick="<<completedFrames<<" ordered_pairs="<<contactPairCount
-            <<" status="<<static_cast<unsigned>(contactStatus)<<"; rejected body outputs were not committed.\n";
-        if(aiContactBoundary.unsupported)std::cerr<<"ORIGINAL AI dynamic-contact owner boundary: slot="
-            <<aiContactBoundary.racerSlot<<" pc="<<std::hex<<aiContactBoundary.sourcePC<<std::dec
-            <<" contacts="<<aiContactBoundary.contactCount20C<<"; no pair results committed.\n";
-        reportRacerContacts();
-        require50DU(false,"native racer contact world pass rejected");
-       }
-       require50DU(collisionNormalMode.acceptCompleted(contactReceipt.normalModeWrite),"source collision normal-mode binding unavailable");
-       require50DU(::allocations==beforeRacerContacts,"successful racer contact world pass allocated C++ storage");
-       addCounter50DU(racerContactTotals.passes);
-       addCounter50DU(racerContactTotals.testedPairs,contactReceipt.testedPairs);
-       addCounter50DU(racerContactTotals.geometryPairs,contactReceipt.geometryPairs);
-       addCounter50DU(racerContactTotals.suppressedPairs,contactReceipt.suppressedPairs);
-       addCounter50DU(racerContactTotals.respondedPairs,contactReceipt.respondedPairs);
-       addCounter50DU(racerContactTotals.generatedRecords,contactReceipt.generatedRecords);
-       addCounter50DU(racerContactTotals.activeRecords,contactReceipt.activeRecords);
-      }else addCounter50DU(racerContactTotals.noPairs);
-     }
+     advanceRacerContacts(false);
      if(originalAiEnabled&&!sourceCameraSession)advanceOriginalAiManager(m.frameFactor);
      if(mode1Enabled){
       const auto timing=mode1->beforeHostCommit(mode1->acceptedWorld+1u,.016f);
@@ -2935,12 +2973,9 @@ void Context::run() {
    if(recoveryPaused){discardTrackBaseline();captureCommitted();if(checkpointRequested)break;continue;}
 
    if(captureFirstWrongWay&&!capturedFirstWrongWay&&(lapContinuity.prefix.flags10CC&2u))capturePending=true;
-   // The neutral racer setup tick precedes the camera Session and already
-   // increments completedFrames. Only that Session's first real scene/camera
-   // child publication admits original-camera rendering, including a zero-step
-   // host poll immediately after Course entry or resume. Keep the pending
-   // render request until the normal fixed-step owner publishes the view.
-   if((sourceCameraSession?sourceCameraSession->hasView():completedFrames!=0)&&
+   // Race78 publishes its first model and lighting pose before Results can draw.
+   if((!native_common_results50PD::state().replayActive||replayFrames50PD)&&
+       (sourceCameraSession?sourceCameraSession->hasView():completedFrames!=0)&&
        (!originalManualResetGraphicsDue||graphicsSequence[0]>=originalManualResetGraphicsDue)&&
        !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
        !(humanCourseEnabled&&sourceCameraSession->endingVideoCovered()&&!humanResultsReady&&
@@ -3465,11 +3500,12 @@ void Context::run() {
       }
      }
     }
+    const auto preparePlayerHud=[&](unsigned hudView){
     if(sourceSpeedBoostRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalSpeedBoostNativeFrame50LA speedFrame;
      original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;
      OriginalSpeedBoostDiagnostic50LA speedDiagnostic;
-     require50DU(sourceSpeedBoostAdapter.capture(speedFrame,adapterDiagnostic),
+     require50DU(sourceSpeedBoostAdapter.capture(speedFrame,adapterDiagnostic,hudView),
          "actual Speed/Boost published racer snapshot rejected");
      const bool prepared=sourceSpeedBoost.owner->prepareNativeDisplay(speedFrame,speedDiagnostic);
      if(!prepared)std::cerr<<"original_speed_boost_display_rejected source_pc="<<speedDiagnostic.sourcePC
@@ -3482,7 +3518,7 @@ void Context::run() {
      OriginalTimeStatsNativeFrame50LA timeFrame;
      original_time_stats_adapter50LA::Owner::Diagnostic adapterDiagnostic;
      OriginalTimeStatsDiagnostic50LA timeDiagnostic;
-     require50DU(sourceTimeStatsAdapter.capture(timeFrame,adapterDiagnostic),
+     require50DU(sourceTimeStatsAdapter.capture(timeFrame,adapterDiagnostic,hudView),
          "actual TimeStats published timing snapshot rejected");
      require50DU(sourceTimeStats.owner->prepareNativeDisplay(timeFrame,timeDiagnostic),
          "original TimeStats display preparation rejected");
@@ -3491,7 +3527,7 @@ void Context::run() {
     if(sourceDamageRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalDamageNativeFrame50LA damageFrame;
      OriginalDamageObservation50LA::Diagnostic observation;
-     const bool captured=sourceDamageObservation.capture(damageFrame,observation);
+     const bool captured=sourceDamageObservation.capture(damageFrame,observation,hudView);
      if(!captured)std::cerr<<"original_damage_observation_rejected status="
          <<static_cast<unsigned>(observation.status)<<" source_pc="<<observation.sourcePC
          <<" slot="<<observation.slot<<'\n';
@@ -3505,7 +3541,7 @@ void Context::run() {
        originalAiSession.rankBound&&originalAiSession.retired40.bound){
      requireRuntimeNavigation();
      const bool prepared=sourcePositionStatsHud->prepareNativeDisplay(originalMainApplication,
-         *sourceCameraSession,originalAiSession,sourcePositionStatsResources.diagnostic);
+         *sourceCameraSession,originalAiSession,sourcePositionStatsResources.diagnostic,hudView);
      if(!prepared)std::cerr<<"original_position_stats_display_rejected source_pc="
          <<sourcePositionStatsResources.diagnostic.sourcePC<<" material_pc="
          <<sourcePositionStatsResources.diagnostic.material.sourcePC
@@ -3521,6 +3557,8 @@ void Context::run() {
      if(renderFrame.originalTimeStats&&renderFrame.originalSpeedBoost&&
         !(humanOriginalHud&&hud.resultsPanelVisible))renderFrame.hostHud=nullptr;
     }
+    };
+    preparePlayerHud(0);
     // The water racers' particle children (spray, dust/spark/fire children of
     // the per-racer water runtime, A9) draw through the one particle render.
     if(track.hasWater()){
@@ -3545,17 +3583,18 @@ void Context::run() {
      sourceBlurFrame.logicalView=0;sourceBlurFrame.physicalView=0;
      sourceBlurFrame.cameraRectangle={viewport.x1E0,viewport.y1E4,
          viewport.x1E0+viewport.width1E8,viewport.y1E4+viewport.height1EC};
+     if(originalAiHumanCount==2u&&(viewport.width1E8!=viewport.fullWidth204||viewport.height1EC!=viewport.fullHeight208)){
+      const auto* second=sourceCameraSession->hudViewport(1u);
+      require50DU(second&&second->matricesReady,"second race blur viewport unavailable");
+      sourceBlurFrame.hasSecondView=true;
+      sourceBlurFrame.secondRectangle={second->x1E0,second->y1E4,second->x1E0+second->width1E8,second->y1E4+second->height1EC};
+     }
      renderFrame.gameplayBlur=&sourceBlurFrame;
     }
     if(nativeSelectedLights){
      renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeSelectedLights;
      renderFrame.selectedLights=&drawLights[0];
     }
-    // The one track-animation window: project the rows that moved (original 241280 draws from
-    // the node worlds the steps left), then publish the course's one dynamic mesh.
-    if(trackAnimations){track_animation_runtime50AN::Diagnostic drawDiagnostic;
-     require50DU(trackAnimations->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"track animation draw projection rejected":drawDiagnostic.message.c_str());
-     require50DU(trackAnimationWindow.bindFrame(renderFrame),"track animation dynamic frame publication failed");}
     // Common rewrite (I4): the one animated-texture owner of the track
     // (track.roles.atm, authored ATM data; absent when the course authors none).
     if(track.roles.atm&&track.roles.atm->loaded())
@@ -3579,9 +3618,16 @@ void Context::run() {
      if(auto* sequences=track.roles.sky->sequences()){
       sequences->setSelected(renderFrame.skyEnabled);
       require50DU(sequences->bindFrame(renderFrame),"sky cube sequence frame binding rejected");
+      static const bool captureLightning=std::getenv("RR_TEST_SKY_FLASH_CAPTURE")!=nullptr;
+      if(captureLightning&&race.phase==race_session50HM::Phase::Racing){
+       bool flash=false;
+       for(std::size_t i=0;renderFrame.skySpanImages&&i<renderFrame.skySpanImageCount;++i)
+        flash|=renderFrame.skySpanImages[i]!=rr::platform::vehicleWindowSkyBaseImage50DS;
+       windowCapture.requestSkyChange(renderFrame.skyEnabled&&flash);
+      }
      }
     }
-    {
+    const auto prepareTrackZones=[&](unsigned viewIndex){
      // Original zone (section) visibility, every course: zones hidden behind
      // walls are not drawn. RR_TRACK_ZONE_VISIBILITY=0 keeps frustum-only
      // culling for A/B runs. Unavailable or mismatched rows also keep it.
@@ -3593,7 +3639,7 @@ void Context::run() {
      const bool zones=!zonesOff&&renderRequest.track.zoneCount&&renderRequest.track.enableFrustumCulling&&
          sourceCameraSession&&sourceCameraSession->hasView()&&
          sourceCameraSession->prepareTrackZones50ZV(trackZones50ZV.data(),trackZones50ZV.size(),zoneCount,
-             platform::nativeWidescreenScaleX50DX(renderFrame.width,renderFrame.height))&&
+             platform::nativeWidescreenScaleX50DX(renderFrame.width,renderFrame.height),viewIndex)&&
          zoneCount==renderRequest.track.zoneCount;
      renderFrame.trackZones=zones?trackZones50ZV.data():nullptr;
      renderFrame.trackZoneCount=zones?zoneCount:0;
@@ -3602,7 +3648,8 @@ void Context::run() {
       std::cerr<<"track_zone_visibility fallback=frustum zones="<<renderRequest.track.zoneCount
           <<" rows="<<zoneCount<<'\n';
      }
-    }
+    };
+    prepareTrackZones(0);
     renderFrame.worldFogCamera=camera.eye;
     platform::VehicleWindowOpponent50DS opponents[maxHostRaceOpponents50HT]{};
     RacePresentation50HZ nextRacePresentation{};
@@ -3771,6 +3818,11 @@ void Context::run() {
     // Canonical callbacks must instead re-read the live capability at each
     // original boundary, including29AD48 after a false callback return.
     const auto sourceApplicationTimestamp=sourceApplicationAnimation.current230;
+    // The one track-animation window: project the rows that moved (original 241280 draws from
+    // the node worlds the steps left), then publish the course's one dynamic mesh.
+    if(trackAnimations){track_animation_runtime50AN::Diagnostic drawDiagnostic;
+     require50DU(trackAnimations->prepareDraw(drawDiagnostic),drawDiagnostic.message.empty()?"track animation draw projection rejected":drawDiagnostic.message.c_str());
+     require50DU(trackAnimationWindow.bindFrame(renderFrame,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0),"track animation dynamic frame publication failed");}
     // One UV service for every course: the renderer calls it for each drawn
     // UV-animated span; prototypes shared by several spans step once a tick.
     struct TrackUvRenderService {
@@ -3797,9 +3849,10 @@ void Context::run() {
     // Frame was constructed earlier and remains unmoved through destruction.
     std::unique_ptr<original_main_entry50KG::NativeF8BarPrefix50LA> nativeF8Frame;
     std::unique_ptr<original_main_entry50KG::NativeResultsFrame50LA> nativeResultsFrame;
-    const bool commonResultsDraw=native_common_results50PD::state().replayActive;
+    const bool replayDraw=native_common_results50PD::state().replayActive;
+    const bool commonResultsDraw=replayDraw||pauseRecordPage1BDAB4;
     // One rule on every course (the RA-only per-frame Results/F8 preparation is retired):
-    // these frames are prepared while the Results replay draws.
+    // Results also owns the record page drawn over a paused Time Trial.
     if(commonResultsDraw&&sourceCameraSession){
      rr::game::OriginalResults104Diagnostic50LA results;
      const bool preparedResults=originalMainApplication.prepareNativeResultsFrame50LA(*sourceCameraSession,
@@ -3815,7 +3868,7 @@ void Context::run() {
      if(commonResultsDraw&&nativeResultsFrame&&!replayDrawLogged50PD){replayDrawLogged50PD=true;
       std::cerr<<"race_replay results_frame prepared=1\n";}
     }
-    if(commonResultsDraw){
+    if(replayDraw){
      // W0 round 2: the F8 frame owner calls the race F8's slot44 1994B0
      // layout (198CF0 over the 115990 gameplay viewport) once per F8 frame,
      // on every race where the F8 renderer runs. A refusal is logged once per
@@ -3926,7 +3979,39 @@ void Context::run() {
      // simulation step) to the submit (player/opponent batches, cables, Binder,
      // flames, shadows, HUD, water/particle builds). Measurement only.
      renderCost50CR.prepMs+=RenderCost50CR::ms(frameHitch50DU.render,submitStart);
+     const auto* secondCore=sourceCameraSession?sourceCameraSession->secondPublishedView():nullptr;
+     if(secondCore&&sourceBlurFrame.hasSecondView)renderFrame.splitPass=1;
      submitted=renderer.submit(next,renderFrame,rendererDiagnostic);
+     if(submitted&&renderFrame.splitPass==1){
+      const auto* secondViewport=sourceCameraSession->hudViewport(1);
+      platform::OriginalCameraPresentation second;
+      require50DU(secondViewport&&platform::projectOriginalCameraPresentation(*secondCore,*secondViewport,
+          sourceCameraSession->publicationCount(),renderFrame.width,renderFrame.height,second).status==
+          platform::OriginalCameraPresentationStatus::complete,"second authored race camera projection rejected");
+      renderFrame.worldViewProjection=second.world.worldViewProjection;
+      renderFrame.skyWorldViewProjection=track.counts.skyCubes?second.sky.worldViewProjection:nullptr;
+      renderFrame.worldFogCamera=second.eye;
+      if(renderFrame.sourceBodyCamera50LA){
+       renderFrame.sourceBodyCamera50LA=secondCore;
+       renderFrame.sourceDiffuseCamera50LA=sourceCameraSession->racerDiffuseCamera(1);
+      }
+      prepareTrackZones(1);
+      if(track.roles.sky){
+       bool zoneSky=false;
+       if(track.roles.sky->select(0u,zoneSky)){
+        std::uint32_t zone=0;
+        require50DU(sourceCameraSession->readCameraPrimaryZone48(zone,1)&&track.roles.sky->select(zone,renderFrame.skyEnabled),
+            "second camera primary-zone sky selection rejected");
+       }
+       if(auto* sequences=track.roles.sky->sequences()){
+        sequences->setSelected(renderFrame.skyEnabled);
+        require50DU(sequences->bindFrame(renderFrame),"second camera sky sequence binding rejected");
+       }
+      }
+      preparePlayerHud(1);
+      renderFrame.splitPass=2;
+      submitted=renderer.submit(next,renderFrame,rendererDiagnostic);
+     }
      const double submitMs=RenderCost50CR::ms(submitStart,FrameHitch50DU::Clock::now());
      renderCost50CR.submitMs+=submitMs;++renderCost50CR.frames;
      if(submitMs>renderCost50CR.submitWorstMs)renderCost50CR.submitWorstMs=submitMs;}
@@ -3996,9 +4081,15 @@ void Context::run() {
     // Select before the exact swap. A restored-camera private underlay and an
     // unfinished video sample are never eligible window images.
     const bool privateUnderlay=sourceCameraSession&&
-        (sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0)&&!sourceMainBaseReady;
+        (loadFadeNeedsUnderlay||replayFadeNeedsUnderlay||((sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0)&&!sourceMainBaseReady));
     //The phase may switch before the first running HUD/image is published.
     //Wait for one actual race second before calling this a settled capture.
+    if(!privateUnderlay&&race.phase==race_session50HM::Phase::Racing){
+     windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
+     const auto& pillar=rr::game::n64PillarCameraShake50NH;
+     windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
+     windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+    }
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
         windowCapture.due(windows_capture50LD::Stage::race,
@@ -4015,7 +4106,13 @@ void Context::run() {
     const bool captureWindowImage=false;
 #endif
     if(sourceCameraSession){
-     if((sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0)&&!sourceMainBaseReady){
+     const auto advanceStartFade=[&](){
+      if(const auto& race=originalMainApplication.sourceRace28COwner_)
+       return race->advanceStartFade1A7BD0(*sourceCameraSession);
+      // Direct development launch has only the camera's local race state.
+      return sourceCameraSession->advanceRaceFadeInPrefix(sourceCameraSession->raceFlags1B0_,0x08u);
+     };
+     if(loadFadeNeedsUnderlay||replayFadeNeedsUnderlay||((sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0)&&!sourceMainBaseReady)){
       // Real private restored-camera underlay, GPU-completed but not yet swapped.
       // The next actual async overlay is the displayed image: no clear-frame
       // flash and no fabricated displayed-history advance for this underlay.
@@ -4023,18 +4120,18 @@ void Context::run() {
       require50DU(renderer.finishSubmittedWork(completionDiagnostic)&&completionDiagnostic.submittedWorkCompleted,
           "first restored-camera private underlay did not complete");
       completionTiming.finish();
-      sourceMainBaseReady=true;
-      require50DU(sourceCameraSession->advanceRaceFadeInPrefix().status==sourceCamera::Status::complete,
-          "actual restored-camera publication did not admit original fade-in prefix");
-      // 1A7C18 of the fresh race: the accepted fade-in clears the race's own race1B0
-      // bit3 too (1A7C2C skips every Pause open while it is set), every course.
-      // PORT STAND-IN (flagged): the original runs 1A7BD0 on the race itself; the port's
-      // fresh fade-in runs on the Session's race1B0 projection, so this bridges it back.
-      if(const auto& owned=originalMainApplication.sourceRace28COwner_){
-       const bool cleared=native_race_replay50PD::Owner::acceptedFreshFadeIn1A7C18(*owned,sourceCameraSession->raceFlags1B0_);
-       std::cerr<<"fade_in_fresh 1A7C18 race_bit3_cleared="<<cleared<<'\n';
-       require50DU(cleared,"fresh race fade-in completed with the Session's race1B0 bit3 still set");
+      sourceMainBaseReady=sourceCameraSession->cameraMode()==5||sourceCameraSession->cameraMode()==0||replayFadeNeedsUnderlay;
+      if(introLoadFadeConsumed&&!loadFadeNeedsUnderlay&&!replayFadeNeedsUnderlay){
+       require50DU(sourceCameraSession->rearmFadeInAfterRestart50PD(),"intro exit fade-in rearm rejected");
+       if(auto& race=originalMainApplication.sourceRace28COwner_)race->armIntroExitFade();
+       introLoadFadeConsumed=false;
       }
+      if(loadFadeNeedsUnderlay){introLoadFadeConsumed=!sourceMainBaseReady;loadFadeNeedsUnderlay=false;}
+      const auto fade=replayFadeNeedsUnderlay?originalMainApplication.advanceConsumedSessionFadeIn1A7BD0(*sourceCameraSession):advanceStartFade();
+      replayFadeNeedsUnderlay=false;
+      if(fade.status!=sourceCamera::Status::complete)std::cerr<<"start_fade_refused status="<<int(fade.status)<<" pc="<<std::hex<<fade.sourcePC<<std::dec<<'\n';
+      require50DU(fade.status==sourceCamera::Status::complete,
+          "actual restored-camera publication did not admit original fade-in prefix");
      }else{
       // Includes history staging, existing GPU completion and the actual
       // window swap. This is not a GPU-only timer and adds no synchronization.
@@ -4088,7 +4185,7 @@ void Context::run() {
      if(restartFadeIn1A7BD0Pending&&!native_common_results50PD::state().replayActive&&actualGameplayImageCompleted&&
         sourceCameraSession->countdownInstalled()&&!sourceCameraSession->blockingVideoPending()&&
         !sourceCameraSession->asyncVideoPending()){
-      const auto fade=sourceCameraSession->advanceRaceFadeInPrefix();
+      const auto fade=advanceStartFade();
       static unsigned reportedRestartFade=0xffu;
       if(static_cast<unsigned>(fade.status)!=reportedRestartFade){reportedRestartFade=static_cast<unsigned>(fade.status);
        std::cerr<<"race_restart_fade_in status="<<reportedRestartFade<<" pc="<<std::hex<<fade.sourcePC<<std::dec<<'\n';}
@@ -4197,6 +4294,12 @@ void Context::run() {
 #if defined(__linux__)
     if(captureWindowImage&&windowImage){
 #else
+    if(windowImage&&settledTrack){
+     windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
+     const auto& pillar=rr::game::n64PillarCameraShake50NH;
+     windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
+     windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+    }
     if(windowImage&&windowCapture.due(windows_capture50LD::Stage::race,settledTrack)){
 #endif
      requireOriginalAiFleetReady();
@@ -4205,6 +4308,17 @@ void Context::run() {
          {"race_phase",static_cast<unsigned>(race.phase)},{"race_seconds",race.raceSeconds},
          {"original_ai_racers",originalAiOpponentCount},{"human_racers",originalAiHumanCount},
          {"track_draws",rendererDiagnostic.trackDraws},{"camera_mode",sourceCameraSession?static_cast<int>(sourceCameraSession->cameraMode()):-1}};
+     if(sourceCameraSession&&track.roles.fog&&track.roles.fog->fields3EC()){
+      const auto& fog=*track.roles.fog->fields3EC();
+      const auto& pillar=rr::game::n64PillarCameraShake50NH;
+      if(pillar.scale>0.f){
+       receipt["pillar_elapsed"]=pillar.elapsed;
+       receipt["pillar_eye_y"]=pillar.eyeHeight();
+      }
+      receipt["geometry_far"]=sourceCameraSession->view().sceneAfter.farPlane;
+      receipt["fog_start"]=fog.start34;receipt["fog_end"]=fog.end38;
+      receipt["map_node"]=navigationProgress.reset.vehicleC88;
+     }
      if(originalMainApplication.riderProfile){
       original_course_targets50KX::Selection selection;
       if(originalMainApplication.riderProfile->courseRaceSnapshot(selection))receipt["course_selection"]={

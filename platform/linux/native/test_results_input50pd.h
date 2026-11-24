@@ -6,6 +6,7 @@
 namespace rr::platform {
 struct TestResultsInput50PD {
     bool focus=false; // treat the window as focused for this poll
+    bool restart=false; // one Results Square/R edge (consumed)
     bool enter=false; // one fresh Enter press on this poll (consumed)
     bool down=false;  // one fresh Down-arrow press on this poll (consumed; RR_TEST_RESULTS_EXIT)
     bool capture=false; // one F12 window-capture request on this poll (consumed; RR_TEST_RESULTS_HOLD)

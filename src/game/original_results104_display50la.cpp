@@ -137,7 +137,7 @@ bool OriginalResults10450LA::demandNativeFinalCamera1C15B0(
     return true;
 }
 
-OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSingleHumanBaseCpu1B9220(
+OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeBaseCpu1B9220(
     const ::original_main_entry50KG::Application& root,const OriginalRaceConstructor50LA& race,
     const ::original_position_stats_adapter50LA::Owner& observer,OriginalResults104Diagnostic50LA& d)noexcept {
     using Read=::original_results_roster50LA::Read;
@@ -172,10 +172,8 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     const auto* profile=Read::commonProfile(race);
     if(!profile||!Read::profileKnown(*profile))return reject(Impl::S::owner,0x1b9d98,"Results actual Profile1125C unavailable");
     const auto humans=(Read::profilePlayerBits(*profile)>>5)&3u;
-    // >=2 runs a distinct115A60 viewport scope and polygon38 BEFORE slots78/74.
-    // Never collapse that route into this single-human order, or invent count1.
-    if(humans!=1u)return reject(Impl::S::incomplete,0x1b9da4,
-        "Results shared capture supports only actual single-human Profile; split viewport route unjoined");
+    if(humans!=1u&&humans!=2u)return reject(Impl::S::owner,0x1b9da4,"Results profile human count unavailable");
+    const bool twoPlayers=humans==2u;
     const auto controllerMode=*p.mode1F0;
     // mode1F0 is optional, unknown until actual1B9FE0 stores it. Additionally
     // require THIS completed update to have taken the bit3-clear producer,
@@ -246,7 +244,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     }
     // The concrete slots78 then74 chain follows, with the selected borrow
     // retained through every reached primitive and the final child boundary.
-    const auto prefix=captureNativeDerivedCpu1C21B0(race,observer,d);
+    const auto prefix=captureNativeDerivedCpu1C21B0(race,observer,d,twoPlayers);
     if(!p.nativeDisplay||!p.nativeDisplay->boundedDerivedReturned)return prefix;
     auto& capture=*p.nativeDisplay;capture.boundedDerivedReturned=false;
     capture.sharedRootPublication=publication;capture.sharedRootTimestamp=sample.timestamp;capture.sharedRaw250=sample.raw250;
@@ -258,12 +256,12 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     // Single human: slots78 textures ->74 pages -> optional180
     // -> polygon38 -> conditional polygon3C. Each projector checks its own
     // actual global BEFORE CPU work/service; dirty208 is never a draw gate.
-    if(controllerMode&&!p.projectTextCpu2E0170(*p.base180,0x1b9ef0,d)){
+    if(controllerMode&&!p.projectTextCpu2E0170(*p.base180,twoPlayers?0x1b9e48:0x1b9ef0,d)){
         capture.building=false;capture.stoppedPC=d.sourcePC;return prefix;}
-    if(!p.projectPolygonCpu2E2398(0,0x1b9ef8,d)){
+    if(!twoPlayers&&!p.projectPolygonCpu2E2398(0,0x1b9ef8,d)){
         capture.building=false;capture.stoppedPC=d.sourcePC;return prefix;}
     if(p.base->hidden160||!(p.base->transition164<0.f)){
-        if(!p.projectPolygonCpu2E2398(1,0x1b9f30,d)){
+        if(!p.projectPolygonCpu2E2398(1,twoPlayers?0x1b9e80:0x1b9f30,d)){
             capture.building=false;capture.stoppedPC=d.sourcePC;return prefix;}
     }
     capture.building=false;
@@ -272,7 +270,7 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeSi
     // (retirementCurrent). Thus141D70 has no child callback to invent or skip.
     capture.boundedDerivedReturned=true;capture.boundedSharedReturned=true;capture.stoppedPC=0x1b9f44;
     p.stop(d,Impl::S::incomplete,0x1b9f44,
-        "Results single-human shared CPU body returned; source camera/B4/Frame draw lifetime remains unjoined");
+        "Results shared CPU body returned; source camera/B4/Frame draw lifetime remains unjoined");
     return prefix;
 }
 
@@ -369,7 +367,7 @@ bool OriginalResults10450LA::Impl::copyNativePolygon2E21D0(std::size_t index,
 
 OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDerivedCpu1C21B0(
     const OriginalRaceConstructor50LA& race,const ::original_position_stats_adapter50LA::Owner& observer,
-    OriginalResults104Diagnostic50LA& d)noexcept {
+    OriginalResults104Diagnostic50LA& d,bool twoPlayerBase)noexcept {
     using Read=::original_results_roster50LA::Read;
     const auto liveRace=Read::raceAccess(race);
     d={};
@@ -419,6 +417,12 @@ OriginalResults10450LA::DisplayCpuPrefix OriginalResults10450LA::captureNativeDe
     p.references.beginNativeCapture50DL(); // PORT EXTENSION: add-on icon policy is per capture
     // The existing private chain traverses each reached derived call once;
     // never replay its borrowed TextCall/TextureCall arrays after mutation.
+    // 1B9E0C..1B9E94 scopes these draws to (0,0,640,448), the full viewport
+    // already selected by 1ABB88 and validated by the native Results caller.
+    // Polygon38 precedes slots78/74 on the two-player branch.
+    if(twoPlayerBase&&!p.projectPolygonCpu2E2398(0,0x1b9e14,d)){
+        capture.building=false;capture.stoppedPC=d.sourcePC;return DisplayCpuPrefix::none;
+    }
     const auto prefix=prepareCareerSummaryCpuPrefix(race,observer,d);
     capture.building=false;capture.stoppedPC=d.sourcePC;
     // PORT EXTENSION, NOT ORIGINAL (DLC menu-art step D): each add-on portrait

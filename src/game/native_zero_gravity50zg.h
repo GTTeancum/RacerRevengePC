@@ -109,6 +109,7 @@ struct ZeroGravityRacer50ZG {
     float lookAhead=zeroGLookAheadInitial50ZG; // spline parameter ahead of the cursor (+0x104)
     float pitchTarget=0.f,pitchRate=0.f;       // +0x224, +0x220 (deg/s, before x1.5)
     float rollRate=0.f;                        // +0x21C (deg/s)
+    bool groundRecenter=false;
     float tilt=0.f;                            // N64 tilt state (-1..1)
     std::uint32_t lineOwner=noSurfaceOwner50ST;
     std::uint64_t steps=0,modeStep=0;
@@ -163,10 +164,15 @@ public:
             // floor table replaces the line sampling's owner per sample when present;
             // absent or refused = the line sampling below (the log line says which).
             floor_.load(archive,floorMember,graphs_,rules);
+            const auto& nodes=graphs_[0].nodes;
+            if(std::any_of(nodes.begin(),nodes.end(),[](const auto& n){return n.line[1]<0.f;})){
+                for(const auto& mesh:meshes)if(mesh.any)undertrackPlane50ZG=std::min(undertrackPlane50ZG,mesh.lo[1]);
+            }
+            roadMeshes_=std::move(meshes);
             loaded_=true;
             std::cerr<<"zero_gravity_load map_nodes="<<graphs_[0].nodes.size()<<" map_samples="<<graphs_[0].samples.size()
                 <<" map_hits="<<graphs_[0].hits<<" ai_nodes="<<graphs_[1].nodes.size()<<" ai_samples="<<graphs_[1].samples.size()
-                <<" ai_hits="<<graphs_[1].hits<<'\n';
+                <<" undertrack_plane="<<undertrackPlane50ZG<<" ai_hits="<<graphs_[1].hits<<'\n';
         }catch(...){resetCourse();std::cerr<<"zero_gravity_load failed; course stays original\n";}
     }
     bool active()const noexcept {return loaded_;}
@@ -209,7 +215,25 @@ public:
         }else{
             floor_.apply(slot,in.human?0u:1u,c.from,c.slot,c.t,c.sample,floorSample_[slot]); // .nft when bound
             r.lineOwner=c.sample?c.sample->owner:noSurfaceOwner50ST;}
-        if(r.mode==ZeroGravityMode50ZG::Normal||!c.valid)return out;
+        if(r.mode==ZeroGravityMode50ZG::Recover||r.groundRecenter){
+            // 800670CC: the ordinary ground ray follows world gravity, independently of chassis roll.
+            ZeroGravityLineSample50ZG road{};
+            if(downRay(roadMeshes_,in.position[0],in.position[1]+2.f,in.position[2],road)){
+                out.roadDistance=in.position[1]-road.floorY;
+                for(unsigned i=0;i<3;++i)out.roadNormal[i]=road.normal[i];
+            }
+            out.groundRecenter=r.groundRecenter;
+            out.dt=in.dt;
+        }
+        if(r.mode==ZeroGravityMode50ZG::Normal)return out;
+        if(!c.valid){
+            if(r.mode==ZeroGravityMode50ZG::Recover){
+                // Bank recovery still owns orientation between valid spline links.
+                out.mode=r.mode;out.dt=in.dt;out.recoverRollGain=zeroGRecoverRollGain50ZG;
+                for(unsigned i=0;i<3;++i)out.lookAhead[i]=in.position[i];
+            }
+            return out;
+        }
         const float frames=zeroGReferenceFrameRate50ZG*in.dt;
         // f0 = 30 is the designers' reference (the N64 used measured frame
         // time, unclamped). Finished pods use the N64 finished rates.
@@ -257,7 +281,7 @@ public:
             // from the bank error (frame side); floor normal for that error
             // when the probe sees no ground.
             out.recoverRollGain=zeroGRecoverRollGain50ZG;
-            if(c.sample){out.haveSurfaceNormal=true;for(unsigned i=0;i<3;++i)out.surfaceNormal[i]=c.sample->normal[i];}
+
         }
         out.mode=r.mode;out.dt=in.dt;
         out.forwardBlend=1.f-std::pow(1.f-zeroGForwardBlendPerFrame50ZG,frames);
@@ -310,14 +334,31 @@ public:
         if(!loaded_||slot>=zeroGravitySlots50ZG)return;
         if(pendingValid_[slot]){racers_[slot]=pending_[slot];pendingValid_[slot]=false;}
         auto& r=racers_[slot];++r.steps;
-        if(done.active&&done.mode==ZeroGravityMode50ZG::Recover&&done.basisWritten)
+        if(done.active&&done.mode==ZeroGravityMode50ZG::Recover&&done.basisWritten){
             r.rollRate=done.recoverRollGain*done.bankErrorDegrees;
+            const auto age=r.steps-r.modeStep;
+            if(age==1||age==16||age==32||age==64||age==128)
+                std::cerr<<"zero_gravity recovery slot="<<slot<<" step="<<age<<" dt="<<done.dt
+                    <<" bank_error_deg="<<done.bankErrorDegrees<<" roll_deg_s="<<r.rollRate<<'\n';
+        }
         const auto before=r.mode;
         if(before==ZeroGravityMode50ZG::Flight&&std::isfinite(measuredSpeed))
             r.minSpeed=r.minSpeed==0.f?measuredSpeed:std::min(r.minSpeed,measuredSpeed);
         // ZOFF ends when the ground is within 12 ft (contact step, before the tag pass).
-        if(before==ZeroGravityMode50ZG::Recover&&groundDistance<zeroGLandingDistance50ZG){
-            set(slot,ZeroGravityMode50ZG::Normal,"land",r.lineOwner,rules,groundDistance);}
+        if(done.groundRecenter&&done.basisWritten){
+            const auto age=r.steps-r.modeStep;
+            if(age==1||age==8||age==16||age==32||age==64)
+                std::cerr<<"zero_gravity grounded slot="<<slot<<" step="<<age<<" bank_error_deg="<<done.bankErrorDegrees
+                    <<" dt="<<done.dt<<" road_distance="<<done.roadDistance<<'\n';
+        }
+        if(done.groundRecenter&&done.basisWritten&&std::fabs(done.bankErrorDegrees)<0.5f){
+            r.groundRecenter=false;
+            std::cerr<<"zero_gravity recentered slot="<<slot<<" ground_steps="<<(r.steps-r.modeStep)
+                <<" bank_error_deg="<<done.bankErrorDegrees<<'\n';
+        }
+        if(before==ZeroGravityMode50ZG::Recover&&done.roadDistance<zeroGLandingDistance50ZG){
+            r.groundRecenter=true;
+            set(slot,ZeroGravityMode50ZG::Normal,"land",r.lineOwner,rules,done.roadDistance);}
         // Surface: the line's floor in ZON, the racer's own probe list otherwise.
         std::uint32_t owner=noSurfaceOwner50ST;std::uint8_t bits=0;
         if(before==ZeroGravityMode50ZG::Flight){owner=r.lineOwner;bits=rules.ownerZeroGravity(owner);}
@@ -339,7 +380,7 @@ public:
         if(!loaded_||slot>=zeroGravitySlots50ZG)return;
         auto& r=racers_[slot];const auto before=r.mode;
         if(r.mode==ZeroGravityMode50ZG::Recover){r.mode=ZeroGravityMode50ZG::Normal;r.modeStep=r.steps;}
-        r.pitchTarget=0.f;r.pitchRate=0.f;zeroGravityPublishedMode50ZG[slot]=r.mode;
+        r.groundRecenter=false;r.pitchTarget=0.f;r.pitchRate=0.f;zeroGravityPublishedMode50ZG[slot]=r.mode;
         std::cerr<<"zero_gravity reset slot="<<slot<<" step="<<r.steps<<" mode_from="<<name(before)
             <<" mode_to="<<name(r.mode)<<'\n';
     }
@@ -366,7 +407,7 @@ private:
                 <<" steer_pinned_pct="<<(r.flightSteps?100.0*static_cast<double>(r.steerPinnedSteps)/static_cast<double>(r.flightSteps):0.0)
                 <<" max_line_ft="<<r.maxLineOffset<<" max_up_slip_deg="<<r.maxUpSlip;
         std::cerr<<'\n';
-        if(to==ZeroGravityMode50ZG::Flight){r.minSpeed=0.f;r.maxAbsRoll=0.f;r.maxAbsPitch=0.f;r.minAhead=0.f;r.maxAhead=0.f;
+        if(to==ZeroGravityMode50ZG::Flight){r.groundRecenter=false;r.minSpeed=0.f;r.maxAbsRoll=0.f;r.maxAbsPitch=0.f;r.minAhead=0.f;r.maxAhead=0.f;
             r.flightSteps=0;r.steerPinnedSteps=0;r.maxLineOffset=0.f;r.maxUpSlip=0.f;}
         r.mode=to;r.modeStep=r.steps;r.linkMissingLogged=false;
     }
@@ -504,8 +545,9 @@ private:
         t=std::min(t,1.f);const auto& a=g.nodes[from];const auto& b=g.nodes[to];
         for(unsigned i=0;i<3;++i)out[i]=a.line[i]+t*(b.line[i]-a.line[i]);
     }
-    void resetCourse()noexcept {loaded_=false;for(auto& g:graphs_)g=ZeroGravityLineGraph50ZG{};floor_.reset();resetRacers();}
+    void resetCourse()noexcept {roadMeshes_.clear();undertrackPlane50ZG=0.f;loaded_=false;for(auto& g:graphs_)g=ZeroGravityLineGraph50ZG{};floor_.reset();resetRacers();}
 
+    std::vector<Mesh> roadMeshes_;
     bool loaded_=false,humanLeanBound_=false;
     std::array<ZeroGravityLineGraph50ZG,2> graphs_{};
     std::array<ZeroGravityRacer50ZG,zeroGravitySlots50ZG> racers_{},pending_{};

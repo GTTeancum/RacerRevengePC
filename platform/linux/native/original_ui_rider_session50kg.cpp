@@ -80,6 +80,19 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool confirmShape(const game::OriginalUiRouteDecision50KG& d,std::uint32_t selectedRider,std::uint32_t mode) noexcept {
     using F=game::OriginalUiProfileField50KG;using W=game::OriginalUiProfileWrite50KG;
+    if(mode==1){
+        using Kind=game::OriginalUiRouteKind50KG;
+        const auto& r=d.request;
+        if(d.inputPC!=0x1EA460||d.selectedRider!=static_cast<std::int32_t>(selectedRider)||selectedRider>=27||
+           !d.profileProposalComplete||r.sourceScreen!=5)return false;
+        if(r.sourcePage==1)return r.kind==Kind::changePage&&r.targetScreen==5&&r.targetPage==2&&r.sourcePC==0x1EA630&&
+            d.profileChanges.count==3&&d.profileChanges.values[0].field==F::rider1Mode1_6F4&&
+            d.profileChanges.values[1].field==F::rider1Bits1125D&&d.profileChanges.values[2].field==F::comparisonRider100C0;
+        const auto count=d.profileChanges.count;
+        return r.sourcePage==2&&r.kind==Kind::changeScreen&&r.targetScreen==6&&r.targetPage==1&&r.sourcePC==0x1EAD60&&
+            (count==2||count==3)&&d.profileChanges.values[0].field==F::rider2Bits1125E&&
+            (count==2||d.profileChanges.values[1].field==F::comparisonRider100C0)&&d.profileChanges.values[count-1].field==F::rider2_6F8;
+    }
     if((mode!=0&&mode!=2)||d.inputPC!=0x1EA460||d.selectedRider<0||d.selectedRider>=27||
        static_cast<std::uint32_t>(d.selectedRider)!=selectedRider||!d.profileProposalComplete||d.profileChanges.count!=3||
        d.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||d.request.sourceScreen!=5||d.request.sourcePage!=1||
@@ -133,14 +146,18 @@ struct OriginalUiRiderSession50KG::Storage {
     game::OriginalUiRiderAddonModels50DL addonModels;
     game::OriginalUiRiderBackend50KG backend;
     game::OriginalUiRiderDynamicOwner50KG dynamic;
-    game::OriginalUiApertureOwner50KG aperture;
-    game::OriginalUiRiderPanel50KG panel;
+    std::array<game::OriginalUiApertureOwner50KG,2> pageApertures;
+    auto& aperture() noexcept {return pageApertures[riderPlayer];}
+    const auto& aperture() const noexcept {return pageApertures[riderPlayer];}
+    std::array<game::OriginalUiRiderPanel50KG,2> pagePanels;
+    auto& panel() noexcept {return pagePanels[riderPlayer];}
+    const auto& panel() const noexcept {return pagePanels[riderPlayer];}
     OriginalUiRiderDrawContribution50KG collector;
     game::OriginalUiRiderCamera50KG camera;
     game::OriginalUiRiderRenderContext50KG renderContext;
     game::OriginalUiRiderLighting50KG lighting;
     game::OriginalUiRiderLightCapture50KG savedLighting;
-    std::array<std::vector<std::string>,3> localized; //167,168,172
+    std::array<std::vector<std::string>,4> localized; // 167, 168, P1 172, P2 173
     OriginalUiRiderSessionSnapshot50KG state;
     Diagnostic callbackFault;
     game::OriginalUiRiderSelectionProfile50KG pendingProfile;
@@ -174,7 +191,7 @@ struct OriginalUiRiderSession50KG::Storage {
     // Human player this Rider page selects for: page 5/1 = P1 (0). The port builds
     // only page 5/1 (previousPage94 refuses a page change); a page 5/2 owner for P2
     // would bind with 1, and every add-on call below already takes this index.
-    std::uint8_t addonPlayer=0;
+    std::uint8_t riderPlayer=0;
     std::size_t addonSlot=0;            // 0 = stock rider; k = addonRiderAt(k-1), 1..addonRiderCount()
     bool addonAnchorLast=true;          // entered by Next past the last (true) or Previous past the first (false) stock rider
     std::uint32_t addonConfirmRider=0;  // stock rider an add-on Confirm records (the last stock Confirm's rider)
@@ -228,12 +245,12 @@ struct OriginalUiRiderSession50KG::Storage {
     bool careerResetAllowed() const noexcept {
         if(!addonSlot)return cold.profile->canResetRiderCareer1800E0(state.rider4C4,cold.profile->stamp());
         const auto* pod=addonPod();
-        return pod&&addonPlayer==0&&cold.commonProfile->mode34==2u&&game::dlc50DL::canResetAddonCareer(pod->number);
+        return pod&&riderPlayer==0&&cold.commonProfile->mode34==2u&&game::dlc50DL::canResetAddonCareer(pod->number);
     }
     void addonLog(const char* action) const noexcept {
         const auto* pod=addonPod();
         std::fprintf(stderr,"dlc_rider_carousel player=%u action=%s slot=%zu key=%s number=%u anchor_rider=%u anchor_slot=%u\n",
-            unsigned(addonPlayer)+1u,action,addonSlot,pod?pod->key.c_str():"-",pod?pod->number:0u,state.rider4C4,unsigned(state.slot4C8));
+            unsigned(riderPlayer)+1u,action,addonSlot,pod?pod->key.c_str():"-",pod?pod->number:0u,state.rider4C4,unsigned(state.slot4C8));
     }
     // The add-on model table row of carousel slot k (1-based), only when it is
     // the same registry pod and ready; nullptr otherwise (bounds-checked).
@@ -281,7 +298,7 @@ struct OriginalUiRiderSession50KG::Storage {
             pod?pod->ui.hutteseName:std::string()};}
         catch(...){addonText={};}
         addonSkipLogged=false;addonColorsLogged=false;
-        game::dlc50DL::setHighlightedAddonRider(addonPlayer,pod?pod->number:0u);
+        game::dlc50DL::setHighlightedAddonRider(riderPlayer,pod?pod->number:0u);
         return true;
     }
     // Same original rider-advance sound (and receipts) a stock move plays.
@@ -349,14 +366,14 @@ struct OriginalUiRiderSession50KG::Storage {
         if(!addonCarousel||addonSlot||addonRestoreTried||!entryCompleted||!opened||!idleInput())return true;
         addonRestoreTried=true;
         game::dlc50DL::RememberedAddonRider50DL r;
-        if(!game::dlc50DL::rememberedAddonRider(addonPlayer,r)||r.anchorRider!=state.rider4C4)return true;
+        if(!game::dlc50DL::rememberedAddonRider(riderPlayer,r)||r.anchorRider!=state.rider4C4)return true;
         std::size_t slot=0;
         for(std::size_t i=0;i<game::dlc50DL::addonRiderCount();++i)
             if(const auto* pod=game::dlc50DL::addonRiderAt(i);pod&&pod->number==r.racer){slot=i+1;break;}
         game::OriginalUiRiderSelectionProfile50KG p;game::OriginalUiRiderSelectionPlan50KG plan;
         const auto* n=nav();
         if(!slot||!n||!n->page||n->page->groups.size()<=1||!liveProfile(p)||
-           game::planOriginalUiRiderMove50KG(*selection(),*n,0,0,r.anchorLast?1:0,false,false,p,plan)!=
+           game::planOriginalUiRiderMove50KG(*selection(),*n,riderPlayer,riderPlayer,r.anchorLast?1:0,false,false,p,plan)!=
                game::OriginalUiRiderSelectionStatus50KG::ok)return true;
         const auto from=n->groups[1].selectedSlot;
         if(!(r.anchorLast?plan.slot4C8<=from:plan.slot4C8>=from))return true; // anchor no longer at the wrap
@@ -376,7 +393,7 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     game::OriginalUiRiderWidgets50KG& widgets() noexcept {return *cold.resources->widgets();}
     const game::OriginalUiRiderWidgets50KG& widgets() const noexcept {return *cold.resources->widgets();}
-    const game::OriginalUiNavigation50KG* nav() const noexcept {return widgets().navigation(0);}
+    const game::OriginalUiNavigation50KG* nav() const noexcept {return widgets().navigation(riderPlayer);}
     const game::OriginalUiRiderSelectionData50KG* selection() const noexcept {return widgets().selectionData();}
     bool operational() const noexcept {return dependenciesPrepared&&!sourceClosing&&!state.faulted&&!state.quitRequested&&!dynamic.poisoned()&&!widgets().poisoned();}
     bool audioReady() const noexcept {
@@ -444,7 +461,7 @@ struct OriginalUiRiderSession50KG::Storage {
         return true;
     }
     bool selectedConfirmCharacter(std::uint16_t& character) const noexcept {
-        const auto* n=nav();if(!n||!n->page||n->page->groups.size()<=1||n->controllerGroup[0]!=1||
+        const auto* n=nav();if(!n||!n->page||n->page->groups.size()<=1||n->controllerGroup[riderPlayer]!=1||
            !state.slot4C8||n->groups[1].selectedSlot!=state.slot4C8||
            state.slot4C8>n->page->groups[1].controls.size()||!preparedRider(state.rider4C4))return false;
         std::array<std::uint16_t,4> ids{};
@@ -494,7 +511,7 @@ struct OriginalUiRiderSession50KG::Storage {
         if(std::fegetround()!=FE_TONEAREST){fault(Status::unsupportedState,0x1EB5E4);return false;}
         volatile float next=timer-dt;
         timer=next; //1EB5E8: retain overshoot, with no clamp or catch-up.
-        if(!panel.bypass4E4()||timer>0)return true;
+        if(!panel().bypass4E4()||timer>0)return true;
         // Original2924A0 stops page53B8's UIACCEPT group. This bounded native
         // page can issue only its one retained confirm utterance. Release the
         // exact transport/revision receipt; never stop generic selection audio,
@@ -526,11 +543,11 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         // PORT EXTENSION: an add-on rider has no confirm voice (DLC voice absent),
         // so the original per-rider voice preflight does not gate its Confirm.
-        return confirmAudioReady()&&(mode==0||mode==2)&&(!addonSlot||(addonPod()&&(mode!=2||addonPlayer==0)))&&
-            cold.commonProfile->mode34==mode&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
+        return (riderPlayer?audioReady():confirmAudioReady())&&mode<=2&&(!addonSlot||(addonPod()&&(mode!=2||riderPlayer==0)))&&
+            cold.commonProfile->mode34==mode&&(cold.commonProfile->playerBits1125C&0x60)==(mode==1?0x40:0x20)&&
             cold.profile->riderSelectionFacts(confirmRider(),rider)&&rider.unlock10FAC&&
-            confirmAnimationPreflight(d)&&(addonSlot?boundedRiderConfirmEnabled&&cold.application->clock101A50:
-                confirmVoiceChronologyReady());
+            (riderPlayer||(confirmAnimationPreflight(d)&&(addonSlot?boundedRiderConfirmEnabled&&cold.application->clock101A50:
+                confirmVoiceChronologyReady())));
     }
     bool processCurrent() const noexcept {
         return cold.application->known&&cold.commonProfile->known&&cold.profile->commonProfile()==cold.commonProfile.get()&&
@@ -541,18 +558,18 @@ struct OriginalUiRiderSession50KG::Storage {
         return processCurrent()&&cold.commonProfile->mode34==cold.prospectiveMode&&cold.profile->selectionSnapshot(p);
     }
     game::OriginalUiTransitionSnapshot50KG transition() const noexcept {return cold.externalTransition->snapshot();}
-    bool currentPage() const noexcept {const auto t=transition();return t.bound&&t.current.screen==5&&t.current.page==1;}
+    bool currentPage() const noexcept {const auto t=transition();return t.bound&&t.current.screen==5&&t.current.page==riderPlayer+1;}
     bool lightCurrent() const noexcept {
         return cold.lightManager->cacheState()==game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction&&
             cold.lightManager->activeUiIdentity()==cold.riderArchive->identity()&&lightGeneration&&
             cold.lightManager->managerGeneration()==lightGeneration;
     }
     bool idleInput() const noexcept {
-        const auto t=transition();const auto a=aperture.snapshot();
+        const auto t=transition();const auto a=aperture().snapshot();
         return currentPage()&&entryCompleted&&opened&&!closing&&!backAccepted&&!confirmAccepted&&state.pageShown&&state.inputContainerShown&&
-            t.requested.screen==5&&t.requested.page==1&&t.lifecycle==Life::idle&&t.phase==Phase::none&&!t.initialRestartPending&&
+            t.requested.screen==5&&t.requested.page==riderPlayer+1&&t.lifecycle==Life::idle&&t.phase==Phase::none&&!t.initialRestartPending&&
             !t.applicationRequestQueued&&a.inputEnabled268&&a.state==game::OriginalUiApertureState50KG::open&&
-            !panel.inputBlocked4E0()&&panel.offset4DC()==0;
+            !panel().inputBlocked4E0()&&panel().offset4DC()==0;
     }
     bool invalidateProposal() noexcept {
         state.backProposalPending=false;state.confirmProposalPending=false;
@@ -589,7 +606,7 @@ struct OriginalUiRiderSession50KG::Storage {
         if(!navigation.page||group>=navigation.page->groups.size())return false;
         navigation.groups[group].enabled=enabled;
         return groupMembers(navigation,commands,group,Operation::setEnabled,enabled,0x2A5044,0x2A5088)&&
-            cold.resources->widgets()->projectNativeNavigation(projection,0,navigation,commands,d.widget);
+            cold.resources->widgets()->projectNativeNavigation(projection,riderPlayer,navigation,commands,d.widget);
     }
     bool projectNativeEntry(const game::OriginalUiRiderSelectionProfile50KG& profile,
         NativeProjection& before,std::array<NativeProjection,4>& phases,NativeProjection& projection,Diagnostic& d) const noexcept {
@@ -598,20 +615,20 @@ struct OriginalUiRiderSession50KG::Storage {
         navigation.controllerGroup={{-1,-1}};game::OriginalUiCommands50KG resets;
         for(std::size_t group=0;group<navigation.page->groups.size();++group)
             if(!groupMembers(navigation,resets,group,Operation::reset,false,0x2A57D8,0x2A5818)){result(d,Status::widget);return false;}
-        if(!widgets().projectNativeNavigation(projection,0,navigation,resets,d.widget)){result(d,Status::widget);return false;}
+        if(!widgets().projectNativeNavigation(projection,riderPlayer,navigation,resets,d.widget)){result(d,Status::widget);return false;}
         phases[0]=projection;
         game::OriginalUiRiderSelectionPlan50KG remembered;
-        if(game::planOriginalUiRiderEntry50KG(*selection(),navigation,0,profile,remembered)!=game::OriginalUiRiderSelectionStatus50KG::ok||
+        if(game::planOriginalUiRiderEntry50KG(*selection(),navigation,riderPlayer,profile,remembered)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            !preparedRider(remembered.rider4C4)){result(d,Status::unavailableDestination);return false;}
         const game::OriginalUiRiderWidgetCallback50KG lockText{4,Operation::setEnabled,false,0x1E9C80};
         if(!widgets().projectNativeCallbacks(projection,&lockText,1,d.widget)||
            !projectNativeGroup(projection,navigation,2,false,d)){result(d,Status::widget);return false;}
         phases[1]=projection;
         game::OriginalUiRiderSelectionPlan50KG opening;
-        if(game::planOriginalUiRiderEntry50KG(*selection(),navigation,0,profile,opening)!=game::OriginalUiRiderSelectionStatus50KG::ok||
+        if(game::planOriginalUiRiderEntry50KG(*selection(),navigation,riderPlayer,profile,opening)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            opening.rider4C4!=remembered.rider4C4||opening.slot4C8!=remembered.slot4C8||
            !preparedMovement(opening)||
-           !widgets().projectNativeNavigation(projection,0,opening.nextNavigation,opening.navigationCommands,d.widget))
+           !widgets().projectNativeNavigation(projection,riderPlayer,opening.nextNavigation,opening.navigationCommands,d.widget))
             {result(d,Status::unavailableDestination);return false;}
         navigation=opening.nextNavigation;
         if(!projectNativeAppearance(projection,opening.rider4C4,profile,d)||
@@ -637,16 +654,39 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         return collector.nativeDrawableModels(models,d.draw);
     }
+    bool stockConfirmAnchor(const game::OriginalUiRiderSelectionProfile50KG& profile,std::uint32_t& rider) const noexcept {
+        if(!cold.commonProfile||!cold.profile->readHumanPodSelection1ADFF4(*cold.commonProfile,riderPlayer,rider))return false;
+        const auto unlocked=[&](std::uint32_t id){
+            return id<profile.riders.size()&&profile.riders[id].ownerReady&&profile.riders[id].unlock10FAC;
+        };
+        if(unlocked(rider))return true;
+        // Before P2 has confirmed once, the packed pod can still be locked.
+        // The original VS page remembers its own last stock selection at 6F8.
+        if(riderPlayer&&cold.prospectiveMode==1&&unlocked(profile.remembered6F8)){
+            rider=profile.remembered6F8;return true;
+        }
+        return false;
+    }
     bool nativeImageClosure(const NativeProjection& projection,std::vector<std::uint32_t>& images,bool& requiresCoverage,Diagnostic& d) const noexcept {
         if(!nativeDrawableClosure(projection,d))return false;
         std::array<bool,120> models{};
         for(std::size_t i=1;i<models.size();++i)
             models[i]=projection.registered[i]&&projection.states[i].shown;
+        // Add-on Confirm preserves the player's stock selection. Its model
+        // can be drawn during the closing transition before the next page opens.
+        // Carousel steps between add-ons share the last stock move's GPU bank.
+        // Reserve the Confirm model on that move, while the stock slot is active.
+        std::uint32_t anchor=0;
+        game::OriginalUiRiderSelectionProfile50KG profile;
+        if(addonCarousel&&liveProfile(profile)&&stockConfirmAnchor(profile,anchor)&&preparedRider(anchor)){
+            models[dynamic.podWidget(anchor)]=true;
+            models[dynamic.characterWidget(anchor)]=true;
+        }
         return collector.nativeResidencyImages(models,images,requiresCoverage,d.draw);
     }
     bool navigate(const game::OriginalUiNavigation50KG& next,const game::OriginalUiCommands50KG& commands,std::uint32_t pc) noexcept {
         if(nativeWidgetGeneration==std::numeric_limits<std::uint64_t>::max()){fault(Status::unsupportedState,pc);return false;}
-        if(!widgets().commitNavigation(0,next,commands,dynamic.hooks(),callbackFault.widget)){
+        if(!widgets().commitNavigation(riderPlayer,next,commands,dynamic.hooks(),callbackFault.widget)){
             callbackFault.dynamic=dynamic.diagnostic();callbackFault.backend=backend.diagnostic();fault(Status::widget,pc);return false;
         }
         ++nativeWidgetGeneration;return true;
@@ -673,13 +713,13 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     bool entry74() noexcept {
         game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
-        if(!liveProfile(profile)||game::planOriginalUiRiderEntry50KG(*selection(),*nav(),0,profile,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
+        if(!liveProfile(profile)||game::planOriginalUiRiderEntry50KG(*selection(),*nav(),riderPlayer,profile,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            !preparedRider(plan.rider4C4)){fault(Status::profile,0x1E9C50);return false;}
         if(cold.lightManager->activeUiIdentity()!=cold.riderArchive->identity()||
            cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction){fault(Status::lighting,0x1CDB10);return false;}
         lightGeneration=cold.lightManager->managerGeneration();
         if(!lightGeneration||!cold.lightManager->publishRiderRegistry(lighting,callbackFault.lightManager)){fault(Status::lighting,0x1CDB10);return false;}
-        state.promptMask42C=0;panel.entry74();state.fadeMusic4E8=true;
+        state.promptMask42C=0;panel().entry74();state.fadeMusic4E8=true;
         if(!widget(4,Operation::setEnabled,false,0x1E9C80)||!groupEnabled(2,false,0x1E9C90))return false;
         // Remembered search publishes page fields at74, but selection/load is
         // still deferred to the source openingAC group-entry call.
@@ -696,7 +736,7 @@ struct OriginalUiRiderSession50KG::Storage {
     bool openingAC() noexcept {
         game::OriginalUiRiderSelectionProfile50KG p;game::OriginalUiRiderSelectionPlan50KG plan;
         if(!entered||opening||!lightCurrent()||!liveProfile(p)||
-           game::planOriginalUiRiderEntry50KG(*selection(),*nav(),0,p,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
+           game::planOriginalUiRiderEntry50KG(*selection(),*nav(),riderPlayer,p,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            !preparedRider(plan.rider4C4)||plan.rider4C4!=state.rider4C4||plan.slot4C8!=state.slot4C8||
            !game::captureOriginalUiRiderLighting50KG(lighting,savedLighting)){fault(Status::unsupportedState,0x1E9E70);return false;}
         if(!navigate(plan.nextNavigation,plan.navigationCommands,0x1E9FD4))return false;
@@ -709,7 +749,7 @@ struct OriginalUiRiderSession50KG::Storage {
         // Source1EA03C checks the actual predecessor.234900(7,1) restarts
         // the shared menu stream after appearance, before Group2 disable.
         // Initial entry starts no character voice and consumes no audio RNG.
-        if(cold.previousScreen==5)++state.audio.suppressedBySourceGate;
+        if(riderPlayer||transition().lifecycle==Life::selectRequestedPage||cold.previousScreen==5)++state.audio.suppressedBySourceGate;
         else if(cold.audioMode==OriginalUiMainAudioMode50KG::muted)++state.audio.suppressedByMutedMode;
         else if(!audioReady()||!cold.audio->startRiderLoop7()){
             ++state.audio.failed;fault(Status::audio,0x1EA060);return false;
@@ -721,7 +761,7 @@ struct OriginalUiRiderSession50KG::Storage {
         const auto mode=cold.commonProfile->mode34;
         if(!widgets().setDynamicLines(87,localized[mode==2?1:0],callbackFault.widget)){
             fault(Status::widget,mode==2?0x1EA158:0x1EA1F0);return false;}
-        if(mode!=2&&!widgets().setDynamicLines(6,localized[2],callbackFault.widget)){fault(Status::widget,0x1EA294);return false;}
+        if(mode!=2&&!widgets().setDynamicLines(6,localized[2+riderPlayer],callbackFault.widget)){fault(Status::widget,0x1EA294);return false;}
         if(!appearance())return false;opened=true;return nativePhase(3);
     }
     bool closingB4() noexcept {
@@ -758,7 +798,7 @@ struct OriginalUiRiderSession50KG::Storage {
         return true;
     }
     static bool available(void* context) noexcept {
-        auto& s=*static_cast<Storage*>(context);const auto* exit=s.cold.resources->exitText(0);
+        auto& s=*static_cast<Storage*>(context);const auto* exit=s.cold.resources->exitText(s.riderPlayer);
         return s.operational()&&exit&&exit->prepared()&&s.audioReady();
     }
     static void hook(void* context,const game::OriginalUiApertureHook50KG& e) noexcept {
@@ -870,7 +910,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         cold.predecessorCourseResources&&cold.predecessorCourseHolograms&&
         cold.predecessorCourseResources->loaded()&&cold.predecessorCourseResources->widgets()&&
         cold.predecessorCourseResources->materials()&&cold.predecessorCourseHolograms->loaded()&&
-        cold.prospectiveMode==0;
+        cold.prospectiveMode<=1;
     const bool fromTournament=cold.previousScreen==9&&!cold.predecessorResources&&
         !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&cold.predecessorTournament&&cold.prospectiveMode==2;
     if((!fromMain&&!fromCourse&&!fromTournament)||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
@@ -881,7 +921,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         return result(d,Status::resource);
     if(!cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.commonProfile->known||
        cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||
-       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||(fromCourse&&cold.commonProfile->mode34!=0)||(fromTournament&&cold.commonProfile->mode34!=2)||
+       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||(fromCourse&&cold.commonProfile->mode34!=cold.prospectiveMode)||(fromTournament&&cold.commonProfile->mode34!=2)||
        &cold.application->rawRandom308030!=&cold.application->sharedNoise308030.sharedRandomState||
        !cold.lightManager||cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction||
        !cold.externalTransition||cold.externalTransition->snapshot().bound)return result(d,Status::unsupportedState);
@@ -913,8 +953,8 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             if(matches!=1||!cold.resources->background(rider)||!cold.statAssets->portrait(rider))
                 return result(d,Status::resource,0x1D63B0);
         }
-        const unsigned indices[]={167,168,172};
-        for(unsigned i=0;i<3;++i){const auto* entry=cold.english->at(indices[i]);
+        const unsigned indices[]={167,168,172,173};
+        for(unsigned i=0;i<s->localized.size();++i){const auto* entry=cold.english->at(indices[i]);
             if(!entry||entry->text.size()>20||entry->text.find('\0')!=std::string::npos)return result(d,Status::resource,0x1EA158);
             s->localized[i].push_back(entry->text);
         }
@@ -981,7 +1021,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // source is the authored pod widget of the default entry rider 19 (PORT STAND-IN).
         // Without them an add-on Tournament Confirm had no character _sel preflight and
         // was refused at 1EA694 (cr-30 eye check).
-        if((cold.prospectiveMode==0||cold.prospectiveMode==1||(cold.prospectiveMode==2&&s->addonPlayer==0))&&
+        if((cold.prospectiveMode==0||cold.prospectiveMode==1||(cold.prospectiveMode==2&&s->riderPlayer==0))&&
            game::dlc50DL::addonRiderCount()){
             std::uint16_t layout=0,characterLayout=0;
             game::OriginalUiRiderAddonModels50DL::Input addon;
@@ -1012,7 +1052,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // Main's live mode4 is legitimate. Only this immutable cold projection
         // sees the exact prospective source decision; the shared word is untouched.
         if(!cold.profile->selectionSnapshotForMode(cold.prospectiveMode,copiedProfile)||
-           game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok)
+           game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),s->riderPlayer,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok)
             return result(d,Status::unavailableDestination,0x1E9C50);
         // This local session has not escaped. Prepare genuine immutable
         // descriptor candidates, then one complete bank and irreversible seal.
@@ -1027,16 +1067,22 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             if(game::originalUiRiderRequested50KG(requested|cold.requestedTraversalRiders,rider)&&!s->preparedTraversal(rider))
                 return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->preparedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
-        if(!s->widgets().preflightNavigation(0,coldPlan.nextNavigation,coldPlan.navigationCommands,s->dynamic.hooks(),d.widget)){
+        if(!s->widgets().preflightNavigation(s->riderPlayer,coldPlan.nextNavigation,coldPlan.navigationCommands,s->dynamic.hooks(),d.widget)){
             d.dynamic=s->dynamic.diagnostic();d.backend=s->backend.diagnostic();return result(d,Status::resource,0x1E9FD4);}
         // All callback implementations and their original cold resources now
         // exist. bind invokes no hook; the local object cannot escape until the
         // full aperture/panel/composer ownership cycle is established below.
         s->dependenciesPrepared=true;
         game::OriginalUiApertureCallbacks50KG callbacks{s.get(),&Storage::available,&Storage::hook,&Storage::overlay};
-        if(s->aperture.bindRider(cold.riderArchive,1,callbacks,d.aperture)!=ApertureStatus::ok)return result(d,Status::aperture,d.aperture.sourcePC);
-        if(!s->panel.bind(s->aperture,*s->selection(),0))return result(d,Status::aperture,0x1ECFE0);
-        const std::array<const game::OriginalUiApertureOwner50KG*,2> apertures{{&s->aperture,nullptr}};
+        std::array<const game::OriginalUiApertureOwner50KG*,2> apertures{};
+        const unsigned pages=cold.prospectiveMode==1?2u:1u;
+        for(std::uint8_t player=0;player<pages;++player){
+            auto& owner=s->pageApertures[player];
+            if(owner.bindRider(cold.riderArchive,player+1,callbacks,d.aperture)!=ApertureStatus::ok)
+                return result(d,Status::aperture,d.aperture.sourcePC);
+            if(!s->pagePanels[player].bind(owner,*s->selection(),player))return result(d,Status::aperture,0x1ECFE0);
+            apertures[player]=&owner;
+        }
         if(!s->collector.bind(cold.resources,cold.statAssets,cold.binderAssets,s->backend,s->dynamic,*cold.lightManager,
             0,1,cold.externalTransition,apertures,d.draw))return result(d,Status::draw,d.draw.sourcePC);
         s->collectorBound=true;
@@ -1058,10 +1104,10 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             // Free play: mode0 (one human) and mode1 (two-player VS); Tournament
             // (mode2, P1 page) for the add-on pod's own career (dlc_career50dl.h).
             s->addonCarousel=cold.prospectiveMode==0||cold.prospectiveMode==1||
-                (cold.prospectiveMode==2&&s->addonPlayer==0);
-            game::dlc50DL::setHighlightedAddonRider(s->addonPlayer,0);
+                (cold.prospectiveMode==2&&s->riderPlayer==0);
+            game::dlc50DL::setHighlightedAddonRider(s->riderPlayer,0);
             std::fprintf(stderr,"dlc_rider_carousel player=%u action=%s mode=%u addons=%zu stock_slots=%zu\n",
-                unsigned(s->addonPlayer)+1u,s->addonCarousel?"ready":"off",cold.prospectiveMode,addons,page->groups[1].controls.size());
+                unsigned(s->riderPlayer)+1u,s->addonCarousel?"ready":"off",cold.prospectiveMode,addons,page->groups[1].controls.size());
         }
         s->state.bound=true;storage_=std::move(s);
         if(const auto shared=storage_->cold.application->sharedDialogs){
@@ -1075,23 +1121,30 @@ bool OriginalUiRiderSession50KG::canEnterMode(std::uint32_t mode) const noexcept
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||mode!=s->cold.prospectiveMode||!s->processCurrent())return false;
     game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
     return s->cold.profile->selectionSnapshotForMode(mode,profile)&&
-        game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,profile,plan)==game::OriginalUiRiderSelectionStatus50KG::ok&&
+        game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),s->riderPlayer,profile,plan)==game::OriginalUiRiderSelectionStatus50KG::ok&&
         s->preparedRider(plan.rider4C4);
 }
 std::uint32_t OriginalUiRiderSession50KG::intendedMode() const noexcept {
     return storage_?storage_->cold.prospectiveMode:std::numeric_limits<std::uint32_t>::max();
 }
 bool OriginalUiRiderSession50KG::ownsPreparedPage(std::uint8_t page) const noexcept {
-    return page==1&&storage_&&canEnterMode(storage_->cold.prospectiveMode);
+    const auto* s=storage_.get();
+    if(!s||page<1||page>(s->cold.prospectiveMode==1?2:1)||!s->operational()||!s->processCurrent())return false;
+    const auto player=static_cast<std::uint8_t>(page-1);
+    const auto* navigation=s->widgets().navigation(player);
+    game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
+    return navigation&&s->cold.profile->selectionSnapshotForMode(s->cold.prospectiveMode,profile)&&
+        game::planOriginalUiRiderEntry50KG(*s->selection(),*navigation,player,profile,plan)==game::OriginalUiRiderSelectionStatus50KG::ok&&
+        s->preparedRider(plan.rider4C4);
 }
 const game::OriginalUiTransitionOwner50KG* OriginalUiRiderSession50KG::externalLifecycleOwner() const noexcept {
     return storage_?storage_->cold.externalTransition.get():nullptr;
 }
 Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& e,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
-    if(!s->operational()||!s->backend.predecessorRetired()||s->inOperation||s->rendering||e.route.screen!=5||e.route.page!=1)return result(d,Status::unsupportedState,e.sourcePC);
+    if(!s->operational()||!s->backend.predecessorRetired()||s->inOperation||s->rendering||e.route.screen!=5||e.route.page<1||e.route.page>(s->cold.prospectiveMode==1?2:1))return result(d,Status::unsupportedState,e.sourcePC);
     const auto t=s->transition();
-    if(!t.bound||t.current.screen!=5||t.current.page!=1||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!s->processCurrent())
+    if(!t.bound||t.current.screen!=5||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!s->processCurrent())
         return result(d,Status::invalidInput,e.sourcePC);
     // Borrowed sealed vertices must be released before any model/widget
     // callback. Actual GPU/source-owner retirement remains the frontend's job.
@@ -1099,9 +1152,11 @@ Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransi
     bool valid=true;
     switch(e.kind){
     case Notice::requestedPage90:
-        valid=!s->requested&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C44;
+        valid=!s->requested&&((t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C44)||
+            (t.lifecycle==Life::selectRequestedPage&&e.route.page==t.requested.page&&e.sourcePC==0x2A4070));
         if(valid){
-            if(const auto shared=s->cold.application->sharedDialogs){
+            s->riderPlayer=e.route.page-1;
+            if(const auto shared=s->cold.application->sharedDialogs; shared&&t.initialRestartPending){
                 // Genuine constructor1E809C operation, deferred by native cold
                 // preparation until this exact incoming owner is activated.
                 // Never mutate the outgoing Main during private prewarming.
@@ -1115,38 +1170,46 @@ Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransi
             s->requested90();
         }break;
     case Notice::pageEntry74:
-        valid=s->requested&&!s->entered&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C58;
+        valid=s->requested&&!s->entered&&((t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C58)||
+            (t.lifecycle==Life::selectRequestedPage&&e.sourcePC==0x2A3CEC));
         if(valid)s->entry74();break;
     case Notice::managerEntry84:
-        valid=s->entered&&!s->managerEntered&&t.lifecycle==Life::initialEntry&&t.phase==Phase::none&&e.sourcePC==0x2A3D68;
+        valid=s->entered&&!s->managerEntered&&((t.lifecycle==Life::initialEntry&&t.phase==Phase::none&&e.sourcePC==0x2A3D68)||
+            (t.lifecycle==Life::selectRequestedPage&&e.sourcePC==0x2A3D0C));
         if(valid)s->managerEntered=true;break; // Actual inherited2A4330 return.
     case Notice::beginTransition7C:
-        if(t.phase==Phase::entry){valid=s->managerEntered&&!s->opening&&t.lifecycle==Life::waitPageTransition&&e.sourcePC==0x2A3D8C;}
-        else valid=t.phase==Phase::exit&&(s->backAccepted||s->confirmAccepted)&&!s->closing&&t.lifecycle==Life::waitScreenExit&&e.sourcePC==0x2A3DFC;
-        if(valid&&!apertureOkay(s->panel.begin7C(t.phase)))s->fault(Status::aperture,e.sourcePC);break;
+        if(t.phase==Phase::entry){valid=s->managerEntered&&!s->opening&&t.lifecycle==Life::waitPageTransition&&(e.sourcePC==0x2A3D8C||e.sourcePC==0x2A3D30);}
+        else valid=t.phase==Phase::exit&&(s->backAccepted||s->confirmAccepted)&&!s->closing&&((t.lifecycle==Life::waitScreenExit&&e.sourcePC==0x2A3DFC)||
+            (t.lifecycle==Life::waitPageTransition&&e.sourcePC==0x2A3DD0));
+        if(valid&&!apertureOkay(s->panel().begin7C(t.phase)))s->fault(Status::aperture,e.sourcePC);break;
     case Notice::pageAuxiliary1C:
-        if(e.sourcePC==0x2A3DA4)valid=s->opening&&!s->entryAuxiliarySeen&&t.lifecycle==Life::waitPageTransition&&t.phase==Phase::entry;
-        else valid=e.sourcePC==0x2A3E8C&&s->closed&&(s->backAccepted||s->confirmAccepted)&&t.lifecycle==Life::waitScreenExit&&t.phase==Phase::exit;
-        if(valid){s->state.inputContainerShown=false;if(e.sourcePC==0x2A3DA4)s->entryAuxiliarySeen=true;}break;
+        if(e.sourcePC==0x2A3DA4||e.sourcePC==0x2A3D48)valid=s->opening&&!s->entryAuxiliarySeen&&t.lifecycle==Life::waitPageTransition&&t.phase==Phase::entry;
+        else valid=s->closed&&(s->backAccepted||s->confirmAccepted)&&t.phase==Phase::exit&&
+            ((t.lifecycle==Life::waitScreenExit&&e.sourcePC==0x2A3E8C)||(t.lifecycle==Life::waitPageTransition&&e.sourcePC==0x2A3F0C));
+        if(valid){s->state.inputContainerShown=false;if(e.sourcePC==0x2A3DA4||e.sourcePC==0x2A3D48)s->entryAuxiliarySeen=true;}break;
     case Notice::pageAuxiliary24:
         valid=e.sourcePC==0x2A3EE0&&s->entryAuxiliarySeen&&!s->entryCompleted&&s->opened&&
-            t.lifecycle==Life::waitPageTransition&&t.phase==Phase::entry&&s->panel.pollCompletion(Phase::entry)==Completion::complete;
+            t.lifecycle==Life::waitPageTransition&&t.phase==Phase::entry&&s->panel().pollCompletion(Phase::entry)==Completion::complete;
         if(valid){s->state.inputContainerShown=true;s->entryCompleted=true;}break;
     case Notice::previousPage94:
-        // Actual Rider1ECE10 ->2A6E90 disables its page entity. A page change
-        // cannot be admitted in this bounded page1-only owner.
-        valid=false;break;
+        valid=t.lifecycle==Life::selectRequestedPage&&e.sourcePC==0x2A4050&&s->closed&&e.route.page==s->riderPlayer+1;
+        if(valid){
+            game::dlc50DL::setHighlightedAddonRider(s->riderPlayer,0);
+            s->addonSlot=0;s->state.pageShown=false;s->state.inputContainerShown=false;
+            s->requested=s->entered=s->managerEntered=s->opening=s->opened=s->closing=s->restored=s->closed=false;
+            s->backAccepted=s->confirmAccepted=s->entryAuxiliarySeen=s->entryCompleted=false;
+        }break;
     }
     if(!valid)s->fault(Status::transition,e.sourcePC);
     s->inOperation=false;if(s->state.faulted){s->cpuDrain();d=s->callbackFault;return d.status;}return result(d,Status::ok);
 }
 Completion OriginalUiRiderSession50KG::pollCompletion(game::OriginalUiTransitionRoute50KG route,Phase phase) const noexcept {
-    const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||route.screen!=5||route.page!=1||!s->currentPage()||
+    const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||route.screen!=5||route.page!=s->riderPlayer+1||!s->currentPage()||
         !s->processCurrent()||!s->lightCurrent())return Completion::unavailable;
     const auto t=s->transition();if(t.phase!=phase)return Completion::unavailable;
     if(phase==Phase::entry&&!s->opening)return Completion::unavailable;
     if(phase==Phase::exit&&!s->backAccepted&&!s->confirmAccepted)return Completion::unavailable;
-    return s->panel.pollCompletion(phase);
+    return s->panel().pollCompletion(phase);
 }
 Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& in,OriginalUiRiderSessionInputReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();
@@ -1181,7 +1244,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
         }
     }
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
-    if(!receipt.containerReached||!s->aperture.snapshot().inputEnabled268)return finish(Status::noChange);
+    if(!receipt.containerReached||!s->aperture().snapshot().inputEnabled268)return finish(Status::noChange);
     receipt.pageCallbackRan=true;
     //1EA478..490 reads47C result BEFORE player/controller/action dispatch.
     // This same Confirm must return after result handling, never launch a race.
@@ -1226,24 +1289,24 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
         if(!s->appearance()){d=s->callbackFault;return d.status;}
         return finish(Status::ok,0x1EAEE8);
     }
-    if(in.controller!=0||in.popupActive||popup.active3CC||in.sourceInputBlocked)return finish(Status::noChange);
+    if(in.controller!=s->riderPlayer||in.popupActive||popup.active3CC||in.sourceInputBlocked)return finish(Status::noChange);
     if(!s->processCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8)return finish(Status::unsupportedState,0x1EA460);
     if(s->state.deferred4EC)return finish(Status::noChange,0x1EB510);
-    if(s->panel.inputBlocked4E0()){
+    if(s->panel().inputBlocked4E0()){
         if(in.originalInput!=4)return finish(Status::noChange,0x1EAF40);
         // Actual page0/controller0 second Confirm1EAF34..5C. Existing
         // container/input268 gates above still apply during panel travel and
         // readiness wait. Do not replay the accepted route, profile, voice
         // selection/RNG or character _sel action from the first Confirm.
-        s->panel.confirmWhileClosing(); //1EAF54: bypass4E4=1 first.
+        s->panel().confirmWhileClosing(); //1EAF54: bypass4E4=1 first.
         s->state.confirmStopTimer7D24=std::bit_cast<float>(std::uint32_t{0x3EB33333}); //1EAF5C
         return finish(Status::ok,0x1EAF5C);
     }
     game::OriginalUiRiderSelectionProfile50KG profile;
     if(!s->liveProfile(profile))return finish(Status::profile,0x1EA460);
     if(in.originalInput<=1){
-        const auto planned=game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),0,in.controller,in.originalInput,
-            in.popupActive,s->panel.inputBlocked4E0(),profile,receipt.selection);
+        const auto planned=game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),s->riderPlayer,in.controller,in.originalInput,
+            in.popupActive,s->panel().inputBlocked4E0(),profile,receipt.selection);
         if(planned==game::OriginalUiRiderSelectionStatus50KG::noChange)return finish(Status::noChange);
         if(planned!=game::OriginalUiRiderSelectionStatus50KG::ok)return finish(Status::unsupportedState,0x1EB1F0);
         // PORT EXTENSION (DLC D4): the add-on block between the last and first stock rider.
@@ -1259,7 +1322,13 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
            !s->preparedRider(receipt.selection.rider4C4)||
            !s->preparedRider(s->state.rider4C4)||!s->audioReady()||
            (s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!s->cold.audio->canPlayRiderAdvance2()))
-            return finish(Status::unavailableDestination,receipt.selection.sourcePC);
+            {
+                std::fprintf(stderr,"rider_move_unavailable page=%u from=%u to=%u idle=%d visited=%u traversal=%d target_ready=%d source_ready=%d audio=%d\n",
+                    unsigned(s->riderPlayer+1),unsigned(s->state.rider4C4),unsigned(receipt.selection.rider4C4),int(s->idleInput()),
+                    unsigned(receipt.selection.visitedControls),int(s->preparedMovement(receipt.selection)),int(s->preparedRider(receipt.selection.rider4C4)),
+                    int(s->preparedRider(s->state.rider4C4)),int(s->audioReady()));
+                return finish(Status::unavailableDestination,receipt.selection.sourcePC);
+            }
         receipt.moveSerial=s->proposalSerial;receipt.moveEvent=in.originalInput;
         return finish(Status::moveProposed,receipt.selection.sourcePC);
     }
@@ -1292,11 +1361,9 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     // is held only by dlc50DL::selectAddonRider at acceptance. Back stays original.
     s->addonConfirmRider=0;
     if(in.originalInput==4&&s->addonSlot){
-        std::uint8_t packed=0;std::uint32_t comparison=0;
-        if(!s->addonPod()||s->addonPlayer!=0||!s->cold.profile->riderConfirmSnapshot(packed,comparison)) // mode 2: DLC career (dlc_career50dl.h)
-            return finish(Status::profile,0x1EA58C);
-        const std::uint32_t stock=packed>>3u;
-        if(stock>=27||!profile.riders[stock].ownerReady||!profile.riders[stock].unlock10FAC){
+        std::uint32_t stock=0;
+        if(!s->addonPod())return finish(Status::profile,0x1EA58C);
+        if(!s->stockConfirmAnchor(profile,stock)){
             std::fprintf(stderr,"dlc_rider_confirm key=%s status=refused reason=\"no unlocked stock Confirm to keep\" stock_rider=%u\n",
                 s->addonPod()->key.c_str(),stock);
             return finish(Status::unavailableDestination,0x1EA694);
@@ -1307,36 +1374,19 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
         // snapshot that destination takes already reads the add-on career. The
         // Tournament screen then draws the add-on's own pod model in the
         // anchor's place, or nothing (never the anchor's model).
-        // HOLD (coordinator, 2026-11-21, build cr-25): the original race-end route
-        // 1AB5BC sends every tournament race without a Hall/Win/Unlock stop to the
-        // Garage (13/1, 0x1AB818), and the race-return Garage entry faults the
-        // frontend when 1D1950 refuses an add-on career (Garage model step G2-G6
-        // not done). So the add-on Tournament Confirm stays refused until the
-        // Garage loads the add-on's own model; the latch below is then restored.
-        // TEST ONLY (eyecheck R5): RR_TEST_ADDON_TOURNAMENT=1 lets the add-on
-        // Tournament Confirm through the latch, honoured only on an unattended
-        // capture run (RR_UNATTENDED_CAPTURE=1, the same gate the runner's other
-        // RR_TEST_ switches use). Players always get the refusal above.
-        static const bool testAddonTournament=[]{
-            const auto on=[](const char* name){const char* v=std::getenv(name);return v&&v[0]=='1'&&!v[1];};
-            return on("RR_UNATTENDED_CAPTURE")&&on("RR_TEST_ADDON_TOURNAMENT");}();
-        if(s->cold.prospectiveMode==2&&!testAddonTournament){
-            std::fprintf(stderr,"dlc_rider_confirm key=%s status=refused reason=\"add-on tournament career waits for the add-on Garage model (race end goes to the Garage)\"\n",
-                s->addonPod()->key.c_str());
-            return finish(Status::unavailableDestination,0x1EA58C);
-        }
         if(s->cold.prospectiveMode==2){
-            std::fprintf(stderr,"dlc_rider_confirm key=%s status=latching mode=tournament test_override=1\n",s->addonPod()->key.c_str());
+            std::fprintf(stderr,"dlc_rider_confirm key=%s status=latching mode=tournament\n",s->addonPod()->key.c_str());
             if(!game::dlc50DL::latchTournamentCareer(stock,s->addonPod()->number))return finish(Status::profile,0x1EA58C);
         }
     }else if(in.originalInput==4&&s->cold.prospectiveMode==2)game::dlc50DL::clearTournamentCareer(); // stock tournament Confirm
     const auto selected=in.originalInput==4?s->confirmRider():s->state.rider4C4;
     if(selected>=profile.riders.size())return finish(Status::unsupportedState,0x1EA460);
-    game::OriginalUiRiderContext50KG context;context.playerIndex=0;context.selectedRider=selected;context.mode34=profile.mode34;
+    game::OriginalUiRiderContext50KG context;context.playerIndex=s->riderPlayer;context.selectedRider=selected;context.mode34=profile.mode34;
     context.packed1125C=s->cold.commonProfile->playerBits1125C;
     context.admission.sourceControllerReady=true;context.admission.selectionOwnerReady=true;context.admission.profileOwnerReady=true;
     context.unlockOwnerReady=profile.riders[selected].ownerReady;
     context.selectedUnlockWord10FAC=profile.riders[selected].unlock10FAC;
+    if(s->riderPlayer&&in.originalInput==4&&!s->cold.profile->readRiderComparison(context))return finish(Status::profile,0x1EABC4);
     const auto routed=game::dispatchOriginalUiRider50KG(in.controller,static_cast<game::OriginalUiRouteInput50KG>(in.originalInput),context,receipt.decision);
     if(routed==game::OriginalUiRouteStatus50KG::noChange)return finish(Status::noChange);
     if(routed!=game::OriginalUiRouteStatus50KG::unavailable)return finish(Status::unsupportedState,0x1EA460);
@@ -1353,7 +1403,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     }
     const auto& r=receipt.decision;
     if(!s->idleInput()||!s->backAudioReady()||!r.profileProposalComplete||r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
-       r.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||r.request.targetScreen!=4||r.request.targetPage!=1||
+       r.request.kind!=(s->riderPlayer?game::OriginalUiRouteKind50KG::changePage:game::OriginalUiRouteKind50KG::changeScreen)||r.request.targetScreen!=(s->riderPlayer?5:4)||r.request.targetPage!=1||
        r.profileChanges.count!=1||r.selectedRider!=static_cast<std::int32_t>(s->state.rider4C4))return finish(Status::unavailableDestination,0x1EA810);
     s->pendingProfile=profile;s->pendingCommon=*s->cold.commonProfile;s->pendingStamp=s->cold.profile->stamp();
     s->pendingBack=r;s->pendingLifecycle=s->transition();s->state.backProposalPending=true;
@@ -1395,7 +1445,7 @@ Status OriginalUiRiderSession50KG::prepareMoveResidency(const OriginalUiRiderSes
         return result(d,Status::invalidInput);
     try {
         game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
-        if(!s->liveProfile(profile)||game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),0,0,
+        if(!s->liveProfile(profile)||game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),s->riderPlayer,s->riderPlayer,
            receipt.moveEvent,false,false,profile,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            !plan.visitedControls||!s->preparedMovement(plan)||!s->preparedRider(plan.rider4C4)||
            plan.rider4C4!=receipt.selection.rider4C4||plan.slot4C8!=receipt.selection.slot4C8)
@@ -1403,12 +1453,12 @@ Status OriginalUiRiderSession50KG::prepareMoveResidency(const OriginalUiRiderSes
         Storage::NativeProjection projection;
         if(!s->widgets().beginNativeProjection(s->dynamic,projection,d.widget))return result(d,Status::widget);
         const auto before=projection;
-        if(!s->widgets().projectNativeNavigation(projection,0,plan.nextNavigation,plan.navigationCommands,d.widget)||
+        if(!s->widgets().projectNativeNavigation(projection,s->riderPlayer,plan.nextNavigation,plan.navigationCommands,d.widget)||
            !s->projectNativeAppearance(projection,plan.rider4C4,profile,d))return result(d,Status::widget);
         auto selected=plan.nextNavigation;game::OriginalUiCommands50KG repeat;
         const auto control=selected.page->groups[1].controls[plan.slot4C8-1];
         if(!appendControl(selected,repeat,control,Operation::select,false,receipt.moveEvent?0x1EB304:0x1EB484)||
-           !s->widgets().projectNativeNavigation(projection,0,selected,repeat,d.widget))return result(d,Status::widget);
+           !s->widgets().projectNativeNavigation(projection,s->riderPlayer,selected,repeat,d.widget))return result(d,Status::widget);
         OriginalUiRiderResidencyDemand50KG demand;
         demand.session_=this;demand.serial_=s->proposalSerial;demand.bank_=bank();
         // No draw occurs between the navigation, appearance and repeated SELECT.
@@ -1455,13 +1505,13 @@ bool OriginalUiRiderSession50KG::acceptEntryProfileCommit(OriginalUiRiderProfile
        s->nativePreparedMaterialGeneration!=s->backend.registryGeneration()||!s->widgets().matchesNativeProjection(s->nativeBefore))return false;
     const bool courseBack=origin==EntryOrigin::course;
     if((origin==EntryOrigin::main&&s->cold.previousScreen!=4)||
-       (courseBack&&(s->cold.previousScreen!=6||s->cold.prospectiveMode!=0))||
+       (courseBack&&(s->cold.previousScreen!=6||s->cold.prospectiveMode>1))||
        (origin==EntryOrigin::tournament&&(s->cold.previousScreen!=9||s->cold.prospectiveMode!=2||!s->cold.predecessorTournament))||
        (origin!=EntryOrigin::main&&origin!=EntryOrigin::course&&origin!=EntryOrigin::tournament))return false;
     const auto after=s->cold.profile->stamp();
     if(after.mode34!=s->cold.prospectiveMode||
        (origin==EntryOrigin::tournament&&before.mode34!=2)||
-       (courseBack?(before.mode34!=0||after.mode34!=0||before.generation==std::numeric_limits<std::uint64_t>::max()||
+       (courseBack?(before.mode34!=after.mode34||before.generation==std::numeric_limits<std::uint64_t>::max()||
             after.generation!=before.generation+1):after.generation!=before.generation))return false;
     game::OriginalUiRiderSelectionProfile50KG actual;
     if(!s->liveProfile(actual)||!sameProfile(actual,s->nativeEntryProfile))return false;
@@ -1496,7 +1546,7 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
        receipt.status!=Status::moveProposed||receipt.moveSerial!=s->proposalSerial||receipt.moveEvent>1)
         return result(d,Status::invalidInput);
     game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
-    if(!s->liveProfile(profile)||game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),0,0,
+    if(!s->liveProfile(profile)||game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),s->riderPlayer,s->riderPlayer,
        receipt.moveEvent,false,false,profile,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
        !plan.visitedControls||!s->preparedMovement(plan)||!s->preparedRider(plan.rider4C4)||plan.rider4C4!=receipt.selection.rider4C4||
        plan.slot4C8!=receipt.selection.slot4C8||!plan.captureAndRestorePodTransform||!plan.resetSelectedControl||plan.deferred4EC!=3)
@@ -1517,12 +1567,12 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
         return result(d,Status::unavailableDestination,0x292360);
     Storage::NativeProjection finalProjection;
     if(!s->widgets().beginNativeProjection(s->dynamic,finalProjection,d.widget)||
-       !s->widgets().projectNativeNavigation(finalProjection,0,plan.nextNavigation,plan.navigationCommands,d.widget)||
+       !s->widgets().projectNativeNavigation(finalProjection,s->riderPlayer,plan.nextNavigation,plan.navigationCommands,d.widget)||
        !s->projectNativeAppearance(finalProjection,plan.rider4C4,profile,d))return result(d,Status::unavailableDestination);
     auto finalNavigation=plan.nextNavigation;game::OriginalUiCommands50KG finalRepeat;
     const auto finalControl=finalNavigation.page->groups[1].controls[plan.slot4C8-1];
     if(!appendControl(finalNavigation,finalRepeat,finalControl,Operation::select,false,receipt.moveEvent?0x1EB304:0x1EB484)||
-       !s->widgets().projectNativeNavigation(finalProjection,0,finalNavigation,finalRepeat,d.widget)||
+       !s->widgets().projectNativeNavigation(finalProjection,s->riderPlayer,finalNavigation,finalRepeat,d.widget)||
        !s->nativeDrawableClosure(finalProjection,d))return result(d,Status::unavailableDestination);
     const auto generation=s->collector.sourceSubmissionWatermark(),frontier=s->backend.materialLifetime().sequence();
     if(!generation||s->collector.sourceRenderer()!=&renderer)return result(d,Status::unavailableDestination);
@@ -1536,7 +1586,7 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
        !rd.submittedWorkCompleted)return result(d,Status::backend,d.draw.sourcePC);
     s->cpuDrain();
     if(!s->backend.acceptSourceRetirement(&s->collector,generation,frontier))return result(d,Status::backend);
-    if(!s->widgets().preflightNavigation(0,plan.nextNavigation,plan.navigationCommands,s->dynamic.hooks(),d.widget)){
+    if(!s->widgets().preflightNavigation(s->riderPlayer,plan.nextNavigation,plan.navigationCommands,s->dynamic.hooks(),d.widget)){
         // Retirement is irreversible. An unexpected allocation/backend failure
         // here is a cleanup-owned fault, never a usable unchanged destination.
         s->callbackFault.widget=d.widget;s->fault(Status::widget,plan.sourcePC);d=s->callbackFault;return d.status;
@@ -1545,7 +1595,7 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
     const auto control=selected.page->groups[1].controls[plan.slot4C8-1];
     // 2A5A00 dispatches widget+78: repeated SELECT, never generic reset/show.
     if(!appendControl(selected,repeat,control,Operation::select,false,receipt.moveEvent?0x1EB304:0x1EB484)||
-       !s->widgets().preflightNavigation(0,selected,repeat,s->dynamic.hooks(),d.widget)){
+       !s->widgets().preflightNavigation(s->riderPlayer,selected,repeat,s->dynamic.hooks(),d.widget)){
         s->callbackFault.widget=d.widget;s->fault(Status::widget,0x2A5A00);d=s->callbackFault;return d.status;
     }
     s->inOperation=true;
@@ -1580,7 +1630,7 @@ bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRoute
        p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||
        s->cold.application->uiObject3D8||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
-       !sameLife(s->transition(),s->pendingLifecycle)||!s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||
+       !sameLife(s->transition(),s->pendingLifecycle)||!s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[s->riderPlayer]!=1||
        s->nav()->groups[1].selectedSlot!=s->state.slot4C8)return false;
     if(s->state.confirmProposalPending){
         game::OriginalUiRiderDynamicDiagnostic50KG preflight;std::uint8_t packed=0;std::uint32_t comparison=0;
@@ -1598,19 +1648,31 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
            !confirmShape(p.decision,s->confirmRider(),s->cold.prospectiveMode)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
            !s->confirmReady(d.dynamic)||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon))
             return result(d,Status::invalidInput,s->cold.prospectiveMode==2?0x1EA5E4:0x1EA604);
-        auto expectedLife=s->pendingLifecycle;expectedLife.requested={static_cast<std::uint8_t>(s->cold.prospectiveMode==2?9:6),1};expectedLife.lifecycle=Life::requestScreenExit;
+        auto expectedLife=s->pendingLifecycle;expectedLife.requested={p.decision.request.targetScreen,p.decision.request.targetPage};
+        expectedLife.lifecycle=p.decision.request.kind==game::OriginalUiRouteKind50KG::changePage?Life::requestPageExit:Life::requestScreenExit;
         const auto stamp=s->cold.profile->stamp();std::uint8_t packed=0;std::uint32_t comparison=0;
+        std::uint32_t selectedStock=0;
+        bool comparisonWritten=false;
+        for(std::size_t i=0;i<p.decision.profileChanges.count;++i)
+            comparisonWritten|=p.decision.profileChanges.values[i].field==game::OriginalUiProfileField50KG::comparisonRider100C0;
         if(!sameLife(s->transition(),expectedLife)||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
            stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=s->cold.prospectiveMode||
            !s->cold.profile->riderConfirmSnapshot(packed,comparison)||
-           packed!=static_cast<std::uint8_t>((s->pendingPacked1125D&7u)|(s->confirmRider()<<3))||comparison!=s->confirmRider())
+           packed!=(s->riderPlayer?s->pendingPacked1125D:static_cast<std::uint8_t>((s->pendingPacked1125D&7u)|(s->confirmRider()<<3)))||
+           !s->cold.profile->readHumanPodSelection1ADFF4(*s->cold.commonProfile,s->riderPlayer,selectedStock)||selectedStock!=s->confirmRider()||
+           comparison!=(comparisonWritten?s->confirmRider():s->pendingComparison100C0))
             return result(d,Status::profile,0x1EA58C);
         auto expected=s->pendingProfile;
-        if(s->cold.prospectiveMode==2)expected.remembered6FC=s->confirmRider();else expected.remembered6F0=s->confirmRider();
+        if(s->cold.prospectiveMode==2){
+            if(!s->addonSlot)expected.remembered6FC=s->confirmRider();
+        }else if(s->cold.prospectiveMode==1){
+            if(s->riderPlayer)expected.remembered6F8=s->confirmRider();else expected.remembered6F4=s->confirmRider();
+        }else expected.remembered6F0=s->confirmRider();
         game::OriginalUiRiderSelectionProfile50KG actual;
         if(!s->liveProfile(actual)||!sameProfile(actual,expected))return result(d,Status::profile,s->cold.prospectiveMode==2?0x1EA54C:0x1EA538);
         std::uint16_t character=0;if(!s->selectedConfirmCharacter(character))return result(d,Status::model,0x1ECF70);
-        s->cpuDrain();s->state.fadeMusic4E8=true; //1EA600(mode2)/1EA620(mode0), after actual route/profile commit.
+        s->cpuDrain();s->state.fadeMusic4E8=p.decision.request.kind!=game::OriginalUiRouteKind50KG::changePage; // 1EA640 keeps Song7 across pages.
+        if(!s->riderPlayer){ // Only P1 chooses a voice and starts _sel. P2 goes directly to event 1 at 1EAD8C.
         // PORT EXTENSION: an add-on rider has no confirm voice (no choice, no RNG draw).
         if(s->addonSlot){if(!s->confirmAudioReady()){s->fault(Status::unsupportedState,0x1EA694);d=s->callbackFault;return d.status;}
             ++s->state.audio.suppressedBySourceGate;}
@@ -1623,7 +1685,8 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
             if(!s->addonSelectLogged){s->addonSelectLogged=true;const auto* pod=s->addonPod();
                 std::fprintf(stderr,"dlc_rider_character key=%s motion=sel status=started\n",pod?pod->key.c_str():"-");}
         }else if(!s->dynamic.confirmCharacter(character)){d.dynamic=s->dynamic.diagnostic();s->fault(Status::model,0x1D2690);return result(d,Status::model,0x1D2690);}
-        //1EA7B0 follows the actual voice command and character _sel action.
+        }
+        // P1 1EA7B0 and P2 1EAD8C both play the selection effect.
         if(s->cold.audioMode==OriginalUiMainAudioMode50KG::muted)++s->state.audio.suppressedByMutedMode;
         else if(!s->cold.audio->playRiderConfirmSelection1()){
             ++s->state.audio.failed;s->fault(Status::audio,0x1EA7B0);d=s->callbackFault;return d.status;
@@ -1632,22 +1695,23 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
         // PORT EXTENSION (DLC): the port-owned add-on selection follows the accepted
         // Confirm; a stock Confirm returns to the stock selection the profile keeps.
         if(const auto* pod=s->addonPod()){
-            const bool selected=game::dlc50DL::selectAddonRider(s->addonPlayer,pod->number);
+            const bool selected=game::dlc50DL::selectAddonRider(s->riderPlayer,pod->number);
             std::fprintf(stderr,"dlc_rider_confirm player=%u key=%s number=%u status=%s stock_rider=%u\n",
-                unsigned(s->addonPlayer)+1u,pod->key.c_str(),pod->number,selected?"selected":"refused",s->confirmRider());
-        }else game::dlc50DL::clearAddonRider(s->addonPlayer);
-        if(s->addonCarousel)game::dlc50DL::forgetAddonRider(s->addonPlayer); // only Back re-highlights
+                unsigned(s->riderPlayer)+1u,pod->key.c_str(),pod->number,selected?"selected":"refused",s->confirmRider());
+        }else game::dlc50DL::clearAddonRider(s->riderPlayer);
+        if(s->addonCarousel)game::dlc50DL::forgetAddonRider(s->riderPlayer); // only Back re-highlights
         // Do NOT call acceptedBack/confirmWhileClosing or set bypass4E4. The
-        // panel waits for actual _sel >80% readiness before closing aperture.
+        // panel waits for actual _sel >80% readiness before closing aperture().
         return result(d,Status::ok);
     }
     if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||!s->state.backProposalPending||p.source!=this||
        !p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !s->processCurrent()||!s->lightCurrent()||!s->backAudioReady()||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
-       !s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||s->nav()->groups[1].selectedSlot!=s->state.slot4C8)
+       !s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[s->riderPlayer]!=1||s->nav()->groups[1].selectedSlot!=s->state.slot4C8)
         return result(d,Status::invalidInput,0x1EA810);
     const auto t=s->transition();auto expectedLife=s->pendingLifecycle;
-    expectedLife.requested={4,1};expectedLife.lifecycle=Life::requestScreenExit;
+    expectedLife.requested={p.decision.request.targetScreen,p.decision.request.targetPage};
+    expectedLife.lifecycle=s->riderPlayer?Life::requestPageExit:Life::requestScreenExit;
     const auto stamp=s->cold.profile->stamp();
     if(!sameLife(t,expectedLife)||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
        stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=s->pendingStamp.mode34)
@@ -1658,6 +1722,7 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     switch(change.field){
     case game::OriginalUiProfileField50KG::riderMode0_6F0:expected.remembered6F0=s->state.rider4C4;break;
     case game::OriginalUiProfileField50KG::rider1Mode1_6F4:expected.remembered6F4=s->state.rider4C4;break;
+    case game::OriginalUiProfileField50KG::rider2_6F8:expected.remembered6F8=s->state.rider4C4;break;
     case game::OriginalUiProfileField50KG::riderOtherMode6FC:expected.remembered6FC=s->state.rider4C4;break;
     default:return result(d,Status::invalidInput,0x1EA810);
     }
@@ -1666,15 +1731,15 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     s->cpuDrain();s->state.backProposalPending=false;s->state.confirmProposalPending=false;s->backAccepted=true;
     // Real page1 Back1EA82C/1EA830 sets fade4E8 and bypass4E4. These cannot
     // certify Main readiness and are not published for an unaccepted proposal.
-    s->state.fadeMusic4E8=true;s->panel.acceptedBack();
+    s->state.fadeMusic4E8=!s->riderPlayer;s->panel().acceptedBack();
     // PORT EXTENSION (DLC): Back records the highlighted add-on port-owned (the
     // original Back word above keeps the anchor stock rider); a stock Back forgets it.
     if(s->addonCarousel){
         if(const auto* pod=s->addonPod()){
-            const bool kept=game::dlc50DL::rememberAddonRider(s->addonPlayer,pod->number,s->state.rider4C4,s->addonAnchorLast);
+            const bool kept=game::dlc50DL::rememberAddonRider(s->riderPlayer,pod->number,s->state.rider4C4,s->addonAnchorLast);
             std::fprintf(stderr,"dlc_rider_back player=%u key=%s number=%u status=%s anchor_rider=%u\n",
-                unsigned(s->addonPlayer)+1u,pod->key.c_str(),pod->number,kept?"remembered":"refused",s->state.rider4C4);
-        }else game::dlc50DL::forgetAddonRider(s->addonPlayer);
+                unsigned(s->riderPlayer)+1u,pod->key.c_str(),pod->number,kept?"remembered":"refused",s->state.rider4C4);
+        }else game::dlc50DL::forgetAddonRider(s->riderPlayer);
     }
     if(!s->backAudio()){d=s->callbackFault;return d.status;}
     // Retail233410 queues a backend play command before267BE0 submits it.
@@ -1722,9 +1787,9 @@ Status OriginalUiRiderSession50KG::update(const OriginalUiMainSessionUpdate50KG&
         // next ordinary render, using the preceding completed source image.
         if(s->state.deferred4EC)--s->state.deferred4EC;
         const auto t=s->transition();
-        if(!s->panel.update38(in.elapsedSeconds,t.lifecycle,t.phase,*s->nav(),s->dynamic,s->addonCharacter()))s->fault(Status::aperture,0x1ECFE0);
+        if(!s->panel().update38(in.elapsedSeconds,t.lifecycle,t.phase,*s->nav(),s->dynamic,s->addonCharacter()))s->fault(Status::aperture,0x1ECFE0);
         if(!s->state.faulted)s->updateConfirmStop1EB5C8(in.elapsedSeconds);
-        if(!s->state.faulted&&s->aperture.saveRiderUpdateDelta38(in.elapsedSeconds)!=ApertureStatus::ok)
+        if(!s->state.faulted&&s->aperture().saveRiderUpdateDelta38(in.elapsedSeconds)!=ApertureStatus::ok)
             s->fault(Status::aperture,0x1EB620);
     }
     if(!s->state.faulted)s->updateWidgets(*top,in.elapsedSeconds);
@@ -1786,12 +1851,12 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     if(s->inOperation||s->rendering||s->updatePrepared||!s->currentPage()||!clock.known||(s->paused&&clock.advanceAnimations))
         return result(d,Status::invalidInput);
     if(!s->processCurrent()||!s->lightCurrent()||!s->state.cameraActive||!s->state.pageShown||
-       s->cold.application->uiObject3D8||!s->aperture.snapshot().hasUpdateDelta)return result(d,Status::unsupportedState,0x1ECE20);
+       s->cold.application->uiObject3D8||!s->aperture().snapshot().hasUpdateDelta)return result(d,Status::unsupportedState,0x1ECE20);
     Storage::NativeProjection liveProjection;
     if(!s->widgets().beginNativeProjection(s->dynamic,liveProjection,d.widget)||!s->nativeDrawableClosure(liveProjection,d))
         return result(d,Status::unavailableDestination);
     game::OriginalUiRiderStatInput50KG stats;
-    if(!s->cold.profile->statSnapshot(s->state.rider4C4,s->panel.offset4DC(),stats))return result(d,Status::profile,0x1EBBF0);
+    if(!s->cold.profile->statSnapshot(s->state.rider4C4,s->panel().offset4DC(),stats))return result(d,Status::profile,0x1EBBF0);
     if(s->addonSlot){
         // PORT EXTENSION (DLC): the add-on's own PHY stats in the original projection
         // (current = [BaseAbilities], maximum = [MaxAbilities], lanes in the original
@@ -1844,7 +1909,7 @@ Status OriginalUiRiderSession50KG::render(const OriginalUiRiderDrawClock50KG& cl
     if(okay)okay=s->collector.projectOrdinaryWidgets(true,d.draw);
     if(okay)okay=s->pageColors();
     if(okay)okay=s->collector.projectPage(stats,true,d.draw);
-    if(okay){const auto status=s->aperture.render48(s->transition().lifecycle);
+    if(okay){const auto status=s->aperture().render48(s->transition().lifecycle);
         if(!apertureOkay(status)){d.aperture.status=status;s->fault(Status::aperture,0x1ECE80);okay=false;}
         if(s->state.faulted)okay=false;
     }
@@ -1940,9 +2005,9 @@ const OriginalUiRiderDrawContribution50KG* OriginalUiRiderSession50KG::rendererO
 }
 OriginalUiRiderSessionSnapshot50KG OriginalUiRiderSession50KG::snapshot() const noexcept {
     const auto* s=storage_.get();if(!s)return {};
-    auto out=s->state;out.blocked4E0=s->panel.inputBlocked4E0();out.bypass4E4=s->panel.bypass4E4();out.panelY4DC=s->panel.offset4DC();
+    auto out=s->state;out.blocked4E0=s->panel().inputBlocked4E0();out.bypass4E4=s->panel().bypass4E4();out.panelY4DC=s->panel().offset4DC();
     out.resetPopupPending=s->resetPending;
-    out.transition=s->transition();out.aperture=s->aperture.snapshot();out.bankGeneration=s->backend.generation();
+    out.transition=s->transition();out.aperture=s->aperture().snapshot();out.bankGeneration=s->backend.generation();
     std::uint16_t character=0;
     out.selectedCharacterReady=out.selectionAttached&&s->selectedConfirmCharacter(character)&&
         (s->addonSlot?(s->addonCharacter()&&s->addonCharacter()->sourceReadiness()):s->dynamic.sourceCharacterReadiness(character));
@@ -1951,6 +2016,17 @@ OriginalUiRiderSessionSnapshot50KG OriginalUiRiderSession50KG::snapshot() const 
 void OriginalUiRiderSession50KG::drain() noexcept {if(storage_)storage_->cpuDrain();}
 void OriginalUiRiderSession50KG::requestQuit() noexcept {
     if(!storage_)return;storage_->cpuDrain();storage_->state.backProposalPending=false;storage_->state.confirmProposalPending=false;storage_->state.quitRequested=true;
+}
+Status OriginalUiRiderSession50KG::retirePageSubmission(VehicleWindowGl50DS& renderer,
+    VehicleWindowDiagnostic50DS& rd,Diagnostic& d) noexcept {
+    auto* s=storage_.get();
+    if(!s||s->transition().lifecycle!=Life::selectRequestedPage||s->cold.prospectiveMode!=1)return result(d,Status::invalidInput);
+    const auto generation=s->collector.sourceSubmissionWatermark(),frontier=s->backend.materialLifetime().sequence();
+    if(!generation||s->collector.sourceRenderer()!=&renderer||!s->collector.retireSourceRenderer(renderer,rd,d.draw)||
+       !rd.submittedWorkCompleted)return result(d,Status::backend);
+    s->cpuDrain();
+    if(!s->backend.acceptSourceRetirement(&s->collector,generation,frontier))return result(d,Status::backend);
+    return result(d,Status::ok);
 }
 bool OriginalUiRiderSession50KG::sourceTeardownPending()const noexcept {
     return storage_&&!storage_->sourceTornDown&&storage_->backendBound&&
@@ -1982,7 +2058,7 @@ Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
     if(!s.collector.consumeMaterials(false,d.draw))return result(d,Status::draw,d.draw.sourcePC);
     if(!s.backend.finalizeTeardown(s.collector.materialSequence(),d.backend))return result(d,Status::backend);
     s.sourceTornDown=true;s.dependenciesPrepared=false;s.state.selectionAttached=false;
-    if(s.addonCarousel)game::dlc50DL::setHighlightedAddonRider(s.addonPlayer,0); // no Rider page, no highlight
+    if(s.addonCarousel)game::dlc50DL::setHighlightedAddonRider(s.riderPlayer,0); // no Rider page, no highlight
     s.addonModels.drain(); // add-on graphs hold no lifetime rows; the renderer is retired above
     return result(d,Status::ok);
 }

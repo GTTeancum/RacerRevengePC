@@ -56,9 +56,9 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
            camera->nativeTaIssuance_->generation!=race->entity_.sessionGeneration||
            camera->generation_!=race->entity_.sessionGeneration||camera->actual_.applicationEntities!=entitiesOwner_||
            &camera->actual_.bank!=&actual.racerBank||&camera->actual_.all8Manager!=&actual.originalAiSession.manager||
-           camera->actual_.raceHud!=&actual.sourceRaceHud||camera->actual_.humanCount34!=1u||
+           camera->actual_.raceHud!=&actual.sourceRaceHud||!camera->actual_.humanCount34||camera->actual_.humanCount34>2u||
            !camera->viewport_.prepared||camera->viewport_.sessionGeneration!=camera->generation_||
-           !actual.sourceRaceHud.loaded()||actual.sourceRaceHud.viewCount()!=1u)
+           !actual.sourceRaceHud.loaded()||actual.sourceRaceHud.viewCount()!=camera->actual_.humanCount34)
             return reject("Native human root requires prepared same-Operation Camera/Bank/HUD owners");
         const auto hud=race->endHud_.lock();
         if(!hud||hud->thread_!=std::this_thread::get_id()||!hud->active_||!hud->published_||
@@ -94,6 +94,22 @@ bool Application::publishNativeHumanResultsRoot50LA(::interactive_publication50D
 }
 
 namespace rr::game {
+bool OriginalRaceConstructor50LA::disableResultsCamera1ABA24(std::int32_t view)noexcept {
+    const auto* session=cameraNativeAdapter34_;
+    if(view!=1||!session||!ownsNativeCameraAdapter34(*session)||session->actual_.humanCount34!=2u||
+       !session->nativeRacerCameraBindingsCurrent()||!session->identitiesCurrent())return false;
+    auto* binding=session->display_.controllers48[view];
+    if(binding!=&session->secondControllerEntity_||binding->actualController!=&session->secondColdController_.entity||
+       session->secondColdController_.vtable08!=0x3ce310u)return false;
+    auto* entity=binding->actualController;
+    if(entity->firstChild18||binding->firstEntityChild18||entity->sessionGeneration!=entity_.sessionGeneration)return false;
+    // 3CE310+18 -> 141520, which clears flags29 bits 0/1 and notifies children via 141460.
+    OriginalWreckComponent50LA* nodes[]={entity};
+    const OriginalWreckComponentDomain50LA domain{entity->sessionGeneration,nodes,1};
+    if(setOriginalWreckBaseActivity50LA(domain,*entity,false).status!=OriginalWreckComponentStatus50LA::complete)return false;
+    binding->flags29=entity->flags29;
+    return true;
+}
 bool OriginalRaceConstructor50LA::attachNativeHumanResultsRoot50LA()noexcept {
     if(resultsFeedbackThread_!=std::this_thread::get_id()||
        nativeHumanRootStep_!=NativeHumanRootStep::unreached||nativeRootAttached_||nativeRootMaskReached_||

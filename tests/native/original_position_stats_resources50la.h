@@ -373,7 +373,7 @@ class OriginalPositionStatsResources50LA final {
     // Source191150 obtains3210 from race8C;191BB0 supplies Application268+1.
     bool layout191290(const OriginalPositionStatsNumbers50LA& observation,D& d)noexcept {
         position_stats_detail50LA::LayoutOffsets offsets;
-        if(!observationDisplay()||observation.viewIndex!=0||
+        if(!observationDisplay()||observation.viewIndex>=2||
            !position_stats_detail50LA::layoutOffsets191290(observation.raceMode8C,
                 observation.viewIndex+1,offsets)){
             d.error=E::phase;d.sourcePC=0x191290;return false;
@@ -540,7 +540,7 @@ inline bool Application::capturePositionStatsNumbers50LA(
     const rr::game::OriginalPositionStatsResources50LA& resources,
     const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
     rr::game::OriginalPositionStatsNumbers50LA& output,
-    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d,unsigned view)const noexcept {
     using Adapter=original_position_stats_adapter50LA::Owner;
     using Error=rr::game::OriginalPositionStatsResourceDiagnostic50LA::Error;
     d={};
@@ -561,23 +561,23 @@ inline bool Application::capturePositionStatsNumbers50LA(
     Adapter observation;Adapter::Diagnostic adapterDiagnostic;
     rr::game::OriginalPositionStatsNumbers50LA next;
     if(!observation.bind(camera,manager,adapterDiagnostic)||
-       !observation.capture(next,adapterDiagnostic))return reject();
+       !observation.capture(next,adapterDiagnostic,view))return reject();
     output=next;return true;
 }
 inline bool Application::preparePositionStatsLayout50LA(
     rr::game::OriginalPositionStatsResources50LA& resources,
     const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
-    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d,unsigned view)const noexcept {
     rr::game::OriginalPositionStatsNumbers50LA observation;
-    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)&&
+    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d,view)&&
         resources.layout191290(observation,d);
 }
 inline bool Application::preparePositionStatsText50LA(
     rr::game::OriginalPositionStatsResources50LA& resources,
     const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
-    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d,unsigned view)const noexcept {
     rr::game::OriginalPositionStatsNumbers50LA observation;
-    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)&&
+    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d,view)&&
         resources.layout191290(observation,d)&&
         resources.prepareText191DB0(observation,std::uint32_t(videoOwner_->packetZMaximum),d);
 }
@@ -587,13 +587,13 @@ inline bool Application::preparePositionStatsText50LA(
 inline bool Application::preparePositionStatsRadar50LA(
     rr::game::OriginalPositionStatsResources50LA& resources,
     const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
-    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d,unsigned view)const noexcept {
     namespace detail=rr::game::position_stats_detail50LA;
     using Adapter=original_position_stats_adapter50LA::Owner;
     using Error=rr::game::OriginalPositionStatsResourceDiagnostic50LA::Error;
     resources.radarRoute_={};resources.radarMarkerCount_=0;
     rr::game::OriginalPositionStatsNumbers50LA observation;
-    if(!capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)||
+    if(!capturePositionStatsNumbers50LA(resources,camera,manager,observation,d,view)||
        !resources.layout191290(observation,d))return false;
     bool visible=false;detail::Visibility preference;
     if(!detail::ownLeafVisible191BE0(observation.viewIndex,observation.raceFlags1B0,
@@ -603,7 +603,7 @@ inline bool Application::preparePositionStatsRadar50LA(
         d.error=Error::phase;d.sourcePC=0x191be0;return false;}
     if(!visible||!preference.map)return true;
     Adapter adapter;Adapter::Diagnostic diagnostic;Adapter::RadarObservation radar;
-    if(!adapter.bind(camera,manager,diagnostic)||!adapter.captureRadar1924C0(radar,diagnostic)||
+    if(!adapter.bind(camera,manager,diagnostic)||!adapter.captureRadar1924C0(radar,diagnostic,view)||
        radar.publication!=observation.cameraPublication||!radar.map.runtimeValid()){
         d.error=Error::phase;d.sourcePC=0x1924fc;return false;}
     return resources.prepareRadarRoute1924C0(radar.map,radar.center,radar.headingE4,d)&&

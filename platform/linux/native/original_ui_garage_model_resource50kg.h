@@ -87,7 +87,7 @@ private:
         }
     }
     bool prepare(std::shared_ptr<const assets::OriginalUiGarageModelAsset50KG> source,
-        RootMode mode,bool lighting,const std::vector<std::shared_ptr<OriginalUiGarageModelResource50KG>>& population,D& d)noexcept {
+        RootMode mode,bool lighting,const std::vector<std::shared_ptr<OriginalUiGarageModelResource50KG>>& population,D& d,bool selectedPod)noexcept {
         d={};if(attempted_||closed_)return fail(d,S::alreadyPrepared,0x26E820,"garage.model.prepare.reentry");
         if(!application_||!application_->application10()||!generation_||application_->attachmentLock423F58()||
            !domain_||!domain_->prepared()||!context_||!context_->live()||
@@ -110,7 +110,8 @@ private:
             archive==assets::originalUiGaragePodArchive50KG(static_cast<std::uint32_t>(selectedCareer));
         if(!source->archive->loaded()||
            (archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::garage)&&
-            !selectedArchive))
+            !selectedArchive&&!(selectedPod&&source->archive->addon()&&
+             assets::originalUiAddonMemberArchive50DL(source->source.identity)==archive)))
             return fail(d,S::source,0x132820,"garage.model.archive.identity");
         // Every authenticated selected E archive has its exact single PSG at
         // ordinal1. Do not admit a different catalog member just because its
@@ -368,7 +369,7 @@ class OriginalUiGarageModelResources50KG final {
         std::shared_ptr<const assets::OriginalStandardMaterialContext50LA> context,std::uint64_t generation)noexcept
         :application_(std::move(application)),domain_(std::move(domain)),context_(std::move(context)),issuer_(issuer),generation_(generation){}
     bool load(std::shared_ptr<const assets::OriginalUiGarageModelAsset50KG> source,R::RootMode mode,
-        bool lighting,std::shared_ptr<R>& out,D& d)noexcept {
+        bool lighting,std::shared_ptr<R>& out,D& d,bool selectedPod=false)noexcept {
         d={};if(out||!issuer_||!generation_||population_.size()>=42u)return R::fail(d,S::input,0x26E820,"garage.models.load.inputs");
         try {
             // Reserve native owner backing before any counted constructor.
@@ -376,7 +377,7 @@ class OriginalUiGarageModelResources50KG final {
             auto next=std::shared_ptr<R>(new R(application_,domain_,context_,generation_));
             next->nativeSharedSelf_=next;
             population_.push_back(next);out=next; // Retain a partial prefix on failure.
-            return next->prepare(std::move(source),mode,lighting,population_,d);
+            return next->prepare(std::move(source),mode,lighting,population_,d,selectedPod);
         }catch(...){return R::fail(d,S::allocation,0x26E820,"garage.models.load.allocation");}
     }
 public:

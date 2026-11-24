@@ -94,7 +94,15 @@ struct OriginalCameraControllerEntityFields {
     OriginalWreckComponent50LA* actualController=nullptr;
     OriginalWreckComponent50LA* actualIntroAudio=nullptr;
 };
+struct OriginalRaceCameraSceneBorrow {
+    OriginalCameraViewportFields* viewport=nullptr;
+    CameraSceneState49F* scene=nullptr;
+    OriginalCameraSceneTick* tick=nullptr;
+    const assets::TVCameraVector49E* position180=nullptr;
+    CameraViewOutput49F* matrices=nullptr;
+};
 struct OriginalRaceCameraDisplayFields {
+    OriginalRaceCameraSceneBorrow secondScene{};
     std::uint64_t sessionGeneration=0,raceKey=0;
     std::array<std::uint64_t,4> applicationCameras254{};
     std::uint32_t cameraCount264=0;
@@ -108,13 +116,6 @@ struct OriginalRaceCameraDisplayFields {
     OriginalRendererDispatchFields* rendererDispatch=nullptr;
     OriginalCameraDrainPolicy drainPolicy=OriginalCameraDrainPolicy::requireCommittedImage;
     OriginalRaceFogFields* actualTrackFog3EC=nullptr;
-};
-struct OriginalRaceCameraSceneBorrow {
-    OriginalCameraViewportFields* viewport=nullptr;
-    CameraSceneState49F* scene=nullptr;
-    OriginalCameraSceneTick* tick=nullptr;
-    const assets::TVCameraVector49E* position180=nullptr;
-    CameraViewOutput49F* matrices=nullptr;
 };
 //26F940 direct selection after real1146B0/1156E0. The admitted fresh scene
 //has source640x448 dimensions already; the different-size114920 branch stays
@@ -131,6 +132,7 @@ inline OriginalCameraStartResult selectOriginalRaceScene26F940(
 class OriginalRaceViewportCall final {
     unsigned phase_=0;
     unsigned drainPhase_=0;
+    std::int32_t mode_=0;
     bool started_=false,completed_=false,cold_=false;
     OriginalRaceCameraDisplayFields* owner_=nullptr;
     OriginalCameraViewportFields* viewport_=nullptr;
@@ -138,12 +140,12 @@ class OriginalRaceViewportCall final {
     OriginalCameraDrainPolicy drainPolicy_=OriginalCameraDrainPolicy::requireCommittedImage;
     OriginalCameraStartResult applicationList(OriginalRaceCameraDisplayFields& d,
         const OriginalRaceCameraSceneBorrow& scene) noexcept {
-        d.applicationCameras254={{scene.viewport->sceneKey,0,0,0}};d.cameraCount264=1;
+        d.applicationCameras254={{scene.viewport->sceneKey,mode_?d.secondScene.viewport->sceneKey:0,0,0}};d.cameraCount264=mode_?2u:1u;
         return {OriginalCameraStartStatus::complete,0x1401f8};
     }
     OriginalCameraStartResult fog(OriginalRaceCameraDisplayFields& d) noexcept {
         if(!d.actualTrackFog3EC)return {OriginalCameraStartStatus::complete,0x1a98e4};
-        return restoreOriginalRaceFog1A98DC(*d.actualTrackFog3EC,d.rendererFogColor28);
+        return restoreOriginalRaceFog1A98DC(*d.actualTrackFog3EC,d.rendererFogColor28,mode_!=0);
     }
     OriginalCameraStartResult controllers(OriginalRaceCameraDisplayFields& d) noexcept {
         //The real fresh controller entity trees have no generic children.
@@ -158,13 +160,18 @@ class OriginalRaceViewportCall final {
                 return {OriginalCameraStartStatus::sceneChildren,0x1414cc};
             OriginalWreckComponent50LA* nodes[]={parent,child};
             const OriginalWreckComponentDomain50LA domain{parent->sessionGeneration,nodes,2};
-            const auto r=setOriginalWreckBaseActivity50LA(domain,*parent,i==0);
+            const auto r=setOriginalWreckBaseActivity50LA(domain,*parent,i<(mode_?2u:1u));
             if(r.status!=OriginalWreckComponentStatus50LA::complete)
                 return {OriginalCameraStartStatus::sceneChildren,r.sourcePC};
             c->flags29=parent->flags29;
         }
-        if(d.controllers48[0])d.controllers48[0]->flags29|=3u;
-        for(unsigned i=1;i<4;++i)if(d.controllers48[i])d.controllers48[i]->flags29&=static_cast<std::uint8_t>(~3u);
+        for(unsigned i=0;i<d.controllers48.size();++i){
+            auto* c=d.controllers48[i];
+            if(!c)continue;
+            if(i<(mode_?2u:1u))c->flags29|=3u;
+            else c->flags29&=static_cast<std::uint8_t>(~3u);
+            if(c->actualController)c->actualController->flags29=c->flags29;
+        }
         return {OriginalCameraStartStatus::complete,0x1a9938};
     }
 public:
@@ -182,19 +189,29 @@ public:
            display.sessionGeneration!=scene.viewport->sessionGeneration||!scene.tick->bound||
            scene.tick->sessionGeneration!=display.sessionGeneration||scene.tick->sceneKey!=scene.viewport->sceneKey)
             return {S::owner,0x1a9750};
-        if(!cold&&(display.viewportMode8C!=0||display.extraScene44))return {S::sourcePath,0x1a9840};
-        if(started_&&(cold_!=cold||owner_!=&display||viewport_!=scene.viewport||renderer_!=&renderer||
+        const auto mode=cold?0:display.viewportMode8C;
+        if(mode<0||mode>2||(!cold&&display.extraScene44))return {S::sourcePath,0x1a9840};
+        const auto& second=display.secondScene;
+        if(mode&&(!second.viewport||second.viewport==scene.viewport||!second.viewport->prepared||
+            !second.scene||!second.matrices||!second.position180||!second.tick||!second.tick->bound||
+            second.viewport->sessionGeneration!=display.sessionGeneration||
+            second.tick->sessionGeneration!=display.sessionGeneration||
+            second.tick->sceneKey!=second.viewport->sceneKey||second.viewport->sceneKey==scene.viewport->sceneKey))
+            return {S::owner,0x1a99dc};
+        if(started_&&(mode_!=mode||cold_!=cold||owner_!=&display||viewport_!=scene.viewport||renderer_!=&renderer||
             drainPolicy_!=display.drainPolicy))return {S::owner,0x1a9750};
-        if(!started_){started_=true;cold_=cold;owner_=&display;viewport_=scene.viewport;
+        if(!started_){started_=true;cold_=cold;mode_=mode;owner_=&display;viewport_=scene.viewport;
             renderer_=&renderer;drainPolicy_=display.drainPolicy;}
         for(;;){
-            if(phase_==7){completed_=true;return {S::complete,0x1a9ec8};}
+            if(phase_==(mode_?11u:7u)){completed_=true;return {S::complete,0x1a9ec8};}
             //Cold: viewport/drain/matrix THEN camera list/fog/controller flags.
             //Exit: list/fog/controller flags THEN viewport/drain/matrix.
-            const unsigned action=cold_?phase_:(phase_<3?phase_+4:phase_-3);
+            const bool secondView=phase_>=7;
+            const auto& activeScene=secondView?second:scene;
+            const unsigned action=secondView?phase_-7:(cold_?phase_:(phase_<3?phase_+4:phase_-3));
             OriginalCameraStartResult r{S::complete,0};
             switch(action){
-            case 0:r=setOriginalFullRaceViewport1158A0(*scene.viewport,*scene.scene,*scene.tick,display.rendererBufferCount0C);break;
+            case 0:r=setOriginalFullRaceViewport1158A0(*activeScene.viewport,*activeScene.scene,*activeScene.tick,display.rendererBufferCount0C,mode_,secondView?1u:0u);break;
             case 1:
                 //Each successful external barrier is retained separately. If
                 //the second call blocks/fails, resuming must not repeat the
@@ -218,9 +235,9 @@ public:
                 break;
             case 2:
                 //245918 tests actual renderer current scene0 before zoom.
-                if(display.rendererCurrentScene0)r=updateOriginalViewportZoom2458C0(*scene.viewport,*display.rendererCurrentScene0);
+                if(display.rendererCurrentScene0)r=updateOriginalViewportZoom2458C0(*activeScene.viewport,*display.rendererCurrentScene0);
                 break;
-            case 3:r=rebuildOriginalRaceScene236DD0(*scene.viewport,*scene.scene,*scene.position180,*scene.matrices);break;
+            case 3:r=rebuildOriginalRaceScene236DD0(*activeScene.viewport,*activeScene.scene,*activeScene.position180,*activeScene.matrices);break;
             case 4:r=applicationList(display,scene);break;
             case 5:r=fog(display);break;
             case 6:r=controllers(display);break;
@@ -228,6 +245,7 @@ public:
             }
             if(r.status!=S::complete)return r;
             ++phase_;
+            if(phase_==7)drainPhase_=0;
         }
     }
 };
@@ -316,7 +334,7 @@ public:
         if(b.actualLaunch11258<1||b.actualLaunch11258>3||
            (b.actualLaunch11258!=2&&b.start7C.route[0]!=-1)||
            (b.actualPreference11030!=0&&b.actualPreference11030!=5)||
-           b.actualRacerState40!=0||b.actualIntroAudio80||(b.raceFlags1B0&3u)!=1u||
+           b.actualRacerState40!=0||b.actualIntroAudio80||(b.raceFlags1B0&3u)!=(b.controller.binding.bootstrap==CameraBootstrap::original_versus?2u:1u)||
            b.controller.flags62&0xe0u||!b.startActions.authenticated())return {S::sourcePath,0x1762f4};
         if(!generation_){if(b.controller.mode44!=4)return {S::owner,0x1762f4};generation_=registry->sessionGeneration;}
         for(;;){OriginalCameraStartResult r{S::complete,0};switch(phase_){
@@ -381,7 +399,7 @@ public:
         if((b.actualLaunch11258!=1&&b.actualLaunch11258!=3)||(b.actualPreference11030!=5&&b.actualPreference11030!=0)||
            b.actualRacerState40!=0||(b.actualIntroAudio80&&(!b.introAudioOwner||
                b.introAudioOwner->taIntroEntity80()==nullptr))||b.controller.flags62&0xe0u||
-           (b.raceFlags1B0&3u)!=1u||!b.startActions.authenticated())return {S::sourcePath,0x176664};
+           (b.raceFlags1B0&3u)!=(b.controller.binding.bootstrap==CameraBootstrap::original_versus?2u:1u)||!b.startActions.authenticated())return {S::sourcePath,0x176664};
         if(!begun_){
             if((b.taExitReason<2&&(b.controller.mode44!=7||registry->registered38[registry->selected34]!=b.introChild.start7CKey))||
                (b.taExitReason>=2&&b.controller.mode44!=4))return {S::owner,0x176648};

@@ -14,6 +14,8 @@ namespace rr::game {
 // Bodies, controls, thermal state, navigation and lap clocks remain canonical
 // external owners. No duplicated pose, speed or input histories live here.
 struct AiRuntimeState50IV {
+    // A piloted human keeps separate AI route choices and human lap timing.
+    TrackNavigationProgress50EU pilotNavigation{};
     AiProfile50IU profile{};
     AiStatePrefixState50IV state{};
     AiPackingState50IV packing{1.f,0.f,0};
@@ -78,7 +80,7 @@ struct AiRuntimeInput50IV {
     AiApplicationGlobals50IV* applicationGlobals=nullptr;
     std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0;
     std::uint8_t settings1125C=0;
-    bool raceOwnersBound=false,settings188F60Nonzero=false;
+    bool raceOwnersBound=false,settings188F60Nonzero=false,playerPilot=false;
     ai_combat_distance50LH::DiagnosticSink combatDiagnostic=nullptr;
     void* combatDiagnosticContext=nullptr;
     BodyContactIdentity48R (*resolveBody340)(const void*,std::uint32_t) noexcept=nullptr;
@@ -175,7 +177,10 @@ inline bool driveOriginalAi50IVShared50MB(VehicleFrameState49W&frame,const Vehic
     // A failed prior state5 dispatch owns a partial source frame. Never replay
     // navigation, packing, repair or16E830 after its physical-reset boundary.
     if(ai.physicalReset2255B0Pending)return stop(0x2255b0u);
-    if(!ai.initialized||frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||
+    const bool driverBound=in.playerPilot?
+        (ai.managerIndexFE0<in.managerHumanCount34&&frame.fields.vehicle58==0u):
+        (frame.fields.vehicle58==1u&&frame.fields.nativeAiOwnersBound50IV);
+    if(!ai.initialized||!driverBound||
        frame.phase!=VehicleFramePhase49W::PostPlayer)return stop(0x16e8c0);
     parameters.rates.x=4.f; //16E8D4 owns live B94 even when dispatch is skipped.
     if(!in.applicationGlobals)return stop(0x16e950);
@@ -194,8 +199,9 @@ inline bool driveOriginalAi50IVShared50MB(VehicleFrameState49W&frame,const Vehic
     const typename navigation_consumer_detail50MB::RuntimeTypes<Input>::RouteOwners routeOwners{*aiMetadata,ai.fieldFE4,
         ai.state.aiStateFE8,ai.packing.policy1000,frame.noiseOwner().sharedRandomState,
         &ai.mode1050,&ai.target1008Present,&ai.target1008ManagerIndex,in.racers,in.racerCount};
+    auto pilotFlags=frame.fields.impactFlagsCD8;
     if(!advanceAiNavigation50IV(*mapFF0,*aiFF4,*aiMetadata,previousCA0,position,
-        in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,routeOwners,receipt.driving))return stop(receipt.driving.sourcePC);
+        in.actualZoneOrdinal48,progress,lapCC8,in.playerPilot?pilotFlags:frame.fields.impactFlagsCD8,ai.navigation,ai.boost,routeOwners,receipt.driving))return stop(receipt.driving.sourcePC);
     const auto current=progress.reset.vehicleC80,previous=progress.vehicleC84;
     if(current>=navigation_consumer_detail50MB::read(*orientationTrackBC).track.count||previous>=navigation_consumer_detail50MB::read(*orientationTrackBC).track.count)return stop(0x173af0);
     AiOrientationInput50IV orientation{};
