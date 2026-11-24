@@ -156,3 +156,108 @@ was not traced separately.]
 course_triggers count=0: correct. "count" is the Revenge trigger rows only; the N64 rows are
 counted by the next line (course_triggers_n64 site=ND rows=7, NM rows=6, NV rows=25 in cr-29:
 admitted). The kinds list names both.
+
+2026-11-23 native evidence and original-camera trace
+----------------------------------------------------
+Vengeance (cr-70) bound 24/24 trigger rows. Three asteroid carrier identities are
+animated collision meshes. The floor lookup during flight must not substitute a
+nearby asteroid mesh for the floor. See evidence/pilot-cr-70-nv-time_trial-01.
+The 24-second fan was already at 4.97599 seconds on world tick 311 before green.
+
+Spice Mine Run (cr-72) bound all three collision-only movers and advanced them
+during countdown and racing. Their N64 node offsets are 50d64, 511d0, 5122c.
+Their periods are 166.633, 91.4667 and 31.3333 seconds. The source key times fit
+the native MOT reader and retain changes of direction on the source keys.
+See evidence/pilot-cr-72-ns-time_trial-02. Physical contact still needs checking.
+
+Bumpy's Breakers (cr-72) armed all four panels on the first passage. That run
+exposed a second issue. The PS2 motion clock reset to zero at the terminal key,
+so an N64 307 reversal would choose the wrong direction. The converter now marks
+the four motions HoldLastKey. Verify the terminal times and reversal in cr-74.
+
+The pillar 'Shak' parameters are distances. N64 80041CB0..80041CFC initializes
+two 4x4 transforms and writes the two translation XYZ triples to +50/+54/+58
+and +138/+13C/+140. 80043C2C..80043C58 adds the oscillator to focus Z at +140
+and half to camera Z at +58. The PC camera's corresponding transform roles are
+documented in the local SW_RACER_RE player_camera.cpp. In converted coordinates
+vertical is Y. At scale 2.5 the maximum focus displacement is 0.125 feet and
+camera displacement is 0.0625 feet. Native camera integration remains open.
+
+Bumpy's Breakers at 2.2 (cr-75, pilot-cr-75-nu-single-scale22)
+All four 307 motions held 3.26667 seconds and reversed together on the next
+eligible passage (slot 7, timer 5.61827 seconds). Three racers finished. The
+pilot and four opponents stopped near x=21894, z=31351 at the second panel
+pair, downstream of the shared trigger at x=23766, z=30738. The decoded
+0x68dbc rest mesh spans x=21823..21898 and z=31258..31423. The 307 handler
+at 8007D1F8..8007D23C requires a trigger activation and timer >3 seconds.
+The revised conversion preserves both original spline approaches with extra
+nodes and limits lateral AI targets near the moving panels. Course collision
+and the 307 timer are unchanged. Native retest: evidence/cr75-nu-door-approach.
+
+The 2.2 revised approach passed in Time Trial (cr75-nu-doors-tt, map node
+121 captures 2-4, pilot continued into lap 2). In cr77-nu-doors-field, the
+eight-racer Single Race closed all four panels when slot 4 arrived after
+3.77753 seconds. The player AI crossed both pairs and finished first in
+249.610 seconds with one lap sealed. All eight rebuilt N64 packages were
+then present in the local authoring, DLC and tester collections and passed
+the stock-install package check.
+
+The cr77 Bumpy result predates verification of the compound COL node binding.
+The converted doors carried time-varying poses but their old COL meshes were
+attached to the stationary model root. Repeat the field race with node 1
+bindings before accepting the door passage as a physical test.
+
+Spice Mine Run model 143 has two distinct moving collision meshes. The middle
+animation is the transform parent of the third row and must not register a
+duplicate collider. Both the parent and child keep their own clocks. The
+converted compound collision bodies bind node 1, which the VUT animates.
+The native ray probe hit the expected owner at 1.008, 11.0079 and 26.0003
+seconds for both meshes. First-face centroid distances from the N64 model
+in feet were 0.015/0.072, 0.138/0.087 and 0.065/0.141 in row order.
+ShortAxis MOT keys reduced the rotation error seen with ByteAxis. Evidence:
+evidence/cr87-ns-shortaxis/RacerRevenge.log. Native FPS baseline: 62.50.
+The verified Spice Mine Run package is installed in all three local roots.
+
+cr90-nu-moving-doors supersedes the cr77 Bumpy field result above. In a
+one-lap eight-racer field the AI pilot cleared the moving panels and won
+in 253.62 seconds. On the next eligible activation slot 6 closed all four
+panels after 3.44139 s. Native track images 2, 3 and 4 show the pod leading
+at the doors at 2:32.88, 2:33.00 and 2:33.11. The five-second swap baseline
+was 62.43 FPS. The run was stopped after the result was sealed and the
+replay had looped. Corrected package installed in the three local roots.
+
+Bumpy's Breakers corvettes (N64 USA track model 135). The three ships are
+visual-only subtrees at 0x898, 0x2210 and 0x39B8. Each contains seven meshes
+and 115 source triangles. Each has type 8 rotation and type 9 translation
+with flags 0x11000030. Their respective periods are 31.933, 49.200 and
+31.933 seconds. They start with the course and move independently of racers.
+The converter moves their mesh ownership out of static scenery and exports
+the original joint keys as three visible, non-colliding load loops. Against
+the packed NU.RES at seven times per ship, the largest bidirectional vertex
+distance was 0.66 ft at scale 2.2. A native racing-camera check is separate.
+At course nodes 19 through 22, native frames track-26, track-29 and
+track-35 show the first ship moving across the opening as the racer exits
+the tunnel. Its hull is partly obscured by the pod and terrain. The other
+two paths were checked in the packed data and started in the native log.
+Evidence is under evidence/cr148-nu-corvettes/capture/race-session-2.
+Installed the verified package in the package, tester and authoring roots.
+cr151 Vengeance in-place restart. The two fan rows reset at tick 1148 with
+elapsed=0 and motion_time=0. Nineteen native steps later both read 0.304 s,
+then 5.31199 s after 332 steps. Their periods are 13.3333 s and 24 s.
+Evidence: evidence/cr151-nv-fan-reset/RacerRevenge.log. The 65-second run
+used a watchdog after the restart. Vengeance trigger 9 in the updated
+package uses the local gate. In a production hazard-reader and step test
+on its decoded TOB, a local racer crossed at camera distances 0 and 5000 ft
+and fired both times. AI crossed at the same distances and was rejected
+both times. Installed the Vengeance and Spice Mine Run load-loop packages.
+
+cr158 Vengeance solo time trial, 2.2 scale. The AI-piloted player crossed
+the lap line in 163.752 s. Authored asteroid triggers 4, 7 and 19 started
+three World4D8 one-shots. A full-recording search for the decoded ROM PCM at
+each logged pitch found peaks at 100.384, 104.464 and 132.352 s. These match
+the three race event spacings within 2 ms. Correlation scores were 0.524,
+0.463 and 0.453 (reversed waveform 0.126, 0.109 and 0.123). Native drive
+receipts show 1.0 -> 0.824176 and 0.73 -> 0.601648 at the first impact.
+The full recording and first impact excerpt are under evidence/cr158-nv-solo-impact.
+This run ended on its time budget in Time Trial. The audio package is installed
+in the private package, tester and authoring roots.

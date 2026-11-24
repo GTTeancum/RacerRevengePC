@@ -1,4 +1,4 @@
-> Current handoff: [November 6, 2026](docs/HANDOFF-20261106.md). Its current constraints and checkpoint supersede the historical notes below.
+> [Current maintainer handoff and release recovery instructions](docs/HANDOFF-20261124-release.md). Historical checkpoints follow.
 
 # Additional runtime verification: October 17, 2026, 11:39 p.m. EDT
 

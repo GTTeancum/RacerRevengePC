@@ -148,7 +148,7 @@ the shared dialogs 470/47C (reappendRiderEntry1E809C -> reappendNativeMenu1B86D0
 function required initialMainAttached_, i.e. that some earlier manager had already put
 470/47C under the dispatcher. On a race-return frontend only Main (1D7CF4, fresh boot) or the
 Garage (1FB648, reappend1B86D0) ever did that. A frontend that starts on Course6, Hall11,
-Win7 or Unlock10 boots 470/47C per frontend (port stand-in) and leaves them unattached, so
+Win7 or Unlock10 boots 470/47C per frontend (new PS2 dispatcher at 17C1C4, dialog creation at 1B7BD0) and leaves them unattached, so
 the first later 1B86D0 (Rider from Course, Options from Hall, Main re-entry) was refused and
 the deferred activation of the previous screen failed. The original keeps 470/47C attached
 across the race, so its 1B86D0 just detaches and re-appends them.

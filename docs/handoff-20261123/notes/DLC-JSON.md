@@ -5,6 +5,10 @@ is a PC enhancement. The game checks every rule below at startup
 (`src\assets\dlc_package50dl.cpp`, `src\assets\dlc_files50dl.cpp`); the offline tool
 `tools\dlc\dlc_pack.py` applies the same rules.
 
+## Race loading presentation
+
+Every add-on course uses the stock Racer Revenge race loading layout. The N64 and arcade package builders select `"loading_screen": {"stock": "tb"}`, which reads the original background, record panel and progress-bar frame from the player's installation. The presenter draws the selected add-on's own name, rival, records and loading animation. Keep the course-selection background and hologram in their respective fields. An overhead render of the track does not meet the loading-screen art requirement even if its texture dimensions pass validation.
+
 ## Folder
 
 ```
@@ -207,10 +211,9 @@ dlc_registry packages=12 refused=0 courses=5 pods=7 replacements=0
   "strings": { "english": { "COURSE_NV": "VENGEANCE", "PLANET_NV": "OOVO IV" } },
   "items": [ { "kind": "course", "id": "nv", "code": "nv", "archive": "TRACKS/NV.RES",
      "name_key": "COURSE_NV", "planet_name_key": "PLANET_NV", "phy_class": "B", "ai_class": "A", "rival": "none",
-     "loading_screen": { "file": "UI/TEXTURES/LD_NV.PST" }, "modes": ["single", "time_trial"],
+     "loading_screen": { "stock": "tb" }, "modes": ["single", "time_trial"],
      "enhancements": ["surface_rules", "zero_g", "n64_floor_table"] } ],
-  "files": [ { "path": "TRACKS/NV.RES", "bytes": 1399140, "sha256": "..." },
-             { "path": "UI/TEXTURES/LD_NV.PST", "bytes": 287772, "sha256": "..." } ] }
+  "files": [ { "path": "TRACKS/NV.RES", "bytes": 1399140, "sha256": "..." } ] }
 ```
 
 ## Pod example (Ark Roose)

@@ -89,3 +89,72 @@ S1 detail (round 2 finding, not yet written)
   (original_ui_rider_session50kg.cpp confirmReady admits mode 0 and 2 only), so no VS race can start; Back
   returns to Main. No crash, no half-built race. The S2 race guard ("refuse a two-human race before load, log,
   back to Course") goes in with S1, when a VS launch first becomes reachable.
+
+Native VS progress (cr87–89). The authenticated slot-2 Main choice reaches
+Rider 5/1 then 5/2. Port two changed rider 19 to 20 while port one kept 19.
+Course 6/1 displayed Mos Espa, eight entrants and one lap, accepted Race,
+then mounted TA and reached its race constructor. Native Course still:
+evidence/cr86-vs/capture/frontend-session-1/course-3.png.
+Original 1EA640 preserves Song7 for the Rider page change. P2's 1EAD8C
+plays event 1 directly. It skips P1's voice choice and character confirm
+animation. The two-player launch has seven original profile writes.
+At 1A92A4 the view count of two selects race+8C from the profile's vertical
+split preference (1 horizontal, 2 vertical). Camera34 is initialized before
+the second camera constructor at 1A93FC stores Camera38 at 1A9418. Each
+initializes with 640x448. Independent cameras, controls, HUDs and race
+results still require native verification.
+
+Native build cr98 accepted both human racers in the finish-order publication and
+reached gameplay camera preparation. The current session constructor there still
+requires one human. The original 1A9590 calls 1A9750 with a1=1 to select
+Camera34 full-screen first. The a1=0 path reads race+8C at 1A9840 and selects
+both cameras before dividing the view. For horizontal split, 1A9A90..1A9ADC
+pass (0,0,640,224) and (0,224,640,224) to 1158A0. For vertical split,
+1A9BA8..1A9BF4 pass (0,0,320,448) and (320,0,320,448). Each camera uses its
+own dimensions at +204/+208; the second uses the same half extent for its
+origin. Preserve the initial full-screen stage when wiring the two views.
+
+Native VS verification, November 23
+
+cr133 shows separate race views and HUDs for Anakin and Occo. In cr135,
+the native controller reader recorded P2 accelerating while P1 was idle,
+then P1 accelerating after P2 released. In cr139, P2 was wrecked by the
+test harness and P1 completed the Tatooine lap in 64.23 seconds. Standings
+sealed first place and the replay started. The Results overlay was absent.
+
+The original disables the second camera at 1ABA24..1ABA34. After VCR setup,
+1ABB84..1ABB8C calls 1A9750(race,1), restoring Camera34 to the full display.
+The Results presenter must accept two entrants while validating that single
+full-screen viewport. cr141 includes the viewport transition and gives the
+second racing camera its own zone membership, portal visibility and sky
+selection. The native Results image and a race with two finishers remain
+verification targets.
+
+cr148 stock VS native verification at evidence/cr148-vs-both-finish.
+The disabled-by-default AI pilot drove both human race slots, with two
+process-local SDL virtual controllers attached. Full-screen Results lists
+P1 Anakin first at 1:08.98 and P2 Occo third at 1:10.98. See
+capture/race-session-2/track-4.png. The earlier cr144 capture with an
+absent second device displayed the original insert-controller prompt.
+cr154 VS on Dug Derby selected Elan Mak (35) on Rider page one and Boles
+Roor (33) on page two. Both selections crossed the original Confirm route.
+The race loaded ND and both add-on pod identities. The native split-screen
+image shows two cameras and different lap HUDs, 80 and 152 speed units at
+1.22 seconds. Evidence: evidence/cr154-vs-addon-both/capture/race-session-2/track-3.png.
+The earlier cr153 selected both pods but loaded TC, the stock course anchor.
+Dug Derby native VS Results (cr154-vs-addon-results). Both opt-in AI pilots
+finished one lap. The captured standings show P2 Boles Roor first at 1:19.53
+and P1 Elan Mak second at 1:23.05. Both human rows use the Results highlight.
+Native five-second split-screen baseline: 62.48 FPS. Image under
+evidence/cr154-vs-addon-results/capture/race-session-2/track-4.png.
+At 1AB9B0..1AB9F4 the source selects the best placed human using signed CCC,
+keeping the first on ties. 1ABB9C resolves that manager slot, then 1ABBB0
+passes it to the full-screen camera. cr156 feeds the selected slot into the
+TV director and its target position/velocity. A P1 win logged slot 0 in cr156.
+cr156 rematch: P2 Boles Roor finished first (1:25.99), P1 Elan Mak second
+(1:26.04). The replay selected manager slot 1, racer 33. The five-second
+split-screen baseline measured 62.51 FPS. The first cr156 race selected
+slot 0, racer 35 after P1 won. This verifies both selections for the
+TV director and its resolved target position/velocity; the follow and
+death camera branches have separate bindings.
+Evidence: evidence/cr156-vs-addon-rematch/capture/race-session-2/track-4.png.

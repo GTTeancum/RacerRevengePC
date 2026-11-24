@@ -77,7 +77,6 @@ Two things are **not** decisions, because the rules already settle them:
     etti-iv\                     folder name == package id
       dlc.json
       TRACKS\EB.RES              course archive (members named tracks\eb.*)
-      UI\LD_EB.PST               loading screen
       UI\EB_UI.RES               course-screen hologram, preview, record icons (own small UI archive)
     arcade-pods\
       dlc.json
@@ -140,7 +139,7 @@ Every item has `kind` and `id` (`[a-z0-9-]{2,47}`, unique inside the package). T
 | `planet` | placement key (D1). With option (a) always `"addon"`; with (b) a package planet key plus `planet_name_key`. |
 | `ai_class` | `"A"`, `"B"` or `"C"`. The original takes the AI class from the course's tournament order (`D:\Programming\GitHub\RacerRevengePC\src\game\ai_cold_owners50iu.h:92-93`: order < 5 A, < 9 B, else C); an add-on course has no order, so the class is data. |
 | `rival` | racer reference for the course rival (`"stock:16"` or `"<pkg>/<item>"`); the original keeps one rival per course in the course descriptor (`D:\Programming\GitHub\RacerRevengePC\src\game\original_course_descriptor50kg.h:14-29`). |
-| `loading_screen` | `{ "file": "UI/LD_EB.PST" }` or `{ "stock": "SC" }` (use the stock planet screen by course code). |
+| `loading_screen` | Every add-on track uses the stock race loading presentation, with stock background art and the stock progress indicator. The N64 and arcade builders select `{"stock":"tb"}`. The 3D track preview belongs on the Course selection screen. |
 | `course_screen` | `{ "archive": "UI/EB_UI.RES", "hologram": "<widget stem>", "preview": "<member>" }`, or `{ "stock_template": "SC" }` to draw the stock hologram plane with the package's preview image. |
 | `hall_defaults` | optional default Hall rows (lap/race/KO times and names), same shape as one original Hall row; absent = empty rows. |
 | `records_key` | default = item id. Change it to reset records (D10). |
@@ -336,8 +335,7 @@ New `src\assets\dlc_registry50dl.h/.cpp` is the single place that defines add-on
 - **Tournament:** unchanged (13 stock courses, stock riders' careers). An add-on circuit, if wanted, is a
   separate later phase.
 - **Hall of Fame:** the 13 stock rows as today, then one row per add-on course.
-- **Race:** identical race code; the loading screen, minimap, sky, surface rules and announcer lines all
-  come from the package data.
+- **Race:** The package selects a stock loading screen and supplies the minimap, sky, surface rules and announcer lines.
 
 ### 4.5 Strings
 
@@ -504,7 +502,7 @@ ever admitted).
 - Courses: convert with the natural code (`trk_convert.py 1` without `--code-as sc`, giving `eb`),
   members renamed accordingly. Borrowed stock members (`sc.aub`, `introAud.ini`, `scrptLns.ini`,
   `demoprt.*`, `sc.tun` today) become the course's own members under its own code. The loading screen
-  becomes the package's own `LD_EB.PST` or `{ "stock": "SC" }`.
+  uses the stock race presentation selected by `{"stock":"tb"}` in the package manifest.
 - Pods: new stems (`a2r_ody` ...) instead of POD04/11/...; UI resources go into the package's own UI
   archive instead of edited stock UI archives; display names, voice and announcer from the package.
 - The replacement packages from step A are then retired.

@@ -73,7 +73,7 @@ flag is set on the trigger, so **it fires on every crossing, every lap** (no one
 
 swrRace_Explode (N64 0x80070764..):
 - **Gate:** returns at once unless the pod is LOCAL (flags0 0x20) or FORCE_GROUND (flags1 0x04000000, "gates the full
-  ground/spline update", set for pods near a camera); returns if flags0 has RESPAWN / RESPAWN_INVINC / DEAD (0x7000) or
+  ground/spline update", see the flag writer in section 10.1); returns if flags0 has RESPAWN / RESPAWN_INVINC / DEAD (0x7000) or
   flags1 already EXPLODING (0x4000). **So a distant computer pod passes through unharmed** (verified).
 - Clears flags0 BOOSTING (0x00800000) and CAN_CHARGE_BOOST (0x00200000).
 - flags1 |= EXPLODING (0x4000). +0x310 = 2.0 + rand() (an explosion timer of 2-3 s, inferred from its use; its reader
@@ -117,12 +117,11 @@ flight, so those three never break in a race (they stay solid obstacles).
   state +0x1998 is below a threshold; not fully decoded).
 - On the asteroid: affected node visual off (NodeModifyFlags(node, 2, -4, 0x10, 3)) and **collision off**
   (NodeModifyFlags(node, 0, -3, 0x10, 3)); trigger object FLAG_ACTIVE | FLAG_FIRED.
-- Debris effect: FX model slot 0 (swrObjTrig_ModelArray2[0]; the planet's break model, on Oovo IV the asteroid-part model
-  MODELID_pln_asteroid_part, swrUI.c:1262) made visible and its animation 0 started (EnableFXAnimation(0)).
+- Debris effect: FX model slot 0 (swrObjTrig_ModelArray2[0]; the planet's break model, N64 Oovo IV model 291 at 0x8007E724) made visible with its animations started from time zero (EnableFXAnimation(0)).
   - **Player:** the FX is placed at the trigger centre, then every frame (swrObjTrig_F2, PC 0x47C500) at the pod's
     position + 12 x the pod's forward axis (vB), z offset 0 for 102: the debris travels with the pod.
   - **AI:** the FX gets a uniform scale of 8 at the trigger centre and stays there (test_obj_transform_ptr = NULL).
-  - FX material alpha = (2 - t) / 2 x 255 for t <= 2 s, then 0: fades out over 2 s.
+  - FX material alpha = (2 - t) / 2 x 255 for t <= 2 s, then 0. Model 291 finishes at 1 s, while the material is still about half opaque.
   - The pod's velocity at impact x 0.8 / dt is stored on the trigger object (no reader found in the decompiled F0/F2).
 - Sound: spatial sound 0x39, pitch 0.25 + 0.15 x rand, at the pod, range 10..500 ft.
 - **End:** swrObjTrig_F0 (0x47C390) waits until FX animation 0 is no longer active, then MaybeResetAnimation: trigger
@@ -352,24 +351,44 @@ is accepted and does nothing). One rule per N64 trigger type, from the data (n2r
 - Spatial values scale with the track (n2r_space.SCALE): N64HalfWidth / N64HalfHeight, NearCameraDistance, EffectAhead,
   MinDistance, MaxDistance.
 
+### Bumpy's Breakers collapse (306), Nov 23
+
+The staged NU conversion binds trigger `n64_306_75238` to the floor collision on both
+sides of the zone 8/9 boundary. Its target `nu_collapse_77220` owns both the structure
+and its collision. The splash uses Aquilaris FX slot 1 (model 290). At 2.2 scale,
+320 sampled mesh poses from the packed motion differed from the original transforms
+by at most 0.027 feet.
+
+The original trigger is local-player-only and skips lap one. Once armed, it starts
+camera shake, removes the structure and starts the splash after 1.5 seconds, then
+hides the splash after another 2.2 seconds. The cr138 native run confirmed both
+floor bindings and the target collision at load. The pilot wrecked on the first lap.
+In-race removal of the collision and the visible splash sequence still need verification.
+
 ### 10.1 Values decided from the N64 code
+- **Trigger speed.** N64 0x8006C24C..0x8006C2A8 divides completed-frame displacement by elapsed time.
+  Ground uses horizontal displacement. Zero-gravity flight and recovery use all three axes.
+  At 0x8006C2AC..0x8006C2F4 a negative dot product with the racer's forward axis negates the speed.
+  The port uses the same calculation in feet per second with Revenge's vertical Y axis. A reversing
+  racer and a grounded racer with only vertical motion both fail a positive minimum-speed gate.
 - **Pillar camera shake (decoded):** handler 0x8007D248 sends cMan 'Shak' with (A = [0x800ADC0C] = 0.05, rate = 4.0). The
   camera event (0x800440F0) stores amplitude +0x3A4 = 0.05, rate +0x3A0 = 4.0, offset +0x39C = 0. Every frame (0x80043B80)
   while A > 0: offset += rate x dt; on passing +-A the rate flips and the offset is clamped (a triangle wave of amplitude A,
   4 A / rate = 0.05 s per cycle), added to camera +0x140 and half of it to +0x58, plus a controller rumble (0x80008B14).
   No decay. The 312 trigger object (dispatch 0x8007C008 -> 0x8007BDF4) sends 'Shak' (0, 0) once its timer passes 4.0 s.
-  Revenge mapping by meaning: `ShakeTime 4` (N64 4.0 s), `ShakeDecaying 0` (constant amplitude, abrupt stop), `ShakeDelay 0`.
-  **ShakeMagnitude 1 is a CHOICE [flag]:** the camera fields +0x140 / +0x58 the N64 offset is added to were not identified
-  (angle or position), so 0.05 has no Revenge unit; no stock Revenge course authors a CameraShake to copy.
+  The converter writes `N64PillarShakeScale` from the track scale. The follow camera applies the full offset
+  to target height and half to eye height. At scale 2.2 their signed peaks are 0.11 and 0.055 feet.
+  In Dug Derby the AI pilot fired trigger 6. The attached-camera log in
+  `evidence/cr96-nd-attached/RacerRevenge.log` recorded 249 eye offsets through 3.98419 seconds.
+  All were within 0.000041 feet of the N64 update calculated from the printed timestamps. The attached
+  camera still needs its target-angle response traced. Follow-camera movement, on-screen presentation,
+  and the original controller rumble remain unverified.
 - **RespawnDelay 2.5 s (decoded, with a flag):** the N64 death camera (mode 8/9, 0x800419EC) starts with its timer +0x70 = 1.0
   (0x80044098, state 0), then 1.5 s (0x80041A68, state 2), then respawns the pod (0x80041BF8: flags1 -0x4000, RESPAWN_INVINC
   0x2000 with 3.0 s at +0x30C). 1.0 + 1.5 = 2.5 s. [flag: the N64 exploding phase before the death camera is not timed; the
   port's destroyed state starts at Revenge's own wreck.]
-- **NearCameraDistance 1000 N64 units x scale = 2500 ft at 2.5** (the N64 distant-pod edge `(lod - 400) / 600 >= 1`,
-  n64-loader-re.md 2.7) [inferred: FORCE_GROUND = within that distance of a camera, as before].
-- **Fan phase: no value written [flag].** The N64 plays the fan from track load, so its phase at the green light depends on
-  the load-to-start time (intro plus countdown), not on a constant; Revenge starts the row at race start. No port key for a
-  start phase exists.
+- **Vengeance explosion eligibility.** Racer initialization clears flags1 at `0x80072B3C`. The explosion checks LOCAL and flags1 bit 26 at `0x80070774..0x80070798`. The scoring routine sets bit 26 at `0x80054384` after checking the last lap and LOCAL. A scan of the resident N64 code found this single direct constant OR of bit 26 into offset 0x64. The separate ground LOD check at `0x80067050..0x80067098` does not set this bit. The converted race therefore uses the local-racer gate. A future port of any additional writer must preserve its actual conditions.
+- **Vengeance fan phase.** Both records start with current time zero, speed one and flags `0x11000030`. The 0x3575C fan has a 24-second period and the 0x2FE20 fan has a 13.333-second period. The original RStr handler calls `0x80051C80`. At `0x80051CA4` it clears the animation registry. Registration (`0x800309D8..0x800309EC`) sets a first-evaluation flag. The first update clears the flag without advancing time (`0x80006860..0x80006884`), then the clock advances by elapsed time. Converted N64 load loops start and reset at zero and run during the intro and countdown. Green-light phase depends on elapsed time.
 
 ### 10.2 Results (scale 2.5, packages rebuilt Nov 21)
 - Vengeance: 1 ExplodePod, 23 BreakObject (+23 asteroid rows, 1 debris row), 1 AnimationToggle (door row), 2 looping rows
@@ -380,3 +399,53 @@ is accepted and does nothing). One rule per N64 trigger type, from the data (n2r
   [flag: an animation row needs a drawn PSG; motion not reproduced].
 - Bumpy's Breakers: the 307 door panels keep their static load pose (nodes a trigger set-up stops or poses are not treated as
   free-running loops). Beedo's, Scrapper's, Baroo Coast: no hazard rows.
+### Vengeance asteroid impact audio (N64 USA)
+
+Trigger 102 requests SFX 0x39 at 0x8007CB00. At 0x8007CB3C the call
+passes channel class 6, pitch 0.25 plus the random contribution, unit gain
+and the position pointer. At 0x80008400..0x80008418 the allocator reads
+the queued sound ID and calls 0x80007FC8. This ID has bit 15 clear, so
+0x80007CE4 uses the main bank at 0x800AFA54. 0x80007FFC..0x8000801C
+reads instrument 0, validates the lower 15-bit index and allocates sound
+0x39. The original bank loader uses ROM 0xAF4B0 (control) and 0xB8960
+(sample table). This entry's sound record is at ROM 0xB22B0, wave at
+0xB22C0, predictor book at 0xB22D8, sample data at 0x1E3520. Its 7992
+encoded bytes contain 888 nine-byte N64 ADPCM frames or 14208 mono samples.
+The book has order two and four predictors. The private conversion writes
+PCM16 into the course archive. The tracked converter patch contains the decoder.
+The audio manager calls the N64 AI frequency setter at 0x80007358 with
+0x5622 (22,050 Hz) and supplies its return value to the synth config at
+0x80007360. On play, 0x80008428..0x80008454 sends the per-voice pitch to
+the sound player; the 44,100 Hz control-bank header alone does not establish
+the effective playback rate. The native asset test decoded all 14,208 samples
+and checked each of the four predictor tables separately against FFmpeg.
+
+The staged NV.RES adds sound\n64_39.wav and changes only tracks\nv.tob among
+existing members. All 14,208 packaged samples match the separate ROM decode
+(PCM SHA-256 caff58777f6a8576ecdda67860bcb9ee1f1b55b4e418ddba6e7bb006480bb581).
+The positional sound owner borrows that decoded clip for one world voice per
+audible hit. The authored near and far distances are 22 and 1100 Revenge feet
+at scale 2.2. Between those distances 0x80008CF4..0x80008D74 attenuates linearly.
+The port supplies a horizontal listener bearing to the Revenge mixer's pan law.
+
+At 0x8007C914..0x8007C934 trigger 102 multiplies the racer's stored accelThrust
+(+0x1A4) by the result of 0x80081700. That function computes
+1 - (dt / 0.03) / (dt / 0.03 + 2.5) using the constant at 0x800ADCB0.
+The port applies the multiplier once to each engine's retained smoothed drive
+(+0x70/+0x74), from which Revenge's 0x2E7720 resumes normal acceleration.
+
+The N64 Oovo IV loader compares planet 6 at 0x8007E708, then passes model
+0x123 (291) to 0x800305E8 at 0x8007E720. It stores the animation list in
+FX slot 0 at 0x8007E738 and the root at 0x8007E754. The previous package
+used model 82, based on a PC enum. The original effect has three distinct
+fragment meshes. Eight transformed instances draw 24 animated fragments.
+Three translations run once over one second and their child rotations loop.
+At 0x8007B7BC the animation test returns true as soon as any enabled track
+reaches its end or becomes disabled. The trigger then hides the shared model.
+
+All three meshes share model material 0x2E4. Setup at 0x8007CC20 saves its
+shader. The frame update at 0x8007C24C..0x8007C32C writes shader+0x25,
+truncating 255 * (2 - age) / 2. The renderer packs that alpha into the
+primitive-color command at 0x80035ECC..0x80035EEC. The authored first alpha
+cycle is (TEXEL0 - ZERO) * PRIMITIVE + ZERO, and the second takes COMBINED.
+The model therefore fades for one second and disappears on animation completion.

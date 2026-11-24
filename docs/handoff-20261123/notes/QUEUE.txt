@@ -116,3 +116,6 @@ Reverse-gravity doubling, nose-down drop reduction and far-AI line following wil
 - Port: Bumpy's Breakers doors are an unsupported hazard type (stay fixed). Add the type.
 - Port: fan start phase key (N64 starts the fan at load).
 - Converter-flagged choices to revisit: shake strength 1.0 (N64 0.05 amplitude target undecoded), RespawnDelay 2.5 s omits the pre-death explode moment, near-camera 1,000-unit cutoff inferred, methane is one cloud (N64 three puffs with spread/spin).
+
+2026-11-23 active goal amendment
+Complete the remaining N64 hazards and end-to-end 2P VS verification, and rescale all eight converted N64 courses from 2.5 to 2.2 feet per N64 unit. Rebuild private packages, preserve the Vengeance shaft, electrical bands and geometry draw-distance fixes, and verify the rebuilt courses and their scale-dependent data. Original scale analysis and rebuild procedure are in work/scratch/racer-n64/notes/n64-scale.md, sections 6 and 7.

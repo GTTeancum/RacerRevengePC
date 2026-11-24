@@ -11,10 +11,11 @@ NEW
    (287B60 + 287C80(1.0) / race78+B0 bit1) follows it as in the original. See w0-requests\round3-A.txt.
 
 KEPT (existing, reworded or re-pointed)
-2. common_race_start50cr.cpp: 2DCC70 / 161F60 / 2702E0 run together through restartWorld at the 2DCC70
-   position (R9 #1).
+2. RESOLVED (cr-165): both the normal restart and the Results replay entry now call 2DCC70 at
+   1AC90C, 161F60 at 1AC978 and 2702E0 at 1AC98C. The replay loop calls 2702E0 at 1A81B0
+   and 161F60 at 1A824C. The missing scene-reset children remain open.
 3. common_race_start50cr.cpp: no 10C music manager -> 1AC960 skipped, logged stand_in=1 (R9 #2).
-4. common_race_start50cr.cpp: the 2AED60(raceFC,500) fade is the race's 1A7BD0 fade after bit3 (R9 #3).
+4. RESOLVED (cr-174): 1ACA8C covers the displayed race for restart. The restarted scene fades in at 1A7BD0.
 5. common_race_start50cr.cpp: 1ACB74 267BE0 not called on a restart (Aural transport flush admitted only
    after a Results 26D070 stop) (R9 #3).
 6. RESOLVED (cr-28 round, flow audit F15/F16): the Results Restart rows run on the common path.
@@ -23,9 +24,9 @@ KEPT (existing, reworded or re-pointed)
    to the race loop (tests\native\terrain_interactive_loop50du.cpp), which runs the one in-place
    restart (common_race_start reason=restart caller=1C8DF0|1C9774, same as Pause RESTART 1BD934),
    then the row tail: 1A4AB0(race10C,0.5) on the tournament row, 1A4B90(race10C,2).
-   Remaining PORT STAND-INs (flagged in code): the 1C98DC tail of that event and later events of the
-   same poll are not run after the handover; a refused in-place restart (the original cannot refuse)
-   re-marks race1B0 bit4 so the Results replay keeps running.
+   RESOLVED (cr-174): Restart now calls the race owner synchronously during the input poll. The
+   row plays its feedback and reaches 1C98DC, then traversal continues to the remaining events.
+   A refused restart stops at its failing owner. The replay flag is not reinstated over partial work.
    F16: an uncommitted tournament result arming is dropped at the restart's 1AEA70
    (tests\native\terrain_interactive_continuation50du.cpp, restartGridPlacement1AEA70) and re-arms at
    the restarted race's own GO; a committed result stays committed.
@@ -769,7 +770,7 @@ Proven from the original (SLUS_202.68, work\scratch\dis_all.txt):
    frame has the same gate.
  - The pad is read every frame (1A1A20). RETIRED: slot 0's intro frame now gets this poll's live
    packet, composed with controls not yet permitted (the racing step's countdown hold), not a neutral one.
-Remaining PORT STAND-INs (flagged in code):
+Historical cr-15 findings (superseded for counted races by the cr-167 handoff):
  - the port's racer-contact pass and host race session (host owners, stepped only by the racing step)
    do not run before GO; which original owner performs racer contacts is not proven;
  - the first frame before the first displayed image (cold publication / restart) stays the quiet

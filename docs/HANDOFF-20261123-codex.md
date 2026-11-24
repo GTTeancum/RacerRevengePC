@@ -1,5 +1,7 @@
 # Handoff to Codex, 2026-11-23
 
+See the [current release handoff](HANDOFF-20261124-release.md) for the published installer and maintainer instructions.
+
 RacerRevengePC is a native Windows PC port of Star Wars Racer Revenge (PS2, SLUS_202.68), built from the original
 game's code (disassembly-guided reconstruction, original PS2 addresses such as `1AC8E0` appear throughout the code
 comments). The user is not a programmer; reports go to them in plain language.
@@ -92,6 +94,8 @@ nv Vengeance, nb, nc, nr, ns, nu (N64 conversions), lc and eb (arcade conversion
    original); GB lightning flash overlays from the original `.acb` data; water surface on worker threads (bit-identical,
    MC back to ~60 FPS); add-on pod engine cables on Rider/Tournament.
 
+GB lightning verified from the normal race camera in cr-162. A bolt appears beside the minimap at 8.05 s and clears by 8.19 s. Native frames are in `evidence/cr162-gb-lightning/capture/race-session-2/track-20.png` and `track-21.png`.
+
 ## Open items
 
 Built in cr-32, not yet run:
@@ -99,8 +103,6 @@ Built in cr-32, not yet run:
   `docs\handoff-20261123\notes\eyecheck-career-plan.txt` (runs R2-R5, still frames). If the Garage shows the add-on
   pod with Watto, re-enable the add-on Tournament Confirm for players (the latch line sits under the refusal in
   `platform\linux\native\original_ui_rider_session50kg.cpp`; test switch `RR_TEST_ADDON_TOURNAMENT=1`).
-- GB lightning: the log shows flashes firing; `sky_flash_draw ... flash_frames=` now counts flash frames actually
-  drawn. The flashes are thin bolts low on three sky faces (original data), hard to see from the race camera.
 
 Not yet passing:
 - NV and MB: the unattended test driver does not finish the lap (driver improved in cr-27, still failing on NV).
@@ -114,11 +116,119 @@ DLC:
   Converter-estimated values to revisit: shake strength, respawn delay without the explode moment, near-camera
   distance, methane as one cloud. See `notes\n64-hazards-STATUS.txt` and `notes\QUEUE.txt` (tail is newest).
 
-Rewrite stand-ins still flagged (full list `notes\STAND-INS.txt`): start fade on the camera's copy of the race flags;
-the quiet first intro frame; no pod contacts on the grid; menu pop-up dialogs booted per frontend; two teardown
-stand-ins; two Results-restart stand-ins.
+Rewrite cleanup (cr-165): the counted race now owns the start-fade flag. Fresh starts and restarts clear it
+when the video manager accepts the fade. The restart also resets triggers, particles, and scenery at their
+individual PS2 call sites. The Results replay loop resets the scene before rewinding playback and particles
+after restoring the camera.
+
+Checked on TA with eight racers: Pause Restart reached a second GO (61.9 average FPS after the restart).
+A separate one-lap race reached the eight-place Results screen and completed a full replay loop.
+Evidence: `evidence/cr165-ta-rewrite-restart` and `evidence/cr165-ta-rewrite-results` in the main checkout.
+
+Counted races now build the first pod image on the scheduled intro frame, including after Pause Restart.
+Grid contact checks run after all held racers update. Tatooine reached GO with eight entrants on both
+starts. The precise original pre-GO contact caller is still unidentified. The PS2 race-return code at
+17C1C4 constructs a new frontend dispatcher, and 1B7BD0 creates both dialogs in that dispatcher.
+The port already follows this lifetime. Pause Quit now fades the race over 500 ms before returning to
+Course. Evidence: `evidence/cr167-pause-course`. The historical inventory is in `notes/STAND-INS.txt`.
+
+Time Trial now fades the authored load screen before the first race image. On Tatooine, Pause Quit
+returned to Course for a nonqualifying lap. With slow Hall times seeded in a test save, a 1:07.16 lap
+opened the record page. Confirming it released the paused race and opened the Hall with that lap in
+first place. Native captures: `evidence/cr171-tt-record` and `evidence/cr173-tt-hall`.
+
+Results Restart (cr-174) accepts R or controller X. A replay now draws all racers from their recorded
+poses before fading in the Results panel. The restart runs inside its original input dispatch, so the
+same event reaches its shared tail and later events see the disabled Results screen. On Tatooine the
+AI pilot finished a one-lap Single Event, restarted from the eight-place Results screen, finished the
+second race, and confirmed back to Course. Average race FPS was 60.9 and 61.8.
+Evidence: `evidence/cr174-results-restart`. Pause Restart also reached a second eight-racer GO
+(`evidence/cr174-pause-restart`). Time Trial Pause Restart now submits the music fade queued during
+Pause before starting the next song. Its fresh and restarted countdowns each ran 327 held frames and
+released the racer at GO (`evidence/cr175-tt-restart`).
+
+Tournament Results Restart (cr-176) also cancels the outgoing race’s pending tournament result in
+the profile. Two full three-lap Mos Espa tournament races ran consecutively via the Restart row
+at 1C9774. Accepting the second result committed it and returned to frontend screen 13. Average
+race FPS was 61.4 and 61.7. Evidence: `evidence/cr176-tournament-restart`.
+
+In cr-177 the Time Trial record page uses the Results renderer while the race is paused. Native
+framebuffer captures show the name-entry page displaying 1:07.61 and the Hall listing the same player
+and time after confirmation. See `evidence/cr177-tt-hall/record-hall-review.jpg`.
+The bounded capture runs exit with code 3 when the requested frontend hold expires.
 
 Performance: frame preparation costs about 8-9 ms per frame on every course (FPS fine, little headroom).
+
+
+## Personal Windows launcher (cr-179)
+
+`build/personal-launcher/RacerRevengeLauncher.exe` in the main checkout is the
+single-file, GUI-only personal installer. It accepts a USA Racer Revenge PS2
+ISO or extracted disc folder. The supported Racer Arcade ZIP and USA Episode I
+Racer N64 ROM independently select the embedded personal DLC packages. Pugwis
+is an editable example under `Templates/demolition-pugwis`. The installed game
+runs directly. The installed launcher saves video, input device, and both player
+schemes in the game's INI. Builder and WinForms source are in
+`platform/windows/launcher` on this worktree. The embedded personal content
+keeps the executable local. Setup and settings renders, a direct-start log and
+native game captures are under `evidence/personal-launcher` in the main checkout.
+
+To reproduce the borderless launcher artwork, pass
+`--race-frame work/scratch/icon/mos-espa-race-frame.png` to the personal builder
+from the main checkout. The builder crops the native race capture and embeds it
+in the executable. Updated window captures and profile checks are under
+`evidence/launcher-redesign`.
+
+For launcher-to-game resolution checks use an isolated install. Save the
+settings through the launcher, then start the same launcher with
+`--test-play-capture`. It invokes the normal Play handler after the window
+opens. Only this opt-in launch passes the game's explicit asset argument so
+its existing process-local capture route can run. Ordinary Play continues to
+start the game without arguments. The game clears inherited test overrides on
+normal startup. Compare the game process's parent PID, requested size, race
+target capacity and captured race image dimensions. cr-179 allocates the race
+targets to include the retained window drawable, even when it exceeds the size
+of the attached monitor. The supported window size is 640–3840 pixels wide and
+448–2160 pixels high. Native captures and logs are in
+`evidence/launcher-play/fixed` in the main checkout.
+
+### Keyboard bindings (cr-180)
+
+Open **Controls & video > Keyboard bindings**. Select Standard or Twin engine,
+select an action and press its new key. Delete clears the assignment, Escape
+cancels it and Restore layout defaults resets the selected family. Duplicate
+keys are flagged within each family. Zero-G lean applies to Standard 1.
+Use bindings returns changes to the launcher's draft. Save settings or Play
+writes the profile. Cancel discards the editor's draft.
+
+The launcher and game share the action definitions in
+`platform/linux/native/keyboard_actions.inc`. The game reads physical SDL
+scancodes from the local INI sections KeyboardStandard and KeyboardTwin on
+startup. Existing installations without those sections use the defaults.
+The overrides apply to racing on the Player 1 keyboard. Mouse bindings remain open.
+
+The cr-180 launcher Play tests exercised remapped Standard throttle and both
+Twin engine axes through process-local input. All eight original presets
+passed packet-level checks for rebinding, clearing, release and focus loss.
+Native form pictures and game logs are under `evidence/keyboard-bindings`
+in the main checkout.
+
+### Controller bindings (cr-181)
+
+Open **Controls & video > Controller bindings**, choose the player and preset,
+then choose a physical button, trigger or stick axis for a race action. Each
+player has eight independent profiles. Reusing an assigned input swaps the two
+assignments. An input can also be unbound. Restore preset defaults affects the
+displayed player and preset. Changes become persistent through Save settings or
+Play. Direct game startup reads the same per-install INI. Original PS2 prompts
+and menu navigation retain their original labels and inputs. Start opens Pause.
+The second player's available actions reflect the Versus driving input path.
+
+The editor uses the game's original preset rows for action labels. The native
+packet composer applies overrides after device validation and before per-action
+pause masking. Analog triggers retain pressure and stick axes retain magnitude.
+Launcher-to-game captures and logs are in `evidence/controller-bindings` in the
+main checkout. The packet-level test is `tests/native/controller_rebinding_check.cpp`.
 
 ## Requirement: regular file cleanup
 
@@ -142,6 +252,7 @@ What was removed on 2026-11-23, and the rules to keep following:
   files, never committed), and anything modified in the last day.
 - Remaining large item at handoff: 14 GB of copied asset folders in `work\scratch\racer-arcade\silo\assets*`
   (Custom content's; it was asked to prune them).
+
 
 ## Working with the user (their stated preferences)
 

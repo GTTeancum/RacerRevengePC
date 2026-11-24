@@ -13,6 +13,8 @@ A native Windows PC port of *Star Wars: Racer Revenge*, reconstructed from the P
 
 You can launch **RacerRevengePC.exe** directly after setup. Open the installed launcher to change settings. Saved changes take effect the next time the game starts. To change which ROMs you import, run a freshly extracted launcher and choose a new destination.
 
+[Watch the 32-second release trailer](https://github.com/GTTeancum/RacerRevengePC/releases/download/v0.9.0/RacerRevengePC-0.9.0-Release-Trailer.mp4)
+
 ## The Mos Espa Open
 
 ![Mos Espa in 3440×1440 ultrawide, with rival pods on both sides of the starting straight](docs/screenshots/mos-espa-ultrawide.jpg)
@@ -44,4 +46,4 @@ The Windows port and offline converter sources are included here. Supply origina
 - [Windows x64 build guide](platform/windows/native/README-interactive50du.md)
 - [Native build guide and dependencies](docs/interactive-build50dv.md)
 - [Required local inputs and generated fixtures](docs/source-only-exclusions.md)
-- [Development handoff](docs/HANDOFF-20261123-codex.md)
+- [Current maintainer handoff](docs/HANDOFF-20261124-release.md)
