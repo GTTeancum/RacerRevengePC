@@ -149,7 +149,7 @@ class Operation final {
          right_(owners_->right),left_(owners_->left),bottomRight_(owners_->bottomRight),bottomLeft_(owners_->bottomLeft),
          chariot_(owners_->chariot),visuals_(owners_->visuals),cables_(owners_->cables),contacts_(owners_->contacts){}
     static void need(bool v,const char* why){if(!v)throw std::runtime_error(why);}
-    auto& runtime()const noexcept{return *runtime_;}
+    ra_source_camera50LA::OwnershipBridge& runtime() const noexcept { return *runtime_; }
     bool registered()const noexcept {
         if(constructorOnly_&&!constructorArenaCurrent())return false;
         auto& r=runtime();auto& a=arena_;auto& x=a.live;
