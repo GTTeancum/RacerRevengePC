@@ -112,6 +112,7 @@ public:
     bool poll(WindowInput50DQ&, WindowHostDiagnostic50DQ&) noexcept;
     // Submission only: SDL's void swap API cannot prove presentation/completion.
     bool swap(WindowHostDiagnostic50DQ&) noexcept;
+    // On Windows the driver may override this preference. Read info().swapInterval for the effective interval.
     bool setSwapInterval(std::int32_t,WindowHostDiagnostic50DQ&) noexcept;
     // Nonmodal native status only; never changes the original menu artwork.
     bool setTitle(const char*,WindowHostDiagnostic50DQ&) noexcept;

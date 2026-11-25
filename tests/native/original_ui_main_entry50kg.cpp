@@ -567,7 +567,7 @@ bool Frontend::available()const noexcept  {
         if(!presentationActive)return riderPresentationPolicy==RiderPresentationPolicy::inactive;
         if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight){std::fprintf(stderr,"original_rider_presentation_failure method=available site=3\n");return false;}
         return (riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1&&info.swapInterval==1)||
-            (riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz&&info.swapInterval==0);
+            (riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz&&info.swapInterval==savedSwapInterval);
     }
 
 bool Frontend::begin()noexcept  {
@@ -577,20 +577,20 @@ bool Frontend::begin()noexcept  {
         presentationHeight=presentationHost->info().drawableHeight;
         presentationBeginSwaps=riderPresentationSwaps;
         presentationCompletedWaits=0;presentationCompletedWaitNanoseconds=0;riderDeadline.reset();
-        // Any failed setter leaves an explicit restoration obligation until
-        // the exact saved native setting is verified; no assumed rollback.
+        // Save the observed interval so the rider transition can restore the previous preference.
         presentationActive=true;riderPresentationPolicy=RiderPresentationPolicy::restoring;
         rr::platform::GameHostDiagnostic50ER d;
-        if(presentationHost->setSwapInterval(1,d))riderPresentationPolicy=RiderPresentationPolicy::driverSwapInterval1;
+        const bool requested=presentationHost->setSwapInterval(1,d);
+        if(requested&&presentationHost->info().swapInterval==1)riderPresentationPolicy=RiderPresentationPolicy::driverSwapInterval1;
         else {
-            const bool swapControlFailure=d.error==rr::platform::GameHostError50ER::Window&&
-                d.window.error==rr::platform::WindowHostError50DQ::SwapIntervalFailure;
+            const bool swapControlFailure=requested||(d.error==rr::platform::GameHostError50ER::Window&&
+                d.window.error==rr::platform::WindowHostError50DQ::SwapIntervalFailure);
             if(!presentationHost->setSwapInterval(savedSwapInterval,d)){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=2\n");return false;}
             // Optional native-PC policy, never a fabricated interval1 result.
-            // Wrong context/thread, nonzero saved intervals and unaccepted
+            // Wrong context/thread, unstable intervals and unaccepted
             // audio/clock baselines cannot activate this alternate owner.
-            if(!allowNativePcRiderDeadline||!swapControlFailure||savedSwapInterval!=0||
-               presentationHost->info().swapInterval!=0||!lastUpdateNanoseconds||
+            if(!allowNativePcRiderDeadline||!swapControlFailure||
+               presentationHost->info().swapInterval!=savedSwapInterval||!lastUpdateNanoseconds||
                original_ui_elapsed50LH::project(lastUpdateNanoseconds,presentationNow(),pendingUpdateColdNanoseconds).error!=
                    original_ui_elapsed50LH::Error::none){
                 presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;{std::fprintf(stderr,"original_rider_presentation_failure method=begin site=3\n");return false;}

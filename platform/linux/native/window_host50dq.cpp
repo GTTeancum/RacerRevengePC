@@ -157,6 +157,18 @@ struct WindowHost50DQ::State {
     void* (RR_SDL50WIN_CALL *getProcAddress)(const char*) = nullptr;
     Int (RR_SDL50WIN_CALL *setSwapInterval)(Int) = nullptr;
     Int (RR_SDL50WIN_CALL *getSwapInterval)() = nullptr;
+#if defined(_WIN32)
+    Int requestWindowsSwapInterval(Int requested) const noexcept {
+        const Int current = getSwapInterval();
+        if (current == requested) return current;
+        const Int result = setSwapInterval(requested);
+        const Int actual = getSwapInterval();
+        if (result != 0 || actual != requested)
+            std::fprintf(stderr, "native_swap_interval requested=%d actual=%d setter_result=%d\n",
+                         requested, actual, result);
+        return actual;
+    }
+#endif
     void (RR_SDL50WIN_CALL *swapWindow)(SdlWindow*) = nullptr;
     void (RR_SDL50WIN_CALL *pumpEvents)() = nullptr;
     Int (RR_SDL50WIN_CALL *peepEvents)(SdlEvent*, Int, Int, UInt, UInt) = nullptr;
@@ -562,15 +574,14 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
     // another interval when a requested change is unsupported.
     if (s.getSwapInterval() != r.swapInterval && s.setSwapInterval(r.swapInterval) != 0)
         return sdlFail(WindowHostError50DQ::SwapIntervalFailure, "SDL_GL_SetSwapInterval");
-#else
-    if (s.setSwapInterval(r.swapInterval) != 0)
-        return sdlFail(WindowHostError50DQ::SwapIntervalFailure, "SDL_GL_SetSwapInterval");
-#endif
     info_.swapInterval = s.getSwapInterval();
     if (info_.swapInterval != r.swapInterval) {
         fail(d, WindowHostError50DQ::RequirementsNotMet, "SDL_GL_GetSwapInterval/exact interval");
         return cleanup();
     }
+#else
+    info_.swapInterval = s.requestWindowsSwapInterval(r.swapInterval);
+#endif
     refreshWindowInfo();
     s.ready = true;
     return true;
@@ -782,17 +793,21 @@ bool WindowHost50DQ::setSwapInterval(std::int32_t interval,WindowHostDiagnostic5
     d={};
     if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setSwapInterval");
     if(!created()||!current())return fail(d,WindowHostError50DQ::NotCurrent,"setSwapInterval");
+#if defined(_WIN32)
+    if(interval < -1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
+    info_.swapInterval=state_->requestWindowsSwapInterval(interval);
+    return true;
+#else
     if(interval < -1||interval > 1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
-#if defined(__linux__)
     // Match create(): an exact current interval needs no unsupported GLX
     // setter. This also verifies unchanged native state after a rejected
     // presentation request; it never substitutes a different interval.
     info_.swapInterval=state_->getSwapInterval();
     if(info_.swapInterval==interval)return true;
-#endif
     const auto accepted=state_->setSwapInterval(interval)==0;
     info_.swapInterval=state_->getSwapInterval();
     return (accepted&&info_.swapInterval==interval)||fail(d,WindowHostError50DQ::SwapIntervalFailure,"SDL_GL_SetSwapInterval");
+#endif
 }
 bool WindowHost50DQ::rumbleController50KZ(std::uint32_t slot,std::int32_t expected,
     std::uint8_t small,std::uint8_t large,ControllerRumbleReceipt50KZ& receipt,
