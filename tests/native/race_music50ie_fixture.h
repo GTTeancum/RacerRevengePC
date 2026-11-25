@@ -323,7 +323,7 @@ public:
     Owner()=default;~Owner()noexcept;
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
-    bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
+    bool prepare(const std::filesystem::path& audioRoot,
         rr::platform::AudioMixer50HD& mixer,rr::platform::RaceAudioGroups50IC& groups,
         std::string& error,bool includeContactMusic=false,
         TimedVolumePolicy50IW timedVolumePolicy=TimedVolumePolicy50IW::StrictSourceBoundary,
@@ -341,8 +341,6 @@ public:
                 groups.binding(voice)==rr::game::RaceAudioGroup50IC::Unrepresented&&
                 !mixer.hasVoiceGroupGain50IC(voice),"50IE exclusive music slot117 unavailable");
             d::Inputs input;input.capacity=sourceByteCapacity;
-            detail::authenticate(input,discRoot,"SLUS_202.68",2972720,
-                "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30");
             detail::authenticate(input,audioRoot,"RACEMUS.JUK",5952,
                 "676a9f212a588f0c489f92e46b0c928abee578b10f93f54c5a88068a985d5ec5");
             detail::authenticate(input,audioRoot,"RACEMUS.JUB",14043,

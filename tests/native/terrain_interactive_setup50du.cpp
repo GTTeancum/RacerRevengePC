@@ -721,7 +721,7 @@ SessionExit50DU Context::run() {
        dynamicContactEnabled?raceRacerCount:0,&sessionRandom.range),
        audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    const bool practiceMusicOnly=nativeOrdinaryLaunch11258==2u||nativeOrdinaryLaunch11258==3u;
-   require50DU(materialMixer&&raceMusic->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,
+   require50DU(materialMixer&&raceMusic->prepare(audioRoot,
        *materialMixer,*audioGroups,audioError,dynamicContactEnabled&&!practiceMusicOnly,
        dynamicContactEnabled?race_music50IE::TimedVolumePolicy50IW::NativeLinearSharedMix:
            race_music50IE::TimedVolumePolicy50IW::StrictSourceBoundary,practiceMusicOnly,

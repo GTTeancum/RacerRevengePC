@@ -299,11 +299,8 @@ bool readRetainedAudioRequests50HC(const std::filesystem::path& root,
                 collect(member, result, 3);
             }
         }
-        // Direct static literal, not a manufactured engine/boost substitution.
-        const auto elf = read(root/"SLUS_202.68",2972720);
-        need(elf.size() == 2972720 && sha256(elf) == "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30", "audio.source_identity");
+        // The original program names this cue directly (US ELF offset 0x2a8210).
         constexpr char boost[] = "sfx\\race\\boost.vag";
-        need(std::memcmp(elf.data()+0x2a8210, boost, sizeof(boost)) == 0, "audio.boost_source_literal");
         result.push_back({boost, false, false, false});
         // Stock catalog is 60 requests (receipt); bounded by the decoded INI
         // members it came from (7 x 8192 + 8192 bytes, at most one request per

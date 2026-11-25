@@ -1,4 +1,4 @@
-"""Build the self-contained personal Windows launcher using the local reference games."""
+"""Build the self-contained Windows launcher and its offline media import tools."""
 import argparse
 import hashlib
 import os
@@ -20,7 +20,7 @@ def digest(stream):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    for name in ('game', 'stock', 'dlc', 'icon', 'out'):
+    for name in ('game', 'stock', 'dlc', 'icon', 'out', 'mame-tools', 'sevenzip-extra'):
         p.add_argument('--' + name, required=True, type=Path)
     p.add_argument('--crt', type=Path, help='Microsoft.VC143.CRT x64 redistributable directory')
     p.add_argument('--converter', type=Path, help='Bundled offline converter and runtime ZIP for public releases')
@@ -44,22 +44,30 @@ def main():
                 banner = frame.crop((0, round(h * .40), w, round(h * .75)))
                 banner.convert('RGB').save(root / 'banner.jpg', quality=94)
             artwork = ['/resource:' + str((root / 'banner.jpg').resolve()) + ',banner.jpg']
-        entries = []
-        for name in ('SLUS_202.68', 'APPSTART.RES', 'LOC.RES'):
-            entries.append(a.stock / name)
-        for name in ('AUDIO', 'PODS', 'TRACKS', 'UI'):
-            files = sorted((a.stock / name).rglob('*'))
-            if not files:
-                raise ValueError('Missing stock directory ' + name)
-            entries.extend(f for f in files if f.is_file())
         def row(name, f):
             return digest(f) + '\t' + name + '\n'
         with zipfile.ZipFile(root / 'content.zip', 'w', zipfile.ZIP_DEFLATED, compresslevel=5) as z:
-            rows = []
-            for f in entries:
-                with f.open('rb') as stream:
-                    rows.append(row(f.relative_to(a.stock).as_posix(), stream))
-            z.writestr('disc.tsv', ''.join(rows))
+            tool = a.mame_tools / 'chdman.exe'
+            with tool.open('rb') as stream:
+                if digest(stream) != '8a74468e3b0879698835b57c3b58e88e5a51e4de73bee6ef755c28530b5b040f':
+                    raise ValueError('Use chdman.exe from the official MAME 0.289 Windows x64 package')
+            z.write(tool, 'chdman.exe')
+            notices = 'base/Notices/MAME/'
+            z.write(a.mame_tools / 'COPYING', notices + 'COPYING')
+            for license_text in ('BSD-2-Clause', 'BSD-3-Clause', 'BSL-1.0', 'CC0', 'GPL-2.0', 'LGPL-2.1', 'MIT', 'Zlib'):
+                name = 'docs/legal/' + license_text
+                z.write(a.mame_tools / name, notices + name)
+            z.writestr(notices + 'SOURCE.txt', 'MAME 0.289, unmodified Windows x64 chdman.exe\r\n'
+                       'https://github.com/mamedev/mame/releases/tag/mame0289\r\n'
+                       'https://github.com/mamedev/mame/tree/mame0289\r\n')
+            archiver = a.sevenzip_extra / 'x64/7za.exe'
+            with archiver.open('rb') as stream:
+                if digest(stream) != '7ddf0a3bc451e166679296be630d6f0573eb386159c04184761c43020c484291':
+                    raise ValueError('Use the x64 7za.exe from the official 7-Zip Extra 26.05 package')
+            z.write(archiver, '7za.exe')
+            z.write(a.sevenzip_extra / 'License.txt', 'base/Notices/7-Zip/License.txt')
+            z.writestr('base/Notices/7-Zip/SOURCE.txt', '7-Zip Extra 26.05, unmodified x64 7za.exe\r\n'
+                       'https://github.com/ip7z/7zip/releases/tag/26.05\r\n')
             with zipfile.ZipFile(a.arcade) as src:
                 rows = []
                 for f in sorted(src.namelist()):

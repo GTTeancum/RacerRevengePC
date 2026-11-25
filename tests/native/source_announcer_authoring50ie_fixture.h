@@ -135,11 +135,11 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
         d::need(addonRacer(playerRacer60)||(playerRacer60<next.namedBanks.size()&&next.namedBanks[playerRacer60]),
             "50IE selected racer is absent from actual announcer roster");
         if(addons)std::cerr<<"dlc_announcer named_banks="<<named<<" addon_racers="<<addons<<" addon_lines=generic\n";
-        // One generic INI, one SPCHPCT, at most eight2496-byte named INIs.
-        // These are cold metadata reads only; no selector or RNG is touched.
-        d::Inputs input;input.capacity=32768;
-        const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",32768);
-        const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",32768);
+        // One generic INI, one SPCHPCT and one named INI per stock racer.
+        constexpr std::size_t maxEventFile=32*1024;
+        d::Inputs input;input.capacity=(2+named)*maxEventFile;
+        const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",maxEventFile);
+        const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",maxEventFile);
         // Stock digests are log-only receipts; the files are read by their own rows (C4).
         if(!(generic.size()==11704&&d::sha256(generic)=="24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab"))
             std::cerr<<"common_shared_file member=GEN_ANN.INI bytes="<<generic.size()<<" receipt=differs\n";
@@ -163,9 +163,7 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
             if(addonRacer(racer))continue; // no named bank (see above)
             const auto& identity=*original_player_identity50IK::find(racer);
             const auto pod=input.read(original_player_identity50IK::announcerPath(discRoot,identity),
-                identity.announcerBytes);
-            d::need(pod.size()==identity.announcerBytes&&d::sha256(pod)==identity.announcerSha256,
-                std::string("50IE original named announcer differs: ")+identity.podId);
+                maxEventFile);
             // Each pod's own NumEvents (29 or 30 on the stock disc; the receipt
             // identity.announcerEvents is compared, never used to size or gate).
             // A section past NumEvents is never selected (292650); a hole is skipped.

@@ -114,14 +114,27 @@ static class Install {
             using(var bundle=new ZipArchive(resource)){
                 if(!String.IsNullOrEmpty(arcade)){status(0,"Verifying Racer Arcade");VerifyArcade(arcade,Rows(bundle,"arcade"));}
                 if(!String.IsNullOrEmpty(n64)){status(1,"Verifying Episode I Racer");VerifyN64(n64,Rows(bundle,"n64")["USA"]);}
-                var files=Rows(bundle,"disc");int done=0,previous=-1;
-                using(var disc=new Disc(ps2))foreach(var pair in files){
-                    int percent=2+86*done++/files.Count;
-                    if(percent!=previous){status(percent,"Installing Racer Revenge");previous=percent;}
-                    string dest=Safe(stage,pair.Key);Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                    disc.Copy(pair.Key,dest);
-                    using(var s=File.OpenRead(dest))if(Digest(s)!=pair.Value)throw new InvalidDataException("The Racer Revenge USA disc does not match at "+pair.Key);
+                string image=ps2, scratch=Path.Combine(stage,"DiscImport");
+                DiscContainer format=DiscTool.Format(image);
+                if(format==DiscContainer.Archive){
+                    status(2,"Opening archived PS2 disc");
+                    image=DiscArchive.Extract(bundle,image,scratch);
+                    format=DiscTool.Format(image);
                 }
+                if(format==DiscContainer.Chd){
+                    status(2,"Reading compressed PS2 disc");
+                    image=Chd.Extract(bundle,image,scratch);
+                }
+                using(var disc=new Disc(image)){
+                    var files=disc.GameFiles().ToArray();int previous=-1;
+                    for(int i=0;i<files.Length;i++){
+                        int percent=3+85*i/files.Length;
+                        if(percent!=previous){status(percent,"Installing Racer Revenge");previous=percent;}
+                        string dest=Safe(stage,files[i]);Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                        disc.Copy(files[i],dest);
+                    }
+                }
+                if(Directory.Exists(scratch))Directory.Delete(scratch,true);
                 status(89,"Installing the game and selected content");
                 foreach(var e in bundle.Entries){
                     int slash=e.FullName.IndexOf('/');if(slash<0)continue;

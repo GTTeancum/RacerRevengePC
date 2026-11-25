@@ -1,13 +1,13 @@
 # Racer Revenge PC
 
-A native Windows PC port of *Star Wars: Racer Revenge*, reconstructed from the PlayStation 2 game. The project uses the original game data for its courses, pods, menus, and audio. You need your own USA PS2 copy (SLUS-202.68).
+A native Windows PC port of *Star Wars: Racer Revenge*, reconstructed from the PlayStation 2 game. The project uses your original disc data for its courses, pods, menus, and audio.
 
 ## Install 0.9.0 on Windows x64
 
 Use a graphics driver that provides desktop OpenGL 4.0 or newer. Stock courses such as the Mos Espa Open use its multisample rendering features.
 
 1. Download **RacerRevengePC-0.9.0-Windows-x64.zip** from the [0.9.0 release](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.0). Extract the ZIP and open **RacerRevengeLauncher.exe**.
-2. Select your USA *Racer Revenge* PS2 DVD as an uncompressed ISO, or browse to the extracted root folder containing `SLUS_202.68`.
+2. For the published 0.9.0 launcher, select the USA *Racer Revenge* PS2 disc as an uncompressed ISO, or browse to the extracted root folder containing `SLUS_202.68`.
 3. Choose **stock** by leaving **Include Arcade + Nintendo 64 content** unchecked. For the **full installation**, check it and supply both your Racer Arcade chip-set ZIP (`swracer.zip`) and your USA Episode I Racer ROM (`.z64`, `.v64`, or `.n64`). The full installation adds two Arcade courses, six Arcade pilots, and eight N64 courses. Setup verifies both dumps and converts them locally with the bundled offline tools.
 4. Choose a **new** installation folder outside the extracted disc folder and click **Install**. ROM conversion can take several minutes. After setup, choose your video and control settings and click **Play**.
 
@@ -16,6 +16,12 @@ Use a graphics driver that provides desktop OpenGL 4.0 or newer. Stock courses s
 You can launch **RacerRevengePC.exe** directly after setup. Open the installed launcher to change settings. Saved changes take effect the next time the game starts. To change which ROMs you import, run a freshly extracted launcher and choose a new destination.
 
 [Watch the 32-second release trailer](https://github.com/GTTeancum/RacerRevengePC/releases/download/v0.9.0/RacerRevengePC-0.9.0-Release-Trailer.mp4)
+
+### PS2 discs in the development launcher
+
+Under **Image…**, choose your ISO, raw BIN, single-data-track CUE, or self-contained CD/DVD CHD. For a BIN/CUE pair, keep both files together and select the CUE. You can also select a `.7z` or `.zip` containing one of these discs. Use **Folder…** for an extracted disc. All readers are included and work offline.
+
+Setup reads the PS2 boot configuration and checks the game's resource layout. Both the USA disc (`SLUS_202.68`) and the European PAL disc (`SLES_503.66`) have been tested from the launcher into Mos Espa. The PAL test also completed a one-lap race and returned to course selection. Other regional releases are unverified.
 
 ## The Mos Espa Open
 

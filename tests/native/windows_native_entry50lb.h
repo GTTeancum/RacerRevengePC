@@ -336,13 +336,13 @@ template<class Entry> int run(Entry entry,int argc,char** argv,bool automatic) {
         // Exact wide directory only, never cwd/PATH search or fallback assets.
         // ASCII relative roots avoid the legacy narrow argv/environment seam.
         if(automatic&&!SetCurrentDirectoryW(assets.c_str()))throw std::runtime_error("Cannot open executable directory as original asset root");
-        if(automatic)for(const wchar_t* relative:{L"SLUS_202.68",L"APPSTART.RES",L"LOC.RES",L"UI/UIFONTS.RES",L"UI/UIMAIN/UIMAIN.RES"}){
+        if(automatic)for(const wchar_t* relative:{L"APPSTART.RES",L"LOC.RES",L"TRACKS/TA.RES",L"PODS/POD19/POD19.RES",L"UI/UIFONTS.RES",L"UI/UIMAIN/UIMAIN.RES"}){
             std::error_code error;
             if(!fs::is_regular_file(assets/relative,error)){
                 std::cerr<<"native_player_missing_original_asset="<<utf8Path(fs::path(relative))<<'\n';
                 sessionMarker("SESSION END exit=1 missing-assets");
                 visibleFailure(L"An original disc file is missing or unreadable:\n"+std::wstring(relative)+
-                    L"\n\nPlace this native EXE and its required DLLs in the folder containing your intact original disc files (including SLUS_202.68, APPSTART.RES, LOC.RES, UI and AUDIO). Do not execute or rename SLUS_202.68. No replacement assets are downloaded or substituted.",log);
+                    L"\n\nUse the launcher to install Racer Revenge from your original PS2 disc, then run the game from that installation.",log);
                 return 1;
             }
         }

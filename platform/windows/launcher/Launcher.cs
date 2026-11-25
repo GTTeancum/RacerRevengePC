@@ -136,13 +136,13 @@ sealed class LauncherForm:Form {
         var box=new TextBox{BackColor=PanelColor,ForeColor=Ink,BorderStyle=BorderStyle.FixedSingle,Dock=DockStyle.Fill,Anchor=AnchorStyles.Left|AnchorStyles.Right,AccessibleName=label};
         row.Controls.Add(box,0,0);
         Action<Button> append=b=>{int i=row.ColumnCount++;row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));row.Controls.Add(b,i,0);};
-        if(filter!=null)append(ActionButton(folders?"ISO…":"Browse…",(s,e)=>SelectFile(box,label,filter)));
+        if(filter!=null)append(ActionButton(folders?"Image…":"Browse…",(s,e)=>SelectFile(box,label,filter)));
         if(folders)append(ActionButton("Folder…",(s,e)=>SelectFolder(box,label,parent)));
         Add(row);return box;
     }
     void SetupPage(){
         ResetPage();Title("Installation");
-        var disc=PathRow("Racer Revenge · USA PS2 disc or extracted folder","DVD image (*.iso)|*.iso",true,false);
+        var disc=PathRow("Racer Revenge · PS2 disc image or extracted folder","PS2 images and archives (*.iso;*.cue;*.bin;*.chd;*.7z;*.zip)|*.iso;*.cue;*.bin;*.chd;*.7z;*.zip|All files (*.*)|*.*",true,false);
         var full=new Switch{Text="Include Arcade + Nintendo 64 content (both ROMs required)",Checked=false};
         Add(full);
         var arcade=PathRow("Racer Arcade · chip-set ZIP","Racer Arcade (*.zip)|*.zip",false,false);

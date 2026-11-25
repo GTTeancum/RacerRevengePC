@@ -35,7 +35,7 @@ inline std::string_view trim(std::string_view s)noexcept {
     const auto a=s.find_first_not_of(" \t\r");if(a==s.npos)return {};
     return s.substr(a,s.find_last_not_of(" \t\r")-a+1);
 }
-// Values are parsed from authenticated files. The retained race file contains
+// Values are parsed from the disc. The retained race file contains
 // Event5..9 but NumEvents=4: those UI-looking trailing records are not loaded.
 inline std::vector<rr::assets::AudioRequest50HC> readEvents(
     const std::vector<std::uint8_t>&bytes,unsigned expected) {
@@ -172,20 +172,17 @@ public:
         try {
             d::need(mixer.count()>=firstVoice+voiceCount,"50HQ reserved voices80..95 unavailable");
             d::need(groups.uses(mixer),"50IC shared group owner differs from race mixer");
-            d::Inputs input;input.capacity=4096;
+            constexpr std::size_t maxEventFile=32*1024;
+            d::Inputs input;input.capacity=2*maxEventFile;
             const auto* identity=original_player_identity50IK::find(playerRacer60);
             d::need(identity,"50IK HOST named announcer player identity unsupported");
-            const auto speechSize=identity->announcerBytes;
             // PORT EXTENSION, NOT ORIGINAL: an add-on pod row has no named
             // announcer INI (generic lines only); its named clips stay absent
             // (Unavailable), the four RACE_SND clips are unchanged.
             const bool named=!original_player_identity50IK::addonPodOf(identity->racer60);
-            const auto raceBytes=input.read(discRoot/"AUDIO/RACE_SND.INI",661);
-            const auto speechBytes=named?input.read(original_player_identity50IK::announcerPath(discRoot,*identity),speechSize):
+            const auto raceBytes=input.read(discRoot/"AUDIO/RACE_SND.INI",maxEventFile);
+            const auto speechBytes=named?input.read(original_player_identity50IK::announcerPath(discRoot,*identity),maxEventFile):
                 std::vector<std::uint8_t>{};
-            d::need(raceBytes.size()==661&&d::sha256(raceBytes)=="2ab8596ed7c33efc7ca771c73850fc5262b17b05fb07e3a3b8de95f9a6ef1b65","50HQ original RACE_SND.INI identity differs");
-            d::need(!named||(speechBytes.size()==speechSize&&d::sha256(speechBytes)==identity->announcerSha256),
-                "50HQ original selected player announcer authoring differs");
             auto race=detail::readEvents(raceBytes,4);
             const auto speech=named?detail::readEvents(speechBytes,identity->announcerEvents):
                 std::vector<rr::assets::AudioRequest50HC>{};
