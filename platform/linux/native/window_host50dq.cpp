@@ -158,9 +158,10 @@ struct WindowHost50DQ::State {
     Int (RR_SDL50WIN_CALL *setSwapInterval)(Int) = nullptr;
     Int (RR_SDL50WIN_CALL *getSwapInterval)() = nullptr;
 #if defined(_WIN32)
-    Int requestWindowsSwapInterval(Int requested) const noexcept {
-        const Int current = getSwapInterval();
-        if (current == requested) return current;
+    Int requestedSwapInterval = 0;
+    Int requestWindowsSwapInterval(Int requested) noexcept {
+        // SDL also reports zero when WGL cannot query the interval.
+        requestedSwapInterval = requested;
         const Int result = setSwapInterval(requested);
         const Int actual = getSwapInterval();
         if (result != 0 || actual != requested)
@@ -313,6 +314,12 @@ bool WindowHost50DQ::ownerThread() const noexcept {
     return thread_ == std::this_thread::get_id();
 }
 bool WindowHost50DQ::created() const noexcept { return ownerThread() && state_ && state_->ready; }
+std::int32_t WindowHost50DQ::requestedSwapInterval() const noexcept {
+#if defined(_WIN32)
+    if (created()) return state_->requestedSwapInterval;
+#endif
+    return info_.swapInterval;
+}
 bool WindowHost50DQ::ownsResources() const noexcept { return ownerThread() && state_; }
 bool WindowHost50DQ::current() const noexcept {
     return created() && state_->getCurrentContext() == state_->context &&
@@ -793,12 +800,11 @@ bool WindowHost50DQ::setSwapInterval(std::int32_t interval,WindowHostDiagnostic5
     d={};
     if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setSwapInterval");
     if(!created()||!current())return fail(d,WindowHostError50DQ::NotCurrent,"setSwapInterval");
+    if(interval < -1||interval > 1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
 #if defined(_WIN32)
-    if(interval < -1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
     info_.swapInterval=state_->requestWindowsSwapInterval(interval);
     return true;
 #else
-    if(interval < -1||interval > 1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
     // Match create(): an exact current interval needs no unsupported GLX
     // setter. This also verifies unchanged native state after a rejected
     // presentation request; it never substitutes a different interval.

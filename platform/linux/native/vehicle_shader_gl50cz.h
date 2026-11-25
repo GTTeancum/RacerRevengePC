@@ -109,7 +109,7 @@ struct VehicleGlShaderDiagnostic50CZ {
     // A bounded error drain did not reach GL_NO_ERROR. Stop GL work and let the
     // context owner recover; cleanup has not forgotten any still-owned names.
     bool errorStateUnclear = false, cleanupIncomplete = false;
-    char log[512]{}; // Bounded, NUL-terminated compile/link log, possibly truncated.
+    char log[512]{}; // Bounded compiler/linker output or the first missing uniform.
 };
 
 const char* vehicleGlVertexSource50CZ() noexcept;

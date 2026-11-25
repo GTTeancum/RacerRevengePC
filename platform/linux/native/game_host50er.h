@@ -114,6 +114,7 @@ public:
     // Renderer submit/commit is separate and never performed by this facade.
     bool swapWindow(GameHostDiagnostic50ER&) noexcept;
     bool setSwapInterval(std::int32_t,GameHostDiagnostic50ER&) noexcept;
+    std::int32_t requestedSwapInterval() const noexcept { return window_.requestedSwapInterval(); }
     bool setWindowTitle(const char*,GameHostDiagnostic50ER&) noexcept;
     bool rumbleController50KZ(std::uint32_t slot,std::int32_t expectedInstance,
         std::uint8_t small,std::uint8_t large,ControllerRumbleReceipt50KZ&,

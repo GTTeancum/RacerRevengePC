@@ -71,6 +71,20 @@ void reportRenderer50DU(const rr::platform::VehicleWindowDiagnostic50DS& diagnos
               << " at " << (diagnostic.operation ? diagnostic.operation : "unknown")
               << " GL=" << diagnostic.glError << " cleanup=" << diagnostic.cleanupGlError
               << " component=" << diagnostic.component << '\n';
+    using Stage = rr::platform::VehicleGlShaderStage50CZ;
+    const auto& shader = diagnostic.shader;
+    if (shader.stage == Stage::none) return;
+    const char* stage = "setup";
+    switch (shader.stage) {
+    case Stage::vertex: stage = "vertex"; break;
+    case Stage::fragment: stage = "fragment"; break;
+    case Stage::link: stage = "link"; break;
+    case Stage::uniforms: stage = "uniforms"; break;
+    case Stage::cleanup: stage = "cleanup"; break;
+    default: break;
+    }
+    std::cerr << "race_shader_failure stage=" << stage << " gl_error=" << shader.glError
+              << " detail=" << (shader.log[0] ? shader.log : "(no driver message)") << '\n';
 }
 }
 // This inline frontend body relies on the original helper functions above.

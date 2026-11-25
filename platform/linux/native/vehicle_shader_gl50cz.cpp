@@ -1,6 +1,7 @@
 #include "vehicle_shader_gl50cz.h"
 #include "../../../src/assets/native_asset48b.h"
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <type_traits>
 
@@ -65,10 +66,10 @@ void main() {
             vec3 m = vec3(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n));
             // Source ADDAz 2^23 packing rounds to an integer (ties to even)
             // after the ambient term and after each ordered light term.
-            vec4 packed = roundEven(skinColorRows50LA[3]);
+            vec4 colorBytes = roundEven(skinColorRows50LA[3]);
             for (int light = 0; light < 3; ++light)
-                packed = roundEven(packed + skinColorRows50LA[light] * max(dot(skinLightDirections50LA[light], m), 0.0));
-            color = clamp(packed, 0.0, 255.0) / 255.0;
+                colorBytes = roundEven(colorBytes + skinColorRows50LA[light] * max(dot(skinLightDirections50LA[light], m), 0.0));
+            color = clamp(colorBytes, 0.0, 255.0) / 255.0;
         }
         vec2 map2 = skinSpecular50LA[0] * n.x + skinSpecular50LA[1] * n.y + skinSpecular50LA[2] * n.z;
         mat3 basis = mat3(r0.xyz, r1.xyz, r2.xyz);
@@ -386,36 +387,45 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
         return fail();
     }
     diagnostic.stage = VehicleGlShaderStage50CZ::uniforms;
-    uniforms_.worldViewProjection = gl_.getUniformLocation(program_, "worldViewProjection");
+    bool uniformsComplete = true;
+    const auto requiredUniform = [&](const char* name) noexcept {
+        const auto location = gl_.getUniformLocation(program_, name);
+        if (location < 0 && uniformsComplete) {
+            std::snprintf(diagnostic.log, sizeof(diagnostic.log), "missing active uniform %s", name);
+            uniformsComplete = false;
+        }
+        return location;
+    };
+    uniforms_.worldViewProjection = requiredUniform("worldViewProjection");
     if (!noGlError(diagnostic) || uniforms_.worldViewProjection < 0) return fail();
-    uniforms_.useTexture = gl_.getUniformLocation(program_, "useTexture");
+    uniforms_.useTexture = requiredUniform("useTexture");
     if (!noGlError(diagnostic) || uniforms_.useTexture < 0) return fail();
-    uniforms_.image = gl_.getUniformLocation(program_, "image");
+    uniforms_.image = requiredUniform("image");
     if (!noGlError(diagnostic) || uniforms_.image < 0) return fail();
-    uniforms_.effectMode = gl_.getUniformLocation(program_, "effectMode");
-    uniforms_.alphaScale = gl_.getUniformLocation(program_, "alphaScale");
-    uniforms_.suppressDraw = gl_.getUniformLocation(program_, "suppressDraw");
-    uniforms_.useUvTransform = gl_.getUniformLocation(program_, "useUvTransform");
-    uniforms_.uvScaleOffset = gl_.getUniformLocation(program_, "uvScaleOffset");
-    uniforms_.useLighting = gl_.getUniformLocation(program_, "useLighting");
-    uniforms_.useNativeGcSelectedLights = gl_.getUniformLocation(program_, "useNativeGcSelectedLights");
-    uniforms_.useSourceDiffuseCompressed50LA = gl_.getUniformLocation(program_, "useSourceDiffuseCompressed50LA");
-    uniforms_.sourceSingleDiffuseRgba50LA = gl_.getUniformLocation(program_, "sourceSingleDiffuseRgba50LA");
-    uniforms_.sourceSingleFogColor50LA = gl_.getUniformLocation(program_, "sourceSingleFogColor50LA");
-    uniforms_.sourceSingleFogEnabled50LA = gl_.getUniformLocation(program_, "sourceSingleFogEnabled50LA");
-    uniforms_.sourceSingleAlphaTest50LA = gl_.getUniformLocation(program_, "sourceSingleAlphaTest50LA");
-    uniforms_.sourcePairPass50LA = gl_.getUniformLocation(program_, "sourcePairPass50LA");
-    uniforms_.sourcePairFog50LA = gl_.getUniformLocation(program_, "sourcePairFog50LA");
-    uniforms_.sourcePairDestination50LA = gl_.getUniformLocation(program_, "sourcePairDestination50LA");
-    uniforms_.sourcePairAlphaTest50LA = gl_.getUniformLocation(program_, "sourcePairAlphaTest50LA");
-    uniforms_.sourcePairFixedBlend50LA = gl_.getUniformLocation(program_, "sourcePairFixedBlend50LA");
-    uniforms_.skinMode50LA = gl_.getUniformLocation(program_, "skinMode50LA");
-    uniforms_.skinBones50LA = gl_.getUniformLocation(program_, "skinBones50LA");
-    uniforms_.skinLightDirections50LA = gl_.getUniformLocation(program_, "skinLightDirections50LA");
-    uniforms_.skinColorRows50LA = gl_.getUniformLocation(program_, "skinColorRows50LA");
-    uniforms_.skinDiffuseSelected50LA = gl_.getUniformLocation(program_, "skinDiffuseSelected50LA");
-    uniforms_.skinSpecular50LA = gl_.getUniformLocation(program_, "skinSpecular50LA");
-    uniforms_.nativeGcAmbient = gl_.getUniformLocation(program_, "nativeGcAmbient");
+    uniforms_.effectMode = requiredUniform("effectMode");
+    uniforms_.alphaScale = requiredUniform("alphaScale");
+    uniforms_.suppressDraw = requiredUniform("suppressDraw");
+    uniforms_.useUvTransform = requiredUniform("useUvTransform");
+    uniforms_.uvScaleOffset = requiredUniform("uvScaleOffset");
+    uniforms_.useLighting = requiredUniform("useLighting");
+    uniforms_.useNativeGcSelectedLights = requiredUniform("useNativeGcSelectedLights");
+    uniforms_.useSourceDiffuseCompressed50LA = requiredUniform("useSourceDiffuseCompressed50LA");
+    uniforms_.sourceSingleDiffuseRgba50LA = requiredUniform("sourceSingleDiffuseRgba50LA");
+    uniforms_.sourceSingleFogColor50LA = requiredUniform("sourceSingleFogColor50LA");
+    uniforms_.sourceSingleFogEnabled50LA = requiredUniform("sourceSingleFogEnabled50LA");
+    uniforms_.sourceSingleAlphaTest50LA = requiredUniform("sourceSingleAlphaTest50LA");
+    uniforms_.sourcePairPass50LA = requiredUniform("sourcePairPass50LA");
+    uniforms_.sourcePairFog50LA = requiredUniform("sourcePairFog50LA");
+    uniforms_.sourcePairDestination50LA = requiredUniform("sourcePairDestination50LA");
+    uniforms_.sourcePairAlphaTest50LA = requiredUniform("sourcePairAlphaTest50LA");
+    uniforms_.sourcePairFixedBlend50LA = requiredUniform("sourcePairFixedBlend50LA");
+    uniforms_.skinMode50LA = requiredUniform("skinMode50LA");
+    uniforms_.skinBones50LA = requiredUniform("skinBones50LA");
+    uniforms_.skinLightDirections50LA = requiredUniform("skinLightDirections50LA");
+    uniforms_.skinColorRows50LA = requiredUniform("skinColorRows50LA");
+    uniforms_.skinDiffuseSelected50LA = requiredUniform("skinDiffuseSelected50LA");
+    uniforms_.skinSpecular50LA = requiredUniform("skinSpecular50LA");
+    uniforms_.nativeGcAmbient = requiredUniform("nativeGcAmbient");
     constexpr const char* diffuseNames[] = {
         "nativeGcDiffuse[0]", "nativeGcDiffuse[1]", "nativeGcDiffuse[2]"
     };
@@ -423,24 +433,12 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
         "nativeGcDirection[0]", "nativeGcDirection[1]", "nativeGcDirection[2]"
     };
     for (unsigned i = 0; i < 3; ++i) {
-        uniforms_.nativeGcDiffuse[i] = gl_.getUniformLocation(program_, diffuseNames[i]);
-        uniforms_.nativeGcDirection[i] = gl_.getUniformLocation(program_, directionNames[i]);
+        uniforms_.nativeGcDiffuse[i] = requiredUniform(diffuseNames[i]);
+        uniforms_.nativeGcDirection[i] = requiredUniform(directionNames[i]);
         if (!noGlError(diagnostic) || uniforms_.nativeGcDiffuse[i] < 0 ||
             uniforms_.nativeGcDirection[i] < 0) return fail();
     }
-    if (!noGlError(diagnostic) || uniforms_.effectMode < 0 || uniforms_.alphaScale < 0 ||
-        uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0 ||
-        uniforms_.useLighting < 0 || uniforms_.useNativeGcSelectedLights < 0 ||
-        uniforms_.useSourceDiffuseCompressed50LA < 0 ||
-        uniforms_.sourceSingleDiffuseRgba50LA < 0 || uniforms_.sourceSingleFogColor50LA < 0 ||
-        uniforms_.sourceSingleFogEnabled50LA < 0 || uniforms_.sourceSingleAlphaTest50LA < 0 ||
-        uniforms_.sourcePairPass50LA < 0 ||
-        uniforms_.sourcePairFog50LA < 0 || uniforms_.sourcePairDestination50LA < 0 ||
-        uniforms_.sourcePairAlphaTest50LA < 0 || uniforms_.sourcePairFixedBlend50LA < 0 ||
-        uniforms_.skinMode50LA < 0 || uniforms_.skinBones50LA < 0 || uniforms_.skinLightDirections50LA < 0 ||
-        uniforms_.skinColorRows50LA < 0 || uniforms_.skinDiffuseSelected50LA < 0 || uniforms_.skinSpecular50LA < 0 ||
-        uniforms_.nativeGcAmbient < 0)
-        return fail();
+    if (!noGlError(diagnostic) || !uniformsComplete) return fail();
     ready_ = true;
     diagnostic.stage = VehicleGlShaderStage50CZ::none;
     return true;

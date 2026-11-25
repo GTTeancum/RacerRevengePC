@@ -566,18 +566,20 @@ bool Frontend::available()const noexcept  {
         if((!info.focused&&!unattendedRiderPresentation50KG())||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0){std::fprintf(stderr,"original_rider_presentation_failure method=available site=2\n");return false;}
         if(!presentationActive)return riderPresentationPolicy==RiderPresentationPolicy::inactive;
         if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight){std::fprintf(stderr,"original_rider_presentation_failure method=available site=3\n");return false;}
-        return (riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1&&info.swapInterval==1)||
-            (riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz&&info.swapInterval==savedSwapInterval);
+        if(riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1)return info.swapInterval==1;
+#if !defined(_WIN32)
+        if(info.swapInterval!=0)return false;
+#endif
+        return riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz;
     }
 
 bool Frontend::begin()noexcept  {
         if(presentationActive||!available()){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=1\n");return false;}
-        savedSwapInterval=presentationHost->info().swapInterval;
+        savedSwapInterval=presentationHost->requestedSwapInterval();
         presentationWidth=presentationHost->info().drawableWidth;
         presentationHeight=presentationHost->info().drawableHeight;
         presentationBeginSwaps=riderPresentationSwaps;
         presentationCompletedWaits=0;presentationCompletedWaitNanoseconds=0;riderDeadline.reset();
-        // Save the observed interval so the rider transition can restore the previous preference.
         presentationActive=true;riderPresentationPolicy=RiderPresentationPolicy::restoring;
         rr::platform::GameHostDiagnostic50ER d;
         const bool requested=presentationHost->setSwapInterval(1,d);
@@ -586,11 +588,11 @@ bool Frontend::begin()noexcept  {
             const bool swapControlFailure=requested||(d.error==rr::platform::GameHostError50ER::Window&&
                 d.window.error==rr::platform::WindowHostError50DQ::SwapIntervalFailure);
             if(!presentationHost->setSwapInterval(savedSwapInterval,d)){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=2\n");return false;}
-            // Optional native-PC policy, never a fabricated interval1 result.
-            // Wrong context/thread, unstable intervals and unaccepted
-            // audio/clock baselines cannot activate this alternate owner.
-            if(!allowNativePcRiderDeadline||!swapControlFailure||
-               presentationHost->info().swapInterval!=savedSwapInterval||!lastUpdateNanoseconds||
+            // The deadline caps the sample rate even if a Windows driver overrides the request.
+            if(!allowNativePcRiderDeadline||!swapControlFailure||!lastUpdateNanoseconds||
+#if !defined(_WIN32)
+               savedSwapInterval!=0||presentationHost->info().swapInterval!=0||
+#endif
                original_ui_elapsed50LH::project(lastUpdateNanoseconds,presentationNow(),pendingUpdateColdNanoseconds).error!=
                    original_ui_elapsed50LH::Error::none){
                 presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;{std::fprintf(stderr,"original_rider_presentation_failure method=begin site=3\n");return false;}
@@ -598,7 +600,7 @@ bool Frontend::begin()noexcept  {
             riderPresentationPolicy=RiderPresentationPolicy::nativePcDeadline60Hz;
         }
         if(!available()){std::fprintf(stderr,"original_rider_presentation_failure method=begin site=4\n");return false;}
-        std::fprintf(stderr,"original_rider_presentation_begin policy=%s actual_interval=%d saved_interval=%d physical_scanout_measured=0\n",
+        std::fprintf(stderr,"original_rider_presentation_begin policy=%s actual_interval=%d saved_request=%d physical_scanout_measured=0\n",
             presentationPolicyName(),presentationHost->info().swapInterval,savedSwapInterval);
         return true;
     }
@@ -607,8 +609,8 @@ bool Frontend::end()noexcept  {
         if(!presentationActive)return true;
         rr::platform::GameHostDiagnostic50ER d;
         if(!presentationHost||!presentationHost->setSwapInterval(savedSwapInterval,d)){std::fprintf(stderr,"original_rider_presentation_failure method=end site=1\n");return false;}
-        std::fprintf(stderr,"original_rider_presentation_end policy=%s restored_interval=%d swap_calls=%llu completed_waits=%llu completed_wait_scope_ns=%llu physical_scanout_measured=0\n",
-            presentationPolicyName(),presentationHost->info().swapInterval,
+        std::fprintf(stderr,"original_rider_presentation_end policy=%s requested_interval=%d actual_interval=%d swap_calls=%llu completed_waits=%llu completed_wait_scope_ns=%llu physical_scanout_measured=0\n",
+            presentationPolicyName(),savedSwapInterval,presentationHost->info().swapInterval,
             static_cast<unsigned long long>(riderPresentationSwaps-presentationBeginSwaps),
             static_cast<unsigned long long>(presentationCompletedWaits),
             static_cast<unsigned long long>(presentationCompletedWaitNanoseconds));
@@ -627,8 +629,7 @@ bool Frontend::pollPresentationInput()noexcept {
 
 bool Frontend::waitBeforeSample()noexcept  {
         if(!pollPresentationInput()){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=1\n");return false;}
-        // Driver policy retains its existing real swap wait. The opt-in
-        // interval0 host policy waits BEFORE render, inside actual sample dt.
+        // The deadline policy waits before rendering, inside the measured sample time.
         if(riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1)return true;
         if(riderPresentationPolicy!=RiderPresentationPolicy::nativePcDeadline60Hz){std::fprintf(stderr,"original_rider_presentation_failure method=waitBeforeSample site=2\n");return false;}
         using Error=original_ui_rider_pacing50LB::Error;

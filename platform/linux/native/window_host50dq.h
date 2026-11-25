@@ -17,7 +17,7 @@ struct WindowHostRequest50DQ {
     std::int32_t redBits = 8, greenBits = 8, blueBits = 8, alphaBits = 8;
     std::int32_t depthBits = 24, stencilBits = 8;
     std::int32_t samples = 0; // Zero explicitly forbids multisampling.
-    std::int32_t swapInterval = 1; // Exactly -1 (adaptive), 0 or 1; no fallback.
+    std::int32_t swapInterval = 1; // Request -1 (adaptive), 0 (immediate) or 1 (synchronized).
     bool resizable = true;
     // Opt-in actual SDL GameController transport; absent devices stay absent.
     // Keyboard-only windows do not initialize or load this subsystem.
@@ -112,8 +112,9 @@ public:
     bool poll(WindowInput50DQ&, WindowHostDiagnostic50DQ&) noexcept;
     // Submission only: SDL's void swap API cannot prove presentation/completion.
     bool swap(WindowHostDiagnostic50DQ&) noexcept;
-    // On Windows the driver may override this preference. Read info().swapInterval for the effective interval.
+    // Windows drivers can override the request. info().swapInterval holds SDL's readback.
     bool setSwapInterval(std::int32_t,WindowHostDiagnostic50DQ&) noexcept;
+    std::int32_t requestedSwapInterval() const noexcept;
     // Nonmodal native status only; never changes the original menu artwork.
     bool setTitle(const char*,WindowHostDiagnostic50DQ&) noexcept;
     // Sends only to the actual opened SDL instance. A missing/disconnected/
