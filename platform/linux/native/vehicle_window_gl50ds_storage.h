@@ -491,6 +491,9 @@ struct VehicleWindowGl50DS::Storage {
     std::unique_ptr<HostHudGeometry> hostHudGeometry;
     U hostHudProgram = 0, hostHudVertexShader = 0, hostHudFragmentShader = 0;
     U hostHudVertexBuffer = 0, hostHudIndexBuffer = 0, hostHudVertexArray = 0;
+    OpponentDamageMeters damageMeters{};
+    std::array<float,3> damageMeterEye{};
+    bool drawOpponentDamageMeters() noexcept;
     bool frameHostHud = false;
     U trackCandidateIndexCount = 0; // Sum of original material-pass index ranges.
     U trackVertexBuffer = 0, trackIndexBuffer = 0, trackVertexArray = 0, trackNormalBuffer = 0, trackProjectionBuffer = 0;

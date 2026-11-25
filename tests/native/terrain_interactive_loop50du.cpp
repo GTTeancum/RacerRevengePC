@@ -2072,7 +2072,7 @@ void Context::run() {
             <<" collections="<<native_wreck_debris50PD::cameraView().view.count370<<" at=replay\n";
        }
        native_wreck_debris50PD::updateCameraView();
-       native_wreck_effects50PD::step(.016f);
+       racerBank.visit(0,[&](){native_wreck_effects50PD::step(.016f,s.noiseOwner().sharedRandomState);});
        replayTiming.lap(5);
        const auto frame=++sourceCameraTick;
        const auto scene=sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::replayPose,.016f);
@@ -2700,7 +2700,7 @@ void Context::run() {
           <<" collections="<<native_wreck_debris50PD::cameraView().view.count370<<'\n';
      }
      native_wreck_debris50PD::updateCameraView();
-     native_wreck_effects50PD::step(.016f);
+     racerBank.visit(0,[&](){native_wreck_effects50PD::step(.016f,s.noiseOwner().sharedRandomState);});
      {const auto& fx=native_wreck_effects50PD::state();std::size_t embers=0;float low=1e30f,high=-1e30f,reach=0.f;
       for(const auto& e:fx.emitters)if(e.alive&&e.ballistic){++embers;low=std::min(low,e.position[1]);high=std::max(high,e.position[1]);
        reach=std::max(reach,std::hypot(e.velocity[0],e.velocity[2]));}
@@ -3404,18 +3404,24 @@ void Context::run() {
     renderFrame.playerHiddenDestroyed50PD=playerDestroyed;
     static std::array<platform::VehicleWindowDebrisInstance50DS,platform::maxVehicleWindowDebrisInstances50DS> debrisInstances50PD{};
     static std::array<rr::assets::Vertex48B,platform::maxVehicleWindowEffectQuads50DS*4u> effectVertices50PD{};
-    if(sourceCameraSession&&native_wreck_effects50PD::state().cold&&!native_wreck_effects50PD::state().particles.empty()){
-     // Billboards face the presented camera (its eye and backward axis), not
-     // the pose target, which death-camera mode 0 leaves unwritten.
-     const auto sprites=native_wreck_effects50PD::camera({camera.eye[0],camera.eye[1],camera.eye[2]},
-         {camera.eye[0]-cameraBackward.v[0],camera.eye[1]-cameraBackward.v[1],camera.eye[2]-cameraBackward.v[2]},
-         {camera.up[0],camera.up[1],camera.up[2]});
+    static std::array<std::uint8_t,platform::maxVehicleWindowEffectQuads50DS> wreckAdditive{};
+    auto prepareWreckSprites=[&](unsigned viewIndex,const float* eye,const float* backward,const float* up){
+     if(!sourceCameraSession||!native_wreck_effects50PD::state().cold||native_wreck_effects50PD::state().particles.empty())return;
+     const auto sprites=native_wreck_effects50PD::camera({eye[0],eye[1],eye[2]},
+         {eye[0]-backward[0],eye[1]-backward[1],eye[2]-backward[2]},{up[0],up[1],up[2]});
+     const auto& core=viewIndex?*sourceCameraSession->secondPublishedView():sourceCameraSession->view();
+     const auto& viewport=viewIndex?*sourceCameraSession->hudViewport(viewIndex):sourceCameraSession->viewport();
+     std::array<std::array<std::uint8_t,3>,4> colors{};
+     if(!originalParticleCornerColors50KG(core,lightOwner,drawLights[0],colors))
+      for(auto& color:colors)color.fill(255);
      std::uint32_t blended=0;
+     renderFrame.effectAdditive=wreckAdditive.data();
      renderFrame.effectQuads=native_wreck_effects50PD::build(sprites,effectVertices50PD.data(),
-         platform::maxVehicleWindowEffectQuads50DS,blended);
+         platform::maxVehicleWindowEffectQuads50DS,blended,wreckAdditive.data(),viewport.combinedScreen250,colors);
      renderFrame.effectBlendedQuads=blended;
      renderFrame.effectVertices=renderFrame.effectQuads?effectVertices50PD.data():nullptr;
-    }
+    };
+    prepareWreckSprites(0,camera.eye,cameraBackward.v,camera.up);
     // Original water surface (all courses with water): built from the
     // presented source camera and the completed water runtime state.
     if(sourceCameraSession){
@@ -3501,6 +3507,23 @@ void Context::run() {
      }
     }
     const auto preparePlayerHud=[&](unsigned hudView){
+    auto& meters=renderFrame.damageMeters;
+    meters.count=0;
+    if(raceEnabled&&sourceCameraSession&&sourceCameraSession->nativeHudVisible()&&!replayHud50PD){
+     for(std::size_t slot=0;slot<racerBank.count();++slot){
+      if((slot<originalAiHumanCount&&slot==hudView)||!racerBank.active(slot)||
+         rr::game::nativeRacerDestroyed50PD(slot))continue;
+      racerBank.visit(slot,[&](){
+       auto& meter=meters.racers.at(meters.count++);
+       // 228724 publishes this scene translation as racer+CA0.
+       const auto node=static_cast<unsigned>(x.bindings.animation.bodyScene288);
+       std::copy_n(s.nodes[node].localC0.v+12,3,meter.position.begin());
+       meter.damage=std::max({s.fields.damage7D0,s.fields.damage7D4,s.fields.damage7DC});
+       meter.finished=(s.fields.impactFlagsCD8&1u)!=0;
+       meter.repairing=(s.bodies.main.controls.player.flagsB9C&2u)!=0;
+      });
+     }
+    }
     if(sourceSpeedBoostRendering&&sourceCameraSession&&!replayHud50PD){
      OriginalSpeedBoostNativeFrame50LA speedFrame;
      original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;
@@ -3991,6 +4014,9 @@ void Context::run() {
       renderFrame.worldViewProjection=second.world.worldViewProjection;
       renderFrame.skyWorldViewProjection=track.counts.skyCubes?second.sky.worldViewProjection:nullptr;
       renderFrame.worldFogCamera=second.eye;
+      const auto& up=secondCore->sceneAfter.up;
+      const float secondUp[]={up.x,up.y,up.z};
+      prepareWreckSprites(1,second.eye,second.backward,secondUp);
       if(renderFrame.sourceBodyCamera50LA){
        renderFrame.sourceBodyCamera50LA=secondCore;
        renderFrame.sourceDiffuseCamera50LA=sourceCameraSession->racerDiffuseCamera(1);
@@ -4088,7 +4114,10 @@ void Context::run() {
      windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
      const auto& pillar=rr::game::n64PillarCameraShake50NH;
      windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
-     windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+     if(std::getenv("RR_TEST_WRECK_CAPTURE")&&rr::game::nativeTestDestroys50PD[0].fired)
+      windowCapture.requestEffectSample(race.raceSeconds,rr::game::nativeTestDestroys50PD[0].seconds,true);
+     else
+      windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
     }
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
@@ -4298,7 +4327,10 @@ void Context::run() {
      windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
      const auto& pillar=rr::game::n64PillarCameraShake50NH;
      windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
-     windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+     if(std::getenv("RR_TEST_WRECK_CAPTURE")&&rr::game::nativeTestDestroys50PD[0].fired)
+      windowCapture.requestEffectSample(race.raceSeconds,rr::game::nativeTestDestroys50PD[0].seconds,true);
+     else
+      windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
     }
     if(windowImage&&windowCapture.due(windows_capture50LD::Stage::race,settledTrack)){
 #endif

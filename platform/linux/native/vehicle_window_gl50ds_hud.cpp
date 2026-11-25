@@ -627,6 +627,56 @@ void main() { viewerOutput = hudColor; }
         return verifyLayout(hostHudVertexBuffer, hostHudIndexBuffer);
     }
 
+bool VehicleWindowGl50DS::Storage::drawOpponentDamageMeters() noexcept {
+    if(!damageMeters.count)return true;
+    std::array<assets::Vertex48B,(maxVehicleWindowOpponents50DS+1)*8> vertices{};
+    unsigned count=0;
+    const float sy=2.f/(splitPass?224.f:448.f);
+    const float sx=2.f*std::min(float(width)/640.f,float(height)/448.f)/float(width);
+    for(unsigned i=0;i<damageMeters.count;++i){
+        const auto& racer=damageMeters.racers[i];
+        const auto& p=racer.position;
+        float distance2=0.f;
+        for(unsigned axis=0;axis<3;++axis){
+            const float delta=p[axis]-damageMeterEye[axis];
+            distance2+=delta*delta;
+        }
+        if(!(distance2<90000.f))continue;
+        auto clip=[&](unsigned row){
+            const auto* axis=matrix+4*row; // Same row-vector multiply as the track shader.
+            return axis[0]*p[0]+axis[1]*(p[1]+7.f)+axis[2]*p[2]+axis[3];
+        };
+        const float w=clip(3),x=clip(0),y=clip(1);
+        if(!(w>0.f)||std::abs(x)>w||std::abs(y)>w||std::abs(clip(2))>w)continue;
+        const unsigned fade=distance2<=40000.f?512u:unsigned(.5f+512.f*(1.f-(distance2-40000.f)/50000.f));
+        const auto alpha=std::min(255u,(fade>>2)*2);
+        auto rect=[&](float left,float right,float top,float bottom,unsigned rgb){
+            for(unsigned corner=0;corner<4;++corner){
+                auto& v=vertices[count++];
+                v.position[0]=x/w+(corner==1||corner==2?right:left)*sx;
+                v.position[1]=y/w-(corner<2?bottom:top)*sy;
+                v.position[2]=clip(2)/w;
+                v.color[0]=std::uint8_t((rgb>>16)&254u);v.color[1]=std::uint8_t((rgb>>8)&254u);
+                v.color[2]=std::uint8_t(rgb&254u);v.color[3]=std::uint8_t(alpha);
+            }
+        };
+        rect(-16.f,16.f,-3.f,5.f,0x646464);
+        const unsigned color=racer.finished?0xf0f0f0:racer.repairing?0x6a9dd4:
+            racer.damage<.4f?0x65c96e:racer.damage<.7f?0xc4d868:0xca6060;
+        rect(-14.f,-14.f+28.f*(1.f-std::min(racer.damage,1.f)),-1.f,3.f,color);
+    }
+    if(!count)return true;
+    gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);gl.enable(0x0BE2);
+    gl.blendEquation(0x8006);gl.blendFunc(0x0302,0x0303);gl.colorMask(1,1,1,0);
+    gl.useProgram(hostHudProgram);drawGl.bindVertexArray(hostHudVertexArray);
+    drawGl.bindBuffer(arrayBuffer,hostHudVertexBuffer);
+    drawGl.bufferSubData(arrayBuffer,0,count*sizeof(assets::Vertex48B),vertices.data());
+    drawGl.drawElementsBaseVertex(0x0004,(count/4)*6,0x1405,nullptr,0);
+    gl.colorMask(1,1,1,1);gl.disable(0x0BE2);gl.enable(0x0B71);gl.depthMask(1);
+    gl.useProgram(shader->program());drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+    return check("draw per-camera opponent damage meters");
+}
+
 bool VehicleWindowGl50DS::Storage::drawHostHud() noexcept {
         if (!frameHostHud) return true;
         resetNativeGcLighting();

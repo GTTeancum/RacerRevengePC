@@ -17,6 +17,7 @@
 // PC-native wreck particle sprites: fixed dynamic quad buffer, static indices.
     U effectVertexBuffer=0,effectIndexBuffer=0,effectVertexArray=0,effectTexture=0;
     std::array<assets::Vertex48B,maxVehicleWindowEffectQuads50DS*4u> frameEffectVertices{};
+    std::array<std::uint8_t,maxVehicleWindowEffectQuads50DS> frameEffectAdditive{};
     U frameEffectQuads=0,frameEffectBlended=0;
     std::uint64_t effectDraws=0;
 

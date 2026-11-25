@@ -768,6 +768,15 @@ struct VehicleWindowTrackUvFrame50DS {
     // and return its actual controller translation. Never called for culls.
     bool (*service)(void*, std::uint32_t, float& u, float& v) noexcept = nullptr;
 };
+struct OpponentDamageMeter {
+    std::array<float,3> position{};
+    float damage=0.f;
+    bool finished=false,repairing=false;
+};
+struct OpponentDamageMeters {
+    std::array<OpponentDamageMeter,maxVehicleWindowOpponents50DS+1> racers{};
+    unsigned count=0;
+};
 struct VehicleWindowFrame50DS {
     // Pixel viewport. Window output requires actual default-framebuffer drawable
     // dimensions, not logical window dimensions; skip minimized/zero drawables.
@@ -841,6 +850,7 @@ struct VehicleWindowFrame50DS {
     const GameplayBlurFrame50DS* gameplayBlur = nullptr;
     // 0 for a single presentation, 1 and 2 for consecutive original split views.
     unsigned splitPass = 0;
+    OpponentDamageMeters damageMeters{};
     const VehicleWindowTrackUvFrame50DS* trackUvAnimation = nullptr;
     //Actual track particle manager packets, borrowed through this one
     //transaction; all5000 slots can draw. Drawn after Binder, before HUD/blur.
@@ -892,6 +902,7 @@ struct VehicleWindowFrame50DS {
     // are alpha-blended, the rest additive. Borrowed through submit.
     const assets::Vertex48B* effectVertices = nullptr;
     std::uint32_t effectQuads = 0, effectBlendedQuads = 0;
+    const std::uint8_t* effectAdditive = nullptr;
     // Original water: 2 * waterStrips * 34 vertices (pass A then pass B per
     // strip). Borrowed through submit; zero strips draws no water (the camera
     // zone does not see water, or the course has none).

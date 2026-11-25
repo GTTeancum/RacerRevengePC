@@ -726,6 +726,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         (frame.effectQuads && !frame.effectVertices))
         return fail(d, VehicleWindowError50DS::frame, "effect quad list outside capacity");
     s.frameEffectQuads = frame.effectQuads; s.frameEffectBlended = frame.effectBlendedQuads;
+    for(U i=0;i<frame.effectQuads;++i)
+        s.frameEffectAdditive[i]=frame.effectAdditive?frame.effectAdditive[i]:i>=frame.effectBlendedQuads;
     if (frame.effectQuads)
         std::memcpy(s.frameEffectVertices.data(), frame.effectVertices,
             std::size_t(frame.effectQuads) * 4u * sizeof(assets::Vertex48B));
@@ -753,6 +755,11 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if(d.originalRaceHudRejected&&s.raceHud)s.raceHud->frame=false;
     d.originalRaceStartOverlayRejected=!s.prepareRaceStartOverlayFrame(frame.originalRaceStartOverlay);
     if(d.originalRaceStartOverlayRejected&&s.raceStartOverlay)s.raceStartOverlay->frame=false;
+    s.damageMeters=frame.damageMeters;
+    if(s.damageMeters.count>s.damageMeters.racers.size() ||
+       (s.damageMeters.count && (!frame.worldFogCamera || !s.hostHudProgram)))
+        return fail(d,VehicleWindowError50DS::frame,"opponent meters require a camera and color shader");
+    if(s.damageMeters.count)std::copy_n(frame.worldFogCamera,3,s.damageMeterEye.begin());
     s.splitPass=frame.splitPass;
     if(frame.splitPass>2||(frame.splitPass&&(!frame.gameplayBlur||!frame.gameplayBlur->hasSecondView||!s.gameplaySceneTarget)))
         return fail(d,VehicleWindowError50DS::frame,"split view requires two authored rectangles and a composition target");

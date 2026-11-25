@@ -2388,7 +2388,7 @@ bool VehicleWindowGl50DS::Storage::commit(void* context, std::uint8_t bank) noex
             s.gl.colorMask(1, 1, 1, 1);
             if (!s.check("restore opaque presentation alpha after all body/destination-alpha and particle consumers")) return false;
         }
-        if (!s.resolveCoverage(bank)) return false;
+        if (!s.drawOpponentDamageMeters() || !s.resolveCoverage(bank)) return false;
         s.traceRendererStage("coverage_resolve",stageStart);
         // PC-native FXAA smooths the completed 3D scene only; every HUD,
         // Results, F8 and Pause layer below is drawn afterwards, unsmoothed.
@@ -3000,7 +3000,7 @@ bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
         resetPodState();
         gl.useProgram(trackProgram); gl.uniform1i(gsAlphaPassUniform, 0); gl.uniform1i(environmentMapUniform, 0); gl.uniform1i(gsAlphaPayloadUniform, 0);
         gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
-        gl.uniform1f(trackColorScaleUniform, 255.f / 128.f);
+        gl.uniform1f(trackColorScaleUniform, 1.f);
         gl.uniform1i(trackUseTextureUniform, 1); gl.uniform1i(trackImageUniform, 0);
         gl.uniform1i(trackDiscardZeroAlphaUniform, 1);
         gl.uniform1f(trackAlphaReferenceUniform, 0.f);
@@ -3026,18 +3026,17 @@ bool VehicleWindowGl50DS::Storage::drawEffects() noexcept {
         gl.enable(0x0B71); gl.depthFunc(0x0203); gl.depthMask(0); gl.disable(0x0B44);
         gl.colorMask(1, 1, 1, 0);
         bool accepted = check("bind effect state and upload quads");
-        if (accepted && frameEffectBlended) {
-            gl.uniform1i(worldFogEnabledUniform, fog.enabled ? 1 : 0);
-            gl.blendFunc(0x0302, 0x0303); // SRC_ALPHA, ONE_MINUS_SRC_ALPHA
-            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(frameEffectBlended * 6u), 0x1405, nullptr, 0);
-            accepted = check("draw blended effect quads");
-        }
-        if (accepted && frameEffectQuads > frameEffectBlended) {
-            gl.uniform1i(worldFogEnabledUniform, 0); // additive glow is not mixed toward the fog colour
-            gl.blendFunc(0x0302, 0x0001); // SRC_ALPHA, ONE
-            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>((frameEffectQuads - frameEffectBlended) * 6u), 0x1405,
-                reinterpret_cast<const void*>(std::uintptr_t(frameEffectBlended) * 6u * sizeof(U)), 0);
-            accepted = check("draw additive effect quads");
+        for(U first=0;accepted&&first<frameEffectQuads;){
+            const bool additive=frameEffectAdditive[first]!=0;
+            U end=first+1;
+            while(end<frameEffectQuads&&frameEffectAdditive[end]==additive)++end;
+            gl.uniform1i(worldFogEnabledUniform,fog.enabled?1:0);
+            gl.uniform1i(trackEffectModeUniform,additive?5:1);
+            gl.blendFunc(additive?1:0x0302,additive?1:0x0303);
+            drawGl.drawElementsBaseVertex(0x0004,I((end-first)*6u),0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(first)*6u*sizeof(U)),0);
+            accepted=check("draw depth-ordered wreck particles");
+            first=end;
         }
         if (accepted && (++effectDraws == 1 || effectDraws % 625 == 0))
             std::fprintf(stderr, "native_effects draws=%llu quads=%u blended=%u\n",

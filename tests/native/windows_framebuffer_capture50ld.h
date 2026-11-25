@@ -325,10 +325,10 @@ public:
   skyFlashActive_=active;
   if(serial_<56)requested_=true;
  }
- void requestEffectSample(double now,double start){
+ void requestEffectSample(double now,double start,bool wreck=false){
   static const bool enabled=std::getenv("RR_TEST_N64_EFFECT_CAPTURE")!=nullptr;
   constexpr double offsets[]={0.0,0.12,0.25,0.5,0.75,1.0,1.5,1.95};
-  if(enabled&&run_&&!run_->logsOnly()&&start>=0.0&&effectSample_<std::size(offsets)&&now>=start+offsets[effectSample_]){
+  if((enabled||wreck)&&run_&&!run_->logsOnly()&&start>=0.0&&effectSample_<std::size(offsets)&&now>=start+offsets[effectSample_]){
    ++effectSample_;
    requested_=true;
   }

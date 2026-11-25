@@ -930,6 +930,10 @@ void main() {
     }
     if (effectMode == 2) color *= alphaScale;
     if (worldFogEnabled != 0) color = mix(color, worldFogColor.rgb, trackFogAmount);
+    if (effectMode == 5) {
+        viewerOutput = vec4(color * (sourceAlphaByte / 128.0), 1.0);
+        return;
+    }
     viewerOutput = vec4(color, effectMode == 3 ? sourceAlphaByte / 128.0 :
         effectMode == 1 ? clamp(alpha * alphaScale, 0.0, 1.0) : 1.0);
 }

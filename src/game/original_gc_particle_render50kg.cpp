@@ -21,7 +21,8 @@ bool normalize(V& a) noexcept {
     const float reciprocal=div(1,std::sqrt(square));
     for(float& v:a){v=mul(v,reciprocal);if(!std::isfinite(v))return false;}return true;
 }
-bool lighting(const CameraViewOutput49F& camera,
+}
+bool originalParticleCornerColors50KG(const CameraViewOutput49F& camera,
     const original_gc_gameplay_lighting_candidate::Owner& owner,
     const NativeGcSelectedLightsCandidate& selected,
     std::array<std::array<std::uint8_t,3>,4>& out) noexcept {
@@ -56,7 +57,6 @@ bool lighting(const CameraViewOutput49F& camera,
         }
     }
     return true;
-}
 }
 struct OriginalGcParticleRenderOwner50KG::Storage {
     const OriginalGcParticleManager50KG* manager=nullptr;
@@ -123,7 +123,7 @@ S OriginalGcParticleRenderOwner50KG::build(const CameraViewOutput49F& core,
     OriginalUiMainParticleRenderConstants50KG constants;
     constants.combinedClip100=core.combined;constants.sourceCanvasOffset={{1728,1824}};
     constants.fogStart33Z=fog.end38;constants.fogScale33W=div(255,sub(fog.start34,fog.end38));
-    if(!lighting(core,lightOwner,selected,constants.sourceLighting))return S::lighting;
+    if(!originalParticleCornerColors50KG(core,lightOwner,selected,constants.sourceLighting))return S::lighting;
     s.heads.fill(-1);s.next.fill(-1);
     constexpr float maximumDepth=16777000.f;
     const float scale=div(float(originalGcParticleDepthBuckets50KG),maximumDepth),inverseScale=div(1,scale);

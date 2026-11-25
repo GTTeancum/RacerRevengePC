@@ -1112,7 +1112,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
        main.components.root.worldAngularVelocityA0.v,s.nodes[container].world100.v+12,s.noiseOwner().sharedRandomState,first,
        debrisPrimaryZone(s.nodes[body].world100.v));
    const auto* w=s.nodes[body].world100.v;
-   native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]});
+   native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]},s.noiseOwner().sharedRandomState);
    const auto& live=native_wreck_debris50PD::sim().pieces;
    std::cerr<<"debris_spawn_limp slot="<<actualRacerSlot<<" collections=0x"<<std::hex
        <<native_wreck_debris50PD::sim().activeCollections[actualRacerSlot%8u]<<std::dec<<" pieces="<<spawned
@@ -1238,7 +1238,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
        <<" v="<<q.velocity.x<<','<<q.velocity.y<<','<<q.velocity.z<<']';}
   std::cerr<<'\n';
   native_wreck_effects50PD::destroyed(actualRacerSlot,explode,{w[12],w[13],w[14]},
-      {record.explosion270[0],record.explosion270[1],record.explosion270[2]});
+      {record.explosion270[0],record.explosion270[1],record.explosion270[2]},s.noiseOwner().sharedRandomState);
   const auto& effects=native_wreck_effects50PD::state();
   std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
       <<" embers_launched="<<effects.embersLaunched

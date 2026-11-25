@@ -26,6 +26,9 @@ enum class OriginalGcParticleRenderStatus50KG : std::uint8_t {
     complete,unprepared,alreadyPrepared,manager,camera,fog,lighting,arithmetic,
     frame,unsupportedBrightness,storage,allocation
 };
+bool originalParticleCornerColors50KG(const CameraViewOutput49F&,
+    const original_gc_gameplay_lighting_candidate::Owner&,const NativeGcSelectedLightsCandidate&,
+    std::array<std::array<std::uint8_t,3>,4>&) noexcept;
 class OriginalGcParticleRenderOwner50KG final {
 public:
     OriginalGcParticleRenderOwner50KG() noexcept;

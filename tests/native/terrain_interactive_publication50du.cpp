@@ -1330,6 +1330,7 @@ void Context::run() {
         <<" source="<<(effectsArchive==trackSession->archive?"own":"inherited")<<'\n';
     const bool effects=racerRigs[0]&&native_wreck_debris50PD::loadEffects(effectsArchive.c_str(),*racerRigs[0],effectsLog)&&
         native_wreck_debris50PD::prepareEffectsGpu(textureRequest,textureDiagnostic);
+    if(effects)native_wreck_effects50PD::prepareEmberLaunches(raceRacerCount,s.noiseOwner().sharedRandomState);
     std::cerr<<"wreck_effects_cold ready="<<effects<<' '<<effectsLog<<'\n';}
    require50DU(native_wreck_debris50PD::prepareGpu(textureRequest,textureDiagnostic,debrisLog),debrisLog.c_str());
    native_wreck_debris50PD::bindRequest(renderRequest);
