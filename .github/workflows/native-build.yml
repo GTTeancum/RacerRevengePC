@@ -60,7 +60,7 @@ jobs:
           key: rr-linux-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_setup.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             rr-linux-ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_setup.outputs.fingerprint }}-
-      - name: Compile and link exact608-source Linux client (never launch)
+      - name: Compile and link the interactive Linux client
         id: linux_build
         env:
           CXX: g++-14

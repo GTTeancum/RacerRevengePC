@@ -1,4 +1,4 @@
-> [Current maintainer handoff and release recovery instructions](docs/HANDOFF-20261124-release.md). Historical checkpoints follow.
+> [0.9.1 release and fixes](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.1) · [Current build and installation instructions](README.md) · [0.9.0 release recovery instructions](docs/HANDOFF-20261124-release.md). Historical checkpoints follow.
 
 # Additional runtime verification: October 17, 2026, 11:39 p.m. EDT
 

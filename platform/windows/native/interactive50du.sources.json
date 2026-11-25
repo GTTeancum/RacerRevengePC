@@ -1,12 +1,13 @@
 {
   "schema": 1,
   "description": "MSVC x64 window-only integrated UI/gameplay development client; build only, never launch or run tests.",
-  "reviewedSourceRevision": "Canonical batch7 code-only ordered SCB retirement and TOB metadata prefix after SceneInfo adoption; uncompiled, A4 and full world return incomplete",
+  "reviewedSourceRevision": "Shared interactive client with common track, DLC and projected shadow sources",
   "sourceListProvenance": {
-    "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
-    "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "68452483c01ce23c49f6681afb8cced357b223b3802c84c492a9cd137d70895f"
+    "tools/prepare_interactive_build50dv.py": "a9ebb12a160bbe2c68074df6c8e7769953d61281110873a193539f1a74fb5bf2"
   },
+  "linuxAdditionalSources": [
+    "platform/linux/native/offscreen_gl_context50dc.cpp"
+  ],
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
     "platform/linux/native/vehicle_offscreen_gl50dd.cpp",

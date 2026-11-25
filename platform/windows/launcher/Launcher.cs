@@ -6,6 +6,9 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+[assembly: System.Reflection.AssemblyVersion("0.9.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.9.1.0")]
+
 static class Program {
     [STAThread] static void Main(string[] args){
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);

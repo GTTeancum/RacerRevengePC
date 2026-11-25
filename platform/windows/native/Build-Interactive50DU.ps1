@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Linker,
     [Parameter(Mandatory=$true)][string]$SDL2IncludeDirectory,
     [string]$SDL2RuntimeDll,
+    [string]$ApplicationIcon,
     [string]$SourceRevision = 'unverified-working-tree',
     [ValidateRange(1, 4)][int]$MaxCompileJobs = 1,
     [switch]$CollectSourceErrors
@@ -73,7 +74,13 @@ if ($SDL2RuntimeDll) {
 }
 $manifestPath = ExistingFile (Join-Path $PSScriptRoot 'interactive50du.sources.json')
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 627 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
+if ($manifest.schema -ne 1 -or 'tests/native/terrain_interactive_drive50du.cpp' -cnotin $manifest.sources) {
+    throw 'Invalid interactive source manifest or missing game entry point.'
+}
+$zlibSources = 'adler32','crc32','inflate','inffast','inftrees','zutil' | ForEach-Object { "third_party/native-zlib/$_.c" }
+if (Compare-Object -CaseSensitive $zlibSources @($manifest.nativeDependencySources)) {
+    throw 'The native dependency sources must match the vendored zlib inflate implementation.'
+}
 foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($manifest.nativeDependencySourceProvenance.PSObject.Properties))) {
     $actual = (Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash
     if ($actual -ine $entry.Value) { throw "Generator source changed; reconcile manifest first: $($entry.Name)" }
@@ -81,7 +88,7 @@ foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($m
 $sources = @()
 $seen = @{}
 foreach ($relative in (@($manifest.sources) + @($manifest.nativeDependencySources))) {
-    if ($relative -notmatch '^((src/(game|assets)|platform/linux/native|tests/native)/[A-Za-z0-9_]+\.cpp|third_party/native-zlib/(adler32|crc32|inflate|inffast|inftrees|zutil)\.c)$') { throw "Unexpected source path: $relative" }
+    if ($relative -cnotin $zlibSources -and $relative -cnotmatch '^(src/(game|assets)|platform/linux/native|tests/native)/[A-Za-z0-9_]+\.cpp$') { throw "Unexpected source path: $relative" }
     if ($relative -match '(offscreen|joystick_transport|pcsx2)' -or $seen.ContainsKey($relative)) { throw "Forbidden or duplicate source: $relative" }
     $seen[$relative] = $true
     $sources += ExistingFile (Join-Path $root $relative)
@@ -93,6 +100,12 @@ $out = [IO.Path]::GetFullPath($BuildDirectory)
 if (Test-Path -LiteralPath $out) { throw 'BuildDirectory must be new; existing outputs are never reused or deleted.' }
 # Capture source and header inputs, including local retained fixture headers.
 $inputFiles = @($sources) + @($manifestPath, $PSCommandPath, $compilerPath, $linkerPath, $ffmpegProvenance) + $runtimeDlls
+if ($ApplicationIcon) {
+    $icon = ExistingFile $ApplicationIcon
+    $iconTemplate = ExistingFile (Join-Path $root 'platform/windows/RacerRevengeIcon.rc.in')
+    $resourceCompiler = (Get-Command rc.exe -CommandType Application).Source
+    $inputFiles += @($icon, $iconTemplate, $resourceCompiler)
+}
 foreach ($dir in @('src', 'tests/native', 'platform/linux/native', 'platform/windows/native', 'third_party/native-json', 'third_party/native-zlib', 'third_party/ffmpeg-7.1.5/include')) {
     $inputFiles += Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc', '.inl' } | ForEach-Object { $_.FullName }
 }
@@ -132,6 +145,15 @@ static_assert(sizeof(void*) == 8 && sizeof(float) == 4 &&
 '@ | Set-Content -LiteralPath $guard -Encoding ASCII
 $common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/O2', '/MD', '/fp:strict', '/bigobj', '/utf-8', '/Zc:__cplusplus', '/DNDEBUG', '/DNOMINMAX', '/DWIN32_LEAN_AND_MEAN', ('/FI' + (RspQuote $guard)))
 $common += $includes | ForEach-Object { '/I' + (RspQuote $_) }
+if ($ApplicationIcon) {
+    $common += '/DRR_WINDOWS_EMBEDDED_ICON'
+    $rc = Join-Path $out 'application.rc'
+    $iconResource = Join-Path $out 'application.res'
+    $template = [IO.File]::ReadAllText($iconTemplate)
+    [IO.File]::WriteAllText($rc, $template.Replace('@RR_WINDOWS_ICON_FILE@', $icon.Replace('\','/')), [Text.Encoding]::Unicode)
+    & $resourceCompiler /nologo /fo $iconResource $rc
+    if ($LASTEXITCODE -ne 0) { throw 'Application icon compilation failed.' }
+}
 $cCommon = @('/nologo', '/c', '/TC', '/O2', '/MD', '/fp:strict', '/utf-8', '/DNDEBUG', '/D_CRT_SECURE_NO_WARNINGS', ('/FI' + (RspQuote $guard)))
 $cCommon += $includes | ForEach-Object { '/I' + (RspQuote $_) }
 $objects = New-Object 'string[]' $sources.Count
@@ -288,6 +310,7 @@ try {
     $linkRsp = Join-Path $out 'link.rsp'
     $linkArgs = @('/NOLOGO', '/MACHINE:X64', '/SUBSYSTEM:WINDOWS', '/ENTRY:mainCRTStartup', '/STACK:8388608', '/INCREMENTAL:NO', ('/OUT:' + (RspQuote $exe)))
     $linkArgs += $objects | ForEach-Object { RspQuote $_ }
+    if ($ApplicationIcon) { $linkArgs += RspQuote $iconResource }
     $linkArgs += 'kernel32.lib'
     $linkArgs += 'user32.lib'
     $linkArgs | Set-Content -LiteralPath $linkRsp -Encoding Unicode

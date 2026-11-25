@@ -33,7 +33,7 @@ inline bool automaticEntryActive=false;
 inline bool active() noexcept {return automaticEntryActive;}
 namespace fs=std::filesystem;
 #ifndef RR_WINDOWS_BUILD_ID
-#define RR_WINDOWS_BUILD_ID "native-player-next-unversioned"
+#define RR_WINDOWS_BUILD_ID "0.9.1"
 #endif
 inline HANDLE faultLog=INVALID_HANDLE_VALUE;
 inline LPTOP_LEVEL_EXCEPTION_FILTER previousFilter=nullptr;

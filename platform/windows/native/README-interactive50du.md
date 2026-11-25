@@ -32,6 +32,8 @@ list of `cmake/NativePc48C.cmake`; they use the same `/MD` runtime as the client
 Invoke `Build-Interactive50DU.ps1` only after source/dependency approval, supplying
 `-SourceRoot`, `-BuildDirectory`, `-Compiler`, `-Linker`, `-SDL2IncludeDirectory`,
 optionally `-SDL2RuntimeDll`, and the consolidated commit in `-SourceRevision`.
+For a release build, pass the project ICO to `-ApplicationIcon` to embed it
+with the Windows SDK resource compiler and show it in the game window.
 All paths are supplied by the caller; none depend on a particular user's machine.
 The revision string is metadata, not a substitute for independently verifying
 Git HEAD, local changes and assets. The script explicitly records that limitation.
@@ -66,7 +68,7 @@ Live progress is ordinary stdout: each `compile-progress ` prefix is followed by
 one compact JSON record containing the job bound and started, completed, failed,
 cancelled, running and not-started source counts. Records occur at initialization,
 source transitions, compilation completion and cleanup, never on idle polls:
-at most `2 * sourceCount + 3` records (719 for the current source gate).
+at most `2 * sourceCount + 3` records.
 Completed means exit zero with an object present; failed includes launch failure,
 a nonzero compiler exit or a missing object; cancelled means the script terminated
 an active compiler. Counts do not certify build acceptance.
@@ -95,20 +97,12 @@ there is no installer, download, PATH-wide runtime lookup or asset copier.
 
 ## Source reconciliation and limits
 
-`interactive50du.sources.json` freezes 352 C++ owners from the actual layered
-`prepare_interactive_build50dv.py` / `prepare_offscreen_build50do.py` /
-`check_terrain_registered_drive50bv.py` declarative lists. Six additional
-vendored zlib C files bring the build total to 358. The matching PowerShell
-C++ count gate is 352. The three generator provenance hashes still match the
-source reviewed on October 16; generators were read, not executed or imported.
-
-The passing Linux Ryloth build uses 354 C++ units. It contains all 352 Windows
-units plus the Linux-only offscreen EGL context and the additional unused
-`static_draw_assets50dw.cpp` library unit. The dedicated RA renderer and session
-owners are included by existing translation units. This is source-list coverage,
-not evidence of a Windows build or smoke at the Ryloth revision. See the
-[October 16 source review](../../../docs/recovery/windows-ryloth-source-review-20261016.md).
-Hash gates require renewed review if their generator files change.
+`interactive50du.sources.json` lists the C++ sources for both platforms. For
+0.9.1, Windows compiles 623 C++ files and six vendored zlib C files. Linux adds
+its EGL context to those 623 C++ files and links system zlib. Add or remove
+shared translation units in the manifest. Both builds validate source paths
+and reject duplicates. The manifest also pins the Linux command generator and
+the CMake definition of the vendored zlib sources by SHA-256.
 
 The Windows closure excludes `offscreen_gl_context50dc.cpp`,
 `vehicle_offscreen_gl50dd.cpp`, and `vehicle_offscreen_present50de.cpp`.

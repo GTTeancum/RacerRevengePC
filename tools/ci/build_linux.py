@@ -71,9 +71,9 @@ def main():
             if not arg.startswith(('-O','-std=')) and arg not in common:options.append(arg)
         win=json.loads((root/'platform/windows/native/interactive50du.sources.json').read_text())
         for p,pin in win['sourceListProvenance'].items():assert sha(root/p)==pin
-        assert len(units)==609 and len(set(units))==609 and all(x.endswith('.cpp') for x in units)
-        assert len(win['sources'])==608 and len(win['nativeDependencySources'])==6
-        assert set(win['sources']).issubset(units) and len(set(units)-set(win['sources']))==1
+        expected=win['sources']+win['linuxAdditionalSources']
+        if units!=expected or len(set(units))!=len(units):
+            raise ValueError('Generated Linux sources differ from the shared interactive manifest')
         assert '-lz' in command and '-ldl' in command
         write(out/'source-closure.json',units)
         objects=[]
