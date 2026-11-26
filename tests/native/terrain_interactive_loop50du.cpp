@@ -616,6 +616,15 @@ void Context::run() {
    addCounter50DU(racerContactTotals.activeRecords,contactReceipt.activeRecords);
   }else addCounter50DU(racerContactTotals.noPairs);
  };
+  std::optional<std::uint64_t> firstCapturedWreckStep;
+  const bool captureWreck=std::getenv("RR_TEST_WRECK_CAPTURE")!=nullptr;
+  auto requestWreckSample=[&](){
+   if(!captureWreck||!rr::game::nativeTestDestroys50PD[0].fired)return;
+   // A human DNF stops the lap clock. The wreck world and death camera keep stepping.
+   const auto step=native_wreck_debris50PD::sim().steps;
+   if(!firstCapturedWreckStep)firstCapturedWreckStep=step;
+   if(step>=*firstCapturedWreckStep)windowCapture.requestEffectSample(.016*double(step-*firstCapturedWreckStep),0.,true);
+  };
   for(;;){
    // A suspended source input call still owns its original poll. Do not
    // dispatch fresh input, run simulation or commit tournament work around it.
@@ -4114,11 +4123,9 @@ void Context::run() {
      windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
      const auto& pillar=rr::game::n64PillarCameraShake50NH;
      windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
-     if(std::getenv("RR_TEST_WRECK_CAPTURE")&&rr::game::nativeTestDestroys50PD[0].fired)
-      windowCapture.requestEffectSample(race.raceSeconds,rr::game::nativeTestDestroys50PD[0].seconds,true);
-     else
-      windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+     if(!captureWreck)windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
     }
+    if(!privateUnderlay)requestWreckSample();
     const bool captureWindowImage=host.hasWindow()&&!privateUnderlay&&
         !(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending()))&&
         windowCapture.due(windows_capture50LD::Stage::race,
@@ -4327,11 +4334,9 @@ void Context::run() {
      windowCapture.requestRaceNodeSample(navigationProgress.reset.vehicleC88);
      const auto& pillar=rr::game::n64PillarCameraShake50NH;
      windowCapture.requestPillarSample(pillar.scale,pillar.elapsed);
-     if(std::getenv("RR_TEST_WRECK_CAPTURE")&&rr::game::nativeTestDestroys50PD[0].fired)
-      windowCapture.requestEffectSample(race.raceSeconds,rr::game::nativeTestDestroys50PD[0].seconds,true);
-     else
-      windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
+     if(!captureWreck)windowCapture.requestEffectSample(race.raceSeconds,rr::game::n64HazardRuntime50NH.firstShownAnimationTime());
     }
+    if(windowImage)requestWreckSample();
     if(windowImage&&windowCapture.due(windows_capture50LD::Stage::race,settledTrack)){
 #endif
      requireOriginalAiFleetReady();

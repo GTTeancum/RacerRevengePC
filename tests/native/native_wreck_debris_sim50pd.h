@@ -282,7 +282,8 @@ inline bool initOriginalBody(f5::Body& b,const LivePiece& p,Vec velocity,Vec loc
     b.root.body.angularVelocity={{localB0.x,localB0.y,localB0.z}};
     auto& q=b.parameters;
     q.linearAccelerationLimitSquared=std::bit_cast<float>(0x4963d240u);q.angularAccelerationLimitSquared=std::bit_cast<float>(0x48742400u);
-    q.linearVelocityLimitSquared=std::bit_cast<float>(0x468e6200u);q.angularVelocityLimitSquared=std::bit_cast<float>(0x441c4000u);
+    // 22C208 overwrites the 1653C0 default in each collection piece D0+27C.
+    q.linearVelocityLimitSquared=std::bit_cast<float>(0x49034acfu);q.angularVelocityLimitSquared=std::bit_cast<float>(0x441c4000u);
     for(unsigned i=0;i<3;++i){q.translationEnabled[i]=true;q.rotationEnabled[i]=true;}
     q.mass=p.mass;q.inverseMass=1.f/p.mass;
     f5::tuneDc(b,tuning?tuning->friction:0.f);

@@ -59,3 +59,16 @@ blend state in depth order within the wreck queue. GS additive alpha above
 128 multiplies RGB before additive blending. The host draws through OpenGL.
 Ordering between this queue and unrelated particle systems, and full-frame
 pixel equivalence against PS2 output, have not been verified.
+
+## Player destruction camera and momentum
+
+The USA PS2 executable distinguishes a state 3 wreck (0x226750) from a
+state 4 explosion (0x2261B0). The former can place the camera ahead along
+the incoming velocity. The latter cuts behind the moving debris and aims
+at the collection's weighted center. The camera switch is at 0x177AB0.
+
+Detached pieces inherit the incoming velocity with per-piece variation.
+At 0x22C208 the collection constructor stores 0x49034ACF in the body's
+linear speed limit squared, superseding its generic 135 ft/s limit.
+This allows roughly 733 ft/s. Both free pieces and group roots use the
+collection limit in the native simulation.
