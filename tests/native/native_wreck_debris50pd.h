@@ -70,6 +70,32 @@ inline rr::game::OriginalWreckInventoryEndpointPolicy50LA endpointPolicy() noexc
     }};
 }
 
+// The general neutral mesh includes the entire PSG bind transform. Wreck
+// activation (22C6A0) replaces model14C's root pose with its physics pose.
+// Keep each vertex's transforms below that root, in neutral-export order.
+inline void setPieceLocalPositions(const rr::assets::Scene48D& scene,rr::assets::Mesh48B& mesh) {
+    std::size_t vertexIndex=0;
+    for(const auto& surface:scene.lods.front().surfaces){
+        for(const auto& source:surface.vertices){
+            auto point=source.position_local;
+            for(auto bone=source.bone;bone!=0;bone=scene.nodes[bone].parent){
+                const auto& m=scene.nodes[bone].local_matrix;
+                const auto local=point;
+                for(unsigned a=0;a<3;++a)
+                    point[a]=m[a]*local[0]+m[4+a]*local[1]+m[8+a]*local[2]+m[12+a];
+            }
+            auto& vertex=mesh.vertices[vertexIndex];
+            for(unsigned a=0;a<3;++a){
+                const float value=static_cast<float>(point[a]);
+                vertex.position[a]=value;
+                if(!vertexIndex||value<mesh.bounds.minimum[a])mesh.bounds.minimum[a]=value;
+                if(!vertexIndex||value>mesh.bounds.maximum[a])mesh.bounds.maximum[a]=value;
+            }
+            ++vertexIndex;
+        }
+    }
+}
+
 inline std::string lowerName(std::string value) {
     for(char& c:value){if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');if(c=='/')c='\\';}
     return value;
@@ -168,6 +194,7 @@ inline bool loadRacer(std::size_t slot,const native_racer50HW::Rig& rig,
                     " mesh: "+(meshError.empty()?"empty":meshError);
                 continue;
             }
+            setPieceLocalPositions(scene,piece.mesh);
             piece.spans=scene.spans_lod0;piece.materials=scene.materials;
             piece.authored50=assets->authored50();piece.look60=assets->look60();piece.up70=assets->up70();
             if(c<authoring.collections.size()&&p<authoring.collections[c].pieces.size()){

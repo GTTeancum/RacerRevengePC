@@ -108,3 +108,25 @@ At 22C1E4 the collection constructor writes 0.2 to DC+C4. The friction
 routine reads C4 at 2975A0 and 2975E4. An identical off-center sliding
 contact produced force -32.2 at both settings. Its torque fell from
 -64.4 at the old value of 1 to -12.88 at the retail value of 0.2.
+
+### Debris ground contact
+
+The USA executable reads the activating body's position at 22C718 and
+copies it into the piece movement history at 22C78C and 22C7A0. The
+ground update at 166C60 uses that history for its first swept query.
+Initializing history to zero collapsed the first sweep and allowed a
+piece that had already bounced to fall through the road.
+
+The wreck constructor at 165CF8 saves the model root offset and clears
+its translation. The activated piece supplies its own world pose.
+The port now retains child transforms in the wreck mesh and applies the
+simulated root pose once. For POD19's engrt1b, the previous mesh still
+contained nearly 18 feet of intact-pod longitudinal offset.
+
+In Tatooine captures of immediate explosion, immediate wreck and left-engine
+loss, sampling every fourth physics step through step 300 found no pivot
+below the road. On those same poses, removing the duplicated transform
+reduced the worst sampled visible penetration from 18.44 to 4.39 feet.
+The airborne collision path at 166840 sweeps the piece pivot, so a rotating
+edge can enter the road before the pivot reaches it. The largest measured
+penetration among settled samples was 0.22 feet (rounded up).

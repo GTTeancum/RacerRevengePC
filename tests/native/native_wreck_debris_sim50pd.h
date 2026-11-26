@@ -90,7 +90,7 @@ inline void toMatrix(Quat q,Vec p,float out[16]){
 
 struct LivePiece {
     std::size_t racer=0,index=0;  // cold racer slot and its piece index
-    Vec position,velocity,angular,spawn;
+    Vec position,velocity,angular,spawn,activationOrigin;
     Quat orientation;
     float radius=1.f,mass=1.f,inertia=1.f,drag=0.f,rateDamping=0.f,contactTime=0.f;
     Vec inertiaDiag{1.f,1.f,1.f};  // 166400 box diagonal (inertia is its mean)
@@ -273,6 +273,8 @@ inline const rr::game::Type2ResourceView49X* pieceE0(const LivePiece& p) noexcep
 inline bool initOriginalBody(f5::Body& b,const LivePiece& p,Vec velocity,Vec localB0,
     const rr::game::OriginalWreckTuning50LA* tuning) noexcept {
     b=f5::Body{};
+    // 22C710..22C7A0 seeds the piece movement ray from the activating body.
+    b.previous80={p.activationOrigin.x,p.activationOrigin.y,p.activationOrigin.z,1.f};
     toMatrix(p.orientation,p.position,b.root.scene.v);
     if(!rr::game::matrixToQuaternion48G(b.root.scene,b.root.body.orientation))return false;
     // D0.60 = the model origin (read by 167250's water test before the first
@@ -434,7 +436,7 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
         if(slot<s.activeCollections.size()&&piece.collection<32u&&((s.activeCollections[slot]>>piece.collection)&1u)){
             if(skippedActive)++*skippedActive;continue;}
         if(piece.collection>=collectionModels.size()||!collectionModels[piece.collection])continue;
-        LivePiece live;live.racer=slot;live.index=i;live.orientation=orientation;
+        LivePiece live;live.racer=slot;live.index=i;live.orientation=orientation;live.activationOrigin=origin;
         const auto& a=piece.authored50;
         const Vec offset{a[0]*bodyWorld[0]+a[1]*bodyWorld[4]+a[2]*bodyWorld[8],
                          a[0]*bodyWorld[1]+a[1]*bodyWorld[5]+a[2]*bodyWorld[9],
@@ -526,6 +528,7 @@ inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::si
             const auto& piece=racer.pieces[i];if(piece.collection!=entry.collection)continue;
             if(s.pieces.size()>=maxLivePieces)return spawned;
             LivePiece live;live.racer=slot;live.index=i;
+            live.activationOrigin={bodyWorld[12],bodyWorld[13],bodyWorld[14]};
             if(first){live.orientation=fromBasis(entry.engineWorld);live.position=origin;}
             else{
                 live.orientation=fromBasis(bodyWorld);const auto& a=piece.authored50;
