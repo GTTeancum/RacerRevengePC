@@ -1,6 +1,11 @@
 # Racer Revenge PC maintainer handoff · 24 November 2026
 
-Start new development from GitHub `main`. Version **0.9.0** is the public stable Windows x64 release. A player can install and run it offline with their game inputs. [Player instructions](../README.md) · [Release downloads and trailer](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.0)
+> **November 25 follow-up:** [0.9.1](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.1) supersedes the 0.9.0 download described below. Its release source is `911d9fc8062c9c14d2d98398a70f29099818dde8`. Use the 0.9.1 release notes for install/upgrade instructions and dependencies.
+
+- [#1](https://github.com/GTTeancum/RacerRevengePC/issues/1): closed for the NVIDIA **race-load** shader crash. If that signature returns on 0.9.1, open a new issue with a log. The separate post-finish return-to-menu crash and low frame rate came from an RTX 2080 SUPER test of **binary-patched 0.9.0**; they are not confirmed fixed or reproduced on public 0.9.1. [Reporter details](https://github.com/GTTeancum/RacerRevengePC/issues/1#issuecomment-7163985862).
+- [#3](https://github.com/GTTeancum/RacerRevengePC/issues/3): separate **window startup/VSync** problem. A community tester confirmed launch worked with the experimental 0.9.1 build. Do not treat that result as coverage of the post-finish crash or performance.
+
+Start new development from GitHub `main`. The remainder of this note records the **0.9.0** Windows x64 release. A player can install and run it offline with their game inputs. [Player instructions](../README.md) · [Release downloads and trailer](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.0)
 
 ## Which source matches the download?
 
