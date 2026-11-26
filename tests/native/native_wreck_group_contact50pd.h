@@ -273,7 +273,7 @@ inline void tuneDc(Body& b,float friction) noexcept {
     a.restitutionB8=a.restitutionBC=a.restitutionC0=0.f;                             // 22C4D8
     a.positionCorrectionScaleCC=std::bit_cast<float>(0x3ba3d70au);a.angularCorrectionScaleD0=0.f; // 1660F0
     a.disableLeverArms5C=false;a.correctPenetration64=true;a.yawOnly6C=false;a.customCenter70=false;
-    b.frictionByMaterial.fill(0.f);b.frictionByMaterial[0]=friction;b.frictionTorqueScaleC4=1.f;
+    b.frictionByMaterial.fill(0.f);b.frictionByMaterial[0]=friction;b.frictionTorqueScaleC4=.2f; // 22C1E4 overrides the 1660F0 default
 }
 inline void freshDc(Dc& dc) noexcept {
     dc.state=g::SpringRecordState48N{};dc.state.generatedCapacity88=static_cast<std::int32_t>(recordCapacity88);dc.positive=0;

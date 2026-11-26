@@ -205,12 +205,16 @@ inline float signedUnit(std::uint32_t& raw) noexcept {
 }
 
 // 166400 mass/inertia for the piece's unanimated model bounds (full extents).
-inline void tunePiece(LivePiece& live,const Piece& piece,const rr::game::OriginalWreckTuning50LA* tuning) noexcept {
-    const auto& b=piece.mesh.bounds;
-    const float x=b.maximum[0]-b.minimum[0],y=b.maximum[1]-b.minimum[1],z=b.maximum[2]-b.minimum[2];
+inline void tunePiece(LivePiece& live,const Racer& racer,const Piece& piece,const rr::game::OriginalWreckTuning50LA* tuning) noexcept {
+    // 166498 calls 28D670 on the retained piece model. Each Piece was
+    // created from this same inventory entry at cold load.
+    const auto& bounds=racer.inventory->pieceAssets(piece.collection,piece.piece)->modelBounds();
+    const float x=2.f*bounds.halfExtent170[0],y=2.f*bounds.halfExtent170[1],z=2.f*bounds.halfExtent170[2];
+    const float extent=std::sqrt((x*x+y*y)+z*z);
+    if(extent>0.f)live.inverseExtent118=1.f/extent;
     const float gravityUnit=std::bit_cast<float>(0x4200cccdu);
     live.mass=piece.weight>0.f?piece.weight/gravityUnit:1.f;
-    const float scale=(piece.inertia>0.f?piece.inertia:1.f)*live.mass/12.f;
+    const float scale=piece.inertia*(live.mass/12.f);
     const float mean=scale*((y*y+z*z)+(x*x+z*z)+(x*x+y*y))/3.f;
     live.inertia=mean>1e-4f?mean:live.mass;
     live.inertiaDiag=mean>1e-4f?Vec{scale*(y*y+z*z),scale*(x*x+z*z),scale*(x*x+y*y)}:Vec{live.mass,live.mass,live.mass};
@@ -338,13 +342,6 @@ inline bool setupPieceBody(Sim& s,std::size_t live,Vec velocity,Vec localB0,cons
     if(reason){++s.pieceRefusals;
         std::cerr<<"debris_piece_solver slot="<<p.racer<<" piece="<<p.index<<" route="<<route<<" solver=native_standin reason="<<reason<<'\n';
         return false;}
-    // 166400 1664B8..16652C: 118 = 1/sqrt(x*x + y*y + z*z) of the full model
-    // extents (default 1 when zero). STAND-IN extents: the decoded LOD0 mesh
-    // bounds (the same bounds tunePiece uses), not the 28D670 node bounds.
-    {const auto& bb=piece.mesh.bounds;
-     const float x=bb.maximum[0]-bb.minimum[0],y=bb.maximum[1]-bb.minimum[1],z=bb.maximum[2]-bb.minimum[2];
-     volatile float xx=x*x,yy=y*y,zz=z*z,xy=xx+yy,sum=xy+zz;const float extent=std::sqrt(static_cast<float>(sum));
-     p.inverseExtent118=extent>0.f?1.f/extent:1.f;}
     p.restitution110=tuning?tuning->restitution:0.f;p.frictionTorqueScale114=tuning?tuning->frictionTorqueScale:1.f;
     p.airborne11C=0.f;p.flightDelay120=.5f;p.settled=false;p.contactTime=0.f;
     p.original=true;
@@ -443,7 +440,7 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
                          a[0]*bodyWorld[1]+a[1]*bodyWorld[5]+a[2]*bodyWorld[9],
                          a[0]*bodyWorld[2]+a[1]*bodyWorld[6]+a[2]*bodyWorld[10]};
         live.position=origin+offset;live.spawn=live.position;
-        tunePiece(live,piece,piece.collection<racer.tuning.size()?&racer.tuning[piece.collection]:nullptr);
+        tunePiece(live,racer,piece,piece.collection<racer.tuning.size()?&racer.tuning[piece.collection]:nullptr);
         if(explode){
             // 22CB9C..22CDE4 order: angular X/Y/Z signed, then linear X signed, Y unit, Z signed.
             const Vec jitterAngular{signedUnit(sharedRaw)*angularScale,signedUnit(sharedRaw)*angularScale,signedUnit(sharedRaw)*angularScale};
@@ -537,7 +534,7 @@ inline std::size_t spawnLimp(std::size_t slot,const LimpCollection* list,std::si
                     bodyWorld[14]+a[0]*bodyWorld[2]+a[1]*bodyWorld[6]+a[2]*bodyWorld[10]};
             }
             live.spawn=live.position;
-            tunePiece(live,piece,&racer.tuning[entry.collection]);
+            tunePiece(live,racer,piece,&racer.tuning[entry.collection]);
             live.velocity=point;live.angular=first?rate:Vec{angular[0],angular[1],angular[2]};
             // 22C6A0 flags (see spawn): piece[0] of a 2+ piece collection 0/0.
             const bool primaryOfGroup=piece.piece==0&&authoredPieces(slot,entry.collection)>=2;

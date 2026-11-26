@@ -92,3 +92,19 @@ simulation steps. Four new pieces activated and three already active
 pieces were skipped. All three live race runs used the piece zone walk
 through step 300. A Results replay can still use the storage-order
 collision fallback when its primary zone is absent.
+
+### Debris spin and track contact
+
+The explosion launch at 22CB9C..22CDE4 adds a signed angular increment
+of up to 20 radians per second per axis. Its linear increments use
+293.333 ft/s with a positive vertical draw. An attached member that
+breaks away later uses the separate 2CAEE8 path.
+
+At 166498, 166400 calls 28D670 for the model box. Its full extents drive
+the inertia tensor and the inverse diagonal length used for flight-impact
+spin. The native solver now uses the retained wreck model's box.
+
+At 22C1E4 the collection constructor writes 0.2 to DC+C4. The friction
+routine reads C4 at 2975A0 and 2975E4. An identical off-center sliding
+contact produced force -32.2 at both settings. Its torque fell from
+-64.4 at the old value of 1 to -12.88 at the retail value of 0.2.
