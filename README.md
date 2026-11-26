@@ -54,3 +54,7 @@ The Windows port and offline converter sources are included here. Supply origina
 - [Required local inputs and generated fixtures](docs/source-only-exclusions.md)
 - [0.9.1 release notes and current build information](https://github.com/GTTeancum/RacerRevengePC/releases/tag/v0.9.1)
 - [0.9.0 maintainer handoff and recovery instructions](docs/HANDOFF-20261124-release.md)
+
+## License
+
+Original RacerRevengePC project code, including the offline converters, is under the [MIT License](LICENSE). Third-party code remains under its own licenses and notices. The MIT license does not cover original game data, artwork, audio, trademarks, or other third-party assets.
