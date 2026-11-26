@@ -72,3 +72,23 @@ At 0x22C208 the collection constructor stores 0x49034ACF in the body's
 linear speed limit squared, superseding its generic 135 ft/s limit.
 This allows roughly 733 ft/s. Both free pieces and group roots use the
 collection limit in the native simulation.
+
+In the USA executable, 226750 first activates each eligible collection,
+then replaces its primary piece's authored pose with the current model
+pose. The five slots reference 1B4 (or container 194), 1BC, 1B8, 1C4,
+and 1C0. The velocity lever arm is relative to container 194 (2269B0).
+State 3 is written at 2272F0, after those transfers. The explosion path
+instead writes state 4 on entry. It launches selected ember children
+at 2263D8 before D40. The first human D40 destruction draws its delay
+at 1A00D4, before 22CA60 consumes six draws for each launched piece.
+
+An instrumented player race checked the shared random state at handler
+entry, after the embers, after D40, and after piece activation against
+the multiplier and increment in SLUS_202.68 at 308030. The explosion
+used four ember draws, one D40 draw and 42 draws for seven pieces.
+The immediate wreck used only the D40 draw at those boundaries. A left
+engine loss entered state 1 and reached the timer branch after 125
+simulation steps. Four new pieces activated and three already active
+pieces were skipped. All three live race runs used the piece zone walk
+through step 300. A Results replay can still use the storage-order
+collision fallback when its primary zone is absent.

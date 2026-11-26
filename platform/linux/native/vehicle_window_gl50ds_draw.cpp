@@ -2921,11 +2921,12 @@ bool VehicleWindowGl50DS::Storage::drawDebris() noexcept {
         for (U n = 0; n < frameDebrisCount; ++n) {
             const auto& instance = frameDebris[n];
             if (instance.piece >= debrisPieces.size()) return fail(*diagnostic, VehicleWindowError50DS::frame, "debris instance piece");
-            // Column-major clip = matrix * world.
+            // The shader multiplies a row vector on the left. Its local-to-clip
+            // uniform is transpose(pieceWorld) * worldViewProjection.
             float m[16];
             for (unsigned c = 0; c < 4; ++c) for (unsigned r = 0; r < 4; ++r) {
                 float sum = 0.f;
-                for (unsigned k = 0; k < 4; ++k) sum += matrix[k * 4 + r] * instance.world[c * 4 + k];
+                for (unsigned k = 0; k < 4; ++k) sum += instance.world[r * 4 + k] * matrix[c * 4 + k];
                 m[c * 4 + r] = sum;
             }
             gl.uniformMatrix4fv(u.worldViewProjection, 1, 0, m);

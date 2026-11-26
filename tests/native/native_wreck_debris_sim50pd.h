@@ -421,7 +421,8 @@ inline void attachZones(Sim& s,std::size_t first,rr::game::CollectionRef50BX zon
 // worldAngularA0/bodyPosition its 340+A0 world rate and body position.
 // Returns pieces spawned.
 inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
-    const float* velocity,const float* angular,const float* worldAngularA0,const float* bodyPosition,
+    const float* velocity,const float* angular,const float* worldAngularA0,const float* containerWorld,
+    const std::array<const float*,5>& collectionModels,
     std::uint32_t& sharedRaw,const float* cockpitVelocity=nullptr,const float* cockpitAngular=nullptr,
     std::size_t* skippedActive=nullptr,rr::game::CollectionRef50BX primaryZone=0) {
     auto& c=cold();if(slot>=c.racers.size())return 0;
@@ -435,6 +436,7 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
         const auto& piece=racer.pieces[i];
         if(slot<s.activeCollections.size()&&piece.collection<32u&&((s.activeCollections[slot]>>piece.collection)&1u)){
             if(skippedActive)++*skippedActive;continue;}
+        if(piece.collection>=collectionModels.size()||!collectionModels[piece.collection])continue;
         LivePiece live;live.racer=slot;live.index=i;live.orientation=orientation;
         const auto& a=piece.authored50;
         const Vec offset{a[0]*bodyWorld[0]+a[1]*bodyWorld[4]+a[2]*bodyWorld[8],
@@ -448,19 +450,22 @@ inline std::size_t spawn(std::size_t slot,bool explode,const float* bodyWorld,
             const float lx=signedUnit(sharedRaw),ly=drawUnit(sharedRaw),lz=signedUnit(sharedRaw);
             live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+Vec{lx,ly,lz}*velocityScale;
             live.angular=Vec{angular[0],angular[1],angular[2]}+jitterAngular;
-        }else{
-            // 226750 (226A70..226BAC): the FIRST piece of each collection gets
-            // the rigid-body point velocity 70 + (A0 x r), r = piece - body
-            // position, rate = 340+B0. The other pieces are group members
-            // (2CA480): attached, bodies off, riding the primary (bindGroup).
-            const Vec r{live.position.x-bodyPosition[0],live.position.y-bodyPosition[1],live.position.z-bodyPosition[2]};
+        }else if(piece.piece==0){
+            // After 22C6A0, 226750 moves the primary onto the live model:
+            // 1B4 (or 194), 1BC, 1B8, 1C4, 1C0 in collection order.
+            const auto* model=collectionModels[piece.collection];
+            live.position={model[12],model[13],model[14]};live.spawn=live.position;
+            live.orientation=fromBasis(model);
+            const Vec r=live.position-Vec{containerWorld[12],containerWorld[13],containerWorld[14]};
             const Vec w{worldAngularA0[0],worldAngularA0[1],worldAngularA0[2]};
             const Vec spin{w.y*r.z-w.z*r.y,w.z*r.x-w.x*r.z,w.x*r.y-w.y*r.x};
             live.velocity=Vec{velocity[0],velocity[1],velocity[2]}+spin;
             live.angular=Vec{angular[0],angular[1],angular[2]};
             // 226AD8..226B34: after a limp (states1/2) the cockpit collection
             // 374[0] takes the physical cockpit 35C's own 70/B0 instead.
-            if(cockpitVelocity&&cockpitAngular&&piece.collection==0u){
+            if(piece.collection==0u&&model==containerWorld){
+                live.velocity={velocity[0],velocity[1],velocity[2]}; // 226C68
+            }else if(cockpitVelocity&&cockpitAngular&&piece.collection==0u){
                 live.velocity=Vec{cockpitVelocity[0],cockpitVelocity[1],cockpitVelocity[2]};
                 live.angular=Vec{cockpitAngular[0],cockpitAngular[1],cockpitAngular[2]};
             }

@@ -1111,8 +1111,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
        main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
        main.components.root.worldAngularVelocityA0.v,s.nodes[container].world100.v+12,s.noiseOwner().sharedRandomState,first,
        debrisPrimaryZone(s.nodes[body].world100.v));
-   const auto* w=s.nodes[body].world100.v;
-   native_wreck_effects50PD::destroyed(actualRacerSlot,false,{w[12],w[13],w[14]},{w[12],w[13],w[14]},s.noiseOwner().sharedRandomState);
+   native_wreck_effects50PD::startPieceEmitters(actualRacerSlot);
    const auto& live=native_wreck_debris50PD::sim().pieces;
    std::cerr<<"debris_spawn_limp slot="<<actualRacerSlot<<" collections=0x"<<std::hex
        <<native_wreck_debris50PD::sim().activeCollections[actualRacerSlot%8u]<<std::dec<<" pieces="<<spawned
@@ -1158,11 +1157,11 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  }
  const bool explode=handler==0x2261b0u;
  // 2261C4/2272F0 state, 2261CC/22675C 4C=0, 2261D8 268=0.6f (0x3F19999A).
- main.vehicleState40=explode?4u:3u;
+ if(explode)main.vehicleState40=4u;
  record={};record.destroyed=true;record.handler=handler;record.decisionPC=decision.sourcePC;
  if(limpEscalation){record.limpState40=limp.limpState40;record.limpFrame=limp.limpFrame;record.limpFrames=limp.limpFrames;
   record.attackerD30=limp.attackerD30;record.suffixApplied=true;}
- record.state40=main.vehicleState40;record.timer4C=0.f;
+ record.timer4C=0.f;
  {std::uint32_t bits=explode?0x3f19999au:0u;std::memcpy(&record.timer268,&bits,4);}
  record.frame=completedFrames;
  // 225F04: the victim's D30 names the racer that last hit it (2 s window
@@ -1190,7 +1189,17 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
     stops[count].target=resetEffectBindings.owners81C[i];++count;}
   }
   require50DU(consumeEffects(stops,count),"original destroy handler effect stops rejected");
+  if(explode){
+   // 226288..2263EC starts 814/810 and draws the selected ember lifetimes
+   // before the D40 audio call and before any 22CA60 launch draws.
+   const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
+   const auto* body=s.nodes[node].localC0.v+12;
+   native_wreck_effects50PD::startExplosion(actualRacerSlot,{body[0],body[1],body[2]},
+       {record.explosion270[0],record.explosion270[1],record.explosion270[2]},s.noiseOwner().sharedRandomState);
+  }
   // 2263F8 / 226808: D40 virtual9C. AI: 16DF70 wreck cue and engine/binder stop.
+  auto& humanController=actualRacerSlot?liveAudio->secondHumanController():liveAudio->humanController();
+  const bool firstHumanDestroy=human&&!(humanController.flags22C()&4u);
   if(originalAiAudioEnabled&&s.fields.vehicle58==1u){
    std::uint32_t cue=0;
    const bool played=originalAiAudio->destroyed16DF70(actualRacerSlot,s,x.bindings,sessionRandom,
@@ -1199,10 +1208,10 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
    // retired its race voices; logged. A race wreck still requires it.
    require50DU(played||replay,"original AI D40 16DF70 destroy audio rejected");
    std::cerr<<"pod_destroyed_audio slot="<<actualRacerSlot<<" wreck_cue="<<cue<<" played="<<played<<'\n';
-  }else if(audioEnabled&&human&&liveAudio->outputOpen()){
+  }else if(audioEnabled&&firstHumanDestroy&&liveAudio->outputOpen()){
    // Human D40 virtual9C = 1A0060: v88/v84 stop the binder/engine loops,
    // 2924A0(488) stops the p_event emitter, 292360(48C,1) plays p_debris cue1.
-   // Its D44 virtualA8, 4A8 random delay and 178B80 call are not joined.
+   // The D44 virtualA8 and 178B80 audio continuations are separate.
    using rr::game::AudioBank50HE;using rr::game::AudioOperation50HE;
    auto apply=[&](AudioOperation50HE operation,AudioBank50HE bank,std::uint32_t key,std::uint32_t site){
     rr::game::AudioCommand50HE command{};command.operation=operation;command.cue={bank,key};command.sourceSite=site;
@@ -1215,14 +1224,43 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
    apply(AudioOperation50HE::Start,AudioBank50HE::PodDebris,1u,0x1a00ccu);
    std::cerr<<"pod_destroyed_audio slot=0 human_debris_cue=1\n";
   }
+  // 1A0078 gates the whole call on D40+22C bit 2. Host output does
+  // not gate the shared draw at 1A00D4 or the store at 1A0108.
+  if(firstHumanDestroy){
+   const float delay=2.f*native_wreck_debris50PD::drawUnit(s.noiseOwner().sharedRandomState);
+   humanController.field4A8=std::bit_cast<std::uint32_t>(delay);
+   humanController.flags22C()|=4u; // 178C34, cleared by physical reset
+  }
+ }
+ // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
+ // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
+ // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).
+ if(human&&!s.fields.vehicle3C&&!replay&&(dynamicConsumerFlags11050&4u)&&feedbackSource<2u){
+  auto& device=feedbackDevices[feedbackSource];
+  clearControllerFeedback50KZ(device,2);
+  require50DU(requestControllerFeedback50KZ(device,2,0u,explode?2.f:1.f),"destroyed racer vibration request rejected");
+  std::cerr<<"pod_destroyed_vibration seconds="<<(explode?2:1)<<" capable="<<device.capable<<'\n';
  }
  // 2265A0..2266C8 (22CA60 per collection, 22CB9C launch draws) for 2261B0;
  // 226750's in-place activation (22C6A0) has no launch tail.
  {const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
   std::size_t skippedActive=0;
+  const auto& visual=x.bindings.visual;
+  const auto& roots=x.bindings.lifecycle;
+  auto world=[&](SceneNodeIndex49P n)->const float*{
+   if(n==SceneNodeIndex49P::none)return nullptr;
+   const auto index=static_cast<std::uint32_t>(n);
+   require50DU(index<s.sceneNodeCount,"wreck model outside the racer graph");
+   return s.nodes[index].world100.v;
+  };
+  const auto* container=world(roots.container194);
+  require50DU(container!=nullptr,"wreck requires the original container194");
+  const std::array<const float*,5> models{
+   roots.model1B4==SceneNodeIndex49P::none?container:world(roots.model1B4),
+   world(visual.left1BC),world(visual.right1B8),world(visual.bottomLeft1C4),world(visual.bottomRight1C0)};
   const auto spawned=native_wreck_debris50PD::spawn(actualRacerSlot,explode,s.nodes[node].world100.v,
       main.components.root.body.velocity.v,main.components.root.body.angularVelocity.v,
-      main.components.root.worldAngularVelocityA0.v,main.components.root.body.position.v,s.noiseOwner().sharedRandomState,
+      main.components.root.worldAngularVelocityA0.v,container,models,s.noiseOwner().sharedRandomState,
       limpEscalation&&!explode?s.bodies.secondary.root.body.velocity.v:nullptr,
       limpEscalation&&!explode?s.bodies.secondary.root.body.angularVelocity.v:nullptr,&skippedActive,
       debrisPrimaryZone(s.nodes[node].world100.v));
@@ -1237,8 +1275,7 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
        <<" r="<<q.radius<<" m="<<q.mass<<" i="<<q.inertia<<" drag="<<q.drag
        <<" v="<<q.velocity.x<<','<<q.velocity.y<<','<<q.velocity.z<<']';}
   std::cerr<<'\n';
-  native_wreck_effects50PD::destroyed(actualRacerSlot,explode,{w[12],w[13],w[14]},
-      {record.explosion270[0],record.explosion270[1],record.explosion270[2]},s.noiseOwner().sharedRandomState);
+  native_wreck_effects50PD::startPieceEmitters(actualRacerSlot);
   const auto& effects=native_wreck_effects50PD::state();
   std::cerr<<"wreck_effects_start slot="<<actualRacerSlot<<" emitters="<<effects.emitters.size()
       <<" embers_launched="<<effects.embersLaunched
@@ -1246,17 +1283,11 @@ bool Context::commitOriginalDestroyed(std::size_t actualRacerSlot,
  // The same 79C refresh tail ends 2261B0/226750; not represented (see the
  // limp entry above).
  std::cerr<<"pod_destroyed_query79c slot="<<actualRacerSlot<<" represented=0\n";
+ // 2272F0 commits the wreck state after the collection activations.
+ if(!explode)main.vehicleState40=3u;
+ record.state40=main.vehicleState40;
  // The replay path (228914..) calls the handler alone: no 225C50 suffix.
  if(!limpEscalation&&!replay)applySuffix();
- // 226414..2264AC / 226824..2268BC: human (58==0, 3C==0) with the vibration
- // option (11050 bit2): device virtual40 (238870, clear both) then virtual44
- // (2388B0, both motors) for 2.0 s (explode) or 1.0 s (wreck in place).
- if(human&&!s.fields.vehicle3C&&!replay&&(dynamicConsumerFlags11050&4u)&&feedbackSource<2u){
-  auto& device=feedbackDevices[feedbackSource];
-  clearControllerFeedback50KZ(device,2);
-  require50DU(requestControllerFeedback50KZ(device,2,0u,explode?2.f:1.f),"destroyed racer vibration request rejected");
-  std::cerr<<"pod_destroyed_vibration seconds="<<(explode?2:1)<<" capable="<<device.capable<<'\n';
- }
  std::cerr<<"pod_destroyed slot="<<actualRacerSlot<<" human="<<human<<" handler=0x"<<std::hex<<handler
      <<" dispatch=0x"<<decision.sourcePC<<std::dec<<" state40="<<main.vehicleState40
      <<" frame="<<completedFrames<<" attacker="<<static_cast<std::int32_t>(record.attackerD30)

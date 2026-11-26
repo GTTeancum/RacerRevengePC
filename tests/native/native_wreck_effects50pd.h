@@ -449,27 +449,28 @@ inline void step(float dt,std::uint32_t& random) noexcept {
 // attached group members (theirs start at release). No group sparks or
 // explosion here: an explosion's groups are deactivated (22CAD8, 2CC9C0) and
 // a wreck's fire only on a break (groupEffects).
-inline void destroyed(std::size_t slot,bool explode,const V3& body,const V3& explosion,std::uint32_t& random) noexcept {
+inline void startExplosion(std::size_t slot,const V3& body,const V3& explosion,std::uint32_t& random) noexcept {
     auto& s=state();if(!s.cold)return;
-    if(explode){
-        start(wreckExplosion,body);start(wreckSparks,body);
-        // 818[0..9] (2263A4..2263EC): entries whose 370 > 0.4 launch from 270
-        // (19C780): 60 = 360 * 117.333f (80 mph), 360 = (2r-1, r, 2r-1) drawn
-        // at construction (19BE48..19BED8), 370 = r (19CC24), life 344 =
-        // lerp(MinDeathTime, MaxDeathTime, r) (19C834..19C854).
-        const auto& fire=s.definitions[emberFire];
-        if(fire.parsed&&slot<s.emberLaunches.size())for(const auto& child:s.emberLaunches[slot]){
-            if(!(child.gate>.4f))continue;
-            if(s.emitters.size()>=maxEmitters){++s.dropped;continue;}
-            const float speed=std::bit_cast<float>(0x42eaaa65u);
-            const float maximum=fire.maxDeathTime>0.f?fire.maxDeathTime:fire.deathTime;
-            Emitter e;e.effect=emberFire;e.alive=true;e.ballistic=true;
-            e.position=e.previous=e.smokePosition=e.smokePrevious=explosion;
-            for(unsigned axis=0;axis<3;++axis)e.velocity[axis]=child.direction[axis]*speed;
-            e.life=lerp(fire.deathTime,maximum,unit(random));
-            s.emitters.push_back(e);++s.embersLaunched;
-        }
+    start(wreckExplosion,body);start(wreckSparks,body);
+    // 818[0..9] (2263A4..2263EC): entries whose 370 > 0.4 launch from 270
+    // (19C780): 60 = 360 * 117.333f (80 mph), 360 = (2r-1, r, 2r-1) drawn
+    // at construction (19BE48..19BED8), 370 = r (19CC24), life 344 =
+    // lerp(MinDeathTime, MaxDeathTime, r) (19C834..19C854).
+    const auto& fire=s.definitions[emberFire];
+    if(fire.parsed&&slot<s.emberLaunches.size())for(const auto& child:s.emberLaunches[slot]){
+        if(!(child.gate>.4f))continue;
+        if(s.emitters.size()>=maxEmitters){++s.dropped;continue;}
+        const float speed=std::bit_cast<float>(0x42eaaa65u);
+        const float maximum=fire.maxDeathTime>0.f?fire.maxDeathTime:fire.deathTime;
+        Emitter e;e.effect=emberFire;e.alive=true;e.ballistic=true;
+        e.position=e.previous=e.smokePosition=e.smokePrevious=explosion;
+        for(unsigned axis=0;axis<3;++axis)e.velocity[axis]=child.direction[axis]*speed;
+        e.life=lerp(fire.deathTime,maximum,unit(random));
+        s.emitters.push_back(e);++s.embersLaunched;
     }
+}
+inline void startPieceEmitters(std::size_t slot) noexcept {
+    if(!state().cold)return;
     const auto& cold=native_wreck_debris50PD::cold();
     auto& pieces=native_wreck_debris50PD::sim().pieces;
     if(slot>=cold.racers.size())return;
